@@ -24,7 +24,7 @@ import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { Manifest, loadManifest } from "../manifest.js";
@@ -244,10 +244,26 @@ function envSummary() {
   return { localUrl: process.env.RETAKE_LOCAL_URL ?? "", localModel: process.env.RETAKE_LOCAL_MODEL ?? "", groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY };
 }
 
+/** Local ports with something listening — so "nothing on :3000" can say
+    what IS running, which is usually the app on a port the person forgot. */
+function listeningPorts(): number[] {
+  try {
+    const out = execFileSync("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"], { encoding: "utf8", timeout: 3000 });
+    const ports = new Set<number>();
+    for (const line of out.split("\n")) { const m = /:(\d{4,5})\s+\(LISTEN\)/.exec(line); if (m) { const pt = Number(m[1]); if (pt >= 1024 && pt < 65535) ports.add(pt); } }
+    return [...ports].sort((a, b) => a - b);
+  } catch { return []; }
+}
+
 /** A navigation error, said the way a person would say it. */
 function unreachable(url: string, e: Error): string {
   const m = e.message;
-  if (/ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(m)) return `Nothing is running at ${url}. Start your app first, then try again.`;
+  if (/ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(m)) {
+    const want = Number(new URL(url).port || 80);
+    const others = listeningPorts().filter((pt) => pt !== want && pt !== 4310);
+    const hint = others.length ? ` Things are running on ${others.slice(0, 6).map((pt) => ":" + pt).join(", ")} — one of those?` : "";
+    return `Nothing is running at ${url}. Start your app first, then try again.${hint}`;
+  }
   if (/ERR_NAME_NOT_RESOLVED|ENOTFOUND/.test(m)) return `Could not find ${new URL(url).host}. Check the address.`;
   if (/Timeout/.test(m)) return `${url} did not finish loading in time. Is it up?`;
   return m.split("\n")[0];
