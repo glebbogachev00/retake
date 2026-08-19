@@ -39,7 +39,17 @@ export const Step = z.discriminatedUnion("action", [
   }),
   Base.extend({ action: z.literal("fill"), selector: Selector, text: z.string() }),
   Base.extend({ action: z.literal("hover"), selector: Selector }),
-  Base.extend({ action: z.literal("scroll"), x: z.number().optional(), y: z.number().optional() }),
+  /** Scroll by a pixel delta, or `to` a selector — which computes the delta so
+      the element lands where you want it and animates there, so the viewer sees
+      the page move rather than jumping. */
+  Base.extend({
+    action: z.literal("scroll"),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    to: Selector.optional(),
+    /** Where the target should end up: top | center (default) | bottom. */
+    align: z.enum(["top", "center", "bottom"]).default("center"),
+  }),
   Base.extend({
     action: z.literal("zoom"),
     selector: Selector.optional(),
@@ -61,6 +71,17 @@ export const Step = z.discriminatedUnion("action", [
   Base.extend({ action: z.literal("waitFor"), selector: Selector }),
   /** Run JS in the page (Retake extra). Used for seeding, hiding chrome, etc. */
   Base.extend({ action: z.literal("evaluate"), script: z.string().min(1) }),
+  /** Change what a stubbed endpoint answers, mid-take. This is how a demo shows
+      something *arriving*: the queue is empty, an action happens, the stub is
+      swapped, the next poll shows the new row. */
+  Base.extend({
+    action: z.literal("stub"),
+    url: z.string().min(1),
+    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
+    status: z.number().int().optional(),
+    json: z.unknown().optional(),
+    from: z.string().optional(),
+  }),
   /** A named beat. Timestamps go into the proof log; `caption` gets burned into
       the video from this moment until the next scene (or `holdMs`). */
   Base.extend({
@@ -76,6 +97,23 @@ export const Step = z.discriminatedUnion("action", [
   }),
 ]);
 export type Step = z.infer<typeof Step>;
+
+/** Answer a network call with canned data for the length of a take.
+    Lets a demo show populated screens when the real backend is unavailable,
+    rate-limited, or full of data you must not put on camera. Every stubbed
+    pattern is named in the proof log — a take never hides that it was faked. */
+export const Stub = z.object({
+  /** Glob or regex-ish pattern, Playwright style: "**\/api/requests*". */
+  url: z.string().min(1),
+  /** Only intercept this method; other methods pass through to the app. */
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
+  status: z.number().int().default(200),
+  /** Inline JSON, or a file next to the manifest. One of the two. */
+  json: z.unknown().optional(),
+  from: z.string().optional(),
+  contentType: z.string().default("application/json; charset=utf-8"),
+});
+export type Stub = z.infer<typeof Stub>;
 
 export const Seed = z.discriminatedUnion("kind", [
   /** Write a JSON document to a file before the app is touched. Good for apps
@@ -126,6 +164,8 @@ export const Manifest = z.object({
   /** Cursor overlay (testreel). false → none; {style: touch} → tap dot. Size is preset-scaled unless set. */
   cursor: z.union([z.boolean(), z.object({ style: z.enum(["default", "pointer", "text", "touch"]).optional(), size: z.number().optional(), idleHideMs: z.number().optional() })]).default(true),
   seed: z.array(Seed).default([]),
+  /** Canned network responses, armed before the first navigation. */
+  stub: z.array(Stub).default([]),
   /** Steps run before the camera rolls. */
   setup: z.array(Step).default([]),
   steps: z.array(Step).min(1),

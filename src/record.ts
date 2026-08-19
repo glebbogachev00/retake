@@ -14,7 +14,7 @@ import path from "node:path";
 import { execFileSync, execSync } from "node:child_process";
 import { chromium, type Page } from "playwright";
 import { recordPage, type PageRecorder } from "testreel";
-import { expandEnv, resolve, type Manifest, type Resolved, type Seed, type Step } from "./manifest.js";
+import { expandEnv, resolve, type Manifest, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
 import { ffmpegBin, videoDuration } from "./render.js";
 
 export type TimelineEntry = {
@@ -55,6 +55,9 @@ export type Take = {
   captureSec?: number;
   /** Files the run downloaded, saved under outputs/<name>/downloads/. */
   downloads?: string[];
+  /** Endpoints answered with canned data during this take. Named in the proof
+      log so a stubbed demo can never quietly pass as a live one. */
+  stubbed?: string[];
 };
 
 /** What the *recording* depends on — nothing that render can change afterwards.
@@ -70,7 +73,7 @@ export function captureHash(m: Manifest): string {
     return { action: "scene", label: s.label, focus };
   });
   const h = createHash("sha1");
-  h.update(JSON.stringify({ url: m.url, viewport: q.viewport, scale: q.scale, cursor: q.cursor, wait: m.waitForSelector, reduced: m.reducedMotion, auth: m.auth, seed: m.seed, setup: m.setup, steps, speed: m.speed, camera: m.camera, colorScheme: m.colorScheme }));
+  h.update(JSON.stringify({ url: m.url, viewport: q.viewport, scale: q.scale, cursor: q.cursor, wait: m.waitForSelector, reduced: m.reducedMotion, auth: m.auth, seed: m.seed, stub: m.stub, setup: m.setup, steps, speed: m.speed, camera: m.camera, colorScheme: m.colorScheme }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -124,8 +127,30 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // see are already video pixels, so cursor and clicks line up.
   if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{document.documentElement.style.zoom="${q.scale}"})`);
 
+  // Canned responses live in a map the route handler reads on every request, so
+  // a `stub` step mid-demo swaps the answer without re-registering anything.
+  const stubs = new Map<string, Stub>();
+  const stubbed: string[] = [];
+  const armStub = async (d: Stub) => {
+    const fresh = !stubs.has(d.url);
+    stubs.set(d.url, d);
+    if (!stubbed.includes(d.url)) stubbed.push(d.url);
+    if (!fresh) return;
+    await context.route(d.url, async (route, request) => {
+      const cur = stubs.get(d.url)!;
+      if (cur.method && request.method().toUpperCase() !== cur.method.toUpperCase()) return route.fallback();
+      const body =
+        cur.json !== undefined
+          ? JSON.stringify(cur.json)
+          : cur.from
+            ? fs.readFileSync(path.resolve(opts.manifestDir, expandEnv(cur.from)), "utf8")
+            : "{}";
+      await route.fulfill({ status: cur.status ?? 200, contentType: cur.contentType, body });
+    });
+  };
+
   const timeline: TimelineEntry[] = [];
-  const ctx: StepCtx = { outDir: opts.outDir, manifestDir: opts.manifestDir, downloads: [] };
+  const ctx: StepCtx = { outDir: opts.outDir, manifestDir: opts.manifestDir, downloads: [], stub: armStub };
   let ok = true;
   let partial: string | undefined;
   let video: string | undefined;
@@ -136,6 +161,9 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const sec = (ms: number) => Math.round((ms / 1000) * 1000) / 1000;
 
   try {
+    for (const d of m.stub) await armStub(d);
+    if (m.stub.length) log(`stub: ${m.stub.map((d) => d.url).join(", ")}`);
+
     // Pre-warm the route (a dev server may compile for seconds on first hit) so
     // the recorded navigation is short and the video's start is predictable.
     await context.request.get(expandEnv(m.url)).catch(noop);
@@ -273,6 +301,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     video, screenshots, timeline, duration, startedAt, finishedAt, ok, trimBefore, partial,
     quality: { preset: q.name, width: q.viewport.width, height: q.viewport.height, scale: q.scale, fps: q.fps },
     downloads: ctx.downloads,
+    stubbed,
     captureHash: captureHash(m),
     captureSec: Math.round((Date.parse(finishedAt) - Date.parse(startedAt)) / 100) / 10,
   };
@@ -337,7 +366,7 @@ function isAlive(pid: number): boolean {
   }
 }
 
-type StepCtx = { outDir: string; manifestDir: string; downloads: string[] };
+type StepCtx = { outDir: string; manifestDir: string; downloads: string[]; stub: (d: Stub) => Promise<void> };
 
 async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, ctx: StepCtx): Promise<void> {
   const timeout = step.timeout ?? 8000;
@@ -359,9 +388,21 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
     case "hover":
       await rec.hover(step.selector, { timeout });
       break;
-    case "scroll":
-      await rec.scroll({ x: step.x, y: step.y });
+    case "scroll": {
+      let dy = step.y;
+      if (step.to) {
+        // Work out how far to move so the element sits where we asked, then let
+        // testreel animate that distance (an eased scroll, not a jump).
+        const box = await page.locator(step.to).first().boundingBox({ timeout });
+        if (box) {
+          const vh = page.viewportSize()?.height ?? 800;
+          const want = step.align === "top" ? 80 : step.align === "bottom" ? vh - box.height - 80 : (vh - box.height) / 2;
+          dy = Math.round(box.y - want);
+        }
+      }
+      if (dy || step.x) await rec.scroll({ x: step.x, y: dy });
       break;
+    }
     case "zoom":
       await rec.zoom({ selector: step.selector, scale: step.scale, x: step.x, y: step.y, duration: step.duration });
       break;
@@ -400,6 +441,9 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
     case "evaluate":
       await page.evaluate(step.script);
       break;
+    case "stub":
+      await ctx.stub({ url: step.url, method: step.method, status: step.status ?? 200, json: step.json, from: step.from, contentType: "application/json; charset=utf-8" });
+      break;
     case "scene":
       // A marker only. Its timestamp is the point of the step.
       break;
@@ -425,7 +469,7 @@ export function describe(step: Step): string {
     case "hover":
       return `hover ${step.selector}`;
     case "scroll":
-      return `scroll x=${step.x ?? 0} y=${step.y ?? 0}`;
+      return step.to ? `scroll to ${step.to} (${step.align})` : `scroll x=${step.x ?? 0} y=${step.y ?? 0}`;
     case "zoom":
       return `zoom ${step.scale}x ${step.selector ?? ""}`.trim();
     case "keyboard":
@@ -442,6 +486,8 @@ export function describe(step: Step): string {
       return `wait for ${step.selector}`;
     case "evaluate":
       return `evaluate (${step.script.length} chars)`;
+    case "stub":
+      return `stub ${step.method ? step.method + " " : ""}${step.url}`;
     case "scene":
       return `scene: ${step.label}`;
   }

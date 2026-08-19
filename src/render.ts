@@ -575,6 +575,7 @@ function renderProof(m: Manifest, take: Take, q: Resolved, a: Partial<Artifacts>
     `- Finished: ${take.finishedAt}`,
     `- Result: **${take.ok ? "all steps passed" : "some steps failed"}**${take.partial ? ` · **partial** — ${take.partial}` : ""}`,
     `- Setup trimmed: ${take.trimBefore.toFixed(1)}s · final length ≈ ${(take.duration - take.trimBefore).toFixed(1)}s`,
+    ...(take.stubbed?.length ? [`- **Stubbed data**: ${take.stubbed.join(", ")} — these screens were fed canned responses, not a live backend.`] : []),
     "",
     "## Artifacts",
     "",
