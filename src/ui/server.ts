@@ -32,6 +32,7 @@ import { PRESETS } from "../presets.js";
 import { draftManifest, loadDotenv, pickProvider, proposeEdits, providerStatus, scout, suggestIdeas, type Scout } from "../describe.js";
 import { applyEdits, receiptsFor } from "../edits.js";
 import { dryRun } from "../dryrun.js";
+import { startOperator, getSession, addPending, answerPending, markDone, stopSession } from "../operator/run.js";
 import { gifskiBin, makeGif } from "../render.js";
 import { captureHash } from "../record.js";
 import { digest } from "../digest.js";
@@ -427,6 +428,41 @@ export function serve(port: number) {
           }
         })();
         return json(res, 200, { name, startedAt: run.startedAt, estimate: run.estimate });
+      }
+
+      // ---------- the operator: the coding agent drives Retake, fenced to its tools ----------
+      if (p === "/api/operator" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; project?: string; name?: string };
+        if (!b.describe?.trim()) return json(res, 400, { error: "say what the demo should show" });
+        const prov = pickProvider();
+        const which = prov?.name === "codex" ? "codex" : prov?.name === "claude-code" ? "claude-code" : null;
+        if (!which) return json(res, 400, { error: "The operator needs Claude Code or Codex (Settings). With another model, use “Take it from here” — same result, fixed steps." });
+        const ui = `http://localhost:${(req.socket.localPort as number) || 4310}`;
+        const s = startOperator({ describe: b.describe, url: b.url?.trim() || undefined, project: b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined, name: b.name && safeName(b.name) ? b.name : undefined, ui, root: ROOT, provider: which });
+        return json(res, 200, { id: s.id, startedAt: s.startedAt, provider: which });
+      }
+      const mop = /^\/api\/operator\/([a-z0-9]+)(?:\/(log|pending|done|stream|stop|answer)(?:\/([a-z0-9]+))?)?$/.exec(p);
+      if (mop) {
+        const s = getSession(mop[1]);
+        if (!s) return json(res, 404, { error: "no such session" });
+        const sub = mop[2];
+        if (sub === "log" && req.method === "POST") { const b = JSON.parse(await readBody(req)) as { line: string }; s.lines.push(b.line); for (const l of s.listeners) l({ type: "line", data: b.line }); return json(res, 200, { ok: true }); }
+        if (sub === "pending" && req.method === "POST") { const b = JSON.parse(await readBody(req)) as { kind: "question" | "approve"; text: string; detail?: string }; const pnd = addPending(s, b.kind, b.text, b.detail); return json(res, 200, { id: pnd.id }); }
+        if (sub === "pending" && req.method === "GET" && mop[3]) { const pnd = s.pending.find((x) => x.id === mop[3]); return pnd ? json(res, 200, { answered: pnd.answered, answer: pnd.answer }) : json(res, 404, { error: "no such question" }); }
+        if (sub === "answer" && req.method === "POST") { const b = JSON.parse(await readBody(req)) as { id: string; answer: string }; return json(res, answerPending(s, b.id, b.answer) ? 200 : 404, { ok: true }); }
+        if (sub === "done" && req.method === "POST") { const b = JSON.parse(await readBody(req)) as { summary: string; demo?: string }; markDone(s, b.summary, b.demo); return json(res, 200, { ok: true }); }
+        if (sub === "stop" && req.method === "POST") { stopSession(s); return json(res, 200, { ok: true }); }
+        if (sub === "stream" && req.method === "GET") {
+          res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+          const send = (ev: { type: string; data: unknown }) => res.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev.data)}\n\n`);
+          for (const l of s.lines) send({ type: "line", data: l });
+          for (const pnd of s.pending.filter((x) => !x.answered)) send({ type: "pending", data: pnd });
+          if (s.done) { send({ type: "done", data: { code: s.code, summary: s.summary, demo: s.demo, cost: s.cost, turns: s.turns } }); return res.end(); }
+          s.listeners.add(send);
+          req.on("close", () => s.listeners.delete(send));
+          return;
+        }
+        if (!sub && req.method === "GET") return json(res, 200, { id: s.id, done: s.done, code: s.code, summary: s.summary, demo: s.demo, pending: s.pending.filter((x) => !x.answered), lines: s.lines.slice(-40), cost: s.cost, turns: s.turns });
       }
 
       if (p === "/api/ideas" && req.method === "POST") {
