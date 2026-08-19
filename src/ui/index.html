@@ -199,6 +199,7 @@
         <div class="bar"><i id="barFill"></i></div>
         <div class="stagetext"><span id="stageText">Starting…</span><span id="etaText"></span></div>
         <div class="steps" id="steps"></div>
+        <div class="row hidden" id="retryRow" style="margin-top:12px"><button class="btn" id="retryBtn">Try again</button><span class="hint" id="retryHint"></span></div>
       </div>
 
       <div class="receipts" id="receipts"></div>
@@ -242,6 +243,12 @@
           <button class="btn ghost" id="fCancel">Cancel</button>
         </div>
         <div class="note" id="fBusy"></div>
+        <div class="progress" id="fProgress">
+          <div class="bar"><i id="fBar"></i></div>
+          <div class="stagetext"><span id="fStage">Starting…</span><span id="fEta"></span></div>
+          <div class="steps" id="fSteps"></div>
+          <div class="row hidden" id="fRetryRow" style="margin-top:12px"><button class="btn primary" id="fRetry">Try again</button><span class="hint">Your answers are still here. Start the app, then retry.</span></div>
+        </div>
       </div>
     </section>
 
@@ -476,8 +483,9 @@ for (const c of $('chips').querySelectorAll('.chip')) c.onclick = () => askChang
 
 // ---------- run + progress ----------
 const STAGES = { starting: 'Starting…', scouting: 'Reading the page', drafting: 'Writing the steps', checking: 'Checking every step on the page', capture: 'Recording in the browser', 'capture-skip': 'Reusing last recording', render: 'Rendering', done: 'Done' };
+let pg = { wrap: 'progress', bar: 'barFill', stage: 'stageText', eta: 'etaText', steps: 'steps' };
 function setProgress(stage, at, est, startedAt) {
-  $('progress').classList.add('show');
+  $(pg.wrap).classList.add('show');
   const now = Date.now(), elapsed = (now - startedAt) / 1000;
   let frac;
   if (stage === 'done') frac = 1;
@@ -485,17 +493,18 @@ function setProgress(stage, at, est, startedAt) {
   else if (stage === 'capture-skip') frac = 0.05;
   else if (stage === 'scouting' || stage === 'drafting' || stage === 'checking') frac = Math.min(0.15, elapsed / 200);
   else frac = Math.min(elapsed / (est.capture + est.render), 0.6);
-  $('barFill').style.width = Math.round(frac * 100) + '%'; $('barFill').className = stage === 'done' ? 'done' : '';
-  $('stageText').textContent = STAGES[stage] || stage;
+  $(pg.bar).style.width = Math.round(frac * 100) + '%'; $(pg.bar).className = stage === 'done' ? 'done' : '';
+  $(pg.stage).textContent = STAGES[stage] || stage;
   const remaining = Math.max(0, Math.round(stage === 'render' ? est.render - (now - at) / 1000 : est.capture + est.render - elapsed));
-  $('etaText').textContent = stage === 'done' ? `${Math.round(elapsed)}s` : (stage === 'scouting' || stage === 'drafting' || stage === 'checking') ? `${Math.round(elapsed)}s` : `about ${remaining}s left`;
+  $(pg.eta).textContent = stage === 'done' ? `${Math.round(elapsed)}s` : (stage === 'scouting' || stage === 'drafting' || stage === 'checking') ? `${Math.round(elapsed)}s` : `about ${remaining}s left`;
 }
 function attachStream(name, startedAt, est, onDone) {
   if (es) es.close();
   let stage = 'starting', at = startedAt;
   setProgress(stage, at, est, startedAt);
   clearInterval(tick); tick = setInterval(() => setProgress(stage, at, est, startedAt), 1000);
-  const steps = $('steps'); steps.innerHTML = ''; const log = $('log'); log.innerHTML = '';
+  const steps = $(pg.steps); steps.innerHTML = ''; const log = $('log'); log.innerHTML = '';
+  $('retryRow').classList.add('hidden'); $('fRetryRow').classList.add('hidden');
   es = new EventSource('/api/run/' + name + '/stream');
   es.addEventListener('stage', (ev) => { const d = JSON.parse(ev.data); stage = d.stage; at = d.at; if (d.estimate) est = d.estimate; if (d.startedAt) startedAt = d.startedAt; setProgress(stage, at, est, startedAt); });
   es.onmessage = (ev) => {
@@ -509,13 +518,16 @@ function attachStream(name, startedAt, est, onDone) {
     es.close(); es = null; clearInterval(tick);
     const { code } = JSON.parse(ev.data);
     setProgress('done', Date.now(), est, startedAt);
-    if (code !== 0) { $('barFill').className = 'bad'; $('stageText').textContent = code === 3 ? 'Stopped before recording — see the steps above' : 'Finished with problems — see Advanced › Log'; }
+    if (code !== 0) { $(pg.bar).className = 'bad'; $(pg.stage).textContent = code === 3 ? 'Stopped before recording — see the steps above' : 'Finished with problems'; }
     onDone(code);
   });
 }
+let lastRun = null;
 async function run(kind) {
   if (!current) return;
   if (!(await save())) return;
+  lastRun = kind;
+  pg = { wrap: 'progress', bar: 'barFill', stage: 'stageText', eta: 'etaText', steps: 'steps' };
   const renderOnly = kind === 'render' || (kind === 'main' && !needsRecord && !$('forceBtn').dataset.force);
   const preview = kind === 'main' && quality === 'fast' && !renderOnly;
   $('runBtn').disabled = true; $('forceBtn').disabled = true;
@@ -527,9 +539,11 @@ async function run(kind) {
   attachStream(current, info.startedAt || Date.now(), info.estimate || { capture: 90, render: 45 }, async (code) => {
     $('runBtn').disabled = false; $('forceBtn').disabled = false;
     if (code === 0) pendingRender = false;
+    else { $('retryRow').classList.remove('hidden'); $('retryHint').textContent = /Nothing is running/.test($('log').textContent) ? 'Start the app, then try again.' : 'See Advanced › Log for what went wrong.'; }
     await loadDemos(); await loadTake(true);
   });
 }
+$('retryBtn').onclick = () => run(lastRun || 'main');
 $('runBtn').onclick = () => run('main');
 $('forceBtn').onclick = () => { $('forceBtn').dataset.force = '1'; run('main'); };
 
@@ -554,24 +568,29 @@ $('fGo').onclick = async () => {
   if (!/^https?:\/\//.test(url)) { $('fUrl').style.borderColor = 'var(--bad)'; $('fUrl').focus(); return; } $('fUrl').style.borderColor = '';
   if (!describe) { $('fDesc').focus(); return; }
   if (!(settings && settings.active)) { $('fBusy').textContent = 'No model set up yet — choose one in Settings (gear, top right).'; return; }
-  $('fGo').disabled = true; $('fBusy').textContent = '';
+  $('fGo').disabled = true; $('fBusy').textContent = ''; $('fRetryRow').classList.add('hidden');
   try {
     const r = await api('/api/create', { method: 'POST', body: JSON.stringify({ url, describe, project: $('fProject').value.trim() || undefined }) });
-    if (draftId) { api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; }
-    await loadDemos();
-    current = r.name; show('viewDemo');
-    const d = demoList.find((x) => x.name === r.name); $('title').textContent = d?.title || r.name; paintAction();
-    $('stage').innerHTML = '<div class="empty">Working on your first take…</div>'; $('receipts').innerHTML = '';
-    $('runBtn').disabled = true;
+    // Stay on this card while Retake works, so a failure (app not running,
+    // model missing) leaves the answers in place with a Try again button.
+    pg = { wrap: 'fProgress', bar: 'fBar', stage: 'fStage', eta: 'fEta', steps: 'fSteps' };
     attachStream(r.name, r.startedAt, r.estimate, async (code) => {
-      $('runBtn').disabled = false;
+      $('fGo').disabled = false;
+      const exists = await api('/api/demos/' + r.name).then(() => true).catch(() => false);
+      if (!exists) { $('fRetryRow').classList.remove('hidden'); return; }   // nothing was drafted — retry from here
+      if (draftId) { api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; }
+      await loadDemos();
+      current = r.name; show('viewDemo');
+      const d = demoList.find((x) => x.name === r.name); $('title').textContent = d?.title || r.name;
       const { yaml } = await api('/api/demos/' + r.name).catch(() => ({ yaml: '' })); $('yaml').value = yaml || '';
-      await loadDemos(); fillSettings(demoList.find((x) => x.name === r.name)); await loadTake(true);
+      fillSettings(d); await loadTake(true);
+      pg = { wrap: 'progress', bar: 'barFill', stage: 'stageText', eta: 'etaText', steps: 'steps' };
       if (code === 0) flash('First take ready. Tell it what to change, or make it Final.');
+      else { $('progress').classList.add('show'); $('stageText').textContent = code === 3 ? 'Drafted, but some steps would fail — open Advanced to fix them' : 'Drafted, but the recording had problems'; $('retryRow').classList.remove('hidden'); $('retryHint').textContent = 'Or tell it what to change.'; lastRun = 'main'; }
     });
-  } catch (e) { $('fBusy').textContent = e.message; }
-  finally { $('fGo').disabled = false; }
+  } catch (e) { $('fBusy').textContent = e.message; $('fRetryRow').classList.remove('hidden'); $('fGo').disabled = false; }
 };
+$('fRetry').onclick = () => $('fGo').click();
 $('fBlank').onclick = async () => {
   const url = $('fUrl').value.trim(); if (!/^https?:\/\//.test(url)) { $('fUrl').focus(); return; }
   try { const r = await api('/api/demos', { method: 'POST', body: JSON.stringify({ url, describe: $('fDesc').value }) }); if (draftId) { api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; } await loadDemos(); await select(r.name); $('adv').open = true; }
