@@ -301,6 +301,17 @@ export function serve(port: number) {
         }
         if (req.method === "DELETE") { fs.rmSync(file, { force: true }); return json(res, 200, { ok: true }); }
       }
+      const mres = /^\/api\/demos\/([a-z0-9-]+)\/restore$/.exec(p);
+      if (mres && req.method === "POST") {
+        // Bring back the most recent trashed manifest with this name.
+        const trash = path.join(ROOT, ".trash");
+        const cands = fs.existsSync(trash) ? fs.readdirSync(trash).filter((f) => f.startsWith(mres[1] + ".") && f.endsWith(".yaml")).sort() : [];
+        if (!cands.length) return json(res, 404, { error: "nothing to restore" });
+        const from = path.join(trash, cands[cands.length - 1]);
+        fs.mkdirSync(DEMOS, { recursive: true });
+        fs.renameSync(from, path.join(DEMOS, `${mres[1]}.yaml`));
+        return json(res, 200, { ok: true, name: mres[1] });
+      }
       const mdel = /^\/api\/demos\/([a-z0-9-]+)$/.exec(p);
       if (mdel && req.method === "DELETE") {
         const file = path.join(DEMOS, `${mdel[1]}.yaml`);

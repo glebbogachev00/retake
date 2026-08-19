@@ -38,6 +38,8 @@
   .demo:hover .x, .draft:hover .x { display:inline; }
   .x:hover { color:var(--bad); opacity:1; }
   .drafts { margin-top:12px; border-top:1px solid var(--rule); padding-top:10px; }
+  .undo { margin-top:10px; font-size:13px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .undo button { border:0; background:transparent; color:var(--ink); text-decoration:underline; cursor:pointer; padding:0; font-size:13px; }
   .draft { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:9px; cursor:pointer; font-size:13px; color:var(--muted); }
   .draft:hover { background:#eef1ea; color:var(--ink); }
   .draft .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -62,24 +64,31 @@
   .stage { position:relative; background:#111; border-radius:12px; overflow:hidden; aspect-ratio:16/10; display:grid; place-items:center; color:#aaa; font-size:14px; }
   .stage video { width:100%; height:100%; object-fit:contain; display:block; background:#000; }
   .stage .empty { text-align:center; padding:30px; color:#9a9a9a; }
-  .scrub { position:relative; height:6px; margin:10px 0 0; border-radius:99px; background:#dfe3d8; cursor:pointer; }
+  .scrub { position:relative; height:4px; margin:14px 0 0; border-radius:99px; background:#e3e6dd; cursor:pointer; }
   .scrub i { position:absolute; top:0; bottom:0; left:0; width:0; background:var(--accent); border-radius:99px; pointer-events:none; }
-  .scrub b { position:absolute; top:-4px; width:2px; height:14px; background:var(--amber); border-radius:1px; }
+  .scrub b { position:absolute; top:-3px; width:2px; height:10px; background:#c9b27a; border-radius:1px; opacity:.7; }
+  .scrub b:hover, .scrub b.on { background:var(--amber); opacity:1; }
   .scrub b:hover::after, .scrub b.on::after { content:attr(data-label); position:absolute; top:-24px; left:50%; transform:translateX(-50%); font:11px ui-monospace, Menlo, monospace; color:var(--ink); background:var(--card); border:1px solid var(--rule); border-radius:6px; padding:1px 6px; white-space:nowrap; }
   .scene-edit { display:none; margin-top:10px; padding:12px 14px; border:1px solid var(--rule); border-radius:12px; background:#fff; }
   .scene-edit.show { display:grid; grid-template-columns:minmax(0,1fr) 150px auto; gap:10px; align-items:center; }
   .scene-edit .who { font:11px ui-monospace, Menlo, monospace; color:var(--muted); grid-column:1 / -1; }
-  .ask { margin-top:18px; display:flex; gap:10px; align-items:stretch; }
+  .ask { margin-top:30px; display:flex; gap:10px; align-items:stretch; }
   .ask input { flex:1; padding:13px 16px; font-size:15px; border-radius:12px; }
   .ask .btn { border-radius:12px; }
-  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; max-height:0; overflow:hidden; opacity:0; transition:max-height .2s ease, opacity .2s ease; }
+  .chips.show { max-height:80px; opacity:1; }
   .chip { font-size:12px; color:var(--muted); border:1px solid var(--rule); border-radius:99px; padding:3px 10px; cursor:pointer; background:transparent; }
   .chip:hover { color:var(--ink); border-color:var(--rule2); }
-  .actions { display:flex; gap:10px; align-items:center; margin-top:18px; flex-wrap:wrap; }
-  .quality { display:inline-flex; border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
-  .quality button { border:0; border-radius:0; padding:9px 14px; font-size:13px; color:var(--muted); background:#fff; cursor:pointer; }
-  .quality button.on { background:var(--accent); color:#eceee9; }
-  .progress { margin-top:14px; display:none; }
+  .actions { display:flex; gap:18px; align-items:center; margin-top:30px; flex-wrap:wrap; }
+  /* a switch, not a segmented control: one question, yes or no */
+  .switch { display:inline-flex; align-items:center; gap:10px; font-size:14px; color:var(--muted); cursor:pointer; user-select:none; }
+  .switch input { position:absolute; opacity:0; width:0; height:0; }
+  .switch .tr { width:38px; height:22px; border-radius:99px; background:#d6dad0; position:relative; transition:background .15s; }
+  .switch .tr::after { content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+  .switch input:checked + .tr { background:var(--accent); }
+  .switch input:checked + .tr::after { left:19px; }
+  .switch input:checked ~ span { color:var(--ink); }
+  .progress { margin-top:22px; display:none; }
   .progress.show { display:block; }
   .bar { height:6px; border-radius:99px; background:#e0e4da; overflow:hidden; }
   .bar i { display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .6s linear; }
@@ -87,11 +96,14 @@
   .stagetext { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:8px; }
   .steps { margin-top:10px; font:12.5px/1.6 ui-monospace, Menlo, monospace; color:#3d453e; }
   .steps div.bad { color:var(--bad);} .steps div.ok { color:var(--ok);}
-  .receipts { margin-top:16px; display:flex; gap:6px 14px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+  .receipts { margin-top:26px; display:flex; gap:6px 14px; flex-wrap:wrap; font-size:13px; color:var(--muted); align-items:center; }
+  .receipts .more { display:none; gap:6px 14px; flex-wrap:wrap; }
+  .receipts.open .more { display:contents; }
+  .receipts .toggle { border:0; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; padding:0; text-decoration:underline dotted; }
   .receipts span::before { content:"✓ "; color:var(--ok); }
   .receipts span.bad::before { content:"✗ "; color:var(--bad); }
   .receipts span.neutral::before { content:"· "; color:var(--muted); }
-  details.adv { margin-top:22px; border-top:1px solid var(--rule); padding-top:12px; }
+  details.adv { margin-top:28px; border-top:1px solid var(--rule); padding-top:14px; }
   details.adv > summary { cursor:pointer; color:var(--muted); font-size:13px; list-style:none; }
   details.adv > summary::before { content:"▸ "; } details.adv[open] > summary::before { content:"▾ "; }
   .adv-body { margin-top:14px; display:grid; gap:16px; }
@@ -142,6 +154,7 @@
       <div class="label">Demos</div>
       <div id="demos"></div>
       <button class="btn wide" id="newBtn" style="margin-top:12px">+ New demo</button>
+      <div class="undo hidden" id="undo"><span id="undoText"></span><button id="undoBtn">Undo</button></div>
       <div class="drafts hidden" id="draftsWrap"><div class="label" style="margin-bottom:6px">Unfinished</div><div id="drafts"></div></div>
     </div>
   </aside>
@@ -165,7 +178,7 @@
       </div>
 
       <div class="ask">
-        <input type="text" id="askBox" placeholder="Tell Retake what to change — “slower at the end”, “cut the first 3 seconds”, “zoom on the result”" />
+        <input type="text" id="askBox" placeholder="Tell Retake what to change…" />
         <button class="btn primary" id="askBtn">Change it</button>
       </div>
       <div class="chips" id="chips">
@@ -179,10 +192,8 @@
 
       <div class="actions">
         <button class="btn primary big" id="runBtn">Record</button>
-        <div class="quality"><button id="qFast">Fast</button><button id="qFinal" class="on">Final</button></div>
+        <label class="switch" title="Off: a fast preview to check the story. On: the full-quality render."><input type="checkbox" id="qFinalSw" /><span class="tr"></span><span>Final quality</span></label>
         <span class="hint" id="runHint"></span>
-        <span style="flex:1"></span>
-        <button class="btn ghost" id="forceBtn" title="Record again from scratch, even if nothing changed">Record again</button>
       </div>
       <div class="progress" id="progress">
         <div class="bar"><i id="barFill"></i></div>
@@ -201,6 +212,7 @@
             <div><label>Camera</label><select id="sCamera"><option value="auto">Push in on results</option><option value="static">Static</option></select></div>
             <div><label>Cursor</label><select id="sCursor"><option value="default">Pointer</option><option value="touch">Tap dot</option><option value="none">None</option></select></div>
           </div>
+          <div class="row"><button class="btn ghost" id="forceBtn" title="Record again from scratch, even if nothing changed">Record again from scratch</button></div>
           <div class="files" id="files"></div>
           <div><div class="label">Manifest</div><textarea class="yaml" id="yaml" spellcheck="false"></textarea><div class="row" style="margin-top:8px"><button class="btn" id="saveBtn">Save</button><span class="hint"><kbd>⌘S</kbd> save · <kbd>⌘⏎</kbd> record</span></div></div>
           <details><summary class="hint" style="cursor:pointer">Log</summary><div class="log" id="log"></div></details>
@@ -261,8 +273,11 @@ let current = null, dirty = false, es = null, demoList = [], settings = null, ti
 async function api(url, opts) { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j; }
 function setMsg(t, cls) { const m = $('msg'); m.textContent = t; m.className = 'msg ' + (cls || ''); }
 function show(view) { for (const v of ['viewDemo', 'viewNew', 'viewSettings']) $(v).classList.toggle('hidden', v !== view); }
-function setQuality(q) { quality = q; localStorage.setItem('retake.quality', q); $('qFast').classList.toggle('on', q === 'fast'); $('qFinal').classList.toggle('on', q === 'final'); paintAction(); }
-$('qFast').onclick = () => setQuality('fast'); $('qFinal').onclick = () => setQuality('final');
+function setQuality(q) { quality = q; localStorage.setItem('retake.quality', q); $('qFinalSw').checked = q === 'final'; paintAction(); }
+$('qFinalSw').onchange = (e) => setQuality(e.target.checked ? 'final' : 'fast');
+// the example chips only appear while the box has focus
+$('askBox').addEventListener('focus', () => $('chips').classList.add('show'));
+$('askBox').addEventListener('blur', () => setTimeout(() => { if (!$('chips').matches(':hover')) $('chips').classList.remove('show'); }, 150));
 
 // ---------- sidebar ----------
 async function loadDemos() {
@@ -277,9 +292,10 @@ async function loadDemos() {
     div.onclick = () => select(d.name);
     div.querySelector('.x').onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm(`Delete "${d.name}" and its videos? The manifest is kept in .trash/ for a while.`)) return;
+      if (!confirm(`Delete "${d.name}"? Its videos go too. You get a few seconds to undo.`)) return;
       try { await api('/api/demos/' + d.name, { method: 'DELETE' }); } catch (err) { setMsg(err.message, 'bad'); return; }
       if (current === d.name) current = null;
+      offerUndo(d.name);
       const list = await loadDemos();
       if (!current) { if (list.length) select(list[0].name); else openNew(); }
     };
@@ -287,6 +303,13 @@ async function loadDemos() {
   }
   await loadDrafts();
   return demoList;
+}
+let undoTimer = null;
+function offerUndo(name) {
+  clearTimeout(undoTimer);
+  $('undoText').textContent = `Deleted ${name}.`; $('undo').classList.remove('hidden');
+  $('undoBtn').onclick = async () => { try { await api('/api/demos/' + name + '/restore', { method: 'POST' }); } catch (e) { setMsg(e.message, 'bad'); } $('undo').classList.add('hidden'); await loadDemos(); select(name); };
+  undoTimer = setTimeout(() => $('undo').classList.add('hidden'), 12000);
 }
 let draftId = null, draftTimer = null;
 async function loadDrafts() {
@@ -338,7 +361,7 @@ function paintAction() {
   needsRecord = !d || d.needsRecord;
   $('runBtn').textContent = !has ? 'Record' : needsRecord ? 'Re-record' : pendingRender ? 'Re-render' : 'Render again';
   $('forceBtn').classList.toggle('hidden', !has || needsRecord);
-  $('runHint').textContent = !has ? 'About two minutes.' : needsRecord ? 'The steps changed — the browser runs again.' : pendingRender ? 'Only the render, no browser.' : '';
+  $('runHint').textContent = !has ? (quality === 'final' ? 'About two minutes.' : 'About a minute and a half.') : needsRecord ? 'The steps changed, so it records again.' : pendingRender ? 'Just the render — seconds.' : '';
   const meta = [];
   if (d?.url) meta.push(d.url.replace(/^https?:\/\//, ''));
   if (d?.settings?.preset) meta.push(PRESET_LABEL[d.settings.preset] || d.settings.preset);
@@ -394,16 +417,17 @@ async function loadTake(fresh) {
     if (fresh) v.play().catch(() => {});
   }
   // receipts: plain English, from real state
-  const rc = [];
-  rc.push(`<span class="${take.ok ? '' : 'bad'}">${take.ok ? `Passed ${take.timeline.length} steps` : `${take.timeline.filter((t) => !t.ok).length} of ${take.timeline.length} steps failed`}</span>`);
-  if (take.timeline.some((t) => t.action === 'waitFor')) rc.push('<span>Waited for results</span>');
-  if (facts) rc.push(`<span>Rendered ${facts.width}×${facts.height}${facts.encoder === 'videotoolbox' ? ' preview' : ''}</span>`);
-  rc.push(`<span class="neutral">${dur.toFixed(0)}s</span>`);
-  if (take.partial) rc.push(`<span class="bad">Partial — ${esc(take.partial)}</span>`);
-  if (take.stubbed && take.stubbed.length) rc.push(`<span class="neutral">${take.stubbed.length} endpoint${take.stubbed.length > 1 ? 's' : ''} stubbed</span>`);
-  if (take.timeline.some((t) => /••••/.test(t.summary))) rc.push('<span>Secrets hidden</span>');
-  rc.push(`<span class="neutral">${new Date(take.finishedAt).toLocaleTimeString()}</span>`);
-  $('receipts').innerHTML = rc.join('');
+  // One short line; the rest behind "details".
+  const head = `<span class="${take.ok ? '' : 'bad'}">${take.ok ? `All ${take.timeline.length} steps passed` : `${take.timeline.filter((t) => !t.ok).length} of ${take.timeline.length} steps failed`}</span><span class="neutral">${dur.toFixed(0)}s${facts && facts.encoder === 'videotoolbox' ? ' preview' : ''}</span>`;
+  const more = [];
+  if (take.timeline.some((t) => t.action === 'waitFor')) more.push('<span>Waited for results, not timers</span>');
+  if (facts) more.push(`<span>Rendered ${facts.width}×${facts.height} @ ${facts.fps}fps</span>`);
+  if (take.partial) more.push(`<span class="bad">Partial — ${esc(take.partial)}</span>`);
+  if (take.stubbed && take.stubbed.length) more.push(`<span class="neutral">${take.stubbed.length} endpoint${take.stubbed.length > 1 ? 's' : ''} answered with canned data</span>`);
+  if (take.timeline.some((t) => /••••/.test(t.summary))) more.push('<span>Secrets kept out of logs</span>');
+  more.push(`<span class="neutral">${new Date(take.finishedAt).toLocaleTimeString()}</span>`);
+  $('receipts').innerHTML = head + `<button class="toggle" id="rcToggle">details</button><span class="more">${more.join('')}</span>`;
+  $('rcToggle').onclick = () => { const r = $('receipts'); r.classList.toggle('open'); $('rcToggle').textContent = r.classList.contains('open') ? 'less' : 'details'; };
   $('files').innerHTML = ['demo.mp4', 'master.mp4', 'demo.gif', 'thumbnail.png', 'proof-log.md'].filter(has).map((f) => `<a href="/out/${current}/${f}${q}" target="_blank">${f}${facts && facts.sizes && facts.sizes[f] ? `<small>${(facts.sizes[f] / 1e6).toFixed(1)} MB</small>` : ''}</a>`).join('') + (has('demo.gif') ? '' : `<a href="#" id="mkGif">Make a GIF</a>`);
   const gb = $('mkGif'); if (gb) gb.onclick = async (e) => { e.preventDefault(); gb.textContent = 'Making…'; try { await api('/api/gif/' + current, { method: 'POST' }); await loadTake(); } catch (err) { gb.textContent = err.message; } };
   $('proof').textContent = proof || '';

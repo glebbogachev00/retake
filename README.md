@@ -15,6 +15,9 @@ It does one job: **record the demo well, from what was asked.** What you do with
 
 ## Quickstart
 
+Already using Claude Code or Codex? See [`AGENTS.md`](AGENTS.md) — Retake's CLI is agent-shaped (`validate → dry → run → check`, non-zero exits), and that file is what those tools read when pointed at this folder.
+
+
 ```bash
 npm install
 npx playwright install chromium
