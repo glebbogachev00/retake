@@ -9,31 +9,38 @@
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#edefe8" />
 <style>
-  :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --rule2:#c9cec0; --accent:#1a1c1e; --amber:#e8b04b; --ok:#2f5d3f; --bad:#a23b2c; --r:12px; }
+  :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --rule2:#c9cec0; --accent:#1a1c1e; --amber:#e8b04b; --ok:#2f5d3f; --bad:#a23b2c; }
   * { box-sizing:border-box; }
   html,body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
   button, input, select, textarea { font:inherit; color:inherit; }
-  .top { display:flex; align-items:center; gap:12px; padding:14px 22px; border-bottom:1px solid var(--rule); background:var(--paper); position:sticky; top:0; z-index:5; }
+  .top { display:flex; align-items:center; gap:12px; padding:14px 22px; border-bottom:1px solid var(--rule); position:sticky; top:0; z-index:5; background:var(--paper); }
   .mark { width:26px; height:26px; border-radius:7px; background:var(--accent); position:relative; flex:none; }
   .mark i { position:absolute; left:7px; height:2.5px; border-radius:2px; background:#eceee9; }
   .mark i:nth-child(1){top:6px;width:5px;opacity:.55} .mark i:nth-child(2){top:10px;width:9px;opacity:.8} .mark i:nth-child(3){top:14px;width:13px;background:var(--amber)} .mark i:nth-child(4){top:18px;width:9px;opacity:.8}
-  .top h1 { font-size:17px; font-weight:600; letter-spacing:-.01em; margin:0; }
+  .top h1 { font-size:17px; font-weight:600; margin:0; letter-spacing:-.01em; }
   .top .tag { color:var(--muted); font-size:13px; }
   .top .sp { flex:1; }
   .top .model { font-size:12px; color:var(--muted); }
   .iconbtn { width:34px; height:34px; border-radius:9px; border:1px solid var(--rule); background:var(--card); cursor:pointer; display:grid; place-items:center; color:var(--muted); }
   .iconbtn:hover { border-color:var(--rule2); color:var(--ink); }
-  .wrap { max-width:1240px; margin:0 auto; padding:22px 22px 60px; display:grid; grid-template-columns:230px minmax(0,1fr) 340px; gap:18px; }
-  @media (max-width: 1000px){ .wrap { grid-template-columns:1fr; } }
+  .wrap { max-width:1180px; margin:0 auto; padding:22px 22px 80px; display:grid; grid-template-columns:220px minmax(0,1fr); gap:20px; }
+  @media (max-width: 860px){ .wrap { grid-template-columns:1fr; } }
+  .side { position:sticky; top:78px; align-self:start; }
   .card { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:16px 18px; }
   .label { font:11px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
-  .demo { display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:10px; cursor:pointer; }
+  .demo { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:10px; cursor:pointer; }
   .demo:hover { background:#eef1ea; }
   .demo.on { background:var(--accent); color:#eceee9; }
-  .demo .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .demo small { font:11px ui-monospace, Menlo, monospace; opacity:.7; }
+  .demo .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
   .dot { width:7px; height:7px; border-radius:50%; background:var(--rule2); flex:none; }
   .dot.ok { background:var(--ok);} .dot.bad { background:var(--bad);}
+  .x { display:none; border:0; background:transparent; color:inherit; cursor:pointer; padding:0 4px; line-height:1; font-size:14px; opacity:.6; }
+  .demo:hover .x, .draft:hover .x { display:inline; }
+  .x:hover { color:var(--bad); opacity:1; }
+  .drafts { margin-top:12px; border-top:1px solid var(--rule); padding-top:10px; }
+  .draft { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:9px; cursor:pointer; font-size:13px; color:var(--muted); }
+  .draft:hover { background:#eef1ea; color:var(--ink); }
+  .draft .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .btn { border:1px solid var(--rule); background:var(--card); border-radius:10px; padding:9px 16px; cursor:pointer; line-height:1.2; }
   .btn:hover { border-color:var(--rule2); }
   .btn.primary { background:var(--accent); color:#eceee9; border-color:var(--accent); }
@@ -45,724 +52,547 @@
   input[type=text], input[type=url], input[type=password], textarea, select { border:1px solid var(--rule); background:#fff; border-radius:10px; padding:10px 12px; width:100%; outline:none; }
   input:focus, textarea:focus, select:focus { border-color:var(--ink); }
   select { -webkit-appearance:none; appearance:none; background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23767e74' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") no-repeat right 12px center; padding-right:32px; }
-  textarea.yaml { font:12.5px/1.55 ui-monospace, "SF Mono", Menlo, monospace; min-height:440px; resize:vertical; white-space:pre; overflow:auto; }
   .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .hint { color:var(--muted); font-size:13px; }
-  .h2 { font-size:22px; font-weight:600; letter-spacing:-.02em; margin:0 0 4px; }
-  .sub { color:var(--muted); font-size:13px; font-family:ui-monospace, Menlo, monospace; margin:0 0 16px; }
-  .settings { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; margin:0 0 16px; }
-  @media (max-width: 1000px){ .settings { grid-template-columns:repeat(2,1fr); } }
-  .settings label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
-  .modes { display:inline-flex; border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
-  .modes button { border:0; border-radius:0; padding:6px 14px; font-size:13px; color:var(--muted); background:transparent; cursor:pointer; }
-  .modes button.on { background:var(--accent); color:#eceee9; }
-  .toggle { display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer; user-select:none; }
-  .toggle input { accent-color:var(--accent); width:15px; height:15px; margin:0; }
-  .progress { margin-top:16px; display:none; }
-  .progress.show { display:block; }
-  .bar { height:8px; border-radius:99px; background:#e0e4da; overflow:hidden; }
-  .bar i { display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .6s linear; }
-  .bar i.done { background:var(--ok); }
-  .bar i.bad { background:var(--bad); }
-  .stage { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:8px; }
-  .log { font:12px/1.55 ui-monospace, Menlo, monospace; color:#3d453e; background:#f2f4ee; border-radius:10px; padding:10px 12px; max-height:200px; overflow:auto; white-space:pre-wrap; margin-top:10px; }
-  .log .bad { color:var(--bad);} .log .ok { color:var(--ok);}
-  .timeline { display:flex; gap:2px; height:10px; margin:14px 0 4px; }
-  .timeline span { border-radius:2px; background:#dfe3d8; min-width:2px; }
-  .timeline span.wait { background:var(--amber);} .timeline span.bad { background:var(--bad);}
-  .tl-labels { display:flex; justify-content:space-between; font:11px ui-monospace, Menlo, monospace; color:var(--muted); }
-  video { width:100%; border-radius:10px; background:#000; display:block; }
-  .facts { font:12px/1.7 ui-monospace, Menlo, monospace; color:var(--muted); margin:8px 0 10px; }
-  .files a { display:flex; justify-content:space-between; color:var(--ink); text-decoration:none; padding:7px 0; border-top:1px solid var(--rule); font-size:14px; }
-  .files a small { color:var(--muted); font:11px ui-monospace, Menlo, monospace; }
-  .files a:first-child { border-top:0; }
-  .empty { color:var(--muted); font-size:14px; padding:28px 0; text-align:center; }
-  .msg { font-size:13px; }
-  .msg.bad { color:var(--bad);} .msg.ok { color:var(--ok);}
-  details summary { cursor:pointer; color:var(--muted); font-size:13px; }
-  pre.proof { font:12px/1.5 ui-monospace, Menlo, monospace; white-space:pre-wrap; color:#3d453e; }
-  /* one-thing-at-a-time flow */
-  .flow { max-width:560px; margin:40px auto; }
-  .flow .q { font-size:24px; font-weight:600; letter-spacing:-.02em; margin:0 0 6px; }
-  .flow .why { color:var(--muted); margin:0 0 20px; }
-  .flow input, .flow textarea { font-size:17px; padding:14px 16px; border-radius:12px; }
-  .flow .nav { display:flex; justify-content:space-between; align-items:center; margin-top:22px; }
-  .flow .steps { color:var(--muted); font-size:12px; letter-spacing:.06em; text-transform:uppercase; font-family:ui-monospace, Menlo, monospace; margin-bottom:26px; }
-  .choice { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .choice button { text-align:left; padding:18px; border-radius:14px; border:1px solid var(--rule); background:#fff; cursor:pointer; }
-  .choice button:hover { border-color:var(--ink); }
-  .choice b { display:block; font-weight:600; margin-bottom:4px; }
-  .choice span { color:var(--muted); font-size:13px; }
-  .choice button:disabled { opacity:.5; cursor:default; }
-  .provider { display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid var(--rule); border-radius:12px; margin-bottom:8px; cursor:pointer; background:#fff; }
-  .provider.on { border-color:var(--ink); }
-  .provider.off { opacity:.55; cursor:default; }
-  .provider b { font-weight:600; }
-  .provider .d { color:var(--muted); font-size:13px; }
-  .field { margin:14px 0; }
-  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
-  .hidden { display:none !important; }
-  .refine { margin-top:22px; border-top:1px solid var(--rule); padding-top:16px; }
-  .scene { display:grid; grid-template-columns:74px minmax(0,1fr) 120px 92px; gap:10px; align-items:center; padding:7px 0; }
-  @media (max-width: 1100px){ .scene { grid-template-columns:1fr; } }
-  .scene .at { font:11px ui-monospace, Menlo, monospace; color:var(--muted); }
-  .scene .at b { display:block; color:var(--ink); font-weight:600; font-size:12px; }
-  .scene input[type=text] { padding:8px 10px; }
-  .scene select { padding:8px 10px; font-size:13px; }
-  .scene .go { border:1px solid var(--rule); background:var(--card); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer; color:var(--muted); }
-  .scene .go:hover { color:var(--ink); border-color:var(--rule2); }
-  .trimrow { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
-  .trimrow input { width:74px; padding:8px 10px; text-align:right; }
-  .apply { position:sticky; bottom:0; background:linear-gradient(transparent, var(--card) 35%); padding-top:14px; margin-top:14px; display:flex; gap:10px; align-items:center; }
-  .summary { display:flex; align-items:center; gap:10px; width:100%; text-align:left; border:1px solid var(--rule); background:#fff; border-radius:10px; padding:10px 14px; cursor:pointer; color:var(--muted); font-size:13px; margin-bottom:16px; }
-  .summary:hover { border-color:var(--rule2); }
-  .summary b { color:var(--ink); font-weight:500; }
-  .summary .chev { margin-left:auto; }
+  .msg { font-size:13px; } .msg.bad { color:var(--bad);} .msg.ok { color:var(--ok);}
+  /* --- the demo page: video first --- */
+  .head { display:flex; align-items:baseline; gap:12px; margin:0 0 12px; flex-wrap:wrap; }
+  .head h2 { font-size:20px; font-weight:600; letter-spacing:-.02em; margin:0; flex:1; min-width:0; }
+  .head .meta { font:12px ui-monospace, Menlo, monospace; color:var(--muted); }
+  .stage { position:relative; background:#111; border-radius:12px; overflow:hidden; aspect-ratio:16/10; display:grid; place-items:center; color:#aaa; font-size:14px; }
+  .stage video { width:100%; height:100%; object-fit:contain; display:block; background:#000; }
+  .stage .empty { text-align:center; padding:30px; color:#9a9a9a; }
+  .scrub { position:relative; height:6px; margin:10px 0 0; border-radius:99px; background:#dfe3d8; cursor:pointer; }
+  .scrub i { position:absolute; top:0; bottom:0; left:0; width:0; background:var(--accent); border-radius:99px; pointer-events:none; }
+  .scrub b { position:absolute; top:-4px; width:2px; height:14px; background:var(--amber); border-radius:1px; }
+  .scrub b:hover::after, .scrub b.on::after { content:attr(data-label); position:absolute; top:-24px; left:50%; transform:translateX(-50%); font:11px ui-monospace, Menlo, monospace; color:var(--ink); background:var(--card); border:1px solid var(--rule); border-radius:6px; padding:1px 6px; white-space:nowrap; }
+  .scene-edit { display:none; margin-top:10px; padding:12px 14px; border:1px solid var(--rule); border-radius:12px; background:#fff; }
+  .scene-edit.show { display:grid; grid-template-columns:minmax(0,1fr) 150px auto; gap:10px; align-items:center; }
+  .scene-edit .who { font:11px ui-monospace, Menlo, monospace; color:var(--muted); grid-column:1 / -1; }
+  .ask { margin-top:18px; display:flex; gap:10px; align-items:stretch; }
+  .ask input { flex:1; padding:13px 16px; font-size:15px; border-radius:12px; }
+  .ask .btn { border-radius:12px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .chip { font-size:12px; color:var(--muted); border:1px solid var(--rule); border-radius:99px; padding:3px 10px; cursor:pointer; background:transparent; }
+  .chip:hover { color:var(--ink); border-color:var(--rule2); }
+  .actions { display:flex; gap:10px; align-items:center; margin-top:18px; flex-wrap:wrap; }
   .quality { display:inline-flex; border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
   .quality button { border:0; border-radius:0; padding:9px 14px; font-size:13px; color:var(--muted); background:#fff; cursor:pointer; }
   .quality button.on { background:var(--accent); color:#eceee9; }
-  .why { color:var(--muted); font-size:13px; }
-  .ideas { margin-top:14px; display:grid; gap:8px; }
-  .idea { text-align:left; border:1px solid var(--rule); background:#fff; border-radius:12px; padding:12px 14px; cursor:pointer; }
+  .progress { margin-top:14px; display:none; }
+  .progress.show { display:block; }
+  .bar { height:6px; border-radius:99px; background:#e0e4da; overflow:hidden; }
+  .bar i { display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .6s linear; }
+  .bar i.done { background:var(--ok);} .bar i.bad { background:var(--bad);}
+  .stagetext { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:8px; }
+  .steps { margin-top:10px; font:12.5px/1.6 ui-monospace, Menlo, monospace; color:#3d453e; }
+  .steps div.bad { color:var(--bad);} .steps div.ok { color:var(--ok);}
+  .receipts { margin-top:16px; display:flex; gap:6px 14px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+  .receipts span::before { content:"✓ "; color:var(--ok); }
+  .receipts span.bad::before { content:"✗ "; color:var(--bad); }
+  .receipts span.neutral::before { content:"· "; color:var(--muted); }
+  details.adv { margin-top:22px; border-top:1px solid var(--rule); padding-top:12px; }
+  details.adv > summary { cursor:pointer; color:var(--muted); font-size:13px; list-style:none; }
+  details.adv > summary::before { content:"▸ "; } details.adv[open] > summary::before { content:"▾ "; }
+  .adv-body { margin-top:14px; display:grid; gap:16px; }
+  .settings { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
+  @media (max-width: 860px){ .settings { grid-template-columns:repeat(2,1fr); } }
+  .settings label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
+  textarea.yaml { font:12.5px/1.55 ui-monospace, "SF Mono", Menlo, monospace; min-height:380px; resize:vertical; white-space:pre; overflow:auto; }
+  .files { display:flex; gap:8px 16px; flex-wrap:wrap; font-size:13px; }
+  .files a { color:var(--ink); text-decoration:none; }
+  .files a small { color:var(--muted); font:11px ui-monospace, Menlo, monospace; margin-left:4px; }
+  .log { font:12px/1.55 ui-monospace, Menlo, monospace; color:#3d453e; background:#f2f4ee; border-radius:10px; padding:10px 12px; max-height:220px; overflow:auto; white-space:pre-wrap; }
+  pre.proof { font:12px/1.5 ui-monospace, Menlo, monospace; white-space:pre-wrap; color:#3d453e; max-height:300px; overflow:auto; margin:0; }
+  /* --- new demo: one card --- */
+  .one { max-width:600px; margin:30px auto; }
+  .one h2 { font-size:26px; font-weight:600; letter-spacing:-.02em; margin:0 0 6px; }
+  .one .why { color:var(--muted); margin:0 0 22px; }
+  .one label { display:block; font-size:12px; color:var(--muted); margin:16px 0 6px; }
+  .one input, .one textarea { font-size:16px; padding:13px 15px; border-radius:12px; }
+  .one .go { margin-top:22px; display:flex; align-items:center; gap:12px; }
+  .one .note { font-size:13px; color:var(--muted); margin-top:8px; min-height:1.3em; }
+  .ideas { margin-top:10px; display:grid; gap:8px; }
+  .idea { text-align:left; border:1px solid var(--rule); background:#fff; border-radius:12px; padding:11px 14px; cursor:pointer; }
   .idea:hover { border-color:var(--ink); }
-  .idea b { display:block; font-weight:600; margin-bottom:3px; }
+  .idea b { display:block; font-weight:600; margin-bottom:2px; }
   .idea span { color:var(--muted); font-size:13px; }
-  .ok-note { color:var(--ok); font-size:13px; }
-  .drafts { margin-top:14px; border-top:1px solid var(--rule); padding-top:10px; }
-  .draft { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:9px; cursor:pointer; font-size:14px; color:var(--muted); }
-  .draft:hover { background:#eef1ea; color:var(--ink); }
-  .draft .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .draft small, .demo .x { font:11px ui-monospace, Menlo, monospace; opacity:.7; }
-  .x { display:none; border:0; background:transparent; color:inherit; cursor:pointer; padding:0 4px; line-height:1; }
-  .demo:hover .x, .draft:hover .x { display:inline; }
-  .x:hover { color:var(--bad); }
+  /* --- settings --- */
+  .provider { display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid var(--rule); border-radius:12px; margin-bottom:8px; cursor:pointer; background:#fff; }
+  .provider.on { border-color:var(--ink); } .provider.off { opacity:.55; cursor:default; }
+  .provider b { font-weight:600; } .provider .d { color:var(--muted); font-size:13px; }
+  .field { margin:14px 0; } .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
   kbd { font:11px ui-monospace, Menlo, monospace; border:1px solid var(--rule2); border-bottom-width:2px; border-radius:5px; padding:1px 5px; color:var(--muted); background:#fff; }
+  .hidden { display:none !important; }
 </style>
 </head>
 <body>
 <div class="top">
   <div class="mark"><i></i><i></i><i></i><i></i></div>
   <h1>Retake</h1>
-  <span class="tag">Rerun the demo, don’t re-record it.</span>
+  <span class="tag">Say what to show. Get a take. Tell it what to change.</span>
   <span class="sp"></span>
   <span class="model" id="modelTag"></span>
-  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </div>
 
 <div class="wrap">
-  <aside class="card">
-    <div class="label">Demos</div>
-    <div id="demos"></div>
-    <button class="btn wide" id="newBtn" style="margin-top:14px">+ New demo</button>
-    <div class="drafts hidden" id="draftsWrap"><div class="label" style="margin-bottom:6px">Unfinished</div><div id="drafts"></div></div>
+  <aside class="side">
+    <div class="card">
+      <div class="label">Demos</div>
+      <div id="demos"></div>
+      <button class="btn wide" id="newBtn" style="margin-top:12px">+ New demo</button>
+      <div class="drafts hidden" id="draftsWrap"><div class="label" style="margin-bottom:6px">Unfinished</div><div id="drafts"></div></div>
+    </div>
   </aside>
 
-  <main class="card" id="main">
-    <!-- DEMO VIEW -->
-    <section id="viewDemo">
-      <div class="row" style="justify-content:space-between; margin-bottom:12px">
-        <div class="label" style="margin:0" id="editTitle">Demo</div>
-        <div class="row">
-          <span class="msg" id="msg"></span>
-          <div class="modes"><button id="modeAuto" class="on">Auto</button><button id="modeManual">Manual</button></div>
-        </div>
+  <main>
+    <!-- ============ DEMO: video first ============ -->
+    <section class="card" id="viewDemo">
+      <div class="head">
+        <h2 id="title"></h2>
+        <span class="meta" id="meta"></span>
+        <span class="msg" id="msg"></span>
       </div>
-      <div id="autoPane">
-        <h2 class="h2" id="autoTitle"></h2>
-        <p class="sub" id="autoUrl"></p>
-        <button class="summary" id="setToggle"><b id="setSummary">1080p</b><span id="setSummary2"></span><span class="chev">▾</span></button>
-        <div class="settings hidden" id="setGrid">
-          <div><label>Format</label><select id="sPreset"></select></div>
-          <div><label>Captions</label><select id="sLayout">
-            <option value="default">Below the frame</option>
-            <option value="card">Framed card</option>
-            <option value="overlay-bottom">Over the video</option>
-            <option value="none">None</option></select></div>
-          <div><label>Camera</label><select id="sCamera">
-            <option value="auto">Push in on results</option>
-            <option value="static">Static</option></select></div>
-          <div><label>Cursor</label><select id="sCursor">
-            <option value="default">Pointer</option>
-            <option value="touch">Tap dot</option>
-            <option value="none">None</option></select></div>
-        </div>
+
+      <div class="stage" id="stage"><div class="empty">No take yet. Press Record.</div></div>
+      <div class="scrub" id="scrub" title="Click a marker to edit that scene"><i id="scrubFill"></i></div>
+      <div class="scene-edit" id="sceneEdit">
+        <span class="who" id="sceneWho"></span>
+        <input type="text" id="sceneCap" placeholder="Caption (leave blank for none)" />
+        <select id="sceneCam"><option value="auto">Camera: auto</option><option value="static">Camera: none</option><option value="1.2">Zoom 1.2×</option><option value="1.3">Zoom 1.3×</option><option value="1.5">Zoom 1.5×</option></select>
+        <button class="btn" id="sceneApply">Apply</button>
       </div>
-      <div id="yamlWrap" class="hidden">
-        <textarea class="yaml" id="yaml" spellcheck="false"></textarea>
-        <div class="row" style="margin-top:8px"><button class="btn" id="saveBtn">Save</button><span class="hint">⌘S save · ⌘⏎ run</span></div>
+
+      <div class="ask">
+        <input type="text" id="askBox" placeholder="Tell Retake what to change — “slower at the end”, “cut the first 3 seconds”, “zoom on the result”" />
+        <button class="btn primary" id="askBtn">Change it</button>
       </div>
-      <div class="row" style="margin-top:6px">
+      <div class="chips" id="chips">
+        <button class="chip" data-q="Hold the last scene two seconds longer">hold the ending</button>
+        <button class="chip" data-q="Make every caption shorter and plainer">plainer captions</button>
+        <button class="chip" data-q="Cut the first 2 seconds">trim the start</button>
+        <button class="chip" data-q="Zoom in on the result scene">zoom on the result</button>
+        <button class="chip" data-q="Make it square for a social post">make it square</button>
+        <button class="chip" data-q="No camera moves at all">no camera moves</button>
+      </div>
+
+      <div class="actions">
         <button class="btn primary big" id="runBtn">Record</button>
         <div class="quality"><button id="qFast">Fast</button><button id="qFinal" class="on">Final</button></div>
+        <span class="hint" id="runHint"></span>
         <span style="flex:1"></span>
         <button class="btn ghost" id="forceBtn" title="Record again from scratch, even if nothing changed">Record again</button>
       </div>
-      <p class="why" id="runHint" style="margin:8px 0 0"></p>
       <div class="progress" id="progress">
         <div class="bar"><i id="barFill"></i></div>
-        <div class="stage"><span id="stageText">Starting…</span><span id="etaText"></span></div>
+        <div class="stagetext"><span id="stageText">Starting…</span><span id="etaText"></span></div>
+        <div class="steps" id="steps"></div>
       </div>
-      <div class="timeline" id="timeline"></div>
-      <div class="tl-labels" id="tlLabels"></div>
-      <details id="logWrap" style="margin-top:8px"><summary>Log</summary><div class="log" id="log"></div></details>
 
-      <section class="refine hidden" id="refine">
-        <div class="label">Refine — changes here re-render, they never re-record</div>
-        <div id="sceneList"></div>
-        <div class="trimrow">
-          <span class="hint">Trim</span>
-          <input type="text" id="trimHead" value="0" inputmode="decimal" /><span class="hint">s off the start</span>
-          <input type="text" id="trimTail" value="0" inputmode="decimal" /><span class="hint">s off the end</span>
-          <span class="hint" style="margin-left:auto">Playing: <kbd>space</kbd> <kbd>←</kbd> <kbd>→</kbd> · set trim from the playhead: <kbd>[</kbd> <kbd>]</kbd></span>
-        </div>
-        <div class="apply">
-          <button class="btn primary" id="applyBtn" disabled>Re-render</button>
-          <span class="hint" id="applyHint">No changes since the last render.</span>
-        </div>
-      </section>
-    </section>
+      <div class="receipts" id="receipts"></div>
 
-    <!-- NEW DEMO FLOW -->
-    <section id="viewNew" class="hidden">
-      <div class="flow">
-        <div class="steps" id="flowSteps">Step 1 of 4</div>
-        <div id="step1">
-          <p class="q">Which page should the demo start on?</p>
-          <p class="why">Your app running locally is fine. Retake opens it in its own browser.</p>
-          <input type="url" id="fUrl" placeholder="http://localhost:3000" />
-        </div>
-        <div id="step2" class="hidden">
-          <p class="q">Where does the code live?</p>
-          <p class="why">Optional, and worth it: reading the project tells Retake the real routes, the sign-in fields and what animates forever. Leave blank to work from the page alone.</p>
-          <input type="text" id="fProject" placeholder="~/Documents/my-app" />
-          <p class="hint" id="fProjectNote" style="margin-top:10px"></p>
-        </div>
-        <div id="step3" class="hidden">
-          <p class="q">What should the demo show?</p>
-          <p class="why">One or two sentences, like you’d tell a colleague. This becomes the storyline.</p>
-          <textarea id="fDesc" rows="4" placeholder="Show a messy note being captured, landing as an action and a thread, then opening the thread."></textarea>
-          <button class="btn" id="fIdeas" style="margin-top:12px">Suggest ideas</button>
-          <div class="ideas" id="ideaList"></div>
-        </div>
-        <div id="step4" class="hidden">
-          <p class="q">Name it</p>
-          <p class="why">Optional. Short, lowercase, dashes — it names the folder your videos land in. Leave it blank and it stays as the project number.</p>
-          <input type="text" id="fName" placeholder="my-app-onboarding" />
-        </div>
-        <div id="step5" class="hidden">
-          <p class="q">How do you want to start?</p>
-          <p class="why" id="draftWhy">Draft with AI scouts the page and writes the steps for you. You review before anything records.</p>
-          <div class="choice">
-            <button id="fDraft"><b>Draft with AI</b><span id="fDraftModel">Scouts the page, writes the steps.</span></button>
-            <button id="fBlank"><b>Start blank</b><span>A minimal manifest you fill in yourself.</span></button>
+      <details class="adv" id="adv">
+        <summary>Advanced</summary>
+        <div class="adv-body">
+          <div class="settings">
+            <div><label>Format</label><select id="sPreset"></select></div>
+            <div><label>Captions</label><select id="sLayout"><option value="default">Below the frame</option><option value="card">Framed card</option><option value="overlay-bottom">Over the video</option><option value="none">None</option></select></div>
+            <div><label>Camera</label><select id="sCamera"><option value="auto">Push in on results</option><option value="static">Static</option></select></div>
+            <div><label>Cursor</label><select id="sCursor"><option value="default">Pointer</option><option value="touch">Tap dot</option><option value="none">None</option></select></div>
           </div>
-          <p class="hint" id="fBusy" style="margin-top:16px"></p>
+          <div class="files" id="files"></div>
+          <div><div class="label">Manifest</div><textarea class="yaml" id="yaml" spellcheck="false"></textarea><div class="row" style="margin-top:8px"><button class="btn" id="saveBtn">Save</button><span class="hint"><kbd>⌘S</kbd> save · <kbd>⌘⏎</kbd> record</span></div></div>
+          <details><summary class="hint" style="cursor:pointer">Log</summary><div class="log" id="log"></div></details>
+          <details><summary class="hint" style="cursor:pointer">Proof log</summary><pre class="proof" id="proof"></pre></details>
         </div>
-        <div class="nav">
-          <button class="btn ghost" id="fBack">Back</button>
-          <button class="btn primary big" id="fNext">Continue</button>
+      </details>
+    </section>
+
+    <!-- ============ NEW DEMO: one card ============ -->
+    <section class="card hidden" id="viewNew">
+      <div class="one">
+        <h2>What should the demo show?</h2>
+        <p class="why">Point at your app, say it in a sentence, and Retake does the rest: reads the page, writes the steps, checks them, and records a first take.</p>
+        <label>Your app</label>
+        <input type="url" id="fUrl" placeholder="http://localhost:3000" />
+        <label>What to show</label>
+        <textarea id="fDesc" rows="3" placeholder="A messy note being captured, landing as an action and a thread, then opening the thread."></textarea>
+        <div class="row" style="margin-top:8px"><button class="chip" id="fIdeas">Suggest ideas</button><span class="hint" id="fIdeasNote"></span></div>
+        <div class="ideas" id="ideaList"></div>
+        <label>Code folder <span style="font-weight:400">(optional — better selectors, routes, sign-in fields)</span></label>
+        <input type="text" id="fProject" placeholder="~/Documents/my-app" />
+        <div class="note" id="fProjectNote"></div>
+        <div class="go">
+          <button class="btn primary big" id="fGo">Take it from here</button>
+          <button class="btn ghost" id="fBlank" title="Just create the manifest; write the steps yourself">Start blank</button>
+          <span style="flex:1"></span>
+          <button class="btn ghost" id="fCancel">Cancel</button>
         </div>
+        <div class="note" id="fBusy"></div>
       </div>
     </section>
 
-    <!-- SETTINGS -->
-    <section id="viewSettings" class="hidden">
-      <div class="flow" style="margin-top:12px">
-        <p class="q">Settings</p>
-        <p class="why">Which model drafts your demos. Recording and rendering never use a model.</p>
+    <!-- ============ SETTINGS ============ -->
+    <section class="card hidden" id="viewSettings">
+      <div class="one" style="margin-top:10px">
+        <h2>Settings</h2>
+        <p class="why">Which model drafts and fixes your demos. Recording and rendering never use a model.</p>
         <div id="providers"></div>
         <div id="localFields" class="hidden">
           <div class="field"><label>Local endpoint (OpenAI-compatible — Ollama, LM Studio)</label><input type="url" id="setLocalUrl" placeholder="http://localhost:11434/v1" /></div>
           <div class="field"><label>Local model</label><input type="text" id="setLocalModel" placeholder="llama3.1" /></div>
         </div>
-        <details style="margin-top:12px"><summary>API keys (optional)</summary>
+        <details style="margin-top:12px"><summary class="hint" style="cursor:pointer">API keys (optional)</summary>
           <div class="field"><label>Groq API key</label><input type="password" id="setGroq" placeholder="gsk_…" /></div>
           <div class="field"><label>Mistral API key</label><input type="password" id="setMistral" placeholder="…" /></div>
         </details>
         <p class="hint" id="toolsInfo" style="margin-top:18px"></p>
-        <div class="nav"><span></span><button class="btn primary big" id="setSave">Save</button></div>
+        <div class="go"><span style="flex:1"></span><button class="btn primary big" id="setSave">Save</button></div>
       </div>
     </section>
   </main>
-
-  <aside class="card" id="outCard">
-    <div class="label">Last take</div>
-    <div id="out"><div class="empty">No take yet.</div></div>
-  </aside>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-let current = null, dirty = false, es = null, demoList = [], mode = localStorage.getItem('retake.mode') || 'auto', settings = null, tick = null;
-let quality = localStorage.getItem('retake.quality') || 'final';
-let needsRecord = true;
-function setQuality(q) {
-  quality = q; localStorage.setItem('retake.quality', q);
-  $('qFast').classList.toggle('on', q === 'fast'); $('qFinal').classList.toggle('on', q === 'final');
-  paintAction();
-}
-$('qFast').onclick = () => setQuality('fast');
-$('qFinal').onclick = () => setQuality('final');
-
-/** One button. Its label is the honest answer to "what will happen if I press
-    this?" — the capture hash already knows whether the browser must run. */
-function paintAction() {
-  const b = $('runBtn');
-  const d = demoList.find((x) => x.name === current);
-  const hasTake = !!(d && d.lastTake);
-  needsRecord = !d || d.needsRecord;
-  b.textContent = !hasTake ? 'Record' : needsRecord ? 'Re-record' : pendingRender ? 'Re-render' : 'Render again';
-  $('forceBtn').classList.toggle('hidden', !hasTake || needsRecord);
-  $('runHint').textContent = !hasTake
-    ? (quality === 'fast' ? 'Records the demo and renders a quick 24fps check.' : 'Records the demo and renders it at the chosen format.')
-    : needsRecord
-      ? 'The steps changed, so the browser runs again.'
-      : 'The recording still fits — this only re-renders the video.' + (quality === 'fast' ? ' Fast: hardware encode, seconds.' : '');
-}
-
-async function api(url, opts) {
-  const r = await fetch(url, opts);
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || r.statusText);
-  return j;
-}
-const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let current = null, dirty = false, es = null, demoList = [], settings = null, tick = null, pendingRender = false, needsRecord = true, lastTake = null, sceneTimes = {}, quality = localStorage.getItem('retake.quality') || 'final';
+async function api(url, opts) { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j; }
 function setMsg(t, cls) { const m = $('msg'); m.textContent = t; m.className = 'msg ' + (cls || ''); }
 function show(view) { for (const v of ['viewDemo', 'viewNew', 'viewSettings']) $(v).classList.toggle('hidden', v !== view); }
+function setQuality(q) { quality = q; localStorage.setItem('retake.quality', q); $('qFast').classList.toggle('on', q === 'fast'); $('qFinal').classList.toggle('on', q === 'final'); paintAction(); }
+$('qFast').onclick = () => setQuality('fast'); $('qFinal').onclick = () => setQuality('final');
 
-// --- modes -------------------------------------------------------------
-function setMode(m) {
-  mode = m; localStorage.setItem('retake.mode', m);
-  $('modeAuto').classList.toggle('on', m === 'auto'); $('modeManual').classList.toggle('on', m === 'manual');
-  $('autoPane').classList.toggle('hidden', m !== 'auto');
-  $('yamlWrap').classList.toggle('hidden', m !== 'manual');
-  if (typeof renderRefine === 'function' && demoList.length) renderRefine(demoList.find((x) => x.name === current));
-}
-$('modeAuto').onclick = () => setMode('auto');
-$('modeManual').onclick = () => setMode('manual');
-
-// --- demos -------------------------------------------------------------
+// ---------- sidebar ----------
 async function loadDemos() {
   demoList = await api('/api/demos');
   const el = $('demos'); el.innerHTML = '';
-  if (!demoList.length) el.innerHTML = '<div class="empty">No demos yet.</div>';
+  if (!demoList.length) el.innerHTML = '<div class="hint" style="padding:6px 0">No demos yet.</div>';
   for (const d of demoList) {
     const div = document.createElement('div');
     div.className = 'demo' + (d.name === current ? ' on' : '');
     const dot = d.lastTake ? (d.lastTake.ok && !d.lastTake.partial ? 'ok' : 'bad') : '';
-    div.innerHTML = `<span class="dot ${dot}"></span><span class="name">${escapeHtml(d.name)}</span><small>${d.lastTake ? d.lastTake.duration + 's' : (d.valid ? '' : 'invalid')}</small><button class="x" title="Delete this demo" aria-label="Delete ${escapeHtml(d.name)}">×</button>`;
+    div.innerHTML = `<span class="dot ${dot}"></span><span class="name">${esc(d.name)}</span><button class="x" title="Delete" aria-label="Delete ${esc(d.name)}">×</button>`;
     div.onclick = () => select(d.name);
     div.querySelector('.x').onclick = async (e) => {
       e.stopPropagation();
       if (!confirm(`Delete "${d.name}" and its videos? The manifest is kept in .trash/ for a while.`)) return;
       try { await api('/api/demos/' + d.name, { method: 'DELETE' }); } catch (err) { setMsg(err.message, 'bad'); return; }
-      if (current === d.name) { current = null; $('yaml').value = ''; $('out').innerHTML = '<div class="empty">No take yet.</div>'; }
+      if (current === d.name) current = null;
       const list = await loadDemos();
-      if (!current && list.length) select(list[0].name); else if (!list.length) { show('viewNew'); showStep(1); }
+      if (!current) { if (list.length) select(list[0].name); else openNew(); }
     };
     el.appendChild(div);
   }
   await loadDrafts();
   return demoList;
 }
-
-// --- drafts: an unfinished "new demo", saved as you type ---------------
 let draftId = null, draftTimer = null;
 async function loadDrafts() {
-  let ds = [];
-  try { ds = await api('/api/drafts'); } catch {}
+  let ds = []; try { ds = await api('/api/drafts'); } catch {}
   $('draftsWrap').classList.toggle('hidden', !ds.length);
   const el = $('drafts'); el.innerHTML = '';
   for (const d of ds) {
-    const row = document.createElement('div');
-    row.className = 'draft';
-    row.innerHTML = `<span class="name">${escapeHtml(d.name)}</span><small>step ${d.step}</small><button class="x" title="Discard" aria-label="Discard ${escapeHtml(d.name)}">×</button>`;
-    row.onclick = () => resumeDraft(d);
+    const row = document.createElement('div'); row.className = 'draft';
+    row.innerHTML = `<span class="name">${esc(d.name)}</span><button class="x" title="Discard" aria-label="Discard ${esc(d.name)}">×</button>`;
+    row.onclick = () => { draftId = d.id; $('fUrl').value = d.url || ''; $('fProject').value = d.project || ''; $('fDesc').value = d.describe || ''; $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = ''; show('viewNew'); };
     row.querySelector('.x').onclick = async (e) => { e.stopPropagation(); await api('/api/drafts/' + d.id, { method: 'DELETE' }); if (draftId === d.id) draftId = null; loadDrafts(); };
     el.appendChild(row);
   }
 }
-function saveDraftSoon() {
-  clearTimeout(draftTimer);
-  draftTimer = setTimeout(saveDraft, 500);
-}
-async function saveDraft() {
+function saveDraftSoon() { clearTimeout(draftTimer); draftTimer = setTimeout(async () => {
   if (!draftId) return;
-  const body = { url: $('fUrl').value.trim(), project: $('fProject').value.trim(), describe: $('fDesc').value, step, name: $('fName').value.trim() || undefined };
-  if (!body.url && !body.describe && !body.project) return; // nothing worth keeping yet
-  try { const d = await api('/api/drafts/' + draftId, { method: 'PUT', body: JSON.stringify(body) }); if (!$('fName').value && d.name) $('fName').placeholder = d.name; loadDrafts(); } catch {}
+  const body = { url: $('fUrl').value.trim(), project: $('fProject').value.trim(), describe: $('fDesc').value, step: 1 };
+  if (!body.url && !body.describe && !body.project) return;
+  try { await api('/api/drafts/' + draftId, { method: 'PUT', body: JSON.stringify(body) }); loadDrafts(); } catch {}
+}, 500); }
+
+// ---------- demo view ----------
+const PRESET_LABEL = { 'post-landscape': '1080p', 'post-square': 'square', 'post-vertical': 'vertical', 'docs-gif': 'docs', 'proof-fast': 'small', 'master': 'master', 'preview-fast': 'preview' };
+async function select(name) {
+  if (dirty && !confirm('Discard unsaved manifest edits?')) return;
+  current = name; dirty = false; setMsg('');
+  show('viewDemo');
+  const { yaml } = await api('/api/demos/' + name);
+  $('yaml').value = yaml;
+  await loadDemos();
+  const d = demoList.find((x) => x.name === name);
+  $('title').textContent = d?.title || name;
+  fillSettings(d);
+  pendingRender = false; $('progress').classList.remove('show'); $('steps').innerHTML = ''; $('log').innerHTML = ''; $('sceneEdit').classList.remove('show');
+  await loadTake();
 }
-function resumeDraft(d) {
-  draftId = d.id;
-  $('fUrl').value = d.url || ''; $('fProject').value = d.project || ''; $('fDesc').value = d.describe || ''; $('fName').value = d.name && !/^project-\d+$/.test(d.name) ? d.name : '';
-  $('fName').placeholder = d.name || 'my-demo';
-  $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = '';
-  show('viewNew'); showStep(Math.min(Math.max(d.step || 1, 1), STEPS));
-}
-const PRESET_LABEL = { 'post-landscape': '1080p landscape', 'post-square': '1080 square', 'post-vertical': '1080×1920 vertical', 'docs-gif': 'docs 1440×900', 'proof-fast': 'small 960×720', 'master': 'master 1080p', 'preview-fast': 'preview 1080p' };
 function fillSettings(d) {
   if (!d) return;
-  $('autoTitle').textContent = d.title || d.name;
-  $('autoUrl').textContent = d.url || '';
   const st = d.settings || {};
   $('sPreset').value = st.preset || 'post-landscape';
   $('sLayout').value = (st.layout === 'band' || !st.layout) ? 'default' : st.layout;
   $('sCamera').value = st.camera || 'auto';
   $('sCursor').value = st.cursor || 'default';
-  $('setSummary').textContent = PRESET_LABEL[$('sPreset').value] || $('sPreset').value;
-  const bits = [];
-  if ($('sLayout').value !== 'default') bits.push($('sLayout').selectedOptions[0].textContent.toLowerCase());
-  if ($('sCamera').value === 'static') bits.push('no camera moves');
-  if ($('sCursor').value !== 'default') bits.push($('sCursor').selectedOptions[0].textContent.toLowerCase());
-  $('setSummary2').textContent = bits.length ? '· ' + bits.join(' · ') : '· captions below, camera auto, pointer';
   paintAction();
 }
-$('setToggle').onclick = () => {
-  const open = $('setGrid').classList.toggle('hidden');
-  $('setToggle').querySelector('.chev').textContent = open ? '▾' : '▴';
-};
-async function select(name) {
-  if (dirty && !confirm('Discard unsaved edits?')) return;
-  current = name; dirty = false; setMsg('');
-  show('viewDemo');
-  const { yaml } = await api('/api/demos/' + name);
-  $('yaml').value = yaml;
-  $('editTitle').textContent = 'demos/' + name + '.yaml';
-  await loadDemos();
-  const d = demoList.find((x) => x.name === name);
-  fillSettings(d);
-  pendingRender = false; $('applyBtn').disabled = true; $('applyHint').textContent = 'No changes since the last render.';
-  renderRefine(d);
-  $('log').innerHTML = ''; $('progress').classList.remove('show');
-  await loadTake();
+function paintAction() {
+  const d = demoList.find((x) => x.name === current);
+  const has = !!(d && d.lastTake);
+  needsRecord = !d || d.needsRecord;
+  $('runBtn').textContent = !has ? 'Record' : needsRecord ? 'Re-record' : pendingRender ? 'Re-render' : 'Render again';
+  $('forceBtn').classList.toggle('hidden', !has || needsRecord);
+  $('runHint').textContent = !has ? 'About two minutes.' : needsRecord ? 'The steps changed — the browser runs again.' : pendingRender ? 'Only the render, no browser.' : '';
+  const meta = [];
+  if (d?.url) meta.push(d.url.replace(/^https?:\/\//, ''));
+  if (d?.settings?.preset) meta.push(PRESET_LABEL[d.settings.preset] || d.settings.preset);
+  if (d?.lastTake) meta.push(d.lastTake.duration + 's');
+  $('meta').textContent = meta.join(' · ');
 }
-// --- refine ------------------------------------------------------------
-let sceneTimes = {}, pendingRender = false;
-function markPending(why) {
-  pendingRender = true;
-  $('applyBtn').disabled = false;
-  $('applyHint').textContent = why || 'Changed — re-render to see it.';
-  paintAction();
-}
-function renderRefine(d) {
-  const list = $('sceneList');
-  const scenes = (d && d.settings && d.settings.scenes) || [];
-  $('refine').classList.toggle('hidden', !scenes.length || mode !== 'auto' || !(d && d.lastTake));
-  list.innerHTML = '';
-  for (const sc of scenes) {
-    const row = document.createElement('div');
-    row.className = 'scene';
-    const at = sceneTimes[sc.label];
-    row.innerHTML = `
-      <div class="at"><b>${escapeHtml(sc.label)}</b>${at != null ? at.toFixed(1) + 's' : ''}</div>
-      <input type="text" value="${escapeHtml(sc.caption)}" placeholder="No caption" data-cap="${escapeHtml(sc.label)}" />
-      <select data-cam="${escapeHtml(sc.label)}">
-        <option value="auto">Camera: auto</option>
-        <option value="static">Camera: none</option>
-        <option value="1.2">Zoom 1.2×</option>
-        <option value="1.3">Zoom 1.3×</option>
-        <option value="1.5">Zoom 1.5×</option>
-      </select>
-      <button class="go" data-go="${escapeHtml(sc.label)}">Jump to</button>`;
-    list.appendChild(row);
-    row.querySelector('select').value = typeof sc.camera === 'number' ? String(sc.camera) : sc.camera;
-  }
-  for (const inp of list.querySelectorAll('input[data-cap]')) {
-    inp.onchange = () => patchScene(inp.dataset.cap, { caption: inp.value });
-  }
-  for (const sel of list.querySelectorAll('select[data-cam]')) {
-    sel.onchange = () => patchScene(sel.dataset.cam, { camera: sel.value === 'auto' || sel.value === 'static' ? sel.value : { zoom: Number(sel.value) } });
-  }
-  for (const b of list.querySelectorAll('button[data-go]')) {
-    b.onclick = () => { const v = $('out').querySelector('video'); const t = sceneTimes[b.dataset.go]; if (v && t != null) { v.currentTime = Math.max(0, t); v.play().catch(() => {}); } };
-  }
-  const tr = (d && d.settings && d.settings.trim) || { head: 0, tail: 0 };
-  $('trimHead').value = tr.head || 0; $('trimTail').value = tr.tail || 0;
-}
-async function patchScene(label, body) {
-  try {
-    const r = await api('/api/demos/' + current + '/scene', { method: 'PATCH', body: JSON.stringify({ label, ...body }) });
-    $('yaml').value = r.yaml; markPending('Changed — re-render to see it.');
-    demoList = await api('/api/demos');
-  } catch (e) { setMsg(e.message.split('\n')[0], 'bad'); }
-}
-async function patchTrim() {
-  const head = parseFloat($('trimHead').value) || 0, tail = parseFloat($('trimTail').value) || 0;
-  try {
-    const r = await api('/api/demos/' + current + '/trim', { method: 'PATCH', body: JSON.stringify({ head, tail }) });
-    $('yaml').value = r.yaml; markPending(`Trim ${head}s / ${tail}s — re-render to apply.`);
-    demoList = await api('/api/demos');
-  } catch (e) { setMsg(e.message.split('\n')[0], 'bad'); }
-}
-$('trimHead').onchange = patchTrim; $('trimTail').onchange = patchTrim;
-$('applyBtn').onclick = () => run('render');
-
-// Video keyboard: space play/pause, arrows step, [ ] set trim from the playhead.
-document.addEventListener('keydown', (e) => {
-  const tag = (e.target.tagName || '').toLowerCase();
-  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-  const v = $('out').querySelector('video');
-  if (!v) return;
-  if (e.code === 'Space') { e.preventDefault(); v.paused ? v.play() : v.pause(); }
-  else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'l') { e.preventDefault(); v.currentTime = Math.min(v.duration || 0, v.currentTime + (e.shiftKey ? 5 : 1)); }
-  else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') { e.preventDefault(); v.currentTime = Math.max(0, v.currentTime - (e.shiftKey ? 5 : 1)); }
-  else if (e.key.toLowerCase() === 'k') { e.preventDefault(); v.pause(); }
-  else if (e.key === '[') { $('trimHead').value = (parseFloat($('trimHead').value) || 0) + Math.round(v.currentTime * 10) / 10; patchTrim(); }
-  else if (e.key === ']') { const rest = Math.max(0, (v.duration || 0) - v.currentTime); $('trimTail').value = (parseFloat($('trimTail').value) || 0) + Math.round(rest * 10) / 10; patchTrim(); }
-});
-
 async function patchSetting(key, value) {
-  if (!current) return;
   const body = {};
   if (key === 'cursor') body.cursor = value === 'none' ? false : value === 'touch' ? { style: 'touch' } : null;
   else if (key === 'layout') body.layout = value === 'default' ? null : value;
   else body[key] = value;
-  try {
-    const r = await api('/api/demos/' + current + '/settings', { method: 'PATCH', body: JSON.stringify(body) });
-    $('yaml').value = r.yaml; dirty = false; setMsg('saved', 'ok'); setTimeout(() => setMsg(''), 1500);
-    await loadDemos();
-    markPending('Changed — re-render to see it.');
-    renderRefine(demoList.find((x) => x.name === current));
-  } catch (e) { setMsg(e.message.split('\n')[0], 'bad'); }
+  try { const r = await api('/api/demos/' + current + '/settings', { method: 'PATCH', body: JSON.stringify(body) }); $('yaml').value = r.yaml; dirty = false; pendingRender = true; await loadDemos(); fillSettings(demoList.find((x) => x.name === current)); flash('saved — re-render to see it'); } catch (e) { setMsg(e.message.split('\n')[0], 'bad'); }
 }
 $('sPreset').onchange = (e) => patchSetting('preset', e.target.value);
 $('sLayout').onchange = (e) => patchSetting('layout', e.target.value);
 $('sCamera').onchange = (e) => patchSetting('camera', e.target.value);
 $('sCursor').onchange = (e) => patchSetting('cursor', e.target.value);
-
+function flash(t, cls) { setMsg(t, cls || 'ok'); setTimeout(() => setMsg(''), 2600); }
 async function save() {
   if (!current) return false;
-  if (mode === 'auto' && !dirty) return true;
-  try {
-    const r = await api('/api/demos/' + current, { method: 'PUT', body: JSON.stringify({ yaml: $('yaml').value }) });
-    dirty = false; setMsg(`saved · ${r.steps} steps · ${r.scenes} scenes`, 'ok'); return true;
-  } catch (e) { setMsg(e.message.split('\n')[0], 'bad'); return false; }
+  if (!dirty) return true;
+  try { const r = await api('/api/demos/' + current, { method: 'PUT', body: JSON.stringify({ yaml: $('yaml').value }) }); dirty = false; flash(`saved · ${r.steps} steps`); await loadDemos(); fillSettings(demoList.find((x) => x.name === current)); return true; }
+  catch (e) { setMsg(e.message.split('\n')[0], 'bad'); return false; }
 }
 $('yaml').addEventListener('input', () => { dirty = true; setMsg('unsaved'); });
-$('yaml').addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') run('full'); if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); save(); } });
+$('yaml').addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') run('main'); if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); save(); } });
 $('saveBtn').onclick = save;
 
-// --- run + progress ----------------------------------------------------
-const STAGES = { starting: 'Starting…', capture: 'Recording in the browser', 'capture-skip': 'Reusing last recording', render: 'Rendering the video', done: 'Done' };
+// ---------- the take ----------
+async function loadTake(fresh) {
+  const stage = $('stage'), scrub = $('scrub');
+  scrub.querySelectorAll('b').forEach((b) => b.remove());
+  let data;
+  try { data = await api('/api/take/' + current); } catch { stage.innerHTML = '<div class="empty">No take yet. Press Record.</div>'; $('receipts').innerHTML = ''; $('files').innerHTML = ''; lastTake = null; return; }
+  const { take, files, proof, facts, stamp } = data;
+  lastTake = take;
+  const dur = take.duration - take.trimBefore;
+  const q = '?v=' + stamp;
+  const has = (f) => files.includes(f);
+  stage.innerHTML = has('demo.mp4') ? `<video controls playsinline src="/out/${current}/demo.mp4${q}"${has('thumbnail.png') ? ` poster="/out/${current}/thumbnail.png${q}"` : ''}></video>` : '<div class="empty">Recorded, but no video was rendered.</div>';
+  // scene markers on the scrubber
+  sceneTimes = {};
+  for (const s of take.timeline.filter((e) => e.action === 'scene')) {
+    const t = Math.max(0, s.start - take.trimBefore); sceneTimes[s.label] = t;
+    const b = document.createElement('b'); b.style.left = (t / dur * 100) + '%'; b.dataset.label = s.label; b.title = s.label;
+    b.onclick = (e) => { e.stopPropagation(); openScene(s.label, t); };
+    scrub.appendChild(b);
+  }
+  const v = stage.querySelector('video');
+  if (v) {
+    v.ontimeupdate = () => { $('scrubFill').style.width = (v.currentTime / (v.duration || dur) * 100) + '%'; };
+    scrub.onclick = (e) => { const r = scrub.getBoundingClientRect(); v.currentTime = (e.clientX - r.left) / r.width * (v.duration || dur); };
+    if (fresh) v.play().catch(() => {});
+  }
+  // receipts: plain English, from real state
+  const rc = [];
+  rc.push(`<span class="${take.ok ? '' : 'bad'}">${take.ok ? `Passed ${take.timeline.length} steps` : `${take.timeline.filter((t) => !t.ok).length} of ${take.timeline.length} steps failed`}</span>`);
+  if (take.timeline.some((t) => t.action === 'waitFor')) rc.push('<span>Waited for results</span>');
+  if (facts) rc.push(`<span>Rendered ${facts.width}×${facts.height}${facts.encoder === 'videotoolbox' ? ' preview' : ''}</span>`);
+  rc.push(`<span class="neutral">${dur.toFixed(0)}s</span>`);
+  if (take.partial) rc.push(`<span class="bad">Partial — ${esc(take.partial)}</span>`);
+  if (take.stubbed && take.stubbed.length) rc.push(`<span class="neutral">${take.stubbed.length} endpoint${take.stubbed.length > 1 ? 's' : ''} stubbed</span>`);
+  if (take.timeline.some((t) => /••••/.test(t.summary))) rc.push('<span>Secrets hidden</span>');
+  rc.push(`<span class="neutral">${new Date(take.finishedAt).toLocaleTimeString()}</span>`);
+  $('receipts').innerHTML = rc.join('');
+  $('files').innerHTML = ['demo.mp4', 'master.mp4', 'demo.gif', 'thumbnail.png', 'proof-log.md'].filter(has).map((f) => `<a href="/out/${current}/${f}${q}" target="_blank">${f}${facts && facts.sizes && facts.sizes[f] ? `<small>${(facts.sizes[f] / 1e6).toFixed(1)} MB</small>` : ''}</a>`).join('') + (has('demo.gif') ? '' : `<a href="#" id="mkGif">Make a GIF</a>`);
+  const gb = $('mkGif'); if (gb) gb.onclick = async (e) => { e.preventDefault(); gb.textContent = 'Making…'; try { await api('/api/gif/' + current, { method: 'POST' }); await loadTake(); } catch (err) { gb.textContent = err.message; } };
+  $('proof').textContent = proof || '';
+  paintAction();
+}
+// one scene at a time
+let sceneOpen = null;
+function openScene(label, t) {
+  const d = demoList.find((x) => x.name === current);
+  const sc = (d?.settings?.scenes || []).find((s) => s.label === label);
+  sceneOpen = label;
+  $('sceneWho').textContent = `Scene “${label}” · ${t.toFixed(1)}s`;
+  $('sceneCap').value = sc?.caption || '';
+  $('sceneCam').value = typeof sc?.camera === 'number' ? String(sc.camera) : (sc?.camera || 'auto');
+  $('sceneEdit').classList.add('show');
+  $('scrub').querySelectorAll('b').forEach((b) => b.classList.toggle('on', b.dataset.label === label));
+  const v = $('stage').querySelector('video'); if (v) { v.currentTime = t; v.pause(); }
+}
+$('sceneApply').onclick = async () => {
+  if (!sceneOpen) return;
+  const cam = $('sceneCam').value;
+  try {
+    await api('/api/demos/' + current + '/scene', { method: 'PATCH', body: JSON.stringify({ label: sceneOpen, caption: $('sceneCap').value, camera: cam === 'auto' || cam === 'static' ? cam : { zoom: Number(cam) } }) });
+    $('sceneEdit').classList.remove('show'); pendingRender = true; await loadDemos(); paintAction(); run('render');
+  } catch (e) { setMsg(e.message, 'bad'); }
+};
+
+// ---------- the correction box ----------
+async function askChange(text) {
+  const t = (text || $('askBox').value).trim(); if (!t || !current) return;
+  $('askBtn').disabled = true; $('askBtn').textContent = 'Thinking…';
+  try {
+    const r = await api('/api/fix/' + current, { method: 'POST', body: JSON.stringify({ instruction: t }) });
+    if (!r.applied.length) { flash(r.note || 'Nothing to change for that.', 'bad'); return; }
+    $('yaml').value = r.yaml; $('askBox').value = '';
+    await loadDemos(); fillSettings(demoList.find((x) => x.name === current));
+    const what = r.applied.join(' · ');
+    setMsg(what + (r.rerecord ? ' — recording again' : ' — re-rendering'), 'ok');
+    run(r.rerecord ? 'main' : 'render');
+  } catch (e) { setMsg(e.message, 'bad'); }
+  finally { $('askBtn').disabled = false; $('askBtn').textContent = 'Change it'; }
+}
+$('askBtn').onclick = () => askChange();
+$('askBox').addEventListener('keydown', (e) => { if (e.key === 'Enter') askChange(); });
+for (const c of $('chips').querySelectorAll('.chip')) c.onclick = () => askChange(c.dataset.q);
+
+// ---------- run + progress ----------
+const STAGES = { starting: 'Starting…', scouting: 'Reading the page', drafting: 'Writing the steps', checking: 'Checking every step on the page', capture: 'Recording in the browser', 'capture-skip': 'Reusing last recording', render: 'Rendering', done: 'Done' };
 function setProgress(stage, at, est, startedAt) {
-  const p = $('progress'); p.classList.add('show');
-  const fill = $('barFill');
-  const now = Date.now();
-  const total = (stage === 'capture-skip' || stage === 'render') && stage !== 'capture' ? est.render + (stage === 'render' && startedAt < at - 3000 ? est.capture : 0) : est.capture + est.render;
-  let elapsed = (now - startedAt) / 1000;
+  $('progress').classList.add('show');
+  const now = Date.now(), elapsed = (now - startedAt) / 1000;
   let frac;
   if (stage === 'done') frac = 1;
-  else if (stage === 'render') { const cap = est.capture; const inRender = (now - at) / 1000; frac = (cap + Math.min(inRender, est.render * 0.98)) / (cap + est.render); if (stage === 'render' && at - startedAt < 4000) frac = Math.min(inRender / est.render, 0.98); }
+  else if (stage === 'render') frac = Math.min(0.98, (est.capture + Math.min((now - at) / 1000, est.render)) / (est.capture + est.render));
   else if (stage === 'capture-skip') frac = 0.05;
+  else if (stage === 'scouting' || stage === 'drafting' || stage === 'checking') frac = Math.min(0.15, elapsed / 200);
   else frac = Math.min(elapsed / (est.capture + est.render), 0.6);
-  fill.style.width = Math.round(frac * 100) + '%';
-  fill.className = stage === 'done' ? 'done' : '';
+  $('barFill').style.width = Math.round(frac * 100) + '%'; $('barFill').className = stage === 'done' ? 'done' : '';
   $('stageText').textContent = STAGES[stage] || stage;
-  const remaining = Math.max(0, Math.round(((stage === 'render') ? (est.render - (now - at) / 1000) : (est.capture + est.render - elapsed))));
-  $('etaText').textContent = stage === 'done' ? `${Math.round(elapsed)}s` : `about ${remaining}s left · ${Math.round(elapsed)}s elapsed`;
+  const remaining = Math.max(0, Math.round(stage === 'render' ? est.render - (now - at) / 1000 : est.capture + est.render - elapsed));
+  $('etaText').textContent = stage === 'done' ? `${Math.round(elapsed)}s` : (stage === 'scouting' || stage === 'drafting' || stage === 'checking') ? `${Math.round(elapsed)}s` : `about ${remaining}s left`;
+}
+function attachStream(name, startedAt, est, onDone) {
+  if (es) es.close();
+  let stage = 'starting', at = startedAt;
+  setProgress(stage, at, est, startedAt);
+  clearInterval(tick); tick = setInterval(() => setProgress(stage, at, est, startedAt), 1000);
+  const steps = $('steps'); steps.innerHTML = ''; const log = $('log'); log.innerHTML = '';
+  es = new EventSource('/api/run/' + name + '/stream');
+  es.addEventListener('stage', (ev) => { const d = JSON.parse(ev.data); stage = d.stage; at = d.at; if (d.estimate) est = d.estimate; if (d.startedAt) startedAt = d.startedAt; setProgress(stage, at, est, startedAt); });
+  es.onmessage = (ev) => {
+    const line = JSON.parse(ev.data);
+    const bad = /✗|failed|Error/i.test(line), ok = /^✓|all steps ok|check: pass|Checked:|Found the page|Drafted|Fixed/.test(line);
+    log.innerHTML += `<div>${esc(line)}</div>`;
+    // the human-readable checkpoints only
+    if (/^(Found the page|Read |Drafting|Drafted|Fixed|Checked|Recording|✗|⚠|No repair|\d+ step)/.test(line)) { steps.innerHTML += `<div class="${bad ? 'bad' : ok ? 'ok' : ''}">${esc(line)}</div>`; }
+  };
+  es.addEventListener('done', async (ev) => {
+    es.close(); es = null; clearInterval(tick);
+    const { code } = JSON.parse(ev.data);
+    setProgress('done', Date.now(), est, startedAt);
+    if (code !== 0) { $('barFill').className = 'bad'; $('stageText').textContent = code === 3 ? 'Stopped before recording — see the steps above' : 'Finished with problems — see Advanced › Log'; }
+    onDone(code);
+  });
 }
 async function run(kind) {
   if (!current) return;
   if (!(await save())) return;
   const renderOnly = kind === 'render' || (kind === 'main' && !needsRecord && !$('forceBtn').dataset.force);
-  const preview = kind === 'preview' || (kind === 'main' && quality === 'fast' && !renderOnly);
-  $('runBtn').disabled = true; $('applyBtn').disabled = true; $('forceBtn').disabled = true;
-  const log = $('log'); log.innerHTML = '';
-  const q = preview ? '?mode=preview' : renderOnly ? '?mode=render' : `?reuse=${$('forceBtn').dataset.force ? 0 : 1}`;
+  const preview = kind === 'main' && quality === 'fast' && !renderOnly;
+  $('runBtn').disabled = true; $('forceBtn').disabled = true;
+  const qs = preview ? '?mode=preview' : renderOnly ? '?mode=render' : `?reuse=${$('forceBtn').dataset.force ? 0 : 1}`;
   delete $('forceBtn').dataset.force;
   let info;
-  try { info = await api('/api/run/' + current + q, { method: 'POST' }); }
+  try { info = await api('/api/run/' + current + qs, { method: 'POST' }); }
   catch (e) { setMsg(e.message, 'bad'); $('runBtn').disabled = false; $('forceBtn').disabled = false; return; }
-  let stage = 'starting', at = info.startedAt || Date.now(), est = info.estimate || { capture: 90, render: 45 }, startedAt = info.startedAt || Date.now();
-  setProgress(stage, at, est, startedAt);
-  clearInterval(tick); tick = setInterval(() => setProgress(stage, at, est, startedAt), 1000);
-  if (es) es.close();
-  es = new EventSource('/api/run/' + current + '/stream');
-  es.addEventListener('stage', (ev) => { const d = JSON.parse(ev.data); stage = d.stage; at = d.at; if (d.estimate) est = d.estimate; if (d.startedAt) startedAt = d.startedAt; setProgress(stage, at, est, startedAt); });
-  es.onmessage = (ev) => {
-    const line = JSON.parse(ev.data);
-    const cls = /✗|failed|Error/.test(line) ? 'bad' : (/^✓|all steps ok|check: pass/.test(line) ? 'ok' : '');
-    log.innerHTML += `<div class="${cls}">${escapeHtml(line)}</div>`; log.scrollTop = log.scrollHeight;
-  };
-  es.addEventListener('done', async (ev) => {
-    es.close(); es = null; clearInterval(tick);
-    const { code } = JSON.parse(ev.data);
-    stage = 'done'; setProgress('done', Date.now(), est, startedAt);
-    if (code !== 0) { $('barFill').className = 'bad'; $('stageText').textContent = 'Finished with problems — see the log and proof log'; }
+  attachStream(current, info.startedAt || Date.now(), info.estimate || { capture: 90, render: 45 }, async (code) => {
     $('runBtn').disabled = false; $('forceBtn').disabled = false;
-    if (code === 0) { pendingRender = false; $('applyBtn').disabled = true; $('applyHint').textContent = 'No changes since the last render.'; }
-    else $('applyBtn').disabled = false;
-    setMsg(code === 0 ? (renderOnly ? 're-rendered' : preview ? 'preview ready' : 'take done — all steps ok') : `finished with exit ${code}`, code === 0 ? 'ok' : 'bad');
+    if (code === 0) pendingRender = false;
     await loadDemos(); await loadTake(true);
-    renderRefine(demoList.find((x) => x.name === current));
-    paintAction();
   });
 }
 $('runBtn').onclick = () => run('main');
 $('forceBtn').onclick = () => { $('forceBtn').dataset.force = '1'; run('main'); };
 
-// --- last take ---------------------------------------------------------
-async function loadTake(fresh) {
-  const out = $('out'), tl = $('timeline'), tll = $('tlLabels');
-  tl.innerHTML = ''; tll.innerHTML = '';
-  let data;
-  try { data = await api('/api/take/' + current); } catch { out.innerHTML = '<div class="empty">No take yet.</div>'; return; }
-  const { take, files, proof, facts, stamp } = data;
-  const dur = take.duration - take.trimBefore;
-  for (const e of take.timeline.filter((e) => e.end > e.start)) {
-    const s = document.createElement('span');
-    s.style.flex = String(Math.max(0.05, e.end - e.start));
-    s.className = e.ok === false ? 'bad' : (e.action === 'waitFor' ? 'wait' : '');
-    s.title = `${e.summary} (${(e.start - take.trimBefore).toFixed(1)}s–${(e.end - take.trimBefore).toFixed(1)}s)`;
-    tl.appendChild(s);
-  }
-  const scenes = take.timeline.filter((e) => e.action === 'scene');
-  sceneTimes = {}; for (const s of scenes) sceneTimes[s.label] = Math.max(0, s.start - take.trimBefore);
-  tll.innerHTML = scenes.map((s) => `<span>${(s.start - take.trimBefore).toFixed(0)}s ${escapeHtml(s.label)}</span>`).join('');
-  const has = (f) => files.includes(f);
-  const q = '?v=' + stamp;
-  const status = take.partial ? `<span style="color:var(--bad)">partial — ${escapeHtml(take.partial)}</span>` : (take.ok ? '<span style="color:var(--ok)">all steps ok</span>' : '<span style="color:var(--bad)">some steps failed</span>');
-  const mb = (n) => (n / 1e6).toFixed(1) + ' MB';
-  const tim = facts && facts.timings ? Object.entries(facts.timings).map(([k, v]) => `${k} ${v}s`).join(' · ') : '';
-  out.innerHTML = `
-    ${has('demo.mp4') ? `<video controls playsinline src="/out/${current}/demo.mp4${q}"${has('thumbnail.png') ? ` poster="/out/${current}/thumbnail.png${q}"` : ''}></video>` : ''}
-    <p class="hint" style="margin:10px 0 4px">${dur.toFixed(1)}s · ${status}<br>${new Date(take.finishedAt).toLocaleString()}</p>
-    ${facts ? `<div class="facts">${facts.width}×${facts.height} · ${facts.fps}fps · ${escapeHtml(facts.preset)} · ${escapeHtml(facts.encoder || '')}<br>check: <span style="color:${facts.check && facts.check.ok ? 'var(--ok)' : 'var(--bad)'}">${facts.check && facts.check.ok ? 'pass' : 'FAIL'}</span> · camera on ${facts.cameraScenes} scenes${facts.cached ? ' · cached' : ''}<br>capture ${take.captureSec ?? '?'}s${tim ? ' · ' + tim : ''}</div>` : ''}
-    <div class="files">
-      ${['demo.mp4', 'master.mp4', 'demo.gif', 'thumbnail.png', 'proof-log.md'].filter(has).map((f) => `<a href="/out/${current}/${f}${q}" target="_blank"><span>${f}</span><small>${facts && facts.sizes && facts.sizes[f] ? mb(facts.sizes[f]) : ''}</small></a>`).join('')}
-      ${has('demo.gif') ? '' : `<a href="#" id="mkGif"><span>Make a GIF</span><small>from demo.mp4</small></a>`}
-    </div>
-    <details style="margin-top:12px"><summary>Proof log</summary><pre class="proof">${escapeHtml(proof)}</pre></details>`;
-  const gb = $('mkGif');
-  if (gb) gb.onclick = async (e) => {
-    e.preventDefault(); gb.querySelector('span').textContent = 'Making the GIF…';
-    try { await api('/api/gif/' + current, { method: 'POST' }); await loadTake(); } catch (err) { gb.querySelector('span').textContent = err.message; }
-  };
-  if (fresh) { const v = out.querySelector('video'); if (v) v.play().catch(() => {}); }
-}
-
-// --- new demo flow -----------------------------------------------------
-let step = 1;
-const STEPS = 5;
-const slug = (t) => t.toLowerCase().replace(/https?:\/\//, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-function showStep(n) {
-  step = n;
-  saveDraftSoon();
-  for (let i = 1; i <= STEPS; i++) $('step' + i).classList.toggle('hidden', i !== n);
-  $('flowSteps').textContent = `Step ${n} of ${STEPS}`;
-  $('fBack').textContent = n === 1 ? 'Cancel' : 'Back';
-  $('fNext').classList.toggle('hidden', n === STEPS);
-  $('fNext').textContent = n === 2 && !$('fProject').value.trim() ? 'Skip' : 'Continue';
-  // The name stays project-N unless the person types one; no clever guessing.
-  if (n === STEPS) {
-    $('fDraft').disabled = !(settings && settings.active);
-    $('fDraftModel').textContent = settings && settings.active
-      ? `Scouts the page${$('fProject').value.trim() ? ' and reads the project' : ''}. Model: ${settings.active}.`
-      : 'No model set up yet — add one in Settings.';
-  }
-  const inp = $('step' + n).querySelector('input,textarea'); if (inp) setTimeout(() => inp.focus(), 50);
-}
-$('newBtn').onclick = () => { draftId = 'd' + Date.now().toString(36); for (const id of ['fUrl', 'fProject', 'fDesc', 'fName']) $(id).value = ''; $('fName').placeholder = 'my-demo'; $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = ''; show('viewNew'); showStep(1); };
-for (const id of ['fUrl', 'fProject', 'fDesc', 'fName']) $(id).addEventListener('input', saveDraftSoon);
-$('fBack').onclick = () => { if (step === 1) show('viewDemo'); else showStep(step - 1); };
-$('fNext').onclick = () => {
-  if (step === 1) { const u = $('fUrl').value.trim(); if (!/^https?:\/\//.test(u)) { $('fUrl').focus(); $('fUrl').style.borderColor = 'var(--bad)'; return; } $('fUrl').style.borderColor = ''; }
-  if (step === 3 && !$('fDesc').value.trim()) { $('fDesc').focus(); return; }
-  if (step === 4) { const n = $('fName').value.trim(); if (n && !/^[a-z0-9-]+$/.test(n)) { $('fName').style.borderColor = 'var(--bad)'; return; } $('fName').style.borderColor = ''; }
-  showStep(step + 1);
-};
-for (const id of ['fUrl', 'fName']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('fNext').click(); });
-
-// Checking the folder is instant and local — say what was found, so the value
-// of pointing at it is obvious before anything is drafted.
+// ---------- new demo: one card ----------
+function openNew() { draftId = 'd' + Date.now().toString(36); for (const id of ['fUrl', 'fDesc', 'fProject']) $(id).value = ''; $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = ''; show('viewNew'); setTimeout(() => $('fUrl').focus(), 50); }
+$('newBtn').onclick = openNew;
+$('fCancel').onclick = () => { if (current) show('viewDemo'); };
+for (const id of ['fUrl', 'fDesc', 'fProject']) $(id).addEventListener('input', saveDraftSoon);
 $('fProject').addEventListener('change', async () => {
-  const dir = $('fProject').value.trim();
-  $('fNext').textContent = dir ? 'Continue' : 'Skip';
-  if (!dir) { $('fProjectNote').textContent = ''; return; }
+  const dir = $('fProject').value.trim(); if (!dir) { $('fProjectNote').textContent = ''; return; }
   $('fProjectNote').textContent = 'Reading…';
-  try {
-    const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) });
-    const bits = [`${r.files} files`, r.stack.length ? r.stack.join(', ') : null, r.routes.length ? `${r.routes.length} routes (${r.routes.slice(0, 4).join(' ')}${r.routes.length > 4 ? ' …' : ''})` : null, r.selectors ? `${r.selectors} stable selectors` : null, r.auth ? 'a sign-in' : null, r.flaky ? `${r.flaky} things to watch` : null].filter(Boolean);
-    $('fProjectNote').innerHTML = `<span class="ok-note">Found ${escapeHtml(r.name)}</span> — ${escapeHtml(bits.join(' · '))}`;
-  } catch (e) { $('fProjectNote').textContent = e.message; }
+  try { const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) }); const bits = [`${r.files} files`, r.stack.length ? r.stack.join(', ') : null, r.routes.length ? `${r.routes.length} routes` : null, r.selectors ? `${r.selectors} stable selectors` : null, r.auth ? 'a sign-in' : null, r.flaky ? `${r.flaky} things to watch` : null].filter(Boolean); $('fProjectNote').innerHTML = `<span style="color:var(--ok)">Found ${esc(r.name)}</span> — ${esc(bits.join(' · '))}`; } catch (e) { $('fProjectNote').textContent = e.message; }
 });
-
 $('fIdeas').onclick = async () => {
-  const btn = $('fIdeas'); btn.disabled = true; btn.textContent = 'Looking at the app…';
+  const u = $('fUrl').value.trim(); if (!/^https?:\/\//.test(u)) { $('fUrl').focus(); return; }
+  $('fIdeas').disabled = true; $('fIdeasNote').textContent = 'Looking at the app…';
+  try { const r = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ url: u, project: $('fProject').value.trim() || undefined }) }); $('ideaList').innerHTML = r.ideas.map((i, n) => `<button class="idea" data-i="${n}"><b>${esc(i.title)}</b><span>${esc(i.story || '')}${i.length ? ' · ' + esc(i.length) : ''}</span></button>`).join(''); $('fIdeasNote').textContent = `Saved to ${r.file}`; for (const b of $('ideaList').querySelectorAll('button[data-i]')) b.onclick = () => { const i = r.ideas[Number(b.dataset.i)]; $('fDesc').value = i.story || i.title; $('ideaList').innerHTML = ''; $('fDesc').focus(); }; }
+  catch (e) { $('fIdeasNote').textContent = e.message; } finally { $('fIdeas').disabled = false; }
+};
+$('fGo').onclick = async () => {
+  const url = $('fUrl').value.trim(), describe = $('fDesc').value.trim();
+  if (!/^https?:\/\//.test(url)) { $('fUrl').style.borderColor = 'var(--bad)'; $('fUrl').focus(); return; } $('fUrl').style.borderColor = '';
+  if (!describe) { $('fDesc').focus(); return; }
+  if (!(settings && settings.active)) { $('fBusy').textContent = 'No model set up yet — choose one in Settings (gear, top right).'; return; }
+  $('fGo').disabled = true; $('fBusy').textContent = '';
   try {
-    const r = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ url: $('fUrl').value.trim(), project: $('fProject').value.trim() || undefined }) });
-    $('ideaList').innerHTML = r.ideas.map((i, n) => `<button class="idea" data-i="${n}"><b>${escapeHtml(i.title)}</b><span>${escapeHtml(i.story || '')}${i.length ? ' · ' + escapeHtml(i.length) : ''}</span></button>`).join('') + `<p class="hint">Saved to ${escapeHtml(r.file)}</p>`;
-    for (const b of $('ideaList').querySelectorAll('button[data-i]')) {
-      b.onclick = () => { const i = r.ideas[Number(b.dataset.i)]; $('fDesc').value = i.story || i.title; $('fDesc').focus(); };
-    }
-  } catch (e) { $('ideaList').innerHTML = `<p class="hint">${escapeHtml(e.message)}</p>`; }
-  finally { btn.disabled = false; btn.textContent = 'Suggest ideas'; }
+    const r = await api('/api/create', { method: 'POST', body: JSON.stringify({ url, describe, project: $('fProject').value.trim() || undefined }) });
+    if (draftId) { api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; }
+    await loadDemos();
+    current = r.name; show('viewDemo');
+    const d = demoList.find((x) => x.name === r.name); $('title').textContent = d?.title || r.name; paintAction();
+    $('stage').innerHTML = '<div class="empty">Working on your first take…</div>'; $('receipts').innerHTML = '';
+    $('runBtn').disabled = true;
+    attachStream(r.name, r.startedAt, r.estimate, async (code) => {
+      $('runBtn').disabled = false;
+      const { yaml } = await api('/api/demos/' + r.name).catch(() => ({ yaml: '' })); $('yaml').value = yaml || '';
+      await loadDemos(); fillSettings(demoList.find((x) => x.name === r.name)); await loadTake(true);
+      if (code === 0) flash('First take ready. Tell it what to change, or make it Final.');
+    });
+  } catch (e) { $('fBusy').textContent = e.message; }
+  finally { $('fGo').disabled = false; }
+};
+$('fBlank').onclick = async () => {
+  const url = $('fUrl').value.trim(); if (!/^https?:\/\//.test(url)) { $('fUrl').focus(); return; }
+  try { const r = await api('/api/demos', { method: 'POST', body: JSON.stringify({ url, describe: $('fDesc').value }) }); if (draftId) { api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; } await loadDemos(); await select(r.name); $('adv').open = true; }
+  catch (e) { $('fBusy').textContent = e.message; }
 };
 
-async function createDemo(kind) {
-  const body = JSON.stringify({ name: $('fName').value.trim() || $('fName').placeholder || undefined, url: $('fUrl').value.trim(), describe: $('fDesc').value, project: $('fProject').value.trim() || undefined });
-  $('fDraft').disabled = true; $('fBlank').disabled = true;
-  $('fBusy').textContent = kind === 'draft' ? 'Scouting the page… then drafting. Ten seconds to a couple of minutes, depending on the model.' : 'Creating…';
-  try {
-    const r = await api(kind === 'draft' ? '/api/describe' : '/api/demos', { method: 'POST', body });
-    if (draftId) { await api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; }
-    await loadDemos(); await select(r.name);
-    if (kind === 'draft') setMsg(`drafted by ${r.provider}${r.read ? ` after reading ${r.read} files` : ''} · ${r.scouted} elements scouted — read it before you run`, 'ok');
-  } catch (e) { $('fBusy').textContent = e.message; }
-  finally { $('fDraft').disabled = false; $('fBlank').disabled = false; }
-}
-$('fDraft').onclick = () => createDemo('draft');
-$('fBlank').onclick = () => createDemo('blank');
-
-// --- settings ----------------------------------------------------------
-const PROVIDERS = [
-  ['claude-code', 'Claude Code', 'The claude CLI you are signed into. No key.'],
-  ['codex', 'Codex', 'The codex CLI you are signed into. No key.'],
-  ['groq', 'Groq', 'Fast hosted models. Needs an API key.'],
-  ['mistral', 'Mistral', 'Hosted. Needs an API key.'],
-  ['local', 'Local model', 'Ollama or LM Studio on this machine. Fully offline.'],
-];
+// ---------- settings ----------
+const PROVIDERS = [['claude-code', 'Claude Code', 'The claude CLI you are signed into. No key.'], ['codex', 'Codex', 'The codex CLI you are signed into. No key.'], ['groq', 'Groq', 'Fast hosted models. Needs an API key.'], ['mistral', 'Mistral', 'Hosted. Needs an API key.'], ['local', 'Local model', 'Ollama or LM Studio on this machine. Fully offline.']];
 let chosen = '';
 function renderProviders() {
   const el = $('providers'); el.innerHTML = '';
   for (const [id, name, desc] of PROVIDERS) {
     const avail = settings.available.includes(id) || id === 'local';
-    const div = document.createElement('div');
-    div.className = 'provider' + (chosen === id ? ' on' : '') + (avail ? '' : ' off');
+    const div = document.createElement('div'); div.className = 'provider' + (chosen === id ? ' on' : '') + (avail ? '' : ' off');
     div.innerHTML = `<span class="dot ${avail ? 'ok' : ''}"></span><div><b>${name}</b><div class="d">${desc}${avail ? '' : ' Not detected.'}</div></div>`;
-    if (avail || id === 'local') div.onclick = () => { chosen = id; renderProviders(); };
+    if (avail) div.onclick = () => { chosen = id; renderProviders(); };
     el.appendChild(div);
   }
   $('localFields').classList.toggle('hidden', chosen !== 'local');
 }
-async function openSettings() {
-  settings = await api('/api/settings');
-  chosen = settings.model || (settings.available[0] || '');
-  $('setLocalUrl').value = settings.env.localUrl || ''; $('setLocalModel').value = settings.env.localModel || '';
-  $('toolsInfo').textContent = `GIF encoder: ${settings.gifski ? 'gifski (installed)' : 'ffmpeg palette (install gifski for better GIFs)'} · Active model: ${settings.active || 'none'}`;
-  renderProviders(); show('viewSettings');
-}
-$('gear').onclick = openSettings;
+$('gear').onclick = async () => { settings = await api('/api/settings'); chosen = settings.model || settings.available[0] || ''; $('setLocalUrl').value = settings.env.localUrl || ''; $('setLocalModel').value = settings.env.localModel || ''; $('toolsInfo').textContent = `GIF encoder: ${settings.gifski ? 'gifski' : 'ffmpeg (install gifski for better GIFs)'} · Active model: ${settings.active || 'none'}`; renderProviders(); show('viewSettings'); };
 $('setSave').onclick = async () => {
   const body = { model: chosen, localUrl: $('setLocalUrl').value.trim(), localModel: $('setLocalModel').value.trim() };
-  if ($('setGroq').value) body.groqKey = $('setGroq').value.trim();
-  if ($('setMistral').value) body.mistralKey = $('setMistral').value.trim();
-  settings = await api('/api/settings', { method: 'PUT', body: JSON.stringify(body) });
-  $('setGroq').value = ''; $('setMistral').value = '';
-  $('modelTag').textContent = settings.active ? 'model: ' + settings.active : 'no model';
-  show(current ? 'viewDemo' : 'viewDemo');
+  if ($('setGroq').value) body.groqKey = $('setGroq').value.trim(); if ($('setMistral').value) body.mistralKey = $('setMistral').value.trim();
+  settings = await api('/api/settings', { method: 'PUT', body: JSON.stringify(body) }); $('setGroq').value = ''; $('setMistral').value = '';
+  $('modelTag').textContent = settings.active ? 'model: ' + settings.active : 'no model'; show(current ? 'viewDemo' : 'viewNew');
 };
 
-// --- boot --------------------------------------------------------------
+// ---------- keyboard on the video ----------
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  const v = $('stage').querySelector('video'); if (!v) return;
+  if (e.code === 'Space') { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  else if (e.key === 'ArrowRight') { v.currentTime = Math.min(v.duration || 0, v.currentTime + (e.shiftKey ? 5 : 1)); }
+  else if (e.key === 'ArrowLeft') { v.currentTime = Math.max(0, v.currentTime - (e.shiftKey ? 5 : 1)); }
+});
+
+// ---------- boot ----------
 (async () => {
-  setMode(mode);
+  setQuality(quality);
   try { const ps = await api('/api/presets'); $('sPreset').innerHTML = ps.filter((p) => p.name !== 'preview-fast').map((p) => `<option value="${p.name}">${p.name} — ${p.width}×${p.height}</option>`).join(''); } catch {}
   try { settings = await api('/api/settings'); $('modelTag').textContent = settings.active ? 'model: ' + settings.active : 'no model — set one in Settings'; } catch {}
   const list = await loadDemos();
   const first = list.find((d) => d.valid);
-  if (first) select(first.name); else { show('viewNew'); showStep(1); }
+  if (first) select(first.name); else openNew();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 })();
 </script>

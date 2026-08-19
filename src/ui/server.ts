@@ -29,7 +29,9 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { Manifest, loadManifest } from "../manifest.js";
 import { PRESETS } from "../presets.js";
-import { draftManifest, loadDotenv, pickProvider, providerStatus, scout, suggestIdeas } from "../describe.js";
+import { draftManifest, loadDotenv, pickProvider, proposeEdits, providerStatus, scout, suggestIdeas, type Scout } from "../describe.js";
+import { applyEdits, receiptsFor } from "../edits.js";
+import { dryRun } from "../dryrun.js";
 import { gifskiBin, makeGif } from "../render.js";
 import { captureHash } from "../record.js";
 import { digest } from "../digest.js";
@@ -52,7 +54,38 @@ function nextProjectName(): string {
 }
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-type Run = { proc: ChildProcess; lines: string[]; done: boolean; code: number | null; listeners: Set<http.ServerResponse>; stage: string; startedAt: number; stageAt: number; estimate: { capture: number; render: number } };
+type Run = { proc: ChildProcess | null; lines: string[]; done: boolean; code: number | null; listeners: Set<http.ServerResponse>; stage: string; startedAt: number; stageAt: number; estimate: { capture: number; render: number } };
+
+/** Push a line / stage into a run and to everyone streaming it. */
+function emit(run: Run, line: string) {
+  run.lines.push(line);
+  for (const res of run.listeners) res.write(`data: ${JSON.stringify(line)}\n\n`);
+}
+function setStage(run: Run, stage: string) {
+  run.stage = stage; run.stageAt = Date.now();
+  for (const res of run.listeners) res.write(`event: stage\ndata: ${JSON.stringify({ stage, at: run.stageAt, estimate: run.estimate, startedAt: run.startedAt })}\n\n`);
+}
+function finish(run: Run, code: number) {
+  run.done = true; run.code = code;
+  for (const res of run.listeners) { res.write(`event: done\ndata: ${JSON.stringify({ code })}\n\n`); res.end(); }
+  run.listeners.clear();
+}
+
+/** Deterministic repairs for what a dry run finds — no model needed.
+    Strict-mode collision → pick the first visible match. */
+function autoRepair(yamlText: string, failures: string[]): { yaml: string; fixes: string[] } {
+  const fixes: string[] = [];
+  const doc = YAML.parseDocument(yamlText);
+  const steps = doc.get("steps") as YAML.YAMLSeq | undefined;
+  for (const f of failures) {
+    const m = /^✗ \[(\d+)\] \w+ (.+?) — .*strict mode violation/.exec(f);
+    if (!m || !steps) continue;
+    const n = steps.items[Number(m[1])] as YAML.YAMLMap;
+    const sel = n && typeof n.get === "function" ? String(n.get("selector") ?? "") : "";
+    if (sel && !/>> nth=/.test(sel)) { n.set("selector", `${sel} >> nth=0`); fixes.push(`step ${m[1]}: "${sel}" matched several — using the first`); }
+  }
+  return { yaml: doc.toString(), fixes };
+}
 const runs = new Map<string, Run>();
 
 const json = (res: http.ServerResponse, code: number, body: unknown) => {
@@ -154,7 +187,7 @@ function startRun(name: string, mode: { preview?: boolean; reuse?: boolean; gif?
       if (mode.gif) args.push("--gif");
     }
   }
-  const proc = spawn(process.execPath, [path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs"), ...args], {
+  const proc: ChildProcess = spawn(process.execPath, [path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs"), ...args], {
     cwd: ROOT,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
@@ -178,8 +211,8 @@ function startRun(name: string, mode: { preview?: boolean; reuse?: boolean; gif?
       for (const res of run.listeners) res.write(`data: ${JSON.stringify(l)}\n\n`);
     }
   };
-  proc.stdout.on("data", push);
-  proc.stderr.on("data", push);
+  proc.stdout?.on("data", push);
+  proc.stderr?.on("data", push);
   proc.on("close", (code) => {
     run.done = true;
     run.code = code;
@@ -285,6 +318,84 @@ export function serve(port: number) {
         const out = makeGif(path.join(OUT, mg[1]));
         return json(res, 200, { file: path.basename(out), size: fs.statSync(out).size });
       }
+      // "Tell Retake what to change": plain English → structured edits → re-render or re-record.
+      const mfix = /^\/api\/fix\/([a-z0-9-]+)$/.exec(p);
+      if (mfix && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { instruction: string; run?: boolean };
+        const file = path.join(DEMOS, `${mfix[1]}.yaml`);
+        if (!fs.existsSync(file)) return json(res, 404, { error: "not found" });
+        const provider = pickProvider();
+        if (!provider) return json(res, 400, { error: "no model configured — pick one in Settings" });
+        const m = loadManifest(file).manifest;
+        const takePath = path.join(OUT, mfix[1], "take.json");
+        const take = fs.existsSync(takePath) ? (JSON.parse(fs.readFileSync(takePath, "utf8")) as import("../record.js").Take) : null;
+        const receipts = receiptsFor(take, m.steps as never);
+        const { edits, note } = await proposeEdits({ instruction: b.instruction, yaml: fs.readFileSync(file, "utf8"), receipts, provider });
+        if (!edits.length) return json(res, 200, { applied: [], skipped: [], note: note || "Nothing to change for that.", rerecord: false });
+        const a = applyEdits(file, edits);
+        const m2 = loadManifest(file).manifest;
+        const rerecord = a.rerecord || !take || !take.captureHash || take.captureHash !== captureHash(m2);
+        return json(res, 200, { applied: a.done, skipped: a.skipped, note, rerecord, yaml: a.yaml });
+      }
+
+      // "Take it from here": scout → (read project) → draft → dry-run → repair → fast preview.
+      if (p === "/api/create" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { url: string; describe: string; project?: string; name?: string };
+        if (!/^https?:\/\//.test(b.url)) return json(res, 400, { error: "url must start with http(s)://" });
+        if (!b.describe?.trim()) return json(res, 400, { error: "say what the demo should show" });
+        const provider = pickProvider();
+        if (!provider) return json(res, 400, { error: "no model configured — pick one in Settings" });
+        const name = b.name && safeName(b.name) ? b.name : nextProjectName();
+        const file = path.join(DEMOS, `${name}.yaml`);
+        if (fs.existsSync(file)) return json(res, 409, { error: `"${name}" already exists` });
+        const run: Run = { proc: null, lines: [], done: false, code: null, listeners: new Set(), stage: "scouting", startedAt: Date.now(), stageAt: Date.now(), estimate: { capture: 90, render: 12 } };
+        runs.set(name, run);
+        const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
+        (async () => {
+          try {
+            setStage(run, "scouting");
+            let sc: Scout;
+            try { sc = await scout(b.url); } catch (e) { emit(run, `✗ ${unreachable(b.url, e as Error)}`); return finish(run, 2); }
+            emit(run, `Found the page — ${sc.elements.length} controls${sc.headings.length ? `, “${sc.headings[0]}”` : ""}`);
+            if (project) { try { const d = digest(project); emit(run, `Read ${d.name}: ${d.files} files, ${d.routes.length} routes, ${d.selectors.length} stable selectors`); } catch (e) { emit(run, `Could not read ${project}: ${(e as Error).message}`); } }
+            setStage(run, "drafting");
+            emit(run, `Drafting with ${provider.name}…`);
+            const d = await draftManifest({ name, url: b.url, describe: b.describe, scout: sc, provider, project });
+            fs.mkdirSync(DEMOS, { recursive: true });
+            fs.writeFileSync(file, d.yaml);
+            const m = loadManifest(file).manifest;
+            emit(run, `Drafted ${m.steps.length} steps, ${m.steps.filter((s) => s.action === "scene").length} scenes`);
+            setStage(run, "checking");
+            let r = await dryRun(m, DEMOS, () => {});
+            if (!r.ok) {
+              const rep = autoRepair(fs.readFileSync(file, "utf8"), r.lines);
+              if (rep.fixes.length) { fs.writeFileSync(file, rep.yaml); for (const f of rep.fixes) emit(run, `Fixed ${f}`); r = await dryRun(loadManifest(file).manifest, DEMOS, () => {}); }
+            }
+            if (!r.ok) {
+              // One model pass with the evidence, then stop and show the person.
+              emit(run, `${r.failures} step(s) would fail — asking ${provider.name} to repair…`);
+              const m1 = loadManifest(file).manifest;
+              const { edits, note } = await proposeEdits({ instruction: "These steps fail in a dry run. Repair them (usually a different selector, or a wait for something to appear). Failures:\n" + r.lines.join("\n"), yaml: fs.readFileSync(file, "utf8"), receipts: receiptsFor(null, m1.steps as never), provider });
+              if (edits.length) { const a = applyEdits(file, edits); for (const x of a.done) emit(run, `Fixed: ${x}`); r = await dryRun(loadManifest(file).manifest, DEMOS, () => {}); }
+              else emit(run, note || "No repair proposed.");
+            }
+            if (!r.ok) { for (const l of r.lines.slice(0, 6)) emit(run, l); emit(run, `✗ Still ${r.failures} step(s) that would fail — open Advanced to fix them, then press Record.`); return finish(run, 3); }
+            emit(run, `Checked: all ${m.steps.length} steps resolve on the page`);
+            setStage(run, "capture");
+            emit(run, "Recording a fast preview…");
+            const child = spawn(process.execPath, [path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs"), path.join(ROOT, "src", "cli.ts"), "run", file, "--preset", "preview-fast"], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+            run.proc = child;
+            const push = (chunk: Buffer) => { for (const raw of chunk.toString().split("\n")) { const l = raw.trimEnd(); if (!l || /^\$ ffmpeg|zoom filter|filter graph|^>/.test(l)) continue; const st = /^\[stage\] (\w+)/.exec(l); if (st) { setStage(run, st[1] === "done" ? "done" : st[1]); continue; } emit(run, l); } };
+            child.stdout.on("data", push); child.stderr.on("data", push);
+            child.on("close", (code) => finish(run, code ?? 1));
+          } catch (e) {
+            emit(run, `✗ ${(e as Error).message.split("\n")[0]}`);
+            finish(run, 1);
+          }
+        })();
+        return json(res, 200, { name, startedAt: run.startedAt, estimate: run.estimate });
+      }
+
       if (p === "/api/ideas" && req.method === "POST") {
         const b = JSON.parse(await readBody(req)) as { url: string; project?: string };
         if (!/^https?:\/\//.test(b.url)) return json(res, 400, { error: "url must start with http(s)://" });

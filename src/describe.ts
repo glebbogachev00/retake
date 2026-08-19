@@ -227,6 +227,59 @@ export async function suggestIdeas(input: { url: string; scout: Scout; provider:
   return { markdown, ideas };
 }
 
+// --- fixing ------------------------------------------------------------------
+
+/** A small, fixed vocabulary of edits. The model picks from these; Retake
+    applies them to the YAML document (comments kept) and already knows which
+    ones need the browser again. Deliberately narrow — reliability first. */
+export const EDIT_VERBS = [
+  "set_caption",      // {scene, caption}
+  "set_camera",       // {scene, camera: "auto"|"static"|number}
+  "set_hold",         // {scene, holdMs}
+  "set_trim",         // {head?, tail?}  seconds off each end
+  "set_format",       // {preset}
+  "set_layout",       // {layout}
+  "add_wait",         // {after: <step index>, ms}
+  "wait_for",         // {step: <step index>, selector}   turn a fixed pause into waiting for something to appear (or insert after that step)
+  "set_wait",         // {step: <step index>, ms}
+  "set_text",         // {step: <step index>, text}   for type/fill steps
+  "replace_selector", // {step: <step index>, selector}
+  "delete_step",      // {step: <step index>}
+  "set_cursor",       // {cursor: "default"|"touch"|"none"}
+  "rerecord",         // {}  throw the recording away and record again
+] as const;
+export type Edit = { op: (typeof EDIT_VERBS)[number]; [k: string]: unknown };
+
+export async function proposeEdits(input: { instruction: string; yaml: string; receipts: string; provider: Provider }): Promise<{ edits: Edit[]; note: string }> {
+  const system = [
+    "You edit a Retake demo manifest in response to plain-English feedback about the video it produced.",
+    "Respond with JSON only: {\"edits\": [...], \"note\": \"one short sentence saying what you changed\"}.",
+    "Each edit is one of:",
+    '  {"op":"set_caption","scene":"<label>","caption":"..."}',
+    '  {"op":"set_camera","scene":"<label>","camera":"auto"|"static"|<zoom number 1.1-1.6>}',
+    '  {"op":"set_hold","scene":"<label>","holdMs":<ms>}',
+    '  {"op":"set_trim","head":<sec>,"tail":<sec>}',
+    '  {"op":"set_format","preset":"post-landscape"|"post-square"|"post-vertical"|"docs-gif"}',
+    '  {"op":"set_layout","layout":"band"|"card"|"overlay-bottom"|"overlay-top"|"none"}',
+    '  {"op":"add_wait","after":<step index>,"ms":<ms>}     — slow down after a step',
+    '  {"op":"wait_for","step":<step index>,"selector":"..."} — replace a fixed wait with waiting for an element to appear (if that step is not a wait, the waitFor is inserted after it)',
+    '  {"op":"set_wait","step":<step index>,"ms":<ms>}      — change an existing wait',
+    '  {"op":"set_text","step":<step index>,"text":"..."}   — what gets typed',
+    '  {"op":"replace_selector","step":<step index>,"selector":"..."}',
+    '  {"op":"delete_step","step":<step index>}',
+    '  {"op":"set_cursor","cursor":"default"|"touch"|"none"}',
+    '  {"op":"rerecord"}',
+    "Rules: make the SMALLEST change that does what was asked; never rewrite things that were not mentioned; use scene labels and step indexes exactly as given; if the request is impossible or unclear, return an empty edits list and say why in note.",
+  ].join("\n");
+  const user = `Feedback: ${input.instruction}\n\nReceipts from the last take (what actually happened, with step indexes and scene labels):\n${input.receipts}\n\nCurrent manifest:\n${input.yaml}`;
+  const raw = await chat(input.provider, system, user);
+  const text = raw.replace(/^```[a-z]*\n?/im, "").replace(/```\s*$/m, "").trim();
+  const start = text.indexOf("{");
+  const parsed = JSON.parse(text.slice(start)) as { edits?: Edit[]; note?: string };
+  const edits = (parsed.edits ?? []).filter((e) => (EDIT_VERBS as readonly string[]).includes(e.op));
+  return { edits, note: parsed.note ?? "" };
+}
+
 // --- drafting ---------------------------------------------------------------
 
 const SCHEMA_DOC = `
