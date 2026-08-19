@@ -1,0 +1,17 @@
+node_modules/
+outputs/*
+!outputs/.gitkeep
+.retake-hub/
+*.log
+.DS_Store
+.env
+.auth/
+ideas/
+
+# Demos of private apps stay local; demos/example.yaml is the public template.
+demos/*.yaml
+!demos/example.yaml
+demos/seeds/*
+!demos/seeds/.gitkeep
+scripts/capture-dev.sh
+SUMMARY.md

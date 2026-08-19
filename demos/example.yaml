@@ -1,0 +1,63 @@
+# A template. Copy it, point it at your app, replace the selectors.
+#
+#   npm run retake -- validate demos/example.yaml
+#   npm run retake -- run demos/example.yaml
+#
+# Or skip the writing: `npm run ui`, then New demo → describe what to show and
+# let a model draft this file for you from the page (and your source, if you
+# point at the folder).
+
+name: example
+title: "Example — the shape of a demo"
+url: http://localhost:3000
+
+preset: post-landscape        # 1080p @ 30fps · see `retake presets`
+viewport: { width: 1440, height: 1080 }   # match your app's natural shape
+scale: 1.8                    # page drawn at 1.8× so text stays crisp at 1080p
+reducedMotion: true           # calms infinite spinners and entrance animations
+camera: auto                  # each scene eases toward the last thing touched
+
+# Put the app in a known state before the camera rolls. Pick what fits:
+#   - { kind: file, path: /tmp/app/state.json, from: seeds/empty.json }
+#   - { kind: evaluate, script: "localStorage.clear()" }
+#   - { kind: command, run: "curl -X POST http://localhost:3000/api/test/reset" }
+seed: []
+
+# Runs before recording starts and is trimmed off the front of the video.
+# Sign-ins belong here — see the "Signing in" section of the README.
+setup: []
+
+steps:
+  - action: scene
+    label: start
+    caption: "The problem, before anything happens."
+    camera: static
+  - action: wait
+    ms: 1800
+
+  - action: click
+    selector: "button:has-text('Get started')"
+    pauseAfter: 900
+
+  - action: type
+    selector: "input[name=title]"
+    text: "A realistic thing a person would type"
+    delay: 40
+    pauseAfter: 600
+
+  - action: click
+    selector: "button[type=submit]"
+  - action: waitFor              # wait for the RESULT, never a fixed sleep
+    selector: ".result"
+    timeout: 30000
+
+  - action: scene
+    label: result
+    caption: "And the result, which is the whole point."
+  - action: wait
+    ms: 2600
+
+outputs:
+  mp4: true
+  gif: false                   # opt-in; gifski is used when installed
+  thumbnail: { scene: result }

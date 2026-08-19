@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Retake">
+  <!-- Retake: a play button built out of takes.
+       Five stacked bars — recorded runs — that together read as ▶.
+       The longest one is the take you keep. -->
+  <rect width="512" height="512" rx="112" fill="#1a1c1e"/>
+  <g fill="#eceee9">
+    <rect x="132" y="112" width="96"  height="46" rx="23" opacity="0.55"/>
+    <rect x="132" y="180" width="192" height="46" rx="23" opacity="0.8"/>
+    <rect x="132" y="248" width="288" height="46" rx="23" fill="#e8b04b"/>
+    <rect x="132" y="316" width="192" height="46" rx="23" opacity="0.8"/>
+    <rect x="132" y="384" width="96"  height="46" rx="23" opacity="0.55"/>
+  </g>
+</svg>

@@ -1,0 +1,32 @@
+{
+  "name": "retake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Demo-as-code: a YAML manifest in, a silent product walkthrough (MP4 + GIF + thumbnail + caption + proof log) out. Rerun instead of re-record.",
+  "type": "module",
+  "bin": {
+    "retake": "./src/cli.ts"
+  },
+  "scripts": {
+    "retake": "tsx src/cli.ts",
+    "run": "tsx src/cli.ts run",
+    "validate": "tsx src/cli.ts validate",
+    "ui": "tsx src/cli.ts ui",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "playwright": "^1.58.2",
+    "testreel": "^0.2.0",
+    "yaml": "^2.8.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

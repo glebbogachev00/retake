@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" width="640" height="160" role="img" aria-label="Retake">
+  <rect width="640" height="160" rx="0" fill="none"/>
+  <!-- mark -->
+  <g transform="translate(20,20)">
+    <rect width="120" height="120" rx="26" fill="#1a1c1e"/>
+    <g fill="#eceee9">
+      <rect x="31" y="26"  width="22" height="11" rx="5.5" opacity="0.55"/>
+      <rect x="31" y="42"  width="45" height="11" rx="5.5" opacity="0.8"/>
+      <rect x="31" y="58"  width="68" height="11" rx="5.5" fill="#e8b04b"/>
+      <rect x="31" y="74"  width="45" height="11" rx="5.5" opacity="0.8"/>
+      <rect x="31" y="90"  width="22" height="11" rx="5.5" opacity="0.55"/>
+    </g>
+  </g>
+  <!-- word -->
+  <text x="168" y="102" font-family="-apple-system, 'Inter', 'Helvetica Neue', Arial, sans-serif" font-size="78" font-weight="600" letter-spacing="-2" fill="#1a1c1e">retake</text>
+  <text x="170" y="138" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="18" letter-spacing="2" fill="#7a7f7a">RERUN THE DEMO. DON'T RE-RECORD IT.</text>
+</svg>
