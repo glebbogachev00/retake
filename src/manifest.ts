@@ -152,7 +152,16 @@ export const Manifest = z.object({
   /** Sign in once, reuse the session. `storageState` is a Playwright state file
       (cookies + localStorage) written after `setup` and loaded on later runs, so
       the login only happens when the file is missing or stale. */
-  auth: z.object({ storageState: z.string(), maxAgeHours: z.number().positive().default(72) }).optional(),
+  auth: z
+    .object({
+      storageState: z.string(),
+      maxAgeHours: z.number().positive().default(72),
+      /** The sign-in steps themselves. These are the ONLY steps skipped when a
+          saved session is reused — `setup` always runs, because it usually
+          contains things that have nothing to do with logging in. */
+      setup: z.array(Step).default([]),
+    })
+    .optional(),
   captions: z.union([z.boolean(), z.object({ fontSize: z.number().int().optional(), color: z.string().optional() })]).default(true),
   theme: z.object({ background: z.string().optional(), ink: z.string().optional() }).prefault({}),
   colorScheme: z.enum(["light", "dark"]).default("light"),
@@ -207,7 +216,7 @@ export function warnings(m: Manifest): string[] {
       w.push(`step "${s.action} ${s.selector}" looks like a credential field but is not marked \`secret: true\` — its text will be logged.`);
     }
   }
-  if (m.auth && !m.setup.length) w.push("`auth.storageState` is set but `setup` has no sign-in steps — there is nothing to save a session from.");
+  if (m.auth && !m.auth.setup.length && !m.setup.length) w.push("`auth.storageState` is set but there are no sign-in steps under `auth.setup` — there is nothing to save a session from.");
   return w;
 }
 

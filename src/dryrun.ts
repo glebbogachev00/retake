@@ -1,0 +1,108 @@
+/**
+ * Dry run — execute a manifest with no camera, and report what would break.
+ *
+ * Recording is the slow part of a take (a demo has to be performed in real
+ * time). Checking that every selector resolves and every wait resolves does
+ * not: it runs as fast as the app responds. So the cheap thing should happen
+ * first, and the camera should only roll on a manifest that already works.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { chromium, type Page, type BrowserContext } from "playwright";
+import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
+
+export type DryResult = { ok: boolean; lines: string[]; failures: number };
+
+export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void): Promise<DryResult> {
+  const q = resolve(m);
+  const lines: string[] = [];
+  let failures = 0;
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: q.viewport,
+    colorScheme: m.colorScheme,
+    ...(m.reducedMotion ? { reducedMotion: "reduce" as const } : {}),
+  });
+
+  const stubs = new Map<string, Stub>();
+  const arm = async (d: Stub) => {
+    const key = `${d.method ?? "ANY"} ${d.url}`;
+    const fresh = !stubs.has(key);
+    stubs.set(key, d);
+    if (!fresh) return;
+    await context.route(d.url, async (route, request) => {
+      const cur = stubs.get(key)!;
+      if (cur.method && request.method().toUpperCase() !== cur.method.toUpperCase()) return route.fallback();
+      const body = cur.json !== undefined ? JSON.stringify(cur.json) : cur.from ? fs.readFileSync(path.resolve(manifestDir, expandEnv(cur.from)), "utf8") : "{}";
+      await route.fulfill({ status: cur.status ?? 200, contentType: cur.contentType, body });
+    });
+  };
+
+  const page = await context.newPage();
+  try {
+    for (const d of m.stub) await arm(d);
+    await page.goto(expandEnv(m.url), { waitUntil: "networkidle" });
+    for (const s of [...(m.auth?.setup ?? []), ...m.setup]) await run(s, true);
+    for (const [i, s] of m.steps.entries()) await run(s, false, i);
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+
+  async function run(step: Step, isSetup: boolean, index = -1) {
+    const tag = isSetup ? "setup" : String(index).padStart(3, "0");
+    const short = 8000; // long enough for a click that navigates, short enough to stay fast
+    try {
+      switch (step.action) {
+        case "navigate": await page.goto(expandEnv(step.url), { waitUntil: "networkidle" }); break;
+        case "waitFor": await page.waitForSelector(step.selector, { timeout: Math.min(step.timeout ?? 15000, 15000) }); break;
+        // noWaitAfter: a click that submits a form starts a navigation, and
+        // waiting for the element to settle afterwards reports a false failure
+        // for a click that actually worked.
+        case "click":
+          await page.locator(step.selector).waitFor({ timeout: short }); // strict, like the recorder
+          await page.locator(step.selector).first().click({ timeout: short, noWaitAfter: true });
+          await page.waitForLoadState("domcontentloaded", { timeout: 5000 }).catch(() => {});
+          break;
+        case "type": await page.locator(step.selector).waitFor({ timeout: short }); await page.locator(step.selector).fill(expandEnv(step.text), { timeout: short }); break;
+        case "fill": await page.locator(step.selector).waitFor({ timeout: short }); await page.locator(step.selector).fill(expandEnv(step.text), { timeout: short }); break;
+        case "hover": await page.locator(step.selector).first().hover({ timeout: short }); break;
+        case "scroll": if (step.to) await page.locator(step.to).first().boundingBox({ timeout: short }); break;
+        case "upload": await page.locator(step.selector).first().waitFor({ timeout: short }); break;
+        case "evaluate": await page.evaluate(step.script); break;
+        case "stub": await arm({ url: step.url, method: step.method, status: step.status ?? 200, json: step.json, from: step.from, contentType: "application/json; charset=utf-8" }); break;
+        case "keyboard": await page.keyboard.press(step.key); break;
+        // Pacing does not matter in a dry run, so step waits are compressed.
+        // Setup waits are not: they are usually giving a navigation or a login
+        // time to finish, and cutting them changes the outcome.
+        case "wait": await page.waitForTimeout(isSetup ? step.ms : Math.min(step.ms, 400)); break;
+        default: break; // scene, screenshot, zoom, download: nothing to verify
+      }
+      if (step.pauseAfter) await page.waitForTimeout(120);
+    } catch (e) {
+      failures++;
+      const why = (e as Error).message.split("\n")[0];
+      // What was actually on screen matters more than the timeout message:
+      // most "selector not found" is really "you are on a different page".
+      let where = "";
+      try {
+        const text = (await page.innerText("body")).replace(/\s+/g, " ").trim().slice(0, 110);
+        where = `\n        on ${page.url()} — “${text}”`;
+      } catch { /* page may be gone */ }
+      const line = `✗ [${tag}] ${describe(step)} — ${why}${where}`;
+      lines.push(line);
+      log(line);
+    }
+  }
+
+  const ok = failures === 0;
+  log(ok ? `dry run: all ${m.steps.length} steps resolved` : `dry run: ${failures} step(s) would fail`);
+  return { ok, lines, failures };
+}
+
+function describe(s: Step): string {
+  if ("selector" in s && s.selector) return `${s.action} ${s.selector}`;
+  if (s.action === "navigate") return `navigate ${s.url}`;
+  if (s.action === "scroll" && s.to) return `scroll to ${s.to}`;
+  return s.action;
+}

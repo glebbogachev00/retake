@@ -15,3 +15,6 @@ demos/seeds/*
 !demos/seeds/.gitkeep
 scripts/capture-dev.sh
 SUMMARY.md
+.drafts/
+.trash/
+demos/*/

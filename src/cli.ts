@@ -20,6 +20,15 @@ import { acquireLock, captureHash, record, releaseLock, type Take } from "./reco
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 
+// The manifest may reference ${VARS}; load .env before any command reads one.
+// (`describe` and the UI used to do this individually, so a plain `run` from
+// the terminal silently saw empty values — which is how a whole take can fail
+// at a login without saying why.)
+try {
+  const { loadDotenv } = await import("./describe.js");
+  loadDotenv(process.cwd());
+} catch { /* .env is optional */ }
+
 const program = new Command();
 program.name("retake").description("Rerun the demo instead of re-recording it.").version("0.1.0");
 
@@ -115,6 +124,17 @@ program
     } finally {
       releaseLock(path.resolve(dir));
     }
+  });
+
+program
+  .command("dry")
+  .description("run the manifest with no camera and report what would fail")
+  .argument("<manifest>")
+  .action(async (file: string) => {
+    const { manifest, dir } = loadManifest(file);
+    const { dryRun } = await import("./dryrun.js");
+    const r = await dryRun(manifest, dir, say);
+    if (!r.ok) process.exitCode = 3;
   });
 
 program

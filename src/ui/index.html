@@ -128,6 +128,14 @@
   .idea b { display:block; font-weight:600; margin-bottom:3px; }
   .idea span { color:var(--muted); font-size:13px; }
   .ok-note { color:var(--ok); font-size:13px; }
+  .drafts { margin-top:14px; border-top:1px solid var(--rule); padding-top:10px; }
+  .draft { display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:9px; cursor:pointer; font-size:14px; color:var(--muted); }
+  .draft:hover { background:#eef1ea; color:var(--ink); }
+  .draft .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .draft small, .demo .x { font:11px ui-monospace, Menlo, monospace; opacity:.7; }
+  .x { display:none; border:0; background:transparent; color:inherit; cursor:pointer; padding:0 4px; line-height:1; }
+  .demo:hover .x, .draft:hover .x { display:inline; }
+  .x:hover { color:var(--bad); }
   kbd { font:11px ui-monospace, Menlo, monospace; border:1px solid var(--rule2); border-bottom-width:2px; border-radius:5px; padding:1px 5px; color:var(--muted); background:#fff; }
 </style>
 </head>
@@ -148,6 +156,7 @@
     <div class="label">Demos</div>
     <div id="demos"></div>
     <button class="btn wide" id="newBtn" style="margin-top:14px">+ New demo</button>
+    <div class="drafts hidden" id="draftsWrap"><div class="label" style="margin-bottom:6px">Unfinished</div><div id="drafts"></div></div>
   </aside>
 
   <main class="card" id="main">
@@ -239,7 +248,7 @@
         </div>
         <div id="step4" class="hidden">
           <p class="q">Name it</p>
-          <p class="why">Short, lowercase, dashes. It names the folder your videos land in.</p>
+          <p class="why">Optional. Short, lowercase, dashes — it names the folder your videos land in. Leave it blank and it stays as the project number.</p>
           <input type="text" id="fName" placeholder="my-app-onboarding" />
         </div>
         <div id="step5" class="hidden">
@@ -343,11 +352,54 @@ async function loadDemos() {
     const div = document.createElement('div');
     div.className = 'demo' + (d.name === current ? ' on' : '');
     const dot = d.lastTake ? (d.lastTake.ok && !d.lastTake.partial ? 'ok' : 'bad') : '';
-    div.innerHTML = `<span class="dot ${dot}"></span><span class="name">${escapeHtml(d.name)}</span><small>${d.lastTake ? d.lastTake.duration + 's' : (d.valid ? '' : 'invalid')}</small>`;
+    div.innerHTML = `<span class="dot ${dot}"></span><span class="name">${escapeHtml(d.name)}</span><small>${d.lastTake ? d.lastTake.duration + 's' : (d.valid ? '' : 'invalid')}</small><button class="x" title="Delete this demo" aria-label="Delete ${escapeHtml(d.name)}">×</button>`;
     div.onclick = () => select(d.name);
+    div.querySelector('.x').onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete "${d.name}" and its videos? The manifest is kept in .trash/ for a while.`)) return;
+      try { await api('/api/demos/' + d.name, { method: 'DELETE' }); } catch (err) { setMsg(err.message, 'bad'); return; }
+      if (current === d.name) { current = null; $('yaml').value = ''; $('out').innerHTML = '<div class="empty">No take yet.</div>'; }
+      const list = await loadDemos();
+      if (!current && list.length) select(list[0].name); else if (!list.length) { show('viewNew'); showStep(1); }
+    };
     el.appendChild(div);
   }
+  await loadDrafts();
   return demoList;
+}
+
+// --- drafts: an unfinished "new demo", saved as you type ---------------
+let draftId = null, draftTimer = null;
+async function loadDrafts() {
+  let ds = [];
+  try { ds = await api('/api/drafts'); } catch {}
+  $('draftsWrap').classList.toggle('hidden', !ds.length);
+  const el = $('drafts'); el.innerHTML = '';
+  for (const d of ds) {
+    const row = document.createElement('div');
+    row.className = 'draft';
+    row.innerHTML = `<span class="name">${escapeHtml(d.name)}</span><small>step ${d.step}</small><button class="x" title="Discard" aria-label="Discard ${escapeHtml(d.name)}">×</button>`;
+    row.onclick = () => resumeDraft(d);
+    row.querySelector('.x').onclick = async (e) => { e.stopPropagation(); await api('/api/drafts/' + d.id, { method: 'DELETE' }); if (draftId === d.id) draftId = null; loadDrafts(); };
+    el.appendChild(row);
+  }
+}
+function saveDraftSoon() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraft, 500);
+}
+async function saveDraft() {
+  if (!draftId) return;
+  const body = { url: $('fUrl').value.trim(), project: $('fProject').value.trim(), describe: $('fDesc').value, step, name: $('fName').value.trim() || undefined };
+  if (!body.url && !body.describe && !body.project) return; // nothing worth keeping yet
+  try { const d = await api('/api/drafts/' + draftId, { method: 'PUT', body: JSON.stringify(body) }); if (!$('fName').value && d.name) $('fName').placeholder = d.name; loadDrafts(); } catch {}
+}
+function resumeDraft(d) {
+  draftId = d.id;
+  $('fUrl').value = d.url || ''; $('fProject').value = d.project || ''; $('fDesc').value = d.describe || ''; $('fName').value = d.name && !/^project-\d+$/.test(d.name) ? d.name : '';
+  $('fName').placeholder = d.name || 'my-demo';
+  $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = '';
+  show('viewNew'); showStep(Math.min(Math.max(d.step || 1, 1), STEPS));
 }
 const PRESET_LABEL = { 'post-landscape': '1080p landscape', 'post-square': '1080 square', 'post-vertical': '1080×1920 vertical', 'docs-gif': 'docs 1440×900', 'proof-fast': 'small 960×720', 'master': 'master 1080p', 'preview-fast': 'preview 1080p' };
 function fillSettings(d) {
@@ -597,16 +649,13 @@ const STEPS = 5;
 const slug = (t) => t.toLowerCase().replace(/https?:\/\//, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 function showStep(n) {
   step = n;
+  saveDraftSoon();
   for (let i = 1; i <= STEPS; i++) $('step' + i).classList.toggle('hidden', i !== n);
   $('flowSteps').textContent = `Step ${n} of ${STEPS}`;
   $('fBack').textContent = n === 1 ? 'Cancel' : 'Back';
   $('fNext').classList.toggle('hidden', n === STEPS);
   $('fNext').textContent = n === 2 && !$('fProject').value.trim() ? 'Skip' : 'Continue';
-  if (n === 4 && !$('fName').value) {
-    let base = '';
-    try { const u = new URL($('fUrl').value); base = (u.hostname === 'localhost' ? '' : u.hostname + ' ') + ($('fDesc').value.split(/[.,]/)[0] || u.pathname); } catch { base = $('fDesc').value.split(/[.,]/)[0]; }
-    $('fName').value = slug(base) || 'my-demo';
-  }
+  // The name stays project-N unless the person types one; no clever guessing.
   if (n === STEPS) {
     $('fDraft').disabled = !(settings && settings.active);
     $('fDraftModel').textContent = settings && settings.active
@@ -615,12 +664,13 @@ function showStep(n) {
   }
   const inp = $('step' + n).querySelector('input,textarea'); if (inp) setTimeout(() => inp.focus(), 50);
 }
-$('newBtn').onclick = () => { for (const id of ['fUrl', 'fProject', 'fDesc', 'fName']) $(id).value = ''; $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = ''; show('viewNew'); showStep(1); };
+$('newBtn').onclick = () => { draftId = 'd' + Date.now().toString(36); for (const id of ['fUrl', 'fProject', 'fDesc', 'fName']) $(id).value = ''; $('fName').placeholder = 'my-demo'; $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = ''; show('viewNew'); showStep(1); };
+for (const id of ['fUrl', 'fProject', 'fDesc', 'fName']) $(id).addEventListener('input', saveDraftSoon);
 $('fBack').onclick = () => { if (step === 1) show('viewDemo'); else showStep(step - 1); };
 $('fNext').onclick = () => {
   if (step === 1) { const u = $('fUrl').value.trim(); if (!/^https?:\/\//.test(u)) { $('fUrl').focus(); $('fUrl').style.borderColor = 'var(--bad)'; return; } $('fUrl').style.borderColor = ''; }
   if (step === 3 && !$('fDesc').value.trim()) { $('fDesc').focus(); return; }
-  if (step === 4) { const n = $('fName').value.trim(); if (!/^[a-z0-9-]+$/.test(n)) { $('fName').style.borderColor = 'var(--bad)'; return; } $('fName').style.borderColor = ''; }
+  if (step === 4) { const n = $('fName').value.trim(); if (n && !/^[a-z0-9-]+$/.test(n)) { $('fName').style.borderColor = 'var(--bad)'; return; } $('fName').style.borderColor = ''; }
   showStep(step + 1);
 };
 for (const id of ['fUrl', 'fName']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('fNext').click(); });
@@ -652,11 +702,12 @@ $('fIdeas').onclick = async () => {
 };
 
 async function createDemo(kind) {
-  const body = JSON.stringify({ name: $('fName').value.trim(), url: $('fUrl').value.trim(), describe: $('fDesc').value, project: $('fProject').value.trim() || undefined });
+  const body = JSON.stringify({ name: $('fName').value.trim() || $('fName').placeholder || undefined, url: $('fUrl').value.trim(), describe: $('fDesc').value, project: $('fProject').value.trim() || undefined });
   $('fDraft').disabled = true; $('fBlank').disabled = true;
   $('fBusy').textContent = kind === 'draft' ? 'Scouting the page… then drafting. Ten seconds to a couple of minutes, depending on the model.' : 'Creating…';
   try {
     const r = await api(kind === 'draft' ? '/api/describe' : '/api/demos', { method: 'POST', body });
+    if (draftId) { await api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; }
     await loadDemos(); await select(r.name);
     if (kind === 'draft') setMsg(`drafted by ${r.provider}${r.read ? ` after reading ${r.read} files` : ''} · ${r.scouted} elements scouted — read it before you run`, 'ok');
   } catch (e) { $('fBusy').textContent = e.message; }

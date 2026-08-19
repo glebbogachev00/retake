@@ -129,15 +129,18 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
 
   // Canned responses live in a map the route handler reads on every request, so
   // a `stub` step mid-demo swaps the answer without re-registering anything.
+  // Keyed by method+url: a POST stub must not replace the GET stub on the same
+  // path — they are different answers to different questions.
   const stubs = new Map<string, Stub>();
   const stubbed: string[] = [];
   const armStub = async (d: Stub) => {
-    const fresh = !stubs.has(d.url);
-    stubs.set(d.url, d);
-    if (!stubbed.includes(d.url)) stubbed.push(d.url);
+    const key = `${d.method ?? "ANY"} ${d.url}`;
+    const fresh = !stubs.has(key);
+    stubs.set(key, d);
+    if (!stubbed.includes(key)) stubbed.push(key);
     if (!fresh) return;
     await context.route(d.url, async (route, request) => {
-      const cur = stubs.get(d.url)!;
+      const cur = stubs.get(key)!;
       if (cur.method && request.method().toUpperCase() !== cur.method.toUpperCase()) return route.fallback();
       const body =
         cur.json !== undefined
@@ -168,6 +171,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // the recorded navigation is short and the video's start is predictable.
     await context.request.get(expandEnv(m.url)).catch(noop);
     const page = await context.newPage();
+    if (process.env.RETAKE_PAGE_CONSOLE) page.on("console", (msg) => log(`  [page] ${msg.text().slice(0, 200)}`));
 
     // --- setup phase (still inside the video; trimmed later by `trimBefore`) ---
     await page.goto(expandEnv(m.url), { waitUntil: "networkidle" });
@@ -199,10 +203,11 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
       videoStartedAt,
     });
 
-    // Setup steps: run silently (no timeline entries), cursor left alone.
-    // With a fresh saved session they are skipped — that is the whole point of
-    // saving one: the login happens once, not on every take.
-    for (const step of stateFresh ? [] : m.setup) {
+    // Sign-in steps run only when there is no fresh session to reuse; the rest
+    // of `setup` always runs. (They were once the same list, which meant a
+    // saved session silently skipped the steps that put the app on its opening
+    // screen — a whole take of the wrong thing, with nothing in the log.)
+    for (const step of [...(stateFresh ? [] : (m.auth?.setup ?? [])), ...m.setup]) {
       try {
         await runStep(rec, page, step, m, ctx);
       } catch (e) {
@@ -368,9 +373,26 @@ function isAlive(pid: number): boolean {
 
 type StepCtx = { outDir: string; manifestDir: string; downloads: string[]; stub: (d: Stub) => Promise<void> };
 
+/** testreel clicks and types at *screen* coordinates and never scrolls first,
+    so anything below the fold gets a click on empty air. Bring it into view
+    ourselves — centred, so the viewer sees the target and the cursor lands on it. */
+async function bringIntoView(page: Page, selector: string, timeout: number) {
+  const loc = page.locator(selector).first();
+  await loc.waitFor({ state: "visible", timeout });
+  const box = await loc.boundingBox();
+  const vh = page.viewportSize()?.height ?? 800;
+  if (box && (box.y < 0 || box.y + box.height > vh)) {
+    await loc.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "smooth" }));
+    await page.waitForTimeout(450);
+  }
+}
+
 async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, ctx: StepCtx): Promise<void> {
   const timeout = step.timeout ?? 8000;
   if (step.waitFor) await page.waitForSelector(step.waitFor, { timeout });
+  if ((step.action === "click" || step.action === "type" || step.action === "fill" || step.action === "hover") && "selector" in step) {
+    await bringIntoView(page, step.selector, timeout);
+  }
   const pause = step.pauseAfter;
   switch (step.action) {
     case "wait":

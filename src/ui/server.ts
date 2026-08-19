@@ -10,6 +10,8 @@
  *   POST /api/describe              { name, url, describe } → scout + model → draft manifest (saved)
  *   GET  /api/provider              { active, available }
  *   GET  /api/presets               [{name, ...}]
+ *   GET/PUT/DELETE /api/drafts/:id   an unfinished "new demo" (auto-saved as you go)
+ *   DELETE /api/demos/:name         remove a demo (manifest + outputs)
  *   PATCH /api/demos/:name/settings { preset?, layout?, camera?, cursor? } → edits keys, keeps comments
  *   PATCH /api/demos/:name/scene    { label, caption?, camera?, zoom?, holdMs? } → edits one scene in place
  *   PATCH /api/demos/:name/trim     { head, tail } → seconds cut from the finished video
@@ -35,6 +37,19 @@ import { digest } from "../digest.js";
 const ROOT = process.cwd();
 const DEMOS = path.join(ROOT, "demos");
 const OUT = path.join(ROOT, "outputs");
+const DRAFTS = path.join(ROOT, ".drafts");
+
+/** Unfinished "new demo" flows. Saved on every keystroke, so walking away at
+    step 4 loses nothing; named "project-N" until the person names it. */
+type Draft = { id: string; name: string; url: string; project: string; describe: string; step: number; updated: string };
+function listDrafts(): Draft[] {
+  if (!fs.existsSync(DRAFTS)) return [];
+  return fs.readdirSync(DRAFTS).filter((f) => f.endsWith(".json")).map((f) => { try { return JSON.parse(fs.readFileSync(path.join(DRAFTS, f), "utf8")) as Draft; } catch { return null; } }).filter((d): d is Draft => !!d).sort((a, b) => b.updated.localeCompare(a.updated));
+}
+function nextProjectName(): string {
+  const taken = new Set([...listDrafts().map((d) => d.name), ...(fs.existsSync(DEMOS) ? fs.readdirSync(DEMOS).map((f) => f.replace(/\.ya?ml$/, "")) : [])]);
+  for (let i = 1; ; i++) if (!taken.has(`project-${i}`)) return `project-${i}`;
+}
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 type Run = { proc: ChildProcess; lines: string[]; done: boolean; code: number | null; listeners: Set<http.ServerResponse>; stage: string; startedAt: number; stageAt: number; estimate: { capture: number; render: number } };
@@ -196,6 +211,15 @@ function envSummary() {
   return { localUrl: process.env.RETAKE_LOCAL_URL ?? "", localModel: process.env.RETAKE_LOCAL_MODEL ?? "", groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY };
 }
 
+/** A navigation error, said the way a person would say it. */
+function unreachable(url: string, e: Error): string {
+  const m = e.message;
+  if (/ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(m)) return `Nothing is running at ${url}. Start your app first, then try again.`;
+  if (/ERR_NAME_NOT_RESOLVED|ENOTFOUND/.test(m)) return `Could not find ${new URL(url).host}. Check the address.`;
+  if (/Timeout/.test(m)) return `${url} did not finish loading in time. Is it up?`;
+  return m.split("\n")[0];
+}
+
 export function serve(port: number) {
   loadDotenv(ROOT);
   const page = fs.readFileSync(path.join(HERE, "index.html"), "utf8");
@@ -229,6 +253,33 @@ export function serve(port: number) {
       if (p === "/api/demos" && req.method === "GET") return json(res, 200, listDemos());
       if (p === "/api/provider" && req.method === "GET") return json(res, 200, providerStatus());
       if (p === "/api/presets" && req.method === "GET") return json(res, 200, Object.values(PRESETS));
+      if (p === "/api/drafts" && req.method === "GET") return json(res, 200, listDrafts());
+      const md = /^\/api\/drafts\/([a-z0-9-]+)$/.exec(p);
+      if (md) {
+        const file = path.join(DRAFTS, `${md[1]}.json`);
+        if (req.method === "GET") return fs.existsSync(file) ? json(res, 200, JSON.parse(fs.readFileSync(file, "utf8"))) : json(res, 404, { error: "no such draft" });
+        if (req.method === "PUT") {
+          const b = JSON.parse(await readBody(req)) as Partial<Draft>;
+          fs.mkdirSync(DRAFTS, { recursive: true });
+          const prev: Partial<Draft> = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
+          const d: Draft = { id: md[1], name: b.name || prev.name || nextProjectName(), url: b.url ?? prev.url ?? "", project: b.project ?? prev.project ?? "", describe: b.describe ?? prev.describe ?? "", step: b.step ?? prev.step ?? 1, updated: new Date().toISOString() };
+          fs.writeFileSync(file, JSON.stringify(d, null, 2));
+          return json(res, 200, d);
+        }
+        if (req.method === "DELETE") { fs.rmSync(file, { force: true }); return json(res, 200, { ok: true }); }
+      }
+      const mdel = /^\/api\/demos\/([a-z0-9-]+)$/.exec(p);
+      if (mdel && req.method === "DELETE") {
+        const file = path.join(DEMOS, `${mdel[1]}.yaml`);
+        const out = path.join(OUT, mdel[1]);
+        if (fs.existsSync(path.join(out, ".retake-lock"))) return json(res, 409, { error: "a run is using this demo right now — wait for it to finish" });
+        // Never delete silently: the manifest goes to .trash/ with a timestamp so a slip is recoverable.
+        const trash = path.join(ROOT, ".trash");
+        fs.mkdirSync(trash, { recursive: true });
+        if (fs.existsSync(file)) fs.renameSync(file, path.join(trash, `${mdel[1]}.${Date.now()}.yaml`));
+        if (fs.existsSync(out)) fs.rmSync(out, { recursive: true, force: true });
+        return json(res, 200, { ok: true });
+      }
       const mg = /^\/api\/gif\/([a-z0-9-]+)$/.exec(p);
       if (mg && req.method === "POST") {
         const out = makeGif(path.join(OUT, mg[1]));
@@ -239,7 +290,8 @@ export function serve(port: number) {
         if (!/^https?:\/\//.test(b.url)) return json(res, 400, { error: "url must start with http(s)://" });
         const provider = pickProvider();
         if (!provider) return json(res, 400, { error: "no model configured — pick one in Settings" });
-        const sc = await scout(b.url);
+        let sc;
+        try { sc = await scout(b.url); } catch (e) { return json(res, 400, { error: unreachable(b.url, e as Error) }); }
         const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
         const { markdown, ideas } = await suggestIdeas({ url: b.url, scout: sc, provider, project });
         const file = path.join(ROOT, "ideas", `${new URL(b.url).host.replace(/[^a-z0-9]+/gi, "-")}.md`);
@@ -284,6 +336,7 @@ export function serve(port: number) {
       }
       if (p === "/api/describe" && req.method === "POST") {
         const b = JSON.parse(await readBody(req)) as { name: string; url: string; describe: string; project?: string };
+        if (!b.name) b.name = nextProjectName();
         if (!safeName(b.name)) return json(res, 400, { error: "name must be kebab-case" });
         if (!/^https?:\/\//.test(b.url)) return json(res, 400, { error: "url must start with http(s)://" });
         if (!b.describe?.trim()) return json(res, 400, { error: "describe what to record" });
@@ -291,7 +344,8 @@ export function serve(port: number) {
         if (fs.existsSync(file)) return json(res, 409, { error: "a demo with that name exists" });
         const provider = pickProvider();
         if (!provider) return json(res, 400, { error: "no model configured — set GROQ_API_KEY, MISTRAL_API_KEY, or RETAKE_LOCAL_URL (see README)" });
-        const sc = await scout(b.url);
+        let sc;
+        try { sc = await scout(b.url); } catch (e) { return json(res, 400, { error: unreachable(b.url, e as Error) }); }
         const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
         const d = await draftManifest({ name: b.name, url: b.url, describe: b.describe, scout: sc, provider, project });
         fs.mkdirSync(DEMOS, { recursive: true });
@@ -300,6 +354,7 @@ export function serve(port: number) {
       }
       if (p === "/api/demos" && req.method === "POST") {
         const b = JSON.parse(await readBody(req)) as { name: string; url: string; describe: string };
+        if (!b.name) b.name = nextProjectName();
         if (!safeName(b.name)) return json(res, 400, { error: "name must be kebab-case" });
         const file = path.join(DEMOS, `${b.name}.yaml`);
         if (fs.existsSync(file)) return json(res, 409, { error: "a demo with that name exists" });

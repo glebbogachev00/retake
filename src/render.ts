@@ -527,7 +527,8 @@ export function check(outDir: string, m?: Manifest): Check {
   if (wantW) say(p.width === wantW, `matches expected width ${wantW}`);
   say(p.width >= 960, `at least 960px wide`);
   say(true, `fps: ${p.fps}`);
-  say(p.duration >= 8 && p.duration <= 60, `duration: ${p.duration.toFixed(1)}s (8–60s)`);
+  say(p.duration >= 5 && p.duration <= 300, `duration: ${p.duration.toFixed(1)}s`);
+  if (p.duration > 60) lines.push(`—     ${p.duration.toFixed(0)}s is long for a social post (aim for 15–45s); fine for a walkthrough`);
   const mb = (f: string) => (fs.statSync(f).size / 1e6).toFixed(1) + " MB";
   say(true, `demo.mp4: ${mb(mp4)}`);
   const master = path.join(outDir, "master.mp4");
