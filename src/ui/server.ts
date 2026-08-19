@@ -38,7 +38,13 @@ import { digest } from "../digest.js";
 
 const ROOT = process.cwd();
 const DEMOS = path.join(ROOT, "demos");
-const OUT = path.join(ROOT, "outputs");
+/** Where takes land. Default outputs/ in the project; changeable in Settings
+    (RETAKE_OUT). Read lazily so a settings change applies without a restart. */
+function outRoot(): string {
+  const v = process.env.RETAKE_OUT?.trim();
+  return v ? path.resolve(v.replace(/^~/, os.homedir())) : path.join(ROOT, "outputs");
+}
+const OUT_DEFAULT = path.join(ROOT, "outputs");
 const DRAFTS = path.join(ROOT, ".drafts");
 
 /** Unfinished "new demo" flows. Saved on every keystroke, so walking away at
@@ -124,7 +130,7 @@ function listDemos() {
       } catch {
         valid = false;
       }
-      const take = path.join(OUT, name, "take.json");
+      const take = path.join(outRoot(), name, "take.json");
       let lastTake: unknown = null;
       // Does the browser need to run again, or is a re-render enough? The
       // capture hash answers it, so the UI never has to ask the user.
@@ -165,7 +171,7 @@ function starterManifest(name: string, url: string, describe: string): string {
 
 /** How long the last take took, per stage — the progress bar's estimate. */
 function estimateFor(name: string): { capture: number; render: number } {
-  const dir = path.join(OUT, name);
+  const dir = path.join(outRoot(), name);
   let capture = 90, render = 45;
   try { const t = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8")); if (t.captureSec) capture = t.captureSec; } catch { /* default */ }
   try { const f = JSON.parse(fs.readFileSync(path.join(dir, "facts.json"), "utf8")); const sum = Object.values(f.timings ?? {}).reduce((a: number, b) => a + Number(b), 0) as number; if (sum > 0) render = sum + 3; } catch { /* default */ }
@@ -178,8 +184,8 @@ function startRun(name: string, mode: { preview?: boolean; reuse?: boolean; gif?
   const file = fs.readdirSync(DEMOS).find((f) => f.replace(/\.ya?ml$/, "") === name);
   if (!file) throw new Error(`no demos/${name}.yaml`);
   const args = mode.renderOnly
-    ? [path.join(ROOT, "src", "cli.ts"), "render", path.join(OUT, name), ...(mode.gif ? ["--gif"] : [])]
-    : [path.join(ROOT, "src", "cli.ts"), "run", path.join(DEMOS, file)];
+    ? [path.join(ROOT, "src", "cli.ts"), "render", path.join(outRoot(), name), ...(mode.gif ? ["--gif"] : [])]
+    : [path.join(ROOT, "src", "cli.ts"), "run", path.join(DEMOS, file), "--out", outRoot()];
   if (!mode.renderOnly) {
     if (mode.preview) args.push("--preset", "preview-fast", "--reuse");
     else {
@@ -331,7 +337,7 @@ export function serve(port: number) {
       const mdel = /^\/api\/demos\/([a-z0-9-]+)$/.exec(p);
       if (mdel && req.method === "DELETE") {
         const file = path.join(DEMOS, `${mdel[1]}.yaml`);
-        const out = path.join(OUT, mdel[1]);
+        const out = path.join(outRoot(), mdel[1]);
         if (fs.existsSync(path.join(out, ".retake-lock"))) return json(res, 409, { error: "a run is using this demo right now — wait for it to finish" });
         // Never delete silently: the manifest goes to .trash/ with a timestamp so a slip is recoverable.
         const trash = path.join(ROOT, ".trash");
@@ -342,7 +348,7 @@ export function serve(port: number) {
       }
       const mg = /^\/api\/gif\/([a-z0-9-]+)$/.exec(p);
       if (mg && req.method === "POST") {
-        const out = makeGif(path.join(OUT, mg[1]));
+        const out = makeGif(path.join(outRoot(), mg[1]));
         return json(res, 200, { file: path.basename(out), size: fs.statSync(out).size });
       }
       // "Tell Retake what to change": plain English → structured edits → re-render or re-record.
@@ -354,7 +360,7 @@ export function serve(port: number) {
         const provider = pickProvider();
         if (!provider) return json(res, 400, { error: "no model configured — pick one in Settings" });
         const m = loadManifest(file).manifest;
-        const takePath = path.join(OUT, mfix[1], "take.json");
+        const takePath = path.join(outRoot(), mfix[1], "take.json");
         const take = fs.existsSync(takePath) ? (JSON.parse(fs.readFileSync(takePath, "utf8")) as import("../record.js").Take) : null;
         const receipts = receiptsFor(take, m.steps as never);
         const { edits, note } = await proposeEdits({ instruction: b.instruction, yaml: fs.readFileSync(file, "utf8"), receipts, provider });
@@ -410,7 +416,7 @@ export function serve(port: number) {
             emit(run, `Checked: all ${m.steps.length} steps resolve on the page`);
             setStage(run, "capture");
             emit(run, "Recording a fast preview…");
-            const child = spawn(process.execPath, [path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs"), path.join(ROOT, "src", "cli.ts"), "run", file, "--preset", "preview-fast"], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+            const child = spawn(process.execPath, [path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs"), path.join(ROOT, "src", "cli.ts"), "run", file, "--preset", "preview-fast", "--out", outRoot()], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
             run.proc = child;
             const push = (chunk: Buffer) => { for (const raw of chunk.toString().split("\n")) { const l = raw.trimEnd(); if (!l || /^\$ ffmpeg|zoom filter|filter graph|^>/.test(l)) continue; const st = /^\[stage\] (\w+)/.exec(l); if (st) { setStage(run, st[1] === "done" ? "done" : st[1]); continue; } emit(run, l); } };
             child.stdout.on("data", push); child.stderr.on("data", push);
@@ -447,13 +453,25 @@ export function serve(port: number) {
           return json(res, 400, { error: (e as Error).message });
         }
       }
-      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", gifski: !!gifskiBin(), env: envSummary() });
+      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", gifski: !!gifskiBin(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT });
+      const mopen = /^\/api\/open\/([a-z0-9-]+)$/.exec(p);
+      if (mopen && req.method === "POST") {
+        const dir = path.join(outRoot(), mopen[1]);
+        if (!fs.existsSync(dir)) return json(res, 404, { error: "no outputs yet" });
+        const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer" : "xdg-open";
+        try { spawn(opener, [dir], { stdio: "ignore", detached: true }).unref(); } catch (e) { return json(res, 500, { error: (e as Error).message }); }
+        return json(res, 200, { ok: true, dir });
+      }
       if (p === "/api/settings" && req.method === "PUT") {
-        const b = JSON.parse(await readBody(req)) as { model?: string; localUrl?: string; localModel?: string; groqKey?: string; mistralKey?: string };
-        const set: Record<string, string | undefined> = { RETAKE_MODEL: b.model, RETAKE_LOCAL_URL: b.localUrl, RETAKE_LOCAL_MODEL: b.localModel, GROQ_API_KEY: b.groqKey, MISTRAL_API_KEY: b.mistralKey };
+        const b = JSON.parse(await readBody(req)) as { model?: string; localUrl?: string; localModel?: string; groqKey?: string; mistralKey?: string; outDir?: string };
+        if (b.outDir !== undefined && b.outDir.trim()) {
+          const d = path.resolve(b.outDir.trim().replace(/^~/, os.homedir()));
+          try { fs.mkdirSync(d, { recursive: true }); fs.accessSync(d, fs.constants.W_OK); } catch { return json(res, 400, { error: `Can't write to ${d}` }); }
+        }
+        const set: Record<string, string | undefined> = { RETAKE_MODEL: b.model, RETAKE_LOCAL_URL: b.localUrl, RETAKE_LOCAL_MODEL: b.localModel, GROQ_API_KEY: b.groqKey, MISTRAL_API_KEY: b.mistralKey, RETAKE_OUT: b.outDir === undefined ? undefined : b.outDir.trim() };
         writeEnv(set);
         for (const [k, v] of Object.entries(set)) if (v !== undefined) { if (v === "") delete process.env[k]; else process.env[k] = v; }
-        return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", env: envSummary() });
+        return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT });
       }
       const ms = /^\/api\/demos\/([a-z0-9-]+)\/settings$/.exec(p);
       if (ms && req.method === "PATCH") {
@@ -550,7 +568,7 @@ export function serve(port: number) {
 
       m = /^\/api\/run\/([a-z0-9-]+)$/.exec(p);
       if (m && req.method === "POST") {
-        const lock = path.join(OUT, m[1], ".retake-lock");
+        const lock = path.join(outRoot(), m[1], ".retake-lock");
         const existing = runs.get(m[1]);
         if ((!existing || existing.done) && fs.existsSync(lock)) {
           const pid = Number(fs.readFileSync(lock, "utf8"));
@@ -580,7 +598,7 @@ export function serve(port: number) {
       }
       m = /^\/api\/take\/([a-z0-9-]+)$/.exec(p);
       if (m && req.method === "GET") {
-        const dir = path.join(OUT, m[1]);
+        const dir = path.join(outRoot(), m[1]);
         const tp = path.join(dir, "take.json");
         if (!fs.existsSync(tp)) return json(res, 404, { error: "no take yet" });
         const take = JSON.parse(fs.readFileSync(tp, "utf8"));
@@ -588,11 +606,11 @@ export function serve(port: number) {
         const proof = fs.existsSync(path.join(dir, "proof-log.md")) ? fs.readFileSync(path.join(dir, "proof-log.md"), "utf8") : "";
         const facts = fs.existsSync(path.join(dir, "facts.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "facts.json"), "utf8")) : null;
         const stamp = fs.statSync(tp).mtimeMs;
-        return json(res, 200, { take, files, proof, facts, stamp });
+        return json(res, 200, { take, files, proof, facts, stamp, dir });
       }
       m = /^\/out\/([a-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(p);
       if (m && req.method === "GET") {
-        const f = path.join(OUT, m[1], m[2]);
+        const f = path.join(outRoot(), m[1], m[2]);
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
         const stat = fs.statSync(f);
         const type = MIME[path.extname(f)] ?? "application/octet-stream";

@@ -33,7 +33,7 @@ npm run retake -- check outputs/example             # resolution, fps, duration,
 npm run retake -- ideas http://localhost:3000 -P ~/my-app   # what's worth recording?
 ```
 
-Outputs land in `outputs/<name>/`:
+Outputs land in `outputs/<name>/` (change the folder in the UI's Settings → "Save videos to", or `--out <dir>`; the UI shows the path under every take, with **Download MP4** and **Show in Finder**):
 
 ```
 demo.mp4        the shareable, captions burned in

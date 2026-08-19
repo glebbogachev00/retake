@@ -100,6 +100,9 @@
   .receipts .more { display:none; gap:6px 14px; flex-wrap:wrap; }
   .receipts.open .more { display:contents; }
   .receipts .toggle { border:0; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; padding:0; text-decoration:underline dotted; }
+  .saved { margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .saved .where { font:12px ui-monospace, Menlo, monospace; color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .saved a.btn { text-decoration:none; display:inline-block; }
   .receipts span::before { content:"✓ "; color:var(--ok); }
   .receipts span.bad::before { content:"✗ "; color:var(--bad); }
   .receipts span.neutral::before { content:"· "; color:var(--muted); }
@@ -203,6 +206,11 @@
       </div>
 
       <div class="receipts" id="receipts"></div>
+      <div class="saved hidden" id="saved">
+        <a class="btn" id="dlBtn" download>Download MP4</a>
+        <button class="btn ghost" id="openBtn">Show in Finder</button>
+        <span class="where" id="where" title=""></span>
+      </div>
 
       <details class="adv" id="adv">
         <summary>Advanced</summary>
@@ -262,6 +270,7 @@
           <div class="field"><label>Local endpoint (OpenAI-compatible — Ollama, LM Studio)</label><input type="url" id="setLocalUrl" placeholder="http://localhost:11434/v1" /></div>
           <div class="field"><label>Local model</label><input type="text" id="setLocalModel" placeholder="llama3.1" /></div>
         </div>
+        <div class="field" style="margin-top:22px"><label>Save videos to</label><input type="text" id="setOut" placeholder="outputs (inside Retake)" /><div class="hint" style="margin-top:6px" id="setOutHint"></div></div>
         <details style="margin-top:12px"><summary class="hint" style="cursor:pointer">API keys (optional)</summary>
           <div class="field"><label>Groq API key</label><input type="password" id="setGroq" placeholder="gsk_…" /></div>
           <div class="field"><label>Mistral API key</label><input type="password" id="setMistral" placeholder="…" /></div>
@@ -402,8 +411,8 @@ async function loadTake(fresh) {
   const stage = $('stage'), scrub = $('scrub');
   scrub.querySelectorAll('b').forEach((b) => b.remove());
   let data;
-  try { data = await api('/api/take/' + current); } catch { stage.innerHTML = '<div class="empty">No take yet. Press Record.</div>'; $('receipts').innerHTML = ''; $('files').innerHTML = ''; lastTake = null; return; }
-  const { take, files, proof, facts, stamp } = data;
+  try { data = await api('/api/take/' + current); } catch { stage.innerHTML = '<div class="empty">No take yet. Press Record.</div>'; $('receipts').innerHTML = ''; $('files').innerHTML = ''; $('saved').classList.add('hidden'); lastTake = null; return; }
+  const { take, files, proof, facts, stamp, dir } = data;
   lastTake = take;
   const dur = take.duration - take.trimBefore;
   const q = '?v=' + stamp;
@@ -438,6 +447,13 @@ async function loadTake(fresh) {
   $('files').innerHTML = ['demo.mp4', 'master.mp4', 'demo.gif', 'thumbnail.png', 'proof-log.md'].filter(has).map((f) => `<a href="/out/${current}/${f}${q}" target="_blank">${f}${facts && facts.sizes && facts.sizes[f] ? `<small>${(facts.sizes[f] / 1e6).toFixed(1)} MB</small>` : ''}</a>`).join('') + (has('demo.gif') ? '' : `<a href="#" id="mkGif">Make a GIF</a>`);
   const gb = $('mkGif'); if (gb) gb.onclick = async (e) => { e.preventDefault(); gb.textContent = 'Making…'; try { await api('/api/gif/' + current, { method: 'POST' }); await loadTake(); } catch (err) { gb.textContent = err.message; } };
   $('proof').textContent = proof || '';
+  const sv = $('saved');
+  if (has('demo.mp4')) {
+    sv.classList.remove('hidden');
+    $('dlBtn').href = `/out/${current}/demo.mp4${q}`; $('dlBtn').setAttribute('download', `${current}.mp4`);
+    $('where').textContent = dir ? dir.replace(/^\/Users\/[^/]+/, '~') : ''; $('where').title = dir || '';
+    $('openBtn').onclick = async () => { try { await api('/api/open/' + current, { method: 'POST' }); } catch (e) { setMsg(e.message, 'bad'); } };
+  } else sv.classList.add('hidden');
   paintAction();
 }
 // one scene at a time
@@ -611,11 +627,12 @@ function renderProviders() {
   }
   $('localFields').classList.toggle('hidden', chosen !== 'local');
 }
-$('gear').onclick = async () => { settings = await api('/api/settings'); chosen = settings.model || settings.available[0] || ''; $('setLocalUrl').value = settings.env.localUrl || ''; $('setLocalModel').value = settings.env.localModel || ''; $('toolsInfo').textContent = `GIF encoder: ${settings.gifski ? 'gifski' : 'ffmpeg (install gifski for better GIFs)'} · Active model: ${settings.active || 'none'}`; renderProviders(); show('viewSettings'); };
+$('gear').onclick = async () => { settings = await api('/api/settings'); chosen = settings.model || settings.available[0] || ''; $('setLocalUrl').value = settings.env.localUrl || ''; $('setLocalModel').value = settings.env.localModel || ''; $('setOut').value = settings.outDir === settings.outDefault ? '' : settings.outDir; $('setOutHint').textContent = `Currently: ${settings.outDir}`; $('toolsInfo').textContent = `GIF encoder: ${settings.gifski ? 'gifski' : 'ffmpeg (install gifski for better GIFs)'} · Active model: ${settings.active || 'none'}`; renderProviders(); show('viewSettings'); };
 $('setSave').onclick = async () => {
-  const body = { model: chosen, localUrl: $('setLocalUrl').value.trim(), localModel: $('setLocalModel').value.trim() };
+  const body = { model: chosen, localUrl: $('setLocalUrl').value.trim(), localModel: $('setLocalModel').value.trim(), outDir: $('setOut').value.trim() };
   if ($('setGroq').value) body.groqKey = $('setGroq').value.trim(); if ($('setMistral').value) body.mistralKey = $('setMistral').value.trim();
-  settings = await api('/api/settings', { method: 'PUT', body: JSON.stringify(body) }); $('setGroq').value = ''; $('setMistral').value = '';
+  try { settings = await api('/api/settings', { method: 'PUT', body: JSON.stringify(body) }); } catch (e) { $('setOutHint').textContent = e.message; return; }
+  $('setGroq').value = ''; $('setMistral').value = '';
   $('modelTag').textContent = settings.active ? 'model: ' + settings.active : 'no model'; show(current ? 'viewDemo' : 'viewNew');
 };
 
