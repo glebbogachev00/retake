@@ -38,13 +38,11 @@
   .sp { flex:1; }
   .wrap { width:100%; margin:0; padding:6px 22px 40px; display:grid; grid-template-columns:minmax(0,1fr); gap:26px; align-items:start; }
   .col-main { max-width:720px; width:100%; margin:0 auto; min-width:0; }
-  /* wide screens: the library is a real sidebar — edge to edge, like every
-     app with projects on the left — and the video centers in what remains. */
+  /* wide screens: the library floats as its own card at the left, detached
+     from the window edge; the video centers in the space beside it. */
   @media (min-width: 1000px) {
-    .wrap.two { display:block; padding:24px 36px 40px; }
-    .wrap.two .lib { position:fixed; left:0; top:0; bottom:0; width:232px; background:var(--card); border:0; border-right:1px solid var(--rule); border-radius:0; padding:16px 10px; overflow:auto; z-index:10; }
-    body.rail .top { margin-left:232px; }
-    body.rail .wrap.two { margin-left:232px; }
+    .wrap.two { grid-template-columns:232px minmax(0,1fr); gap:26px; }
+    .wrap.two .lib { position:sticky; top:14px; order:-1; }
   }
 
   /* live activity — what an agent is doing to this library right now */
