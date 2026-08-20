@@ -1,0 +1,27 @@
+[
+  {
+    "name": "capture-two-places",
+    "story": "Type a mixed thought with a task and a question, press Capture, and show the resulting Action and Thread appear on the board — one sentence, two places.",
+    "status": "todo"
+  },
+  {
+    "name": "mark-done",
+    "story": "Capture 'send Maya the revised contract today,' open the resulting Action, press Mark done, and show it fade from the open list.",
+    "status": "todo"
+  },
+  {
+    "name": "distill-messy",
+    "story": "Enter a long rambling thought in the capture field, choose Distill instead of capture, show the distilled wording, then accept it onto the board.",
+    "status": "todo"
+  },
+  {
+    "name": "shelf-life",
+    "story": "Capture 'renew the domain,' open its Action, use Change shelf life to set when it matters, then return to the board with the dated action visible.",
+    "status": "todo"
+  },
+  {
+    "name": "search-thought",
+    "story": "Capture a note about pricing strategy, use Search everything for 'pricing,' and open the matching Thread from the results.",
+    "status": "todo"
+  }
+]

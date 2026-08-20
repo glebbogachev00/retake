@@ -135,6 +135,44 @@ program
   });
 
 program
+  .command("install")
+  .description("set up Claude Code (and print the Codex config): tools + the demo-recording skill")
+  .option("--ui <url>", "the Retake window agents report into", "http://localhost:4310")
+  .action(async (o: { ui: string }) => {
+    const os = await import("node:os");
+    const { execFileSync } = await import("node:child_process");
+    const node = process.execPath;
+    const tsx = path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+    const tools = path.join(process.cwd(), "src", "operator", "tools.ts");
+    const env = { RETAKE_ROOT: process.cwd(), RETAKE_UI: o.ui };
+    const server = { command: node, args: [tsx, tools], env };
+    // 1. the tools, registered with Claude Code for every project
+    try {
+      execFileSync("claude", ["mcp", "add-json", "retake", JSON.stringify(server), "--scope", "user"], { stdio: "pipe" });
+      say("✓ Claude Code: retake tools registered (user scope)");
+    } catch {
+      say("✗ Claude Code CLI not found or refused — run `retake agent` and paste the config yourself");
+    }
+    // 2. the skill: when to reach for the tools, and in what order
+    const skillSrc = path.join(process.cwd(), "skill", "SKILL.md");
+    const skillDst = path.join(os.homedir(), ".claude", "skills", "recording-product-demos");
+    if (fs.existsSync(skillSrc)) {
+      fs.mkdirSync(skillDst, { recursive: true });
+      fs.copyFileSync(skillSrc, path.join(skillDst, "SKILL.md"));
+      say("✓ Claude Code: recording-product-demos skill installed");
+    }
+    say("");
+    say("Codex — add to ~/.codex/config.toml (Codex has no skill store; the tool descriptions carry the method):");
+    say(`  [mcp_servers.retake]`);
+    say(`  command = ${JSON.stringify(node)}`);
+    say(`  args = ${JSON.stringify([tsx, tools])}`);
+    say(`  env = { RETAKE_ROOT = ${JSON.stringify(process.cwd())}, RETAKE_UI = ${JSON.stringify(o.ui)} }`);
+    say("");
+    say("Then, in any project: “record a demo of my app showing the sign-up flow”.");
+    say(`Keep ${o.ui} open to watch. Starting your app from an agent needs RETAKE_ALLOW_START=1 in the env above.`);
+  });
+
+program
   .command("agent")
   .description("print the config to paste into Claude Code, Codex, or Cursor")
   .option("--ui <url>", "the Retake window to report into", "http://localhost:4310")
