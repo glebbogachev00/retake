@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -25,6 +25,7 @@ import { render, check } from "../render.js";
 import { dryRun } from "../dryrun.js";
 import { scout, draftManifest, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
+import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
 import { applyEdits, receiptsFor } from "../edits.js";
 
 const ROOT = process.env.RETAKE_ROOT || process.cwd();
@@ -42,9 +43,12 @@ async function tell(line: string) {
   await fetch(`${UI}/api/operator/${SESSION}/log`, { method: "POST", body: JSON.stringify({ line }) }).catch(() => {});
 }
 
-/** Block until the person answers in the UI. `kind` = question | approve. */
+/** Block until the person answers in the UI. `kind` = question | approve.
+    With no UI attached (Retake driven by someone's own agent) there is nobody
+    here to click, so the caller must have asked its own user instead. */
+export class NoUI extends Error {}
 async function waitForHuman(kind: "question" | "approve", text: string, detail?: string): Promise<string> {
-  if (!UI || !SESSION) throw new Error(`cannot ${kind} — no UI attached`);
+  if (!UI || !SESSION) throw new NoUI(kind);
   const r = await fetch(`${UI}/api/operator/${SESSION}/pending`, { method: "POST", body: JSON.stringify({ kind, text, detail }) });
   const { id } = (await r.json()) as { id: string };
   for (;;) {
@@ -67,30 +71,12 @@ function summariseTake(take: Take): string {
   return lines.join("\n");
 }
 
-function listeningPorts(): number[] {
-  try {
-    const out = execFileSync("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"], { encoding: "utf8", timeout: 3000 });
-    const ports = new Set<number>();
-    for (const line of out.split("\n")) { const m = /:(\d{4,5})\s+\(LISTEN\)/.exec(line); if (m) ports.add(Number(m[1])); }
-    return [...ports].filter((p) => p >= 1024 && p < 65535).sort((a, b) => a - b);
-  } catch { return []; }
-}
-
-async function waitForUrl(url: string, ms: number): Promise<boolean> {
-  const until = Date.now() + ms;
-  while (Date.now() < until) {
-    try { const r = await fetch(url, { signal: AbortSignal.timeout(3000) }); if (r.status < 500) return true; } catch { /* not yet */ }
-    await new Promise((ok) => setTimeout(ok, 1000));
-  }
-  return false;
-}
-
 // --- the server --------------------------------------------------------------
 
 const server = new McpServer({ name: "retake", version: "0.1.0" });
 
 server.registerTool("ports", { description: "Which local TCP ports have something listening. Use this before assuming an app is down — dev servers often come up on the next free port (3000 → 3001/3022).", inputSchema: {} }, async () => {
-  const ps = listeningPorts();
+  const ps = ports();
   return text(ps.length ? `Listening: ${ps.map((p) => ":" + p).join(", ")}` : "Nothing is listening on any local port.");
 });
 
@@ -108,46 +94,43 @@ server.registerTool("scout", { description: "Open a URL headlessly and list what
 
 server.registerTool("wait_for_url", { description: "Wait until a URL answers (up to the timeout). Use after starting an app.", inputSchema: { url: z.string().url(), seconds: z.number().int().min(5).max(180).default(60) } }, async ({ url, seconds }) => {
   await tell(`Waiting for ${url}…`);
-  const ok = await waitForUrl(url, seconds * 1000);
+  const ok = await waitUrl(url, seconds * 1000);
   await tell(ok ? `${url} is answering.` : `${url} did not answer within ${seconds}s.`);
   return text(ok ? `up: ${url}` : `still down after ${seconds}s: ${url}`);
 });
 
 server.registerTool("start_app", {
-  description: "Start the person's app from its folder. ASKS THE PERSON FOR APPROVAL FIRST and waits for their click — never assume yes. Returns the detected port/URL when something starts listening, plus the first log lines. Prefer the project's own dev/start script.",
+  description: "Start the person's app from its folder and report the URL it actually came up on. Requires the person's say-so: inside the Retake app they click a button; driven from your own agent it only works if they enabled it when they added Retake (RETAKE_ALLOW_START=1). Never presented as automatic.",
   inputSchema: { dir: z.string(), command: z.string().describe("e.g. npm run dev, or vercel dev --listen 3200"), expect_url: z.string().url().optional().describe("if you know the URL, wait for it") },
 }, async ({ dir, command, expect_url }) => {
   const cwd = dir.replace(/^~/, os.homedir());
-  const answer = await waitForHuman("approve", `Start the app?`, `${command}\nin ${cwd}`);
-  if (!/^(yes|y|ok|allow|approve|start)/i.test(answer.trim())) { await tell("Not starting the app — you said no."); return text("DENIED by the person. Do not retry without a different reason. Ask them how they'd like to proceed."); }
-  const before = new Set(listeningPorts());
-  await tell(`Starting: ${command}`);
-  const logFile = path.join(os.tmpdir(), `retake-app-${Date.now()}.log`);
-  const out = fs.openSync(logFile, "a");
-  const child = spawn("/bin/sh", ["-lc", command], { cwd, env: process.env, stdio: ["ignore", out, out], detached: true });
-  child.unref();
-  // Watch for a new port (or the expected URL) for up to 90s.
-  let url = expect_url ?? "", port = 0;
-  const until = Date.now() + 90_000;
-  while (Date.now() < until) {
-    await new Promise((ok) => setTimeout(ok, 1500));
-    if (url && (await waitForUrl(url, 1000))) break;
-    const log = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "";
-    const m = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::(\d{2,5}))?/.exec(log);
-    if (m && m[1]) { port = Number(m[1]); url = `http://localhost:${port}`; if (await waitForUrl(url, 1000)) break; }
-    const fresh = listeningPorts().filter((p) => !before.has(p));
-    if (fresh.length) { port = fresh[0]; url = `http://localhost:${port}`; if (await waitForUrl(url, 1000)) break; }
+  try {
+    const answer = await waitForHuman("approve", "Start the app?", `${command}\nin ${cwd}`);
+    if (!/^(yes|y|ok|allow|approve|start)/i.test(answer.trim())) { await tell("Not starting the app — you said no."); return text("DENIED by the person. Do not retry. Ask how they would like to proceed."); }
+  } catch (e) {
+    if (!(e instanceof NoUI)) throw e;
+    // No window means nobody here can click, and a parameter the model fills in
+    // is not consent — it will happily set it. The only real gate is one the
+    // person set themselves, out of reach of whatever is calling this.
+    if (process.env.RETAKE_ALLOW_START !== "1") {
+      return text(`NOT RUN. Retake will not start processes when it is driven from outside its own window, unless the person allowed it when they set Retake up. Tell them: to let this work, add RETAKE_ALLOW_START=1 to Retake's MCP config env and restart. Otherwise ask them to start the app themselves, then call scout again.`);
+    }
   }
-  const log = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8").split("\n").slice(-12).join("\n") : "";
-  fs.writeFileSync(path.join(os.tmpdir(), `retake-app-pid-${child.pid}`), String(child.pid));
-  if (url && (await waitForUrl(url, 1000))) { await tell(`App is up at ${url}`); return text(`started (pid ${child.pid}) · answering at ${url}\nlog tail:\n${log}`); }
-  await tell("Started, but nothing answered yet — see the log.");
-  return text(`started (pid ${child.pid}) but no port answered within 90s. log tail:\n${log}\nCheck the log for the real port or a missing env var, then wait_for_url or ask the person.`);
+  await tell(`Starting: ${command}`);
+  const r = await reallyStartApp({ dir: cwd, command, expectUrl: expect_url, onProgress: (l) => void tell(l) });
+  if (r.ok) { await tell(`App is up at ${r.url}`); return text(`started (pid ${r.pid}) · answering at ${r.url}`); }
+  await tell(`Could not start it: ${r.why}`);
+  return text(`FAILED: ${r.why}\nlog tail:\n${r.log.slice(-800)}`);
 });
 
 server.registerTool("ask", { description: "Ask the person ONE question and wait for the answer. Use only when genuinely blocked (which app, a credential name, a choice between two things). Keep it one sentence, with the evidence.", inputSchema: { question: z.string() } }, async ({ question }) => {
-  const a = await waitForHuman("question", question);
-  return text(`They answered: ${a}`);
+  try {
+    const a = await waitForHuman("question", question);
+    return text(`They answered: ${a}`);
+  } catch (e) {
+    if (!(e instanceof NoUI)) throw e;
+    return text(`No Retake window is open, so ask the person yourself: “${question}” Then carry on with their answer.`);
+  }
 });
 
 server.registerTool("list_demos", { description: "Demos that exist, with their last take.", inputSchema: {} }, async () => {

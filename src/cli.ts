@@ -127,6 +127,35 @@ program
   });
 
 program
+  .command("mcp")
+  .description("run Retake as an MCP server, so your own coding agent can drive it")
+  .action(async () => {
+    // stdio belongs to the protocol from here on; the module talks and exits.
+    await import("./operator/tools.js");
+  });
+
+program
+  .command("agent")
+  .description("print the config to paste into Claude Code, Codex, or Cursor")
+  .action(() => {
+    const node = process.execPath;
+    const tsx = path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+    const tools = path.join(process.cwd(), "src", "operator", "tools.ts");
+    const cfg = { mcpServers: { retake: { command: node, args: [tsx, tools], env: { RETAKE_ROOT: process.cwd() } } } };
+    say("Add Retake to your agent, then ask it for a demo in plain English.\n");
+    say("Claude Code — run this once:");
+    say(`  claude mcp add-json retake '${JSON.stringify(cfg.mcpServers.retake)}'\n`);
+    say("Codex — add to ~/.codex/config.toml:");
+    say(`  [mcp_servers.retake]`);
+    say(`  command = ${JSON.stringify(node)}`);
+    say(`  args = ${JSON.stringify([tsx, tools])}`);
+    say(`  env = { RETAKE_ROOT = ${JSON.stringify(process.cwd())} }\n`);
+    say("Cursor / anything else that speaks MCP — .cursor/mcp.json or equivalent:");
+    say(JSON.stringify(cfg, null, 2) + "\n");
+    say("Then just say: “record a demo of my app at localhost:3000 showing the sign-up flow”.");
+  });
+
+program
   .command("dry")
   .description("run the manifest with no camera and report what would fail")
   .argument("<manifest>")
