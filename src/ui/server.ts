@@ -24,7 +24,7 @@ import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, execFileSync, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { Manifest, loadManifest } from "../manifest.js";
@@ -35,6 +35,7 @@ import { dryRun } from "../dryrun.js";
 import { gifskiBin, makeGif } from "../render.js";
 import { captureHash } from "../record.js";
 import { digest } from "../digest.js";
+import { startOffer, startApp, listeningPorts } from "../appserver.js";
 
 const ROOT = process.cwd();
 const DEMOS = path.join(ROOT, "demos");
@@ -250,17 +251,6 @@ function envSummary() {
   return { localUrl: process.env.RETAKE_LOCAL_URL ?? "", localModel: process.env.RETAKE_LOCAL_MODEL ?? "", groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY };
 }
 
-/** Local ports with something listening — so "nothing on :3000" can say
-    what IS running, which is usually the app on a port the person forgot. */
-function listeningPorts(): number[] {
-  try {
-    const out = execFileSync("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"], { encoding: "utf8", timeout: 3000 });
-    const ports = new Set<number>();
-    for (const line of out.split("\n")) { const m = /:(\d{4,5})\s+\(LISTEN\)/.exec(line); if (m) { const pt = Number(m[1]); if (pt >= 1024 && pt < 65535) ports.add(pt); } }
-    return [...ports].sort((a, b) => a - b);
-  } catch { return []; }
-}
-
 /** A navigation error, said the way a person would say it. */
 function unreachable(url: string, e: Error): string {
   const m = e.message;
@@ -268,7 +258,7 @@ function unreachable(url: string, e: Error): string {
     const want = Number(new URL(url).port || 80);
     const others = listeningPorts().filter((pt) => pt !== want && pt !== 4310);
     const hint = others.length ? ` Things are running on ${others.slice(0, 6).map((pt) => ":" + pt).join(", ")} — one of those?` : "";
-    return `Nothing is running at ${url}. Start your app first, then try again.${hint}`;
+    return `Nothing is running at ${url}.${hint}`;
   }
   if (/ERR_NAME_NOT_RESOLVED|ENOTFOUND/.test(m)) return `Could not find ${new URL(url).host}. Check the address.`;
   if (/Timeout/.test(m)) return `${url} did not finish loading in time. Is it up?`;
@@ -388,7 +378,7 @@ export function serve(port: number) {
           try {
             setStage(run, "scouting");
             let sc: Scout;
-            try { sc = await scout(b.url); } catch (e) { emit(run, `✗ ${unreachable(b.url, e as Error)}`); return finish(run, 2); }
+            try { sc = await scout(b.url); } catch (e) { emit(run, `✗ ${unreachable(b.url, e as Error)}`); if (/ERR_CONNECTION_REFUSED|ECONNREFUSED/.test((e as Error).message)) emit(run, "__DOWN__"); return finish(run, 2); }
             emit(run, `Found the page — ${sc.elements.length} controls${sc.headings.length ? `, “${sc.headings[0]}”` : ""}`);
             if (project) { try { const d = digest(project); emit(run, `Read ${d.name}: ${d.files} files, ${d.routes.length} routes, ${d.selectors.length} stable selectors`); } catch (e) { emit(run, `Could not read ${project}: ${(e as Error).message}`); } }
             setStage(run, "drafting");
@@ -435,7 +425,7 @@ export function serve(port: number) {
         const provider = pickProvider();
         if (!provider) return json(res, 400, { error: "no model configured — pick one in Settings" });
         let sc;
-        try { sc = await scout(b.url); } catch (e) { return json(res, 400, { error: unreachable(b.url, e as Error) }); }
+        try { sc = await scout(b.url); } catch (e) { const m = (e as Error).message; return json(res, 400, { error: unreachable(b.url, e as Error), down: /ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(m) }); }
         const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
         const { markdown, ideas } = await suggestIdeas({ url: b.url, scout: sc, provider, project });
         const file = path.join(ROOT, "ideas", `${new URL(b.url).host.replace(/[^a-z0-9]+/gi, "-")}.md`);
@@ -443,12 +433,21 @@ export function serve(port: number) {
         fs.writeFileSync(file, `# Demo ideas — ${b.url}\n\n_Suggested by ${provider.name} (${provider.model})${project ? ` after reading ${project}` : ""}._\n\n${markdown}\n`);
         return json(res, 200, { ideas, file: path.relative(ROOT, file) });
       }
+      if (p === "/api/start" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { dir: string; command?: string; url?: string };
+        const off = startOffer(b.dir);
+        const command = b.command?.trim() || off?.command;
+        if (!command) return json(res, 400, { error: "No start script found in that folder — start the app yourself, then try again." });
+        const r = await startApp({ dir: b.dir, command, expectUrl: b.url });
+        return json(res, r.ok ? 200 : 400, r.ok ? { ok: true, url: r.url, pid: r.pid } : { error: r.why ?? "could not start", log: r.log.slice(-1200) });
+      }
       if (p === "/api/project" && req.method === "POST") {
         const b = JSON.parse(await readBody(req)) as { dir: string };
         const dir = b.dir.replace(/^~/, os.homedir()).trim();
         try {
           const d = digest(dir);
-          return json(res, 200, { ok: true, dir: d.dir, name: d.name, stack: d.stack, files: d.files, routes: d.routes.slice(0, 12), selectors: d.selectors.length, auth: d.auth.length > 0, flaky: d.flaky.length });
+          const off = startOffer(dir);
+          return json(res, 200, { ok: true, dir: d.dir, name: d.name, stack: d.stack, files: d.files, routes: d.routes.slice(0, 12), selectors: d.selectors.length, auth: d.auth.length > 0, flaky: d.flaky.length, start: off });
         } catch (e) {
           return json(res, 400, { error: (e as Error).message });
         }
@@ -501,7 +500,7 @@ export function serve(port: number) {
         const provider = pickProvider();
         if (!provider) return json(res, 400, { error: "no model configured — set GROQ_API_KEY, MISTRAL_API_KEY, or RETAKE_LOCAL_URL (see README)" });
         let sc;
-        try { sc = await scout(b.url); } catch (e) { return json(res, 400, { error: unreachable(b.url, e as Error) }); }
+        try { sc = await scout(b.url); } catch (e) { const m = (e as Error).message; return json(res, 400, { error: unreachable(b.url, e as Error), down: /ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(m) }); }
         const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
         const d = await draftManifest({ name: b.name, url: b.url, describe: b.describe, scout: sc, provider, project });
         fs.mkdirSync(DEMOS, { recursive: true });
