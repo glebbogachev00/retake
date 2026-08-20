@@ -350,6 +350,20 @@ export function serve(port: number) {
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(chatPage);
       }
+      if (p === "/landing" && req.method === "GET") {
+        const f = path.join(ROOT, "site", "index.html");
+        if (!fs.existsSync(f)) return json(res, 404, { error: "no site/index.html" });
+        res.writeHead(200, { "content-type": "text/html" });
+        return res.end(fs.readFileSync(f));
+      }
+      const msite = /^\/landing\/media\/([A-Za-z0-9._-]+)$/.exec(p);
+      if (msite && (req.method === "GET" || req.method === "HEAD")) {
+        const f = path.join(ROOT, "site", "media", msite[1]);
+        if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
+        res.writeHead(200, { "content-type": MIME[path.extname(f)] ?? "application/octet-stream", "content-length": fs.statSync(f).size });
+        if (req.method === "HEAD") return res.end();
+        return fs.createReadStream(f).pipe(res);
+      }
       if (p === "/guide" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(guidePage);

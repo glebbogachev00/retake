@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Retake — rerun the demo, don't re-record it</title>
+<meta name="description" content="Describe a product demo in a sentence. Retake drives a real browser through your app and hands you the video — and when the UI changes, you re-run instead of re-recording." />
+<style>
+  :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --rule2:#c9cec0; --accent:#1a1c1e; --amber:#e8b04b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
+  .top { display:flex; align-items:center; gap:10px; padding:18px 26px; max-width:880px; margin:0 auto; }
+  .mark { width:26px; height:26px; border-radius:8px; background:var(--accent); position:relative; flex:none; }
+  .mark i { position:absolute; left:6.5px; height:3px; border-radius:2px; background:#eceee9; }
+  .mark i:nth-child(1){top:5px;width:5px;opacity:.55} .mark i:nth-child(2){top:10px;width:8px;opacity:.8} .mark i:nth-child(3){top:15px;width:13px;background:var(--amber)} .mark i:nth-child(4){top:20px;width:8px;opacity:.8}
+  .top b { font-size:17px; letter-spacing:-.01em; }
+  .top .sp { flex:1; }
+  .top a { color:var(--muted); text-decoration:none; font-size:14px; margin-left:18px; }
+  .top a:hover { color:var(--ink); }
+  main { max-width:880px; margin:0 auto; padding:30px 26px 90px; }
+  .hero { padding:40px 0 30px; }
+  .kicker { font:12px ui-monospace, Menlo, monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 14px; }
+  h1 { font-size:clamp(34px, 6vw, 54px); line-height:1.08; letter-spacing:-.025em; margin:0 0 18px; }
+  h1 em { font-style:normal; color:var(--muted); }
+  .lede { font-size:19px; color:var(--muted); max-width:620px; margin:0 0 28px; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn { display:inline-block; text-decoration:none; border-radius:12px; padding:12px 22px; font-size:15px; }
+  .btn.dark { background:var(--accent); color:#eceee9; }
+  .btn.dark:hover { opacity:.9; }
+  .btn.light { border:1px solid var(--rule2); color:var(--ink); background:#fff; }
+  .btn.light:hover { border-color:var(--ink); }
+  .say { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:16px 20px; margin:46px 0 10px; font-size:17px; }
+  .say .who { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:6px; }
+  .say i { font-style:normal; }
+  .arrow { text-align:center; color:var(--muted); margin:8px 0; }
+  .videos { display:grid; gap:26px; margin:14px 0 0; }
+  .shot { border:1px solid var(--rule2); border-radius:14px; overflow:hidden; background:#111; box-shadow:0 14px 40px rgba(24,28,24,.12); }
+  .shot video { width:100%; height:auto; display:block; }
+  .shot figcaption { background:var(--card); padding:12px 18px 14px; font-size:14px; color:var(--muted); }
+  .shot figcaption b { color:var(--ink); font-weight:600; }
+  section { margin-top:72px; }
+  h2 { font-size:24px; letter-spacing:-.015em; margin:0 0 8px; }
+  .sub { color:var(--muted); margin:0 0 26px; max-width:560px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; }
+  .cell { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:18px 20px; }
+  .cell b { display:block; margin-bottom:6px; font-size:15px; }
+  .cell p { margin:0; font-size:14px; color:var(--muted); line-height:1.6; }
+  .how { counter-reset:step; }
+  .step { display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--rule); }
+  .step:last-child { border-bottom:0; }
+  .step::before { counter-increment:step; content:counter(step); flex:none; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#eceee9; display:flex; align-items:center; justify-content:center; font-size:13px; margin-top:2px; }
+  .step b { display:block; }
+  .step p { margin:2px 0 0; color:var(--muted); font-size:14.5px; }
+  pre { background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:16px 20px; overflow-x:auto; font:14px/1.8 ui-monospace, Menlo, monospace; }
+  pre .c { color:var(--muted); }
+  .foot { margin-top:80px; padding-top:22px; border-top:1px solid var(--rule); color:var(--muted); font-size:13.5px; display:flex; gap:18px; flex-wrap:wrap; }
+  .foot a { color:inherit; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="mark"><i></i><i></i><i></i><i></i></div>
+  <b>Retake</b>
+  <span class="sp"></span>
+  <a href="https://github.com/glebbogachev00/retake">GitHub</a>
+</div>
+<main>
+  <div class="hero">
+    <p class="kicker">Demo videos, as code</p>
+    <h1>Rerun the demo.<br><em>Don't re-record it.</em></h1>
+    <p class="lede">Describe a product walkthrough in a sentence. Retake drives a real browser through your app and hands you a crisp 1080p video — and when your UI changes, you change one line and run it again.</p>
+    <div class="actions">
+      <a class="btn dark" href="https://github.com/glebbogachev00/retake">Get Retake</a>
+      <a class="btn light" href="#how">How it works</a>
+    </div>
+  </div>
+
+  <div class="say"><span class="who">You, to the agent you already use</span><i>“Record a demo of my app at localhost:3000 showing the sign-up flow.”</i></div>
+  <p class="arrow">↓</p>
+  <div class="videos" id="proof"></div>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="sub">Retake is a recording engine your coding agent drives. You talk; it does the careful part.</p>
+    <div class="how">
+      <div class="step"><div><b>It reads your app</b><p>Routes, selectors, sign-in fields, the things that animate forever — from the live page and the source folder.</p></div></div>
+      <div class="step"><div><b>It writes the demo as a small file</b><p>Steps, scenes, captions — YAML you can read. That file <i>is</i> the demo; it lives in your repo like code.</p></div></div>
+      <div class="step"><div><b>It checks before it records</b><p>A dry run walks every selector and wait in seconds, with no camera. Nothing records until the walkthrough actually works.</p></div></div>
+      <div class="step"><div><b>You get the take, and the receipts</b><p>demo.mp4, one still per scene, and a proof log of what happened, step by step, with timings.</p></div></div>
+      <div class="step"><div><b>You direct it in plain words</b><p>“No zooms.” “Hide the cursor.” “Square for a post.” Said once, remembered per project. Most changes re-render in seconds.</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What's in the box</h2>
+    <p class="sub">The boring, verifiable middle of demo-making — so neither you nor your agent has to hold it.</p>
+    <div class="grid">
+      <div class="cell"><b>Real interactions</b><p>Real typing, real scrolls, real waits on real results — not a slideshow with a cursor drawn on top.</p></div>
+      <div class="cell"><b>Scenes with captions</b><p>Captions land on the frames they describe, timed from the actual run — never burned into the product area.</p></div>
+      <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
+      <div class="cell"><b>Presets that post well</b><p>1080p landscape, square, vertical, docs GIF — think in the publishing format, not the browser window.</p></div>
+      <div class="cell"><b>Stills for free</b><p>Every scene yields a crisp PNG. A video usually ships with a picture next to it.</p></div>
+      <div class="cell"><b>Secrets stay secret</b><p>Credentials live in .env, redacted from logs, warned about if they'd appear on camera.</p></div>
+      <div class="cell"><b>Stubs and seeds</b><p>Fake the backend, reset the state — demos stay repeatable even when the world isn't.</p></div>
+      <div class="cell"><b>A review window</b><p>Watch your agent work live, judge the take, archive what's stale. One page, no chat to babysit.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two doors, same engine</h2>
+    <p class="sub">Use the agent you already pay for — or the window, if you'd rather point and click.</p>
+    <pre><span class="c"># wire it into Claude Code or Codex, once:</span>
+retake install
+
+<span class="c"># then, in any project, just say:</span>
+<span class="c">#   "record a demo of my app showing checkout"</span>
+
+<span class="c"># or open the review window:</span>
+retake ui</pre>
+  </section>
+
+  <div class="foot">
+    <span>MIT licensed.</span>
+    <a href="https://github.com/glebbogachev00/retake">Source</a>
+    <span>Built on Playwright, testreel, and ffmpeg.</span>
+  </div>
+</main>
+<script>
+// The proof section fills itself from whatever clean renders exist in
+// site/media/. Committed pages carry no product footage; media is local.
+const CANDIDATES = [
+  { file: 'todo-basics',    cap: '<b>Written by an agent, performed by a browser.</b> Real typing, real clicks, captions timed from the actual run — 22 seconds, every step passed.' },
+  { file: 'store-checkout', cap: '<b>The login is handled properly.</b> Credentials from .env, marked secret, signed in before the camera rolls — then a checkout, end to end.' },
+  { file: 'distill-messy',  cap: '<b>A conversation, recorded end to end.</b> Drafted, dry-run, and performed by an agent against a live model — 33 seconds.' },
+];
+(async () => {
+  const host = document.getElementById('proof');
+  for (const c of CANDIDATES) {
+    const url = (location.pathname.startsWith('/landing') ? '/landing/media/' : 'media/') + c.file + '.mp4';
+    try {
+      const r = await fetch(url, { method: 'HEAD' });
+      if (!r.ok) continue;
+    } catch { continue; }
+    const f = document.createElement('figure');
+    f.className = 'shot'; f.style.margin = 0;
+    f.innerHTML = '<video src="' + url + '" poster="' + url.replace('.mp4', '.jpg') + '" controls muted playsinline preload="metadata"></video><figcaption>' + c.cap + '</figcaption>';
+    host.appendChild(f);
+  }
+  if (!host.children.length) host.innerHTML = '<div class="say" style="margin-top:0"><span class="who">Proof pending</span>Record a demo and drop its render into <code>site/media/</code> — this section fills itself.</div>';
+})();
+</script>
+</body>
+</html>
