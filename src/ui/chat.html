@@ -88,6 +88,15 @@
   .arch .row2 small:hover { color:var(--ink); text-decoration:underline; }
   .arch .clear { display:block; width:100%; text-align:left; border:0; background:transparent; color:var(--muted); font-size:12.5px; padding:7px 9px; cursor:pointer; border-radius:8px; }
   .arch .clear:hover { background:#f3e9e6; color:var(--bad); }
+  .veil { position:fixed; inset:0; background:rgba(24,28,24,.32); display:flex; align-items:center; justify-content:center; z-index:60; }
+  .modal { background:#fff; border:1px solid var(--rule2); border-radius:16px; box-shadow:0 18px 50px rgba(24,28,24,.18); padding:22px 24px; width:min(92vw, 380px); }
+  .modal h3 { margin:0 0 8px; font-size:16px; }
+  .modal p { margin:0 0 18px; color:var(--muted); font-size:14px; line-height:1.55; }
+  .modal .row { display:flex; gap:8px; justify-content:flex-end; }
+  .modal .btn { border:1px solid var(--rule2); background:#fff; border-radius:10px; padding:8px 15px; cursor:pointer; font-size:14px; }
+  .modal .btn:hover { border-color:var(--ink); }
+  .modal .btn.danger { background:var(--bad); border-color:var(--bad); color:#fff; }
+  .modal .btn.danger:hover { filter:brightness(.92); }
   .empty { text-align:center; color:var(--muted); padding:60px 20px; }
   .empty .mark { margin:0 auto 14px; width:34px; height:34px; border-radius:10px; }
   .empty .mark i { left:8px; height:3.5px; }
@@ -139,6 +148,22 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 let current = null, demos = [];
 async function api(u, o) { const r = await fetch(u, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j; }
+
+function ask(title, body, confirmLabel) {
+  return new Promise((done) => {
+    const veil = document.createElement('div');
+    veil.className = 'veil';
+    veil.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><p>${esc(body)}</p><div class="row"><button class="btn" data-no>Cancel</button><button class="btn danger" data-yes>${esc(confirmLabel)}</button></div></div>`;
+    const end = (v) => { veil.remove(); document.removeEventListener('keydown', onKey); done(v); };
+    const onKey = (e) => { if (e.key === 'Escape') end(false); };
+    veil.addEventListener('click', (e) => { if (e.target === veil) end(false); });
+    veil.querySelector('[data-no]').onclick = () => end(false);
+    veil.querySelector('[data-yes]').onclick = () => end(true);
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(veil);
+    setTimeout(() => veil.querySelector('[data-no]').focus(), 40);
+  });
+}
 
 async function pin(name) {
   let d; try { d = await api('/api/take/' + name); } catch { return false; }
@@ -194,8 +219,8 @@ async function drawDemos() {
       el.onclick = () => { if (p.lastTake) pin(p.name); else location.href = '/classic#' + encodeURIComponent(p.name); };
       el.querySelector('.zap').onclick = async (ev) => {
         ev.stopPropagation();
-        // Archive, not destroy: the manifest moves to the archive below and
-        // can come back with one click. Only Clear is forever.
+        // Archive, not destroy — but moving someone's work still deserves a beat.
+        if (!(await ask('Archive ' + p.name + '?', 'Its videos are removed. The demo itself moves to the archive below and can be restored any time.', 'Archive'))) return;
         await api('/api/demos/' + p.name, { method: 'DELETE' }).catch((e) => alert(e.message));
         if (current === p.name) { current = null; $('pin').classList.remove('show'); }
         await drawDemos();
@@ -225,7 +250,11 @@ async function drawArchive() {
   const clear = document.createElement('button');
   clear.className = 'clear';
   clear.textContent = 'Clear archive — gone for good';
-  clear.onclick = async () => { if (!confirm('Delete everything in the archive permanently?')) return; await api('/api/trash/clear', { method: 'POST' }); await drawDemos(); };
+  clear.onclick = async () => {
+    if (!(await ask('Clear the archive?', `${items.length} archived demo${items.length === 1 ? '' : 's'} will be deleted permanently. There is no way back from this one.`, 'Delete forever'))) return;
+    await api('/api/trash/clear', { method: 'POST' });
+    await drawDemos();
+  };
   det.appendChild(clear);
   $('demos').appendChild(det);
 }
