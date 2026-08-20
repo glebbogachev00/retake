@@ -66,62 +66,22 @@
 </div>
 <main>
   <div class="hero">
-    <p class="kicker">Demo videos, as code</p>
+    <p class="kicker">Product demos, as code</p>
     <h1>Rerun the demo.<br><em>Don't re-record it.</em></h1>
-    <p class="lede">Describe a product walkthrough in a sentence. Retake drives a real browser through your app and hands you a crisp 1080p video — and when your UI changes, you change one line and run it again.</p>
+    <p class="lede">Retake turns a plain-English walkthrough into a repeatable demo of your real app. Your coding agent writes the flow; Retake checks every step, records it in 1080p, and keeps it rerunnable when the UI changes.</p>
     <div class="actions">
-      <a class="btn dark" href="https://github.com/glebbogachev00/retake">Get Retake</a>
-      <a class="btn light" href="#how">How it works</a>
+      <a class="btn dark" href="https://github.com/glebbogachev00/retake">Install Retake</a>
+      <a class="btn light" href="#proof">Watch a demo</a>
     </div>
   </div>
 
   <div class="say"><span class="who">You, to the agent you already use</span><i>“Record a demo of my app at localhost:3000 showing the sign-up flow.”</i></div>
   <p class="arrow">↓</p>
-  <div class="videos" id="proof"></div>
-
-  <section id="how">
-    <h2>How it works</h2>
-    <p class="sub">Retake is a recording engine your coding agent drives. You talk; it does the careful part.</p>
-    <div class="how">
-      <div class="step"><div><b>It reads your app</b><p>Routes, selectors, sign-in fields, the things that animate forever — from the live page and the source folder.</p></div></div>
-      <div class="step"><div><b>It writes the demo as a small file</b><p>Steps, scenes, captions — YAML you can read. That file <i>is</i> the demo; it lives in your repo like code.</p></div></div>
-      <div class="step"><div><b>It checks before it records</b><p>A dry run walks every selector and wait in seconds, with no camera. Nothing records until the walkthrough actually works.</p></div></div>
-      <div class="step"><div><b>You get the take, and the receipts</b><p>demo.mp4, one still per scene, and a proof log of what happened, step by step, with timings.</p></div></div>
-      <div class="step"><div><b>You direct it in plain words</b><p>“No zooms.” “Hide the cursor.” “Square for a post.” Said once, remembered per project. Most changes re-render in seconds.</p></div></div>
-    </div>
-  </section>
-
-  <section>
-    <h2>What people record</h2>
-    <p class="sub">One engine, different audiences. The demo is a file, so each of these is a re-run — not an afternoon.</p>
-    <div class="grid">
-      <div class="cell"><b>Demos for clients</b><p>Show the flow they asked about, at their pace, without booking a call. When they ask "can it also…", you edit two lines and send a fresh take.</p></div>
-      <div class="cell"><b>Posts for social</b><p>A square or vertical render of a real interaction beats a screenshot with arrows. Ship a feature, post the 20 seconds that show it.</p></div>
-      <div class="cell"><b>Proof it still works</b><p>The dry run walks every step of every demo in seconds — a demo that fails when your app breaks is a smoke test you can also watch.</p></div>
-      <div class="cell"><b>Docs and onboarding</b><p>The README GIF, the "your first project" walkthrough, the help-page clip — regenerated when the UI changes, so they never quietly rot.</p></div>
-      <div class="cell"><b>Release notes people watch</b><p>"What shipped this sprint" as three short takes instead of a bullet list nobody reads.</p></div>
-      <div class="cell"><b>Bug reports that land</b><p>A manifest that reproduces the bug is a video and repro steps in one file — attach both to the ticket.</p></div>
-    </div>
-  </section>
-
-  <section>
-    <h2>What's in the box</h2>
-    <p class="sub">The boring, verifiable middle of demo-making — so neither you nor your agent has to hold it.</p>
-    <div class="grid">
-      <div class="cell"><b>Real interactions</b><p>Real typing, real scrolls, real waits on real results — not a slideshow with a cursor drawn on top.</p></div>
-      <div class="cell"><b>Scenes with captions</b><p>Captions land on the frames they describe, timed from the actual run — never burned into the product area.</p></div>
-      <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
-      <div class="cell"><b>Presets that post well</b><p>1080p landscape, square, vertical, docs GIF — think in the publishing format, not the browser window.</p></div>
-      <div class="cell"><b>Stills for free</b><p>Every scene yields a crisp PNG. A video usually ships with a picture next to it.</p></div>
-      <div class="cell"><b>Secrets stay secret</b><p>Credentials live in .env, redacted from logs, warned about if they'd appear on camera.</p></div>
-      <div class="cell"><b>Stubs and seeds</b><p>Fake the backend, reset the state — demos stay repeatable even when the world isn't.</p></div>
-      <div class="cell"><b>A review window</b><p>Watch your agent work live, judge the take, archive what's stale. One page, no chat to babysit.</p></div>
-    </div>
-  </section>
+  <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
 
   <section>
     <h2>Two doors, same engine</h2>
-    <p class="sub">Use the agent you already pay for — or the window, if you'd rather point and click.</p>
+    <p class="sub">Drive it from Claude Code or Codex — or from Retake's own window, if you'd rather point and click.</p>
     <pre><span class="c"># wire it into Claude Code or Codex, once:</span>
 retake install
 
@@ -131,6 +91,43 @@ retake install
 <span class="c"># or open the review window:</span>
 retake ui</pre>
   </section>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="sub">You provide intent. The agent writes the flow. Retake verifies, records, and renders it.</p>
+    <div class="how">
+      <div class="step"><div><b>Tell your agent what to show</b><p>"Record a demo of checkout." That sentence is the whole brief.</p></div></div>
+      <div class="step"><div><b>It builds and checks the flow</b><p>The agent reads your app — routes, selectors, sign-in fields, unstable UI states — writes the demo as a small readable file, and dry-runs every step in seconds. Nothing records until the walkthrough actually works.</p></div></div>
+      <div class="step"><div><b>Retake records the real interaction</b><p>Real typing, real clicks, real waits — then hands back demo.mp4, a still per scene, and a proof log of what happened, step by step.</p></div></div>
+      <div class="step"><div><b>Rerun or re-render when something changes</b><p>UI moved? Change one line, run again. Want it calmer, square, captionless? Say so — most changes re-render in seconds, no browser involved.</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What people record</h2>
+    <p class="sub">One engine, different audiences. The demo is a file, so each of these is a re-run — not an afternoon.</p>
+    <div class="grid">
+      <div class="cell"><b>Client walkthroughs</b><p>Show the flow they asked about, at their pace, without booking a call. When they ask "can it also…", edit two lines and send a fresh take.</p></div>
+      <div class="cell"><b>Launches and social</b><p>A square or vertical render of a real interaction beats a screenshot with arrows. Ship a feature, post the 20 seconds that show it.</p></div>
+      <div class="cell"><b>Docs and onboarding</b><p>The README GIF, the first-run walkthrough, the help-page clip — regenerated when the UI changes, so they never quietly rot.</p></div>
+      <div class="cell"><b>Proof it still works</b><p>The dry run walks every step of every demo in seconds — a demo that fails when your app breaks is a regression test you can also watch, and a repro you can attach to the ticket.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What's in the box</h2>
+    <p class="sub">Everything required to produce the same clean take again.</p>
+    <div class="grid">
+      <div class="cell"><b>Scenes with captions</b><p>Captions land on the frames they describe, timed from the actual run — never burned into the product area.</p></div>
+      <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
+      <div class="cell"><b>Presets that post well</b><p>1080p landscape, square, vertical, docs GIF — think in the publishing format, not the browser window.</p></div>
+      <div class="cell"><b>A still for every scene</b><p>Each scene yields a crisp PNG. A video usually ships with a picture next to it.</p></div>
+      <div class="cell"><b>Secrets stay secret</b><p>Credentials live in .env, redacted from logs, warned about if they'd appear on camera.</p></div>
+      <div class="cell"><b>Stubs and seeds</b><p>Fake the backend, reset the state — demos stay repeatable even when the world isn't.</p></div>
+    </div>
+  </section>
+
+
 
   <div class="foot">
     <span>MIT licensed.</span>
