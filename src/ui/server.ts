@@ -407,6 +407,19 @@ export function serve(port: number) {
         }
         if (req.method === "DELETE") { fs.rmSync(file, { force: true }); return json(res, 200, { ok: true }); }
       }
+      if (p === "/api/trash" && req.method === "GET") {
+        const trash = path.join(ROOT, ".trash");
+        const items = fs.existsSync(trash) ? fs.readdirSync(trash).filter((f) => f.endsWith(".yaml")).map((f) => { const m = /^(.+)\.(\d+)\.yaml$/.exec(f); return m ? { name: m[1], at: Number(m[2]) } : null; }).filter((x): x is { name: string; at: number } => !!x).sort((a, b) => b.at - a.at) : [];
+        // one row per name — the newest is what restore would bring back
+        const seen = new Set<string>();
+        return json(res, 200, items.filter((x) => !seen.has(x.name) && seen.add(x.name)));
+      }
+      if (p === "/api/trash/clear" && req.method === "POST") {
+        const trash = path.join(ROOT, ".trash");
+        let n = 0;
+        if (fs.existsSync(trash)) for (const f of fs.readdirSync(trash)) if (f.endsWith(".yaml")) { fs.rmSync(path.join(trash, f), { force: true }); n++; }
+        return json(res, 200, { ok: true, cleared: n });
+      }
       const mres = /^\/api\/demos\/([a-z0-9-]+)\/restore$/.exec(p);
       if (mres && req.method === "POST") {
         // Bring back the most recent trashed manifest with this name.
