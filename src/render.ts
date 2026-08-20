@@ -473,7 +473,10 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     const sc = scenes(take);
     const end = take.duration - take.trimBefore;
     for (const [i, sce] of sc.entries()) {
-      const at = Math.min(Math.max(0, sce.start - take.trimBefore + 1.0), Math.max(0, end - 0.2));
+      // The frame worth keeping is the scene's END: by then the click landed,
+      // the result rendered, the text is fully typed. A second in, it hasn't.
+      const next = sc[i + 1] ? sc[i + 1].start - take.trimBefore : end;
+      const at = Math.min(Math.max(sce.start - take.trimBefore + 0.5, next - 1.0), Math.max(0, end - 0.2));
       const file = path.join(dir, `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}.png`);
       ff(["-ss", at.toFixed(2), "-i", mp4, "-frames:v", "1", file], log);
       stills.push(file);
@@ -558,7 +561,7 @@ export function check(outDir: string, m?: Manifest): Check {
   say(fs.existsSync(path.join(outDir, "proof-log.md")), "proof log exists");
   say(take.ok, take.ok ? "all steps passed" : "some steps failed");
   say(!take.partial, take.partial ? `partial: ${take.partial}` : "polished render (not fallback)");
-  const sc = scenes(take);
+  const sc = scenes(m ? applyManifest(m, take) : take);
   say(sc.length >= 2, `${sc.length} scenes`);
   const cams = sc.filter((s) => s.camera).length;
   lines.push(`—     camera on ${cams}/${sc.length} scenes`);

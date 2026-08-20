@@ -709,7 +709,9 @@ document.addEventListener('keydown', (e) => {
   try { const ps = await api('/api/presets'); $('sPreset').innerHTML = ps.filter((p) => p.name !== 'preview-fast').map((p) => `<option value="${p.name}">${p.name} — ${p.width}×${p.height}</option>`).join(''); } catch {}
   try { settings = await api('/api/settings'); $('modelTag').textContent = settings.active ? 'model: ' + settings.active : 'no model — set one in Settings'; } catch {}
   const list = await loadDemos();
-  const first = list.find((d) => d.valid);
+  // Arriving from the review page's Edit link: /classic#<demo> opens that demo.
+  const wanted = decodeURIComponent(location.hash.slice(1));
+  const first = (wanted && list.find((d) => d.name === wanted)) || list.find((d) => d.valid);
   if (first) select(first.name); else openNew();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 })();

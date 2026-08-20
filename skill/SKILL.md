@@ -13,6 +13,16 @@ You drive it; the person watches at http://localhost:4310 if the Retake
 window is open. Prefer the MCP tools (`retake` server). If they are not
 available, the CLI equivalents are in the table at the end.
 
+## If the person asks what Retake is or how to use it
+
+Explain it from this file, briefly, in their language — do not send them to
+docs. The short version: "Describe the demo in a sentence and I'll record it
+as a real browser walkthrough — video plus a still per scene. You can direct
+it like a videographer: no zooms, hide the cursor, shorter captions, square
+for X. Say it once and I'll remember it for this project." Then offer the
+first concrete step: suggest ideas from their app, or record the flow they
+name.
+
 ## The order that wins
 
 1. **`read_project`** (if you have the source folder) — routes, start
@@ -37,6 +47,21 @@ available, the CLI equivalents are in the table at the end.
 7. When it is right: `run` with `preview=false` once (full quality), then
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
+
+## Style — how the person wants their videos to look
+
+Anything they would tell a videographer maps to a knob, in plain English:
+
+- "no zooms" / "keep the camera still" → `camera: static` on scenes
+- "hide the cursor" → `cursor: false`
+- "no captions" / "shorter captions" → captions off, or rewrite them
+- "slower" / "hold the ending" → `pauseAfter`, scene `holdMs`, end waits
+- "square" / "vertical" / "for X" → preset `post-square` / `post-vertical`
+
+The default is already calm: still camera, cursor shown, plain captions.
+The first time the person expresses taste, save it with the `style` tool
+(or write `demos/style.md`) — every later draft in the project reads it, so
+they never have to say it twice. Their stated taste always beats defaults.
 
 ## Rules
 

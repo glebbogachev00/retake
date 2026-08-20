@@ -1,0 +1,4 @@
+- Camera still — no zoom-ins, no pans. Record it properly instead: real scrolls, real typing.
+- Cursor visible.
+- Captions short and plain, no marketing voice.
+- Hold the payoff at the end for ~2 seconds.

@@ -139,6 +139,19 @@ server.registerTool("ask", { description: "Ask the person ONE question and wait 
   }
 });
 
+server.registerTool("style", {
+  description: "Read or set the person's standing style for this project's demos (demos/style.md) — camera, cursor, captions, pacing, format. Set it the first time they express taste ('no zooms', 'hide the cursor') so they never repeat it; every draft reads it. Call with no text to read.",
+  inputSchema: { text: z.string().optional().describe("the style note to save; omit to read") },
+  annotations: RETAKE_WRITE,
+}, async ({ text: t }) => {
+  const file = path.join(DEMOS, "style.md");
+  if (t === undefined) { try { return text(fs.readFileSync(file, "utf8")); } catch { return text("no style note yet — defaults apply: still camera, cursor shown, plain captions"); } }
+  fs.mkdirSync(DEMOS, { recursive: true });
+  fs.writeFileSync(file, t.trim() + "\n");
+  await tell("Style saved — every draft here will follow it.");
+  return text("saved to demos/style.md");
+});
+
 server.registerTool("ideas", {
   description: "What is worth recording. Reads the live page (and the source folder if given) and returns a short list of demo ideas, each a title and a one-sentence story. Use this when the person asks what demos to make — do not invent ideas yourself. Saves the list to demos/ideas.md.",
   inputSchema: { url: z.string().url(), project: z.string().optional() },
@@ -236,7 +249,7 @@ server.registerTool("draft", { description: "Let Retake draft a manifest from a 
   const provider = pickProvider();
   if (!provider) return text("no drafting model configured; write the manifest yourself with write_manifest");
   const sc = await scout(url);
-  const d = await draftManifest({ name, url, describe, scout: sc, provider, project: project?.replace(/^~/, os.homedir()) });
+  const d = await draftManifest({ name, url, describe, scout: sc, provider, project: project?.replace(/^~/, os.homedir()), demosDir: DEMOS });
   fs.mkdirSync(DEMOS, { recursive: true });
   fs.writeFileSync(manifestPath(name), d.yaml);
   const m = loadManifest(manifestPath(name)).manifest;

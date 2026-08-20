@@ -469,7 +469,7 @@ export function serve(port: number) {
             if (project) { try { const d = digest(project); emit(run, `Read ${d.name}: ${d.files} files, ${d.routes.length} routes, ${d.selectors.length} stable selectors`); } catch (e) { emit(run, `Could not read ${project}: ${(e as Error).message}`); } }
             setStage(run, "drafting");
             emit(run, `Drafting with ${provider.name}…`);
-            const d = await draftManifest({ name, url: b.url, describe: b.describe, scout: sc, provider, project });
+            const d = await draftManifest({ name, url: b.url, describe: b.describe, scout: sc, provider, project, demosDir: DEMOS });
             fs.mkdirSync(DEMOS, { recursive: true });
             fs.writeFileSync(file, d.yaml);
             if (project) assignDemoProject(name, project);
@@ -659,7 +659,7 @@ export function serve(port: number) {
         let sc;
         try { sc = await scout(b.url); } catch (e) { const m = (e as Error).message; return json(res, 400, { error: unreachable(b.url, e as Error), down: /ERR_CONNECTION_REFUSED|ECONNREFUSED/.test(m) }); }
         const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
-        const d = await draftManifest({ name: b.name, url: b.url, describe: b.describe, scout: sc, provider, project });
+        const d = await draftManifest({ name: b.name, url: b.url, describe: b.describe, scout: sc, provider, project, demosDir: DEMOS });
         fs.mkdirSync(DEMOS, { recursive: true });
         fs.writeFileSync(file, d.yaml);
         if (project) assignDemoProject(b.name, project);

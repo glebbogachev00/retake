@@ -295,7 +295,7 @@ program
       say(`read ${dg.files} files in ${dg.name}: ${dg.routes.length} routes, ${dg.selectors.length} selectors, ${dg.flaky.length} risks`);
     }
     say(`found ${sc.elements.length} interactive elements · drafting with ${provider.name} (${provider.model}) …`);
-    const d = await draftManifest({ name, url, describe: what, scout: sc, provider, project: opts.project });
+    const d = await draftManifest({ name, url, describe: what, scout: sc, provider, project: opts.project, demosDir: path.join(process.cwd(), "demos") });
     const file = path.resolve("demos", `${name}.yaml`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, d.yaml);

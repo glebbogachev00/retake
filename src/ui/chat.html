@@ -77,14 +77,6 @@
   <div class="top">
     <div class="mark"><i></i><i></i><i></i><i></i></div>
     <h1>Retake</h1>
-    <div class="controls">
-      <button class="chip" id="setBtn"><span id="modelTag">…</span></button>
-      <button class="chip" onclick="location.href='/classic'">Workshop</button>
-      <div class="pop" id="setPop">
-        <p class="ttl">Who does the thinking</p>
-        <div id="provs"></div>
-      </div>
-    </div>
     <span class="sp"></span>
   </div>
   <div class="wrap">
@@ -99,6 +91,7 @@
         <span class="sp"></span>
         <a id="vidDl" download>Download</a>
         <button id="vidFolder">Show in Finder</button>
+        <a id="vidEdit" href="/classic">Edit</a>
       </div>
       <div class="stills" id="stills"></div>
     </div>
@@ -133,6 +126,7 @@ async function pin(name) {
   $('vidMeta').textContent = `${name} · ${(t.duration - t.trimBefore).toFixed(0)}s · ${t.ok ? 'all steps passed' : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
   $('vidDl').href = `/out/${name}/demo.mp4${q}`; $('vidDl').setAttribute('download', name + '.mp4');
   $('vidFolder').onclick = () => api('/api/open/' + name, { method: 'POST' }).catch(() => {});
+  $('vidEdit').href = '/classic#' + encodeURIComponent(name);
   const st = (d.files || []).filter((f) => f.startsWith('stills/')).sort();
   $('stills').innerHTML = st.map((f) => `<img src="/out/${name}/${f}${q}" title="${esc(f.slice(7, -4))}" loading="lazy">`).join('');
   for (const img of $('stills').querySelectorAll('img')) img.onclick = () => window.open(img.src, '_blank');
@@ -181,26 +175,7 @@ function watchActivity() {
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };
 }
 
-// ---- settings: just the provider ------------------------------------------
-const LABEL = { 'claude-code': 'Claude Code', codex: 'Codex', groq: 'Groq', mistral: 'Mistral', local: 'Local model' };
-$('setBtn').onclick = (e) => { e.stopPropagation(); $('setPop').classList.toggle('show'); };
-document.addEventListener('click', (e) => { if (!e.target.closest('.pop')) $('setPop').classList.remove('show'); });
-async function drawSettings() {
-  let st; try { st = await api('/api/settings'); } catch { return; }
-  const ready = st.available || [];
-  const chosen = st.model || (st.active || '').split(' · ')[0];
-  $('modelTag').textContent = ready.length ? (LABEL[chosen] || chosen || 'Pick a model') : 'No model';
-  $('provs').innerHTML = ready.length ? '' : '<div class="quiet">Sign in to the <code>claude</code> or <code>codex</code> CLI, or add a key in the workshop.</div>';
-  for (const name of ready) {
-    const el = document.createElement('div');
-    el.className = 'row2';
-    el.innerHTML = `<span class="dot ok"></span><span class="nm">${esc(LABEL[name] || name)}</span><small>${chosen === name ? 'in use' : ''}</small>`;
-    el.onclick = async () => { await api('/api/settings', { method: 'POST', body: JSON.stringify({ model: name }) }).catch(() => {}); await drawSettings(); $('setPop').classList.remove('show'); };
-    $('provs').appendChild(el);
-  }
-}
-
-(async () => { await drawSettings(); await drawDemos(); await newest(); watchActivity(); setInterval(drawDemos, 30000); })();
+(async () => { await drawDemos(); await newest(); watchActivity(); setInterval(drawDemos, 30000); })();
 </script>
 </body>
 </html>

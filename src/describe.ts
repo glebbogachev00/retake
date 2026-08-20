@@ -297,7 +297,7 @@ Manifest YAML fields:
   camera: auto, setup: [steps run before recording], steps: [...], outputs: {mp4: true, gif: true, thumbnail: {scene: <label>}}
   Do NOT set viewport, cursor, chrome, background, fps, crf or captions — the preset handles quality.
 Steps (each may have pauseAfter ms, waitFor selector, timeout ms):
-  {action: scene, label, caption, camera?: static | {focus: selector, zoom: 1.25}}   a named beat; caption is burned in until the next scene (under 60 chars); camera defaults to auto (eases toward the last selector used)
+  {action: scene, label, caption, camera?: static | {focus: selector, zoom: 1.25}}   a named beat; caption is burned in until the next scene (under 60 chars). Set camera: static on every scene unless the thing being shown is genuinely too small to read at full frame — a calm, still demo reads as more real than a zooming one. If the person asked for zooms (or stillness), that wins.
   {action: wait, ms}
   {action: click, selector, zoom: 1.3}   zoom is optional
   {action: type, selector, text, delay: 30}
@@ -310,14 +310,22 @@ Steps (each may have pauseAfter ms, waitFor selector, timeout ms):
 Rules: never invent field names or add "?" to keys; 15–35 seconds total; 3–6 scenes; open with a scene; every click uses a selector from the scouted list verbatim (selectors ending in \">> nth=N\" are already disambiguated — keep them exactly); after any action that loads or computes something, waitFor an element that only appears as a result (never one that is already on the page) — if you cannot know it from the scout, use {action: wait, ms: 3000} instead; end with a wait of ~2000ms on the payoff; do not use zoom steps — scenes carry the camera.
 `;
 
-export async function draftManifest(input: { name: string; url: string; describe: string; scout: Scout; provider: Provider; project?: string }): Promise<{ yaml: string; provider: string; retried: boolean; digest?: Digest }> {
+/** The person's standing taste — demos/style.md, written once, read by every
+    draft. "No zooms, cursor visible, captions plain" should not need repeating. */
+export function styleNote(demosDir: string): string | null {
+  try { const t = fs.readFileSync(path.join(demosDir, "style.md"), "utf8").trim(); return t || null; } catch { return null; }
+}
+
+export async function draftManifest(input: { name: string; url: string; describe: string; scout: Scout; provider: Provider; project?: string; demosDir?: string }): Promise<{ yaml: string; provider: string; retried: boolean; digest?: Digest }> {
   const { name, url, describe, scout: sc, provider } = input;
   const dg = input.project ? digest(input.project) : undefined;
+  const style = input.demosDir ? styleNote(input.demosDir) : null;
   const system = `You write Retake demo manifests: YAML that drives a Playwright walkthrough of a web app to make a short silent product demo video. Output ONLY the YAML document, no prose, no code fences.\n${SCHEMA_DOC}`;
   const user = [
     `name: ${name}`,
     `url: ${url}`,
     `What to record: ${describe}`,
+    ...(style ? ["", "The person's standing style preferences — these always win over defaults:", style] : []),
     ``,
     ...(dg ? ["The project's own source code says:", dg.text, "", "Use the routes and selectors above when they fit the story — they are more reliable than anything guessed. Add `reducedMotion: true` if infinite animations were flagged. If a sign-in is needed, put it in `setup` with ${ENV} placeholders and `secret: true`, never literal passwords.", ""] : []),
     `Scouted page — title: ${sc.title}`,
