@@ -57,7 +57,7 @@
   .stills img { height:64px; border-radius:7px; border:1px solid var(--rule2); box-shadow:0 2px 6px rgba(24,28,24,.06); cursor:pointer; flex:none; }
   .stills img:hover { border-color:var(--ink); }
   /* the library: one quiet card at the video's side */
-  .lib { border:1px solid var(--rule); background:var(--card); border-radius:14px; padding:8px 6px; position:sticky; top:14px; }
+  .lib { border:1px solid var(--rule); background:var(--card); border-radius:14px; padding:8px 6px; position:sticky; top:14px; line-height:1.35; }
   .lib h2 { font:10.5px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:3px 0 4px 9px; }
   details.group { margin-bottom:0; }
   details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:7px; padding:6px 9px; border-radius:9px; font-size:13px; color:var(--muted); }
@@ -197,7 +197,13 @@ function watchActivity() {
     $('liveWhat').textContent = a.demo ? `· ${a.demo}` : '';
     $('liveLines').innerHTML = (a.lines || []).slice(-4).map((l) => `<div>${esc(l)}</div>`).join('');
   };
-  es.addEventListener('state', (ev) => apply(JSON.parse(ev.data)));
+  es.addEventListener('state', (ev) => {
+    const d = JSON.parse(ev.data);
+    // The server restarted under us → this page's HTML/CSS is stale. Reload.
+    if (window.__boot && d.boot && d.boot !== window.__boot) location.reload();
+    window.__boot = d.boot || window.__boot;
+    apply(d);
+  });
   es.addEventListener('line', (ev) => apply(JSON.parse(ev.data)));
   es.addEventListener('finished', async (ev) => { apply(JSON.parse(ev.data)); await drawDemos(); await newest(); setTimeout(() => $('live').classList.remove('show'), 8000); });
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };

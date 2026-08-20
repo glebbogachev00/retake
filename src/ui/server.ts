@@ -321,6 +321,8 @@ function pickFolder(): Promise<string | null> {
   });
 }
 
+const BOOT = Date.now();   // pages compare this and reload themselves after a restart
+
 /** A live view of agent-driven work, so the app is a window and not a folder. */
 type Activity = { active: boolean; who: string; demo?: string; lines: string[]; startedAt: number; finishedAt?: number };
 const activity: Activity = { active: false, who: "", lines: [], startedAt: 0 };
@@ -525,7 +527,7 @@ export function serve(port: number) {
       if (p === "/api/activity" && req.method === "GET") return json(res, 200, activity);
       if (p === "/api/activity/stream" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-        res.write(`event: state\ndata: ${JSON.stringify(activity)}\n\n`);
+        res.write(`event: state\ndata: ${JSON.stringify({ ...activity, boot: BOOT })}\n\n`);
         const send = (ev: { type: string; data: unknown }) => res.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev.data)}\n\n`);
         activityWatchers.add(send);
         const beat = setInterval(() => res.write(": ping\n\n"), 25_000);
