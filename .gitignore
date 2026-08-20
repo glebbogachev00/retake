@@ -11,6 +11,12 @@ ideas/
 # Demos of private apps stay local; demos/example.yaml is the public template.
 demos/*.yaml
 !demos/example.yaml
+!demos/todo-basics.yaml
+!demos/store-checkout.yaml
+# working files describe private apps — local only
+demos/ideas.md
+demos/plan.json
+demos/style.md
 demos/seeds/*
 !demos/seeds/.gitkeep
 scripts/capture-dev.sh

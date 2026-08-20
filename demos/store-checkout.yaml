@@ -1,0 +1,75 @@
+# Public-safe: SauceDemo, a store built for test automation, with published
+# demo credentials. The point of this one is the login: real credentials
+# come from .env, marked secret, and the sign-in happens before the camera.
+name: store-checkout
+title: Sign in, pick a thing, check out
+url: https://www.saucedemo.com
+preset: post-landscape
+waitForSelector: "#user-name"
+camera: static
+auth:
+  storageState: .auth/saucedemo.json
+  maxAgeHours: 8
+  setup:
+    - { action: fill, selector: "#user-name", text: "${SAUCE_USER}" }
+    - { action: fill, selector: "#password", text: "${SAUCE_PASSWORD}", secret: true }
+    - { action: click, selector: "#login-button" }
+    - { action: waitFor, selector: ".inventory_list", timeout: 15000 }
+setup: []
+steps:
+  - action: scene
+    label: shelf
+    caption: Signed in — the login lives off camera
+    camera: static
+  - action: wait
+    ms: 1600
+  - action: click
+    selector: "#add-to-cart-sauce-labs-backpack"
+    pauseAfter: 700
+  - action: click
+    selector: ".shopping_cart_link"
+    pauseAfter: 800
+  - action: scene
+    label: cart
+    caption: In the cart
+    camera: static
+  - action: wait
+    ms: 1200
+  - action: click
+    selector: "#checkout"
+  - action: waitFor
+    selector: "#first-name"
+  - action: type
+    selector: "#first-name"
+    text: Ada
+    delay: 45
+  - action: type
+    selector: "#last-name"
+    text: Lovelace
+    delay: 45
+  - action: type
+    selector: "#postal-code"
+    text: "1815"
+    delay: 45
+  - action: scene
+    label: details
+    caption: Real typing, not a paste
+    camera: static
+  - action: click
+    selector: "#continue"
+    pauseAfter: 900
+  - action: click
+    selector: "#finish"
+  - action: waitFor
+    selector: ".complete-header"
+  - action: scene
+    label: donezo
+    caption: Order placed — every step on the receipt
+    camera: static
+  - action: wait
+    ms: 2400
+outputs:
+  mp4: true
+  gif: false
+  thumbnail:
+    scene: donezo
