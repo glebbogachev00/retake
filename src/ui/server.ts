@@ -506,19 +506,6 @@ export function serve(port: number) {
         return json(res, 200, { name, startedAt: run.startedAt, estimate: run.estimate });
       }
 
-      // ---------- chat: one continuing conversation per project ----------
-      if (p === "/api/chat" && req.method === "POST") {
-        const b = JSON.parse(await readBody(req)) as { message: string; project?: string; url?: string; demo?: string };
-        if (!b.message?.trim()) return json(res, 400, { error: "say something" });
-        const prov = pickProvider();
-        const which = prov?.name === "codex" ? "codex" : prov?.name === "claude-code" ? "claude-code" : null;
-        if (!which) return json(res, 400, { error: "Chat needs Claude Code or Codex — pick one in Settings." });
-        const ui = `http://localhost:${(req.socket.localPort as number) || 4310}`;
-        const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
-        const s2 = startOperator({ describe: b.message, url: b.url?.trim() || undefined, project, name: b.demo && safeName(b.demo) ? b.demo : undefined, ui, root: ROOT, provider: which, onDemo: (demo) => { if (project && safeName(demo)) assignDemoProject(demo, project); } });
-        return json(res, 200, { id: s2.id, startedAt: s2.startedAt });
-      }
-
       // ---------- what somebody else's agent is doing right now ----------
       // Claude Code or Codex can drive Retake over MCP from their own window.
       // Without this, the app shows nothing until a file lands — so the tools

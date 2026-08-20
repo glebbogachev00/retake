@@ -185,6 +185,8 @@ export const Manifest = z.object({
       gif: z.union([z.boolean(), z.object({ width: z.number().int().optional(), fps: z.number().int().optional() })]).default(false),
       /** Which scene's frame becomes the thumbnail; default = last scene. */
       thumbnail: z.union([z.boolean(), z.object({ scene: z.string() })]).default(true),
+      /** One PNG per scene, into outputs/<name>/stills/. */
+      stills: z.boolean().default(true),
     })
     .prefault({}),
 });

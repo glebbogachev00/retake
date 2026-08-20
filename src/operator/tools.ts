@@ -23,7 +23,7 @@ import { loadManifest, resolve } from "../manifest.js";
 import { record, captureHash, acquireLock, releaseLock, type Take } from "../record.js";
 import { render, check } from "../render.js";
 import { dryRun } from "../dryrun.js";
-import { scout, draftManifest, pickProvider, loadDotenv, type Edit } from "../describe.js";
+import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
 import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
 import { applyEdits, receiptsFor } from "../edits.js";
@@ -137,6 +137,68 @@ server.registerTool("ask", { description: "Ask the person ONE question and wait 
     if (!(e instanceof NoUI)) throw e;
     return text(`No Retake window is open, so ask the person yourself: “${question}” Then carry on with their answer.`);
   }
+});
+
+server.registerTool("ideas", {
+  description: "What is worth recording. Reads the live page (and the source folder if given) and returns a short list of demo ideas, each a title and a one-sentence story. Use this when the person asks what demos to make — do not invent ideas yourself. Saves the list to demos/ideas.md.",
+  inputSchema: { url: z.string().url(), project: z.string().optional() },
+  annotations: READ_ONLY,
+}, async ({ url, project }) => { LAST_DEMO = "";
+  await tell("Looking for demos worth making…");
+  const provider = pickProvider();
+  if (!provider) return text("NO PROVIDER — Retake has no model configured. You know the app better than a blind draft would: propose ideas yourself from read_project.");
+  const sc = await scout(url);
+  const r = await suggestIdeas({ url, scout: sc, provider, project: project?.replace(/^~/, os.homedir()) });
+  fs.mkdirSync(DEMOS, { recursive: true });
+  fs.writeFileSync(path.join(DEMOS, "ideas.md"), r.markdown);
+  await tell(`${r.ideas.length} ideas → demos/ideas.md`);
+  return text(r.ideas.map((i, n) => `${n + 1}. ${i.title} — ${i.story} (${i.length})`).join("\n") || r.markdown);
+});
+
+// The plan is what makes "record them all" one job instead of five the model
+// has to remember. It lives on disk, so a new session can pick up where the
+// last one stopped.
+const PLAN = () => path.join(DEMOS, "plan.json");
+type PlanItem = { name: string; story: string; status: "todo" | "recorded" | "final" | "failed"; note?: string };
+function readPlan(): PlanItem[] { try { return JSON.parse(fs.readFileSync(PLAN(), "utf8")) as PlanItem[]; } catch { return []; } }
+function planText(items: PlanItem[]): string {
+  if (!items.length) return "no plan — make one with plan_set";
+  const left = items.filter((i) => i.status === "todo" || i.status === "failed").length;
+  return items.map((i) => `[${i.status}] ${i.name} — ${i.story}${i.note ? ` (${i.note})` : ""}`).join("\n") + (left ? `\n\n${left} still to do.` : "\n\nAll done.");
+}
+
+server.registerTool("plan_set", {
+  description: "Write the list of demos to record (kebab-case names + one-sentence stories). Replaces the plan. Then work through it: draft → dry → run for each, marking progress with plan_mark.",
+  inputSchema: { items: z.array(z.object({ name: z.string(), story: z.string() })) },
+  annotations: RETAKE_WRITE,
+}, async ({ items }) => {
+  const old = readPlan();
+  const merged: PlanItem[] = items.map((i) => ({ name: i.name, story: i.story, status: old.find((o) => o.name === i.name)?.status ?? "todo" }));
+  fs.mkdirSync(DEMOS, { recursive: true });
+  fs.writeFileSync(PLAN(), JSON.stringify(merged, null, 2));
+  await tell(`Plan: ${merged.length} demos.`);
+  return text(planText(merged));
+});
+
+server.registerTool("plan", {
+  description: "The current plan and what is left. Check this at the start of a batch session — an unfinished plan from before continues here.",
+  inputSchema: {},
+  annotations: READ_ONLY,
+}, async () => text(planText(readPlan())));
+
+server.registerTool("plan_mark", {
+  description: "Record progress on one plan item: recorded (preview done), final (full-quality render done), failed (with a note saying why), or todo to reset it.",
+  inputSchema: { name: z.string(), status: z.enum(["todo", "recorded", "final", "failed"]), note: z.string().optional() },
+  annotations: RETAKE_WRITE,
+}, async ({ name, status, note }) => {
+  const items = readPlan();
+  const it = items.find((i) => i.name === name);
+  if (!it) return text(`"${name}" is not in the plan. Items: ${items.map((i) => i.name).join(", ") || "none"}`);
+  it.status = status; it.note = note;
+  fs.writeFileSync(PLAN(), JSON.stringify(items, null, 2));
+  const left = items.filter((i) => i.status === "todo" || i.status === "failed").length;
+  await tell(`${name}: ${status}${note ? ` — ${note}` : ""} · ${left} to go`);
+  return text(planText(items));
 });
 
 server.registerTool("list_demos", { description: "Demos that exist, with their last take.", inputSchema: {}, annotations: READ_ONLY }, async () => {

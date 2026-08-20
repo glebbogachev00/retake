@@ -63,7 +63,7 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, cap: m.captions, theme: m.theme, camera: m.camera, gif: m.outputs.gif, thumb: m.outputs.thumbnail, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, cap: m.captions, theme: m.theme, camera: m.camera, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -461,6 +461,24 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     thumbnail = path.join(outDir, "thumbnail.png");
     ff(["-ss", Math.max(0, at).toFixed(2), "-i", mp4, "-frames:v", "1", thumbnail], log);
     mark("thumbnail");
+  }
+  // --- 5. scene stills -------------------------------------------------------
+  // Every scene already carries its real timestamp, so one crisp frame per
+  // scene is free — and a video usually ships with a picture next to it.
+  let stills: string[] = [];
+  if (m.outputs.stills) {
+    const dir = path.join(outDir, "stills");
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    const sc = scenes(take);
+    const end = take.duration - take.trimBefore;
+    for (const [i, sce] of sc.entries()) {
+      const at = Math.min(Math.max(0, sce.start - take.trimBefore + 1.0), Math.max(0, end - 0.2));
+      const file = path.join(dir, `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}.png`);
+      ff(["-ss", at.toFixed(2), "-i", mp4, "-frames:v", "1", file], log);
+      stills.push(file);
+    }
+    if (sc.length) mark(`stills ×${sc.length}`);
   }
   if (!master) fs.rmSync(path.join(outDir, "master.mp4"), { force: true });
 
