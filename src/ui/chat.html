@@ -36,7 +36,8 @@
   @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
   .quiet { padding:8px 10px; color:var(--muted); font-size:13px; }
   .sp { flex:1; }
-  .wrap { max-width:760px; width:100%; margin:0 auto; padding:6px 22px 40px; }
+  .wrap { max-width:1060px; width:100%; margin:0 auto; padding:6px 22px 40px; display:grid; grid-template-columns:minmax(0,1fr); gap:26px; align-items:start; }
+  @media (min-width: 1000px) { .wrap.two { grid-template-columns:minmax(0,1fr) 280px; } }
   /* live activity — what an agent is doing to this library right now */
   .live { border:1px solid var(--rule); background:var(--card); border-radius:14px; padding:14px 18px; margin-bottom:18px; display:none; }
   .live.show { display:block; }
@@ -55,22 +56,23 @@
   .stills { display:flex; gap:8px; margin-top:10px; overflow-x:auto; padding-bottom:4px; }
   .stills img { height:64px; border-radius:7px; border:1px solid var(--rule); cursor:pointer; flex:none; }
   .stills img:hover { border-color:var(--ink); }
-  /* the library */
-  .lib { margin-top:26px; }
-  .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:0 0 8px 2px; }
+  /* the library: one quiet card at the video's side */
+  .lib { border:1px solid var(--rule); background:var(--card); border-radius:14px; padding:12px 10px; position:sticky; top:14px; }
+  .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:2px 0 8px 8px; }
   details.group { margin-bottom:6px; }
   details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:11px; font-size:13.5px; color:var(--muted); }
   details.group summary::-webkit-details-marker { display:none; }
+  details.group summary { padding:7px 8px; }
   details.group summary:hover { background:#eef1ea; color:var(--ink); }
   details.group summary .tri { transition:transform .15s; font-size:10px; }
   details.group[open] summary .tri { transform:rotate(90deg); }
   details.group summary b { color:var(--ink); font-weight:600; }
   details.group summary small { margin-left:auto; font-size:12px; }
   details.group .demo { margin-left:10px; }
-  .demo { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:11px; cursor:pointer; }
+  .demo { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:9px; cursor:pointer; }
   .demo:hover { background:#eef1ea; }
-  .demo.on { background:var(--card); border:1px solid var(--rule); }
-  .demo .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14.5px; }
+  .demo.on { background:#fff; border:1px solid var(--rule); }
+  .demo .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
   .demo small { color:var(--muted); font-size:12.5px; flex:none; }
   .empty { text-align:center; color:var(--muted); padding:60px 20px; }
   .empty .mark { margin:0 auto 14px; width:34px; height:34px; border-radius:10px; }
@@ -87,8 +89,10 @@
     <div class="mark"><i></i><i></i><i></i><i></i></div>
     <h1>Retake</h1>
     <span class="sp"></span>
+    <a class="chip" href="/guide" style="text-decoration:none">How it works</a>
   </div>
-  <div class="wrap">
+  <div class="wrap two">
+    <div class="col-main">
     <div class="live" id="live">
       <div class="head"><span class="dot live" id="liveDot"></span><b id="liveWho"></b><span id="liveWhat"></span></div>
       <div class="lines" id="liveLines"></div>
@@ -107,12 +111,13 @@
     <div class="empty" id="empty" style="display:none">
       <div class="mark"><i></i><i></i><i></i><i></i></div>
       <h2>Nothing recorded yet</h2>
-      <p>Ask your agent for a demo — <code>record a demo of my app showing the sign-up flow</code> —<br>or build one by hand in the <a href="/classic">workshop</a>. It will appear here.</p>
+      <p>Ask your agent for a demo — <code>record a demo of my app showing the sign-up flow</code> —<br>or build one by hand in the <a href="/classic">workshop</a>. It will appear here.<br><a href="/guide">How Retake works</a> — one page, two minutes.</p>
     </div>
-    <div class="lib" id="lib" style="display:none">
+    </div>
+    <aside class="lib" id="lib" style="display:none">
       <h2 id="libTtl">Demos</h2>
       <div id="demos"></div>
-    </div>
+    </aside>
   </div>
 </div>
 <script>

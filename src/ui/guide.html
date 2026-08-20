@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How Retake works</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<style>
+  :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --amber:#e8b04b; --accent:#1a1c1e; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
+  .top { display:flex; align-items:center; gap:10px; padding:14px 22px; }
+  .mark { width:22px; height:22px; border-radius:7px; background:var(--accent); position:relative; }
+  .mark i { position:absolute; left:5.5px; height:2.5px; border-radius:2px; background:#eceee9; }
+  .mark i:nth-child(1){top:4px;width:4px;opacity:.55} .mark i:nth-child(2){top:8px;width:7px;opacity:.8} .mark i:nth-child(3){top:12px;width:11px;background:var(--amber)} .mark i:nth-child(4){top:16px;width:7px;opacity:.8}
+  .top a { display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; }
+  .top h1 { font-size:15px; font-weight:600; margin:0; }
+  main { max-width:640px; margin:0 auto; padding:28px 22px 80px; }
+  h2 { font-size:22px; letter-spacing:-.01em; margin:0 0 6px; }
+  .lead { color:var(--muted); margin:0 0 34px; }
+  section { margin-bottom:34px; }
+  h3 { font-size:16px; margin:0 0 8px; }
+  p { margin:0 0 10px; }
+  .say { background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:12px 16px; margin:10px 0; font-style:italic; }
+  .say::before { content:"“"; } .say::after { content:"”"; }
+  ul { margin:8px 0; padding-left:20px; }
+  li { margin-bottom:4px; }
+  .quiet { color:var(--muted); font-size:14px; }
+  code { background:var(--card); border:1px solid var(--rule); border-radius:6px; padding:1px 7px; font:14px ui-monospace, Menlo, monospace; }
+  hr { border:0; border-top:1px solid var(--rule); margin:34px 0; }
+</style>
+</head>
+<body>
+<div class="top"><a href="/"><div class="mark"><i></i><i></i><i></i><i></i></div><h1>Retake</h1></a></div>
+<main>
+  <h2>How Retake works</h2>
+  <p class="lead">Describe a demo of your app in a sentence. Retake drives a real browser through it and hands you the video. When the app changes, you re-run — nobody re-records anything by hand.</p>
+
+  <section>
+    <h3>1 · Ask for a demo</h3>
+    <p>Talk to the agent you already use — Claude Code or Codex. It has Retake's tools.</p>
+    <div class="say">Record a demo of my app at localhost:3000 showing the sign-up flow.</div>
+    <div class="say">What demos are worth recording for this project? Record the best three.</div>
+    <p class="quiet">The agent reads your app, writes the steps, checks every one of them against the live page, and only then records. You can watch it work on this window's front page.</p>
+  </section>
+
+  <section>
+    <h3>2 · Judge the take</h3>
+    <p>The video lands here — newest on top, one still per scene under it. <b>Download</b> for the file, <b>Edit</b> to open its steps and knobs in the workshop.</p>
+  </section>
+
+  <section>
+    <h3>3 · Direct it like a videographer</h3>
+    <p>Say what you want changed, in plain words:</p>
+    <ul>
+      <li>“No zooms — keep the camera still.”</li>
+      <li>“Hide the cursor.” · “Shorter captions.” · “No captions.”</li>
+      <li>“Hold the ending longer.” · “Cut the first two seconds.”</li>
+      <li>“Make it square for a post.” · “Vertical for a reel.”</li>
+    </ul>
+    <p class="quiet">Say it once — Retake remembers it for the project. Most changes re-render in seconds without re-recording.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>Where things live</h3>
+    <p>Each demo is a small YAML file in <code>demos/</code> — that file <i>is</i> the demo. Videos land in <code>outputs/&lt;name&gt;/</code>: <code>demo.mp4</code>, <code>stills/</code>, and <code>proof-log.md</code> saying exactly what happened, step by step.</p>
+  </section>
+
+  <section>
+    <h3>Good to know</h3>
+    <ul>
+      <li>Retake never starts your app without you saying so.</li>
+      <li>Passwords stay in <code>.env</code> — never in a demo file, never on camera.</li>
+      <li>A failed step names what was on screen at the time — read the proof log before guessing.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
