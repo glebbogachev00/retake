@@ -473,10 +473,11 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     const sc = scenes(take);
     const end = take.duration - take.trimBefore;
     for (const [i, sce] of sc.entries()) {
-      // The frame worth keeping is the scene's END: by then the click landed,
-      // the result rendered, the text is fully typed. A second in, it hasn't.
+      // The scene's midpoint: at the start the click hasn't landed, at the
+      // end the scene may already be leaving (a save, a reset, a navigation).
       const next = sc[i + 1] ? sc[i + 1].start - take.trimBefore : end;
-      const at = Math.min(Math.max(sce.start - take.trimBefore + 0.5, next - 1.0), Math.max(0, end - 0.2));
+      const from = sce.start - take.trimBefore;
+      const at = Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
       const file = path.join(dir, `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}.png`);
       ff(["-ss", at.toFixed(2), "-i", mp4, "-frames:v", "1", file], log);
       stills.push(file);

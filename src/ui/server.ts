@@ -133,7 +133,7 @@ function unassignDemoProject(name: string) {
 function listDemos(project?: string) {
   if (!fs.existsSync(DEMOS)) return [];
   const wanted = project?.trim() ? projectKey(project) : null;
-  const assignments = wanted ? demoProjects() : null;
+  const assignments = demoProjects();
   return fs
     .readdirSync(DEMOS)
     .filter((f) => /\.ya?ml$/.test(f))
@@ -155,6 +155,8 @@ function listDemos(project?: string) {
       } catch {
         valid = false;
       }
+      const assigned = assignments[name];
+      const group = assigned ? path.basename(assigned) : (url ? url.replace(/^https?:\/\//, "") : "unsorted");
       const take = path.join(outRoot(), name, "take.json");
       let lastTake: unknown = null;
       // Does the browser need to run again, or is a re-render enough? The
@@ -168,7 +170,7 @@ function listDemos(project?: string) {
           needsRecord = !t.captureHash || t.captureHash !== captureHash(m) || !!t.partial || !t.video || !fs.existsSync(t.video);
         } catch { /* ignore */ }
       }
-      return { name, file: f, title, url, valid, settings, lastTake, needsRecord };
+      return { name, file: f, title, url, group, valid, settings, lastTake, needsRecord };
     })
     .filter((demo) => !wanted || assignments?.[demo.name] === wanted);
 }

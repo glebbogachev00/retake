@@ -125,7 +125,10 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // The page lays out at `scale`× (CSS zoom): the app sees a smaller viewport
   // and renders crisp into the full canvas. Coordinates testreel/Playwright
   // see are already video pixels, so cursor and clicks line up.
-  if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{document.documentElement.style.zoom="${q.scale}"})`);
+  // Scale via a <style> tag, not an inline attribute: React hydration diffs
+  // element attributes against the server HTML, so style.zoom on <html> made
+  // every React app report a hydration mismatch — with a dev badge in shot.
+  if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="html{zoom:${q.scale}}";document.head.appendChild(st)})`);
   // Dev servers decorate themselves — Next's issues badge, Vite's error
   // overlay, webpack's. None of that belongs in a product video, and no
   // manifest should have to know about it.

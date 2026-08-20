@@ -12,16 +12,17 @@
   {
     "name": "distill-messy",
     "story": "Enter a long rambling thought in the capture field, choose Distill instead of capture, show the distilled wording, then accept it onto the board.",
-    "status": "todo"
+    "status": "failed",
+    "note": "Distill requires a model API key (GROQ, Mistral, OpenRouter, etc.) — none is configured. The [aria-label=\"Distilled wording\"] element never appears; times out at 60s."
   },
   {
     "name": "shelf-life",
     "story": "Capture 'renew the domain,' open its Action, use Change shelf life to set when it matters, then return to the board with the dated action visible.",
-    "status": "todo"
+    "status": "recorded"
   },
   {
     "name": "search-thought",
     "story": "Capture a note about pricing strategy, use Search everything for 'pricing,' and open the matching Thread from the results.",
-    "status": "todo"
+    "status": "recorded"
   }
 ]

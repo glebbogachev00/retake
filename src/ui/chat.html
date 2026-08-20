@@ -58,6 +58,15 @@
   /* the library */
   .lib { margin-top:26px; }
   .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:0 0 8px 2px; }
+  details.group { margin-bottom:6px; }
+  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:11px; font-size:13.5px; color:var(--muted); }
+  details.group summary::-webkit-details-marker { display:none; }
+  details.group summary:hover { background:#eef1ea; color:var(--ink); }
+  details.group summary .tri { transition:transform .15s; font-size:10px; }
+  details.group[open] summary .tri { transform:rotate(90deg); }
+  details.group summary b { color:var(--ink); font-weight:600; }
+  details.group summary small { margin-left:auto; font-size:12px; }
+  details.group .demo { margin-left:10px; }
   .demo { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:11px; cursor:pointer; }
   .demo:hover { background:#eef1ea; }
   .demo.on { background:var(--card); border:1px solid var(--rule); }
@@ -143,15 +152,28 @@ async function drawDemos() {
   $('lib').style.display = has ? '' : 'none';
   $('libTtl').textContent = `Demos · ${demos.length}`;
   $('demos').innerHTML = '';
-  for (const p of demos) {
-    const el = document.createElement('div');
-    el.className = 'demo' + (p.name === current ? ' on' : '');
-    const dot = p.lastTake ? (p.lastTake.ok && !p.lastTake.partial ? 'ok' : 'bad') : '';
-    const when = p.lastTake ? new Date(p.lastTake.finishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no take yet';
-    el.innerHTML = `<span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small>`;
-    // No take yet → there is nothing to review; open it where it can be run.
-    el.onclick = () => { if (p.lastTake) pin(p.name); else location.href = '/classic#' + encodeURIComponent(p.name); };
-    $('demos').appendChild(el);
+  const groups = new Map();
+  for (const p of demos) { const g = p.group || 'unsorted'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p); }
+  const open = new Set(JSON.parse(localStorage.getItem('retake.openGroups') || 'null') || [demos.find((d) => d.name === current)?.group || (demos[0] && demos[0].group)]);
+  for (const [g, items] of groups) {
+    const det = document.createElement('details');
+    det.className = 'group';
+    if (open.has(g) || groups.size === 1) det.open = true;
+    det.innerHTML = `<summary><span class="tri">▶</span><b>${esc(g)}</b><small>${items.length}</small></summary>`;
+    det.addEventListener('toggle', () => {
+      const now = [...document.querySelectorAll('details.group[open] summary b')].map((b) => b.textContent);
+      localStorage.setItem('retake.openGroups', JSON.stringify(now));
+    });
+    for (const p of items) {
+      const el = document.createElement('div');
+      el.className = 'demo' + (p.name === current ? ' on' : '');
+      const dot = p.lastTake ? (p.lastTake.ok && !p.lastTake.partial ? 'ok' : 'bad') : '';
+      const when = p.lastTake ? new Date(p.lastTake.finishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no take yet';
+      el.innerHTML = `<span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small>`;
+      el.onclick = () => { if (p.lastTake) pin(p.name); else location.href = '/classic#' + encodeURIComponent(p.name); };
+      det.appendChild(el);
+    }
+    $('demos').appendChild(det);
   }
 }
 
