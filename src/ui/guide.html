@@ -9,7 +9,7 @@
   :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --amber:#e8b04b; --accent:#1a1c1e; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
-  .top { display:flex; align-items:center; gap:10px; padding:14px 22px; }
+  .top { display:flex; align-items:center; gap:10px; padding:14px 22px; --rule2:#c9cec0; }
   .mark { width:22px; height:22px; border-radius:7px; background:var(--accent); position:relative; }
   .mark i { position:absolute; left:5.5px; height:2.5px; border-radius:2px; background:#eceee9; }
   .mark i:nth-child(1){top:4px;width:4px;opacity:.55} .mark i:nth-child(2){top:8px;width:7px;opacity:.8} .mark i:nth-child(3){top:12px;width:11px;background:var(--amber)} .mark i:nth-child(4){top:16px;width:7px;opacity:.8}
@@ -31,7 +31,11 @@
 </style>
 </head>
 <body>
-<div class="top"><a href="/"><div class="mark"><i></i><i></i><i></i><i></i></div><h1>Retake</h1></a></div>
+<div class="top">
+  <a href="/"><div class="mark"><i></i><i></i><i></i><i></i></div><h1>Retake</h1></a>
+  <span style="flex:1"></span>
+  <a href="/" style="border:1px solid var(--rule2, #c9cec0); background:#fff; border-radius:999px; padding:6px 13px; font-size:13px; color:var(--ink); text-decoration:none">← Back</a>
+</div>
 <main>
   <h2>How Retake works</h2>
   <p class="lead">Describe a demo of your app in a sentence. Retake drives a real browser through it and hands you the video. When the app changes, you re-run — nobody re-records anything by hand.</p>
