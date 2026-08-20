@@ -126,6 +126,10 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // and renders crisp into the full canvas. Coordinates testreel/Playwright
   // see are already video pixels, so cursor and clicks line up.
   if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{document.documentElement.style.zoom="${q.scale}"})`);
+  // Dev servers decorate themselves — Next's issues badge, Vite's error
+  // overlay, webpack's. None of that belongs in a product video, and no
+  // manifest should have to know about it.
+  await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="nextjs-portal,#__next-build-watcher,vite-error-overlay,#webpack-dev-server-client-overlay,#react-refresh-overlay{display:none!important}";document.head.appendChild(st)})`);
 
   // Canned responses live in a map the route handler reads on every request, so
   // a `stub` step mid-demo swaps the answer without re-registering anything.

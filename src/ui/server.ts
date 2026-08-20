@@ -760,13 +760,14 @@ export function serve(port: number) {
         const tp = path.join(dir, "take.json");
         if (!fs.existsSync(tp)) return json(res, 404, { error: "no take yet" });
         const take = JSON.parse(fs.readFileSync(tp, "utf8"));
-        const files = fs.readdirSync(dir).filter((f) => !f.startsWith("."));
+        const files = fs.readdirSync(dir).filter((f) => !f.startsWith(".")).flatMap((f) =>
+          f === "stills" ? fs.readdirSync(path.join(dir, "stills")).map((x) => `stills/${x}`) : [f]);
         const proof = fs.existsSync(path.join(dir, "proof-log.md")) ? fs.readFileSync(path.join(dir, "proof-log.md"), "utf8") : "";
         const facts = fs.existsSync(path.join(dir, "facts.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "facts.json"), "utf8")) : null;
         const stamp = fs.statSync(tp).mtimeMs;
         return json(res, 200, { take, files, proof, facts, stamp, dir });
       }
-      m = /^\/out\/([a-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(p);
+      m = /^\/out\/([a-z0-9-]+)\/((?:stills\/)?[A-Za-z0-9._-]+)$/.exec(p);
       if (m && req.method === "GET") {
         const f = path.join(outRoot(), m[1], m[2]);
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });

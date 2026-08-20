@@ -137,6 +137,7 @@ async function pin(name) {
 
 async function drawDemos() {
   try { demos = await api('/api/demos'); } catch { return; }
+  demos.sort((a, b) => (b.lastTake ? new Date(b.lastTake.finishedAt).getTime() : 0) - (a.lastTake ? new Date(a.lastTake.finishedAt).getTime() : 0));
   const has = demos.length > 0;
   $('empty').style.display = has ? 'none' : '';
   $('lib').style.display = has ? '' : 'none';
@@ -148,7 +149,8 @@ async function drawDemos() {
     const dot = p.lastTake ? (p.lastTake.ok && !p.lastTake.partial ? 'ok' : 'bad') : '';
     const when = p.lastTake ? new Date(p.lastTake.finishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no take yet';
     el.innerHTML = `<span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small>`;
-    el.onclick = () => pin(p.name);
+    // No take yet → there is nothing to review; open it where it can be run.
+    el.onclick = () => { if (p.lastTake) pin(p.name); else location.href = '/classic#' + encodeURIComponent(p.name); };
     $('demos').appendChild(el);
   }
 }
