@@ -37,7 +37,7 @@
   .quiet { padding:8px 10px; color:var(--muted); font-size:13px; }
   .sp { flex:1; }
   .wrap { max-width:1060px; width:100%; margin:0 auto; padding:6px 22px 40px; display:grid; grid-template-columns:minmax(0,1fr); gap:26px; align-items:start; }
-  @media (min-width: 1000px) { .wrap.two { grid-template-columns:minmax(0,1fr) 280px; } }
+  @media (min-width: 1000px) { .wrap.two { grid-template-columns:280px minmax(0,1fr) ; } .wrap.two .lib { order:-1; } }
   /* live activity — what an agent is doing to this library right now */
   .live { border:1px solid var(--rule); background:var(--card); border-radius:14px; padding:14px 18px; margin-bottom:18px; display:none; }
   .live.show { display:block; }
