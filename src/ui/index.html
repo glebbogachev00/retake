@@ -600,18 +600,28 @@ function openNew() { draftId = 'd' + Date.now().toString(36); startInfo = null; 
 $('newBtn').onclick = openNew;
 $('fCancel').onclick = () => { if (current) show('viewDemo'); };
 for (const id of ['fUrl', 'fDesc', 'fProject']) $(id).addEventListener('input', saveDraftSoon);
-$('fProject').addEventListener('change', async () => {
-  const dir = $('fProject').value.trim(); if (!dir) { $('fProjectNote').textContent = ''; return; }
+let projTimer = null;
+async function checkProject() {
+  const dir = $('fProject').value.trim();
+  if (!dir) { $('fProjectNote').textContent = ''; startInfo = null; return; }
   $('fProjectNote').textContent = 'Reading…';
-  try { const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) }); const bits = [`${r.files} files`, r.stack.length ? r.stack.join(', ') : null, r.routes.length ? `${r.routes.length} routes` : null, r.selectors ? `${r.selectors} stable selectors` : null, r.auth ? 'a sign-in' : null, r.flaky ? `${r.flaky} things to watch` : null].filter(Boolean); $('fProjectNote').innerHTML = `<span style="color:var(--ok)">Found ${esc(r.name)}</span> — ${esc(bits.join(' · '))}`; } catch (e) { $('fProjectNote').textContent = e.message; }
-});
+  try {
+    const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) });
+    startInfo = r.start || null;
+    if (startInfo && lastDownWhere) offerStart(lastDownWhere);
+    const bits = [`${r.files} files`, r.stack.length ? r.stack.join(', ') : null, r.routes.length ? `${r.routes.length} routes` : null, r.selectors ? `${r.selectors} stable selectors` : null, r.auth ? 'a sign-in' : null, r.flaky ? `${r.flaky} things to watch` : null, startInfo ? `starts with ${startInfo.command}` : null].filter(Boolean);
+    $('fProjectNote').innerHTML = `<span style="color:var(--ok)">Found ${esc(r.name)}</span> — ${esc(bits.join(' · '))}`;
+  } catch (e) { $('fProjectNote').textContent = e.message; startInfo = null; }
+}
+$('fProject').addEventListener('change', checkProject);
+$('fProject').addEventListener('input', () => { clearTimeout(projTimer); projTimer = setTimeout(checkProject, 700); });
 $('fIdeas').onclick = async () => {
   const u = $('fUrl').value.trim(); if (!/^https?:\/\//.test(u)) { $('fUrl').focus(); return; }
   $('fIdeas').disabled = true; $('fIdeasNote').textContent = 'Looking at the app…';
   try { const r = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ url: u, project: $('fProject').value.trim() || undefined }) }); $('ideaList').innerHTML = r.ideas.map((i, n) => `<button class="idea" data-i="${n}"><b>${esc(i.title)}</b><span>${esc(i.story || '')}${i.length ? ' · ' + esc(i.length) : ''}</span></button>`).join(''); $('fIdeasNote').textContent = `Saved to ${r.file}`; for (const b of $('ideaList').querySelectorAll('button[data-i]')) b.onclick = () => { const i = r.ideas[Number(b.dataset.i)]; $('fDesc').value = i.story || i.title; $('ideaList').innerHTML = ''; $('fDesc').focus(); }; }
   catch (e) {
     $('fIdeasNote').textContent = e.message;
-    if (e.down) { lastDownWhere = 'ideas'; if (!offerStart('ideas')) { $('fIdeasNote').textContent += ' Point me at the code folder below and I can start it for you.'; $('fProject').focus(); } }
+    if (e.down) { lastDownWhere = 'ideas'; if (!offerStart('ideas')) { if ($('fProject').value.trim()) checkProject(); else { $('fIdeasNote').textContent += ' Point me at the code folder below and I can start it for you.'; $('fProject').focus(); } } }
   } finally { $('fIdeas').disabled = false; }
 };
 $('fGo').onclick = async () => {
@@ -635,8 +645,8 @@ $('fGo').onclick = async () => {
         if (wasDown) {
           lastDownWhere = 'create';
           if (!offerStart('create')) {
-            $('fBusy').textContent = 'Point me at the code folder (below) and I can start it for you — or start the app yourself and press Try again.';
-            $('fProject').focus();
+            if ($('fProject').value.trim()) { $('fBusy').textContent = 'Checking that folder for a way to start it…'; checkProject(); }
+            else { $('fBusy').textContent = 'Point me at the code folder (below) and I can start it for you — or start the app yourself and press Try again.'; $('fProject').focus(); }
             $('fRetryRow').classList.remove('hidden');
           }
         } else $('fRetryRow').classList.remove('hidden');
