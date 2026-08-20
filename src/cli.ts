@@ -137,11 +137,15 @@ program
 program
   .command("agent")
   .description("print the config to paste into Claude Code, Codex, or Cursor")
-  .action(() => {
+  .option("--ui <url>", "the Retake window to report into", "http://localhost:4310")
+  .action((o: { ui: string }) => {
     const node = process.execPath;
     const tsx = path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
     const tools = path.join(process.cwd(), "src", "operator", "tools.ts");
-    const cfg = { mcpServers: { retake: { command: node, args: [tsx, tools], env: { RETAKE_ROOT: process.cwd() } } } };
+    // RETAKE_UI is what makes the app a window onto the work rather than a
+    // folder you check afterwards: the tools report progress there as they go.
+    const env = { RETAKE_ROOT: process.cwd(), RETAKE_UI: o.ui };
+    const cfg = { mcpServers: { retake: { command: node, args: [tsx, tools], env } } };
     say("Add Retake to your agent, then ask it for a demo in plain English.\n");
     say("Claude Code — run this once:");
     say(`  claude mcp add-json retake '${JSON.stringify(cfg.mcpServers.retake)}'\n`);
@@ -149,10 +153,12 @@ program
     say(`  [mcp_servers.retake]`);
     say(`  command = ${JSON.stringify(node)}`);
     say(`  args = ${JSON.stringify([tsx, tools])}`);
-    say(`  env = { RETAKE_ROOT = ${JSON.stringify(process.cwd())} }\n`);
+    say(`  env = { RETAKE_ROOT = ${JSON.stringify(process.cwd())}, RETAKE_UI = ${JSON.stringify(o.ui)} }\n`);
     say("Cursor / anything else that speaks MCP — .cursor/mcp.json or equivalent:");
     say(JSON.stringify(cfg, null, 2) + "\n");
     say("Then just say: “record a demo of my app at localhost:3000 showing the sign-up flow”.");
+    say(`Keep ${o.ui} open while it works — the plan, the run and the video appear there.`);
+    say("Retake will not start your app from outside its own window unless you add RETAKE_ALLOW_START=1 above.");
   });
 
 program

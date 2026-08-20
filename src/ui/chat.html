@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Retake</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#edefe8" />
+<style>
+  :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --rule2:#c9cec0; --accent:#1a1c1e; --amber:#e8b04b; --ok:#2f5d3f; --bad:#a23b2c; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font:15px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
+  button, input, select, textarea { font:inherit; color:inherit; }
+  .app { height:100%; display:flex; flex-direction:column; }
+  /* top bar — a name, and one small thing you can open */
+  .top { display:flex; align-items:center; gap:10px; padding:14px 22px; }
+  .mark { width:22px; height:22px; border-radius:7px; background:var(--accent); position:relative; flex:none; }
+  .mark i { position:absolute; left:5.5px; height:2.5px; border-radius:2px; background:#eceee9; }
+  .mark i:nth-child(1){top:4px;width:4px;opacity:.55} .mark i:nth-child(2){top:8px;width:7px;opacity:.8} .mark i:nth-child(3){top:12px;width:11px;background:var(--amber)} .mark i:nth-child(4){top:16px;width:7px;opacity:.8}
+  .controls { position:relative; display:flex; align-items:center; gap:8px; }
+  .top h1 { font-size:15px; font-weight:600; margin:0; letter-spacing:-.01em; }
+  .top .sp { flex:1; }
+  .chip { border:1px solid var(--rule); background:transparent; border-radius:999px; padding:5px 11px; font-size:13px; color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .chip:hover { border-color:var(--rule2); color:var(--ink); background:var(--card); }
+  .chip.on { background:var(--accent); color:#eceee9; border-color:var(--accent); }
+  /* popovers */
+  .pop { position:absolute; z-index:40; background:#fff; border:1px solid var(--rule2); border-radius:14px; box-shadow:0 12px 34px rgba(24,28,24,.13); padding:8px; display:none; }
+  .pop.show { display:block; }
+  .pop .ttl { font:11px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:6px 10px 8px; }
+  .pop .row2 { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:9px; cursor:pointer; font-size:14px; }
+  .pop .row2:hover { background:#f1f3ee; }
+  .pop .row2 .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pop .row2 small { color:var(--muted); font-size:12px; }
+  .pop .sep { height:1px; background:var(--rule); margin:6px 4px; }
+  .pop .quiet { padding:8px 10px; color:var(--muted); font-size:13px; }
+  .pop label { display:block; padding:6px 10px 3px; font-size:12px; color:var(--muted); }
+  .pop input { width:100%; border:1px solid var(--rule); border-radius:9px; padding:8px 11px; font-size:14px; outline:none; }
+  .pop input:focus { border-color:var(--ink); }
+  .pop .pad { padding:0 10px 10px; }
+  .settings-shade { position:fixed; inset:0; z-index:80; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(25,29,25,.28); }
+  .settings-shade.show { display:flex; }
+  .settings-panel { width:min(720px,100%); max-height:min(760px,calc(100vh - 48px)); overflow:auto; background:#fff; border:1px solid var(--rule2); border-radius:18px; box-shadow:0 24px 70px rgba(24,28,24,.2); }
+  .settings-head { position:sticky; top:0; z-index:1; display:flex; align-items:flex-start; gap:16px; padding:20px 22px 15px; background:#fff; border-bottom:1px solid var(--rule); }
+  .settings-head h2 { margin:0; font-size:20px; line-height:1.3; }
+  .settings-head p { margin:3px 0 0; color:var(--muted); font-size:13px; }
+  .settings-x { margin-left:auto; border:0; background:transparent; color:var(--muted); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:20px; }
+  .settings-x:hover { background:#f1f3ee; color:var(--ink); }
+  .settings-body { padding:20px 22px 24px; }
+  .settings-section + .settings-section { margin-top:24px; padding-top:21px; border-top:1px solid var(--rule); }
+  .settings-section h3 { margin:0 0 3px; font-size:14px; }
+  .settings-section > p { margin:0 0 12px; color:var(--muted); font-size:13px; }
+  .provider-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .provider-card { display:flex; align-items:flex-start; gap:10px; text-align:left; border:1px solid var(--rule); background:var(--card); border-radius:12px; padding:11px 12px; cursor:pointer; }
+  .provider-card:hover { border-color:var(--rule2); }
+  .provider-card.selected { border-color:var(--ink); background:#fff; }
+  .provider-card .copy { flex:1; min-width:0; }
+  .provider-card b { display:block; font-weight:600; }
+  .provider-card small { display:block; color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px; }
+  .cap { flex:none; border:1px solid var(--rule); border-radius:999px; padding:2px 6px; color:var(--muted); font-size:10px; white-space:nowrap; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field.full { grid-column:1/-1; }
+  .field label { display:flex; align-items:center; gap:7px; margin-bottom:5px; color:var(--muted); font-size:12px; }
+  .field input { width:100%; border:1px solid var(--rule); background:#fff; border-radius:10px; padding:9px 11px; outline:0; }
+  .field input:focus { border-color:var(--ink); }
+  .configured { color:var(--ok); font-size:11px; }
+  .settings-note { min-height:22px; margin-top:10px; color:var(--muted); font-size:13px; }
+  .settings-note.bad { color:var(--bad); }
+  .settings-actions { display:flex; align-items:center; gap:8px; margin-top:18px; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--rule2); flex:none; }
+  .dot.ok { background:var(--ok);} .dot.bad { background:var(--bad);}
+  .body { flex:1; display:flex; min-height:0; }
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .workspace { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .welcome { flex:1; display:none; align-items:center; justify-content:center; padding:32px; }
+  .main.onboarding .welcome { display:flex; }
+  .main.onboarding .workspace { display:none; }
+  .welcome-card { width:min(540px,100%); text-align:center; }
+  .welcome-mark { width:52px; height:52px; margin:0 auto 18px; border-radius:16px; background:var(--accent); position:relative; }
+  .welcome-mark i { position:absolute; left:13px; height:5px; border-radius:4px; background:#eceee9; }
+  .welcome-mark i:nth-child(1) { top:9px; width:9px; opacity:.55; }
+  .welcome-mark i:nth-child(2) { top:18px; width:16px; opacity:.8; }
+  .welcome-mark i:nth-child(3) { top:27px; width:26px; background:var(--amber); }
+  .welcome-mark i:nth-child(4) { top:36px; width:17px; opacity:.8; }
+  .welcome-card h2 { margin:0; font-size:28px; line-height:1.2; letter-spacing:-.03em; }
+  .welcome-card > p { color:var(--muted); font-size:16px; margin:10px auto 20px; max-width:440px; }
+  .welcome-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+  .welcome-option { text-align:left; border:1px solid var(--rule); background:var(--card); border-radius:12px; padding:11px 13px; cursor:pointer; }
+  .welcome-option:hover, .welcome-option.selected { border-color:var(--ink); background:#fff; }
+  .welcome-option b { display:block; font-weight:600; }
+  .welcome-option span { display:block; color:var(--muted); font-size:12px; line-height:1.4; margin-top:2px; }
+  .folder-choice { display:flex; gap:8px; padding:7px; border:1px solid var(--rule2); background:#fff; border-radius:16px; box-shadow:0 8px 28px rgba(24,28,24,.07); }
+  .folder-choice input { flex:1; min-width:0; border:0; outline:0; background:transparent; padding:9px 11px; }
+  .welcome-actions { display:flex; gap:8px; }
+  .welcome-actions .btn { white-space:nowrap; }
+  .welcome-error { min-height:24px; margin-top:10px; color:var(--bad); font-size:13px; }
+  .welcome-steps { display:flex; justify-content:center; gap:18px; margin-top:10px; color:var(--muted); font-size:12px; }
+  .welcome-steps span { display:flex; align-items:center; gap:6px; }
+  .welcome-steps b { display:grid; place-items:center; width:19px; height:19px; border:1px solid var(--rule2); border-radius:50%; color:var(--ink); font-size:11px; font-weight:600; }
+  .project-name { color:var(--muted); font-size:13px; max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .library { width:280px; flex:none; overflow:hidden; border-right:1px solid var(--rule); background:var(--card); transition:width .18s ease,border-color .18s ease; }
+  .library.closed { width:0; border-color:transparent; }
+  .library-inner { width:280px; height:100%; display:flex; flex-direction:column; padding:14px 10px; }
+  .library-head { display:flex; align-items:center; padding:0 7px 9px; }
+  .library-head h2 { flex:1; margin:0; font-size:13px; font-weight:600; }
+  .library-close { border:0; background:transparent; color:var(--muted); width:28px; height:28px; border-radius:8px; cursor:pointer; }
+  .library-close:hover { color:var(--ink); background:#eef0ea; }
+  .library-list { flex:1; overflow:auto; }
+  .library .row2 { display:flex; align-items:center; gap:9px; padding:8px 9px; border-radius:9px; cursor:pointer; }
+  .library .row2:hover { background:#eef0ea; }
+  .library .row2 .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .library .row2 small { color:var(--muted); font-size:11px; }
+  .library .quiet { padding:14px 9px; color:var(--muted); font-size:13px; }
+  .library-foot { border-top:1px solid var(--rule); padding-top:8px; }
+  /* the video, pinned */
+  .pin { display:none; }
+  .pin.show { display:block; }
+  .pin .inner { max-width:720px; margin:0 auto; padding:2px 22px 4px; }
+  .pin video { width:100%; max-height:42vh; border-radius:12px; background:#000; display:block; }
+  .pin .under { display:flex; align-items:center; gap:14px; margin-top:9px; font-size:13px; color:var(--muted); }
+  .pin .under a, .pin .under button { color:var(--muted); text-decoration:none; border:0; background:transparent; cursor:pointer; padding:0; font-size:13px; }
+  .pin .under a:hover, .pin .under button:hover { color:var(--ink); }
+  /* conversation */
+  .talk { flex:1; overflow:auto; }
+  .talk .inner { max-width:720px; margin:0 auto; padding:22px 22px 4px; }
+  .msg { margin-bottom:20px; }
+  .msg.me { display:flex; justify-content:flex-end; }
+  .msg.me div { background:var(--accent); color:#eceee9; padding:10px 15px; border-radius:16px 16px 4px 16px; max-width:80%; }
+  .msg.it .doing { color:var(--muted); font-size:14px; display:flex; align-items:center; gap:8px; padding:2px 0; }
+  .msg.it .doing.done::before { content:"✓"; color:var(--ok); }
+  .msg.it .doing.bad { color:var(--bad); }
+  .msg.it .doing.bad::before { content:"✗"; }
+  .msg.it .doing.now::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--amber); animation:pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+  .ideas { display:grid; gap:8px; margin-top:10px; }
+  .idea { text-align:left; border:1px solid var(--rule); background:#fff; border-radius:12px; padding:11px 14px; cursor:pointer; }
+  .idea:hover { border-color:var(--ink); }
+  .idea b { display:block; font-weight:600; margin-bottom:2px; }
+  .idea span { color:var(--muted); font-size:13px; }
+  .ask-human { border:1px solid var(--amber); background:#fdf6e6; border-radius:12px; padding:14px 16px; margin-top:10px; }
+  .ask-human .q { margin-bottom:10px; }
+  .ask-human .detail { font:12px ui-monospace, Menlo, monospace; color:var(--muted); white-space:pre-wrap; margin-bottom:10px; }
+  .ask-human .row { display:flex; gap:8px; }
+  .ask-human input { flex:1; border:1px solid var(--rule); border-radius:9px; padding:8px 12px; }
+  .btn { border:1px solid var(--rule); background:var(--card); border-radius:10px; padding:8px 15px; cursor:pointer; }
+  .btn:hover { border-color:var(--rule2); }
+  .btn.primary { background:var(--accent); color:#eceee9; border-color:var(--accent); }
+  /* composer — one box, everything else lives inside it */
+  .composer .inner { max-width:720px; margin:0 auto; padding:10px 22px 18px; position:relative; }
+  .box { border:1px solid var(--rule2); background:#fff; border-radius:18px; padding:6px 6px 6px 0; box-shadow:0 1px 2px rgba(24,28,24,.04); }
+  .box:focus-within { border-color:var(--ink); }
+  .box textarea { width:100%; border:0; background:transparent; padding:12px 16px 4px; font-size:15px; resize:none; outline:none; max-height:170px; }
+  .box .tools { display:flex; align-items:center; gap:6px; padding:2px 4px 2px 12px; }
+  .box .tools .sp { flex:1; }
+  .attach { border:0; background:transparent; color:var(--muted); cursor:pointer; width:30px; height:30px; border-radius:8px; font-size:18px; line-height:1; }
+  .attach:hover { background:#f1f3ee; color:var(--ink); }
+  #tags { display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap; }
+  .tag { display:inline-flex; align-items:center; gap:6px; border:0; background:#f1f3ee; border-radius:999px; padding:4px 10px; font-size:12.5px; color:var(--muted); cursor:pointer; max-width:230px; }
+  .tag:hover { color:var(--ink); }
+  .tag.empty { border:1px dashed var(--rule2); background:transparent; padding:3px 9px; }
+  .tag.demo { background:#fdf6e6; color:#6d5424; }
+  .tag b { font-weight:500; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .send { border:0; background:var(--accent); color:#eceee9; border-radius:11px; width:34px; height:34px; cursor:pointer; font-size:16px; flex:none; }
+  .send:disabled { opacity:.35; cursor:default; }
+  .send.stop { background:#f1f3ee; color:var(--ink); }
+  .foot { font-size:12px; color:var(--muted); margin-top:9px; text-align:center; }
+  .hidden { display:none !important; }
+  @media (max-width:600px) {
+    .top { padding:11px 14px; }
+    .talk .inner, .pin .inner { padding-left:14px; padding-right:14px; }
+    .composer .inner { padding:8px 14px 12px; }
+    .pop { max-width:calc(100vw - 28px); }
+    #setPop { right:14px !important; }
+    #attachPop { left:14px !important; }
+    .tag { max-width:150px; }
+    .controls { position:relative; display:flex; align-items:center; gap:8px; }
+  .top h1 { display:none; }
+    .project-name { display:none; }
+    .library { position:absolute; z-index:35; left:0; top:0; bottom:0; box-shadow:16px 0 32px rgba(24,28,24,.12); }
+    .library.closed { box-shadow:none; }
+    .welcome { padding:22px; }
+    .welcome-options { grid-template-columns:1fr; }
+    .folder-choice { display:block; }
+    .welcome-actions { margin-top:8px; }
+    .welcome-actions .btn { flex:1; }
+    .welcome-steps { align-items:flex-start; gap:8px; text-align:left; }
+    .settings-shade { padding:0; align-items:flex-end; }
+    .settings-panel { max-height:92vh; border-radius:18px 18px 0 0; }
+    .provider-grid, .fields { grid-template-columns:1fr; }
+    .field.full { grid-column:auto; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="mark"><i></i><i></i><i></i><i></i></div>
+    <h1>Retake</h1>
+    <div class="controls">
+      <button class="chip" id="setBtn" aria-label="Open settings"><span id="modelTag">…</span></button>
+      <button class="chip" id="settingsBtn" aria-label="Open Retake settings">Settings</button>
+      <button class="chip" id="demosBtn" aria-label="Toggle recorded demos" aria-expanded="true">Demos</button>
+      <div class="pop" id="setPop" style="left:0; top:38px; width:290px;">
+        <p class="ttl">Use for the next request</p>
+        <div id="quickProviders"></div>
+        <div class="sep"></div>
+        <div class="row2" id="openSettings"><span class="nm">Provider settings…</span><small>configure</small></div>
+      </div>
+    </div>
+    <span class="project-name" id="projectName"></span>
+    <span class="sp"></span>
+  </div>
+  <div class="body">
+    <aside class="library" id="library" aria-label="Recorded demos">
+      <div class="library-inner">
+        <div class="library-head"><h2>Recorded demos</h2><button class="library-close" id="libraryClose" aria-label="Hide recorded demos">×</button></div>
+        <div class="library-list" id="projects"></div>
+        <div class="library-foot">
+          <div class="row2" id="newProject"><span class="nm">New project</span><small>choose folder</small></div>
+          <div class="row2" onclick="location.href='/classic'"><span class="nm">Open the workshop</span><small>manifests</small></div>
+        </div>
+      </div>
+    </aside>
+    <main class="main onboarding" id="main">
+      <section class="welcome" id="welcome">
+        <div class="welcome-card">
+          <div class="welcome-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <h2>Start your first project</h2>
+          <p>Choose the app folder you want Retake to understand and record.</p>
+          <div class="welcome-options" aria-label="Things you can do with Retake">
+            <button class="welcome-option" type="button" data-welcome-intent="scan" aria-pressed="false"><b>Scan my app for ideas</b><span>Review the live app and source, then save a file of demos worth recording.</span></button>
+            <button class="welcome-option" type="button" data-welcome-intent="record" aria-pressed="false"><b>Create a specific demo</b><span>Describe a workflow naturally and let Retake turn it into a video.</span></button>
+          </div>
+          <div class="folder-choice">
+            <input id="welcomeFolder" type="text" aria-label="App source folder" placeholder="~/Documents/my-app" />
+            <div class="welcome-actions">
+              <button class="btn" id="pickFolder">Choose folder…</button>
+              <button class="btn primary" id="useFolder">Continue</button>
+            </div>
+          </div>
+          <div class="welcome-error" id="welcomeError"></div>
+          <div class="welcome-steps" aria-label="How Retake works">
+            <span><b>1</b>Choose a folder</span>
+            <span><b>2</b>Describe the video</span>
+            <span><b>3</b>Review and refine</span>
+          </div>
+        </div>
+      </section>
+      <section class="workspace" id="workspace">
+      <div class="pin" id="pin"><div class="inner">
+        <video id="vid" controls playsinline></video>
+        <div class="under">
+          <span id="vidMeta"></span>
+          <span class="sp" style="flex:1"></span>
+          <a id="vidDl" download>Download</a>
+          <button id="vidFolder">Show in Finder</button>
+        </div>
+      </div></div>
+      <div class="talk" id="talk"><div class="inner" id="thread"></div></div>
+      <div class="composer"><div class="inner">
+        <div class="pop" id="attachPop" style="left:22px; bottom:76px; width:330px;">
+          <label for="fFolder">App source folder</label>
+          <div class="pad"><input type="text" id="fFolder" placeholder="~/Documents/my-app" /></div>
+          <label for="fUrl">App URL</label>
+          <div class="pad"><input type="url" id="fUrl" placeholder="http://localhost:3000" /></div>
+        </div>
+        <div class="pop" id="modelPop" style="left:58px; bottom:76px; width:300px; max-height:390px; overflow:auto;">
+          <p class="ttl">Model for the next request</p>
+          <div id="modelOptions"></div>
+          <div id="reasoningWrap" class="hidden"><div class="sep"></div><p class="ttl">Reasoning</p><div id="reasoningOptions"></div></div>
+        </div>
+        <div class="box">
+          <textarea id="say" rows="1" aria-label="Describe the demo you want" placeholder="Describe the demo you want…"></textarea>
+          <div class="tools">
+            <button class="attach" id="attachBtn" title="Add app context" aria-label="Add app folder or URL">+</button>
+            <button class="tag" id="modelBtn" title="Choose model"><b id="modelName">Model</b><span>⌄</span></button>
+            <span id="tags"></span>
+            <span class="sp"></span>
+            <button class="send" id="send" title="Send" aria-label="Send request">↑</button>
+            <button class="send stop hidden" id="stop" title="Stop" aria-label="Stop current work">■</button>
+          </div>
+        </div>
+        <div class="foot" id="foot">Retake asks before it starts anything.</div>
+      </div></div>
+      </section>
+    </main>
+  </div>
+  <div class="settings-shade" id="settingsShade" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="settings-panel">
+      <div class="settings-head">
+        <div><h2 id="settingsTitle">Settings</h2><p>Choose how Retake thinks and where it saves finished videos.</p></div>
+        <button class="settings-x" id="settingsClose" aria-label="Close settings">×</button>
+      </div>
+      <div class="settings-body">
+        <section class="settings-section">
+          <h3>Provider</h3>
+          <p>Full agents can troubleshoot and revise conversationally. Guided providers follow Retake’s fixed recording workflow.</p>
+          <div class="provider-grid" id="settingsProviders"></div>
+        </section>
+        <section class="settings-section">
+          <h3>Connections</h3>
+          <p>Existing keys are never shown. Leave a configured key blank to keep it unchanged.</p>
+          <div class="fields">
+            <div class="field"><label>Groq API key <span class="configured" id="groqState"></span></label><input type="password" id="setGroq" autocomplete="off" placeholder="gsk_…" /></div>
+            <div class="field"><label>Mistral API key <span class="configured" id="mistralState"></span></label><input type="password" id="setMistral" autocomplete="off" placeholder="Enter a key" /></div>
+            <div class="field"><label>Local endpoint</label><input type="url" id="setLocalUrl" placeholder="http://localhost:11434/v1" /></div>
+            <div class="field"><label>Local model</label><input type="text" id="setLocalModel" placeholder="llama3.1" /></div>
+          </div>
+        </section>
+        <section class="settings-section">
+          <h3>Files</h3>
+          <p>Leave this blank to use Retake’s default outputs folder.</p>
+          <div class="fields"><div class="field full"><label>Save videos to</label><input type="text" id="setOut" placeholder="outputs/" /></div></div>
+        </section>
+        <div class="settings-note" id="settingsNote"></div>
+        <div class="settings-actions"><span class="sp" style="flex:1"></span><button class="btn" id="settingsCancel">Cancel</button><button class="btn primary" id="settingsSave">Save settings</button></div>
+      </div>
+    </div>
+  </div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+let es = null, busy = false, activeSession = null, currentDemo = null, activeProject = null, activeProjectInfo = null, settings = null, projects = [], welcomeIntent = '';
+async function api(u, o) {
+  let r;
+  try { r = await fetch(u, o); }
+  catch { throw new Error('Retake is not connected. Restart the app and refresh this page.'); }
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) { const e = new Error(j.error || r.statusText); Object.assign(e, j); throw e; }
+  return j;
+}
+const atBottom = () => $('talk').scrollHeight - $('talk').scrollTop - $('talk').clientHeight < 80;
+const scroll = (force) => { if (force || atBottom()) requestAnimationFrame(() => { $('talk').scrollTop = $('talk').scrollHeight; }); };
+
+function sayMine(text) { const d = document.createElement('div'); d.className = 'msg me'; d.innerHTML = `<div>${esc(text)}</div>`; $('thread').appendChild(d); scroll(true); }
+function block() { const d = document.createElement('div'); d.className = 'msg it'; $('thread').appendChild(d); scroll(true); return d; }
+function line(host, text, cls) { const d = document.createElement('div'); d.className = 'doing ' + (cls || ''); d.textContent = text; host.appendChild(d); scroll(); return d; }
+function prose(host, text) { const d = document.createElement('div'); d.textContent = text; host.appendChild(d); scroll(); return d; }
+function starterPrompts(host) {
+  prose(host, 'Not sure where to begin? Pick a starting point or write your own:');
+  const options = [
+    ['Show the first-time experience', 'Show a new user getting started with this app.', 'prompt'],
+    ['Record the main workflow', 'Record the main workflow from beginning to completion.', 'prompt'],
+    ['Scan the app for demo ideas', 'Review the app and create a file of demos worth recording.', 'ideas'],
+  ];
+  const wrap = document.createElement('div'); wrap.className = 'ideas';
+  for (const [title, prompt, action] of options) {
+    const button = document.createElement('button'); button.className = 'idea'; button.type = 'button';
+    button.innerHTML = `<b>${esc(title)}</b><span>${esc(prompt)}</span>`;
+    button.onclick = (event) => {
+      event.stopPropagation();
+      if (action === 'ideas') {
+        scanForIdeas(activeProjectInfo);
+        return;
+      }
+      box.value = prompt; box.dispatchEvent(new Event('input')); box.focus();
+    };
+    wrap.appendChild(button);
+  }
+  host.appendChild(wrap);
+}
+
+// ---- the video stays the centrepiece -------------------------------------
+async function pin(name) {
+  if (!name) return;
+  let d; try { d = await api('/api/take/' + name); } catch { return; }
+  const has = (f) => d.files.includes(f);
+  if (!has('demo.mp4')) return;
+  currentDemo = name;
+  const q = '?v=' + d.stamp;
+  $('vid').src = `/out/${name}/demo.mp4${q}`;
+  if (has('thumbnail.png')) $('vid').poster = `/out/${name}/thumbnail.png${q}`;
+  const t = d.take, dur = (t.duration - t.trimBefore).toFixed(0);
+  $('vidMeta').textContent = `${name} · ${dur}s · ${t.ok ? 'all steps passed' : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
+  $('vidDl').href = `/out/${name}/demo.mp4${q}`; $('vidDl').setAttribute('download', name + '.mp4');
+  $('vidFolder').onclick = () => api('/api/open/' + name, { method: 'POST' }).catch(() => {});
+  $('pin').classList.add('show');
+  drawTags();
+}
+function clearPinnedDemo() {
+  currentDemo = null;
+  $('vid').pause(); $('vid').removeAttribute('src'); $('vid').removeAttribute('poster'); $('vid').load();
+  $('pin').classList.remove('show'); $('vidMeta').textContent = ''; drawTags();
+}
+
+// ---- the small things you can open ----------------------------------------
+const pops = ['attachPop', 'modelPop', 'setPop'];
+function openPop(id) { for (const x of pops) { const el = $(x); if (el) el.classList.toggle('show', x === id && !el.classList.contains('show')); } }
+function showPop(id) { for (const x of pops) $(x)?.classList.toggle('show', x === id); }
+document.addEventListener('click', (e) => { if (!e.target.closest('.pop') && !e.target.closest('.chip') && !e.target.closest('.attach')) pops.forEach((x) => $(x)?.classList.remove('show')); });
+function setLibrary(open) {
+  $('library').classList.toggle('closed', !open);
+  $('demosBtn').classList.toggle('on', open);
+  $('demosBtn').setAttribute('aria-expanded', String(open));
+  localStorage.setItem('retake.library', open ? 'open' : 'closed');
+  if (open) loadProjects();
+}
+$('demosBtn').onclick = () => setLibrary($('library').classList.contains('closed'));
+$('libraryClose').onclick = () => setLibrary(false);
+
+async function loadProjects() {
+  const dir = $('fFolder').value.trim();
+  try { projects = dir ? await api('/api/demos?project=' + encodeURIComponent(dir)) : []; } catch { return; }
+  $('demosBtn').textContent = projects.length ? `Demos · ${projects.length}` : 'Demos';
+  $('projects').innerHTML = projects.length ? '' : `<div class="quiet">${dir ? 'No demos yet. Choose a suggestion in the chat or describe your own.' : '<b>Start your first project</b><br>Choose an app folder to begin.'}</div>`;
+  for (const p of projects) {
+    const el = document.createElement('div');
+    el.className = 'row2';
+    const dot = p.lastTake ? (p.lastTake.ok && !p.lastTake.partial ? 'ok' : 'bad') : '';
+    const meta = p.lastTake ? `${Math.max(0, Math.round(p.lastTake.duration || 0))}s` : '';
+    el.innerHTML = `<span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${meta}</small>`;
+    el.onclick = () => pin(p.name);
+    $('projects').appendChild(el);
+  }
+}
+
+// ---- what is attached to the conversation ----------------------------------
+$('attachBtn').onclick = (e) => { e.stopPropagation(); openPop('attachPop'); setTimeout(() => $('fFolder').focus(), 40); };
+function drawTags() {
+  const dir = $('fFolder').value.trim(), url = $('fUrl').value.trim();
+  const folder = dir ? dir.replace(/\/+$/, '').split('/').pop() : 'Add folder';
+  const address = url ? url.replace(/^https?:\/\/(localhost)?/, ':').replace(/^:(\d)/, ':$1') : 'Add URL';
+  $('tags').innerHTML = `<button class="tag ${dir ? '' : 'empty'}" data-field="fFolder" title="${esc(dir || 'Add the app source folder')}"><b>${esc(folder)}</b></button><button class="tag ${url ? '' : 'empty'}" data-field="fUrl" title="${esc(url || 'Add the running app URL')}"><b>${esc(address)}</b></button>${currentDemo ? `<button class="tag demo" data-demo="1" title="Your next request will update this demo"><b>Editing ${esc(currentDemo)}</b></button>` : ''}`;
+  $('tags').querySelectorAll('[data-field]').forEach((t) => t.onclick = (e) => { e.stopPropagation(); openPop('attachPop'); setTimeout(() => $(t.dataset.field).focus(), 40); });
+  const demo = $('tags').querySelector('[data-demo]');
+  if (demo) demo.onclick = (e) => { e.stopPropagation(); setLibrary(true); };
+}
+
+// ---- first-run project selection ------------------------------------------
+function rememberProject() {
+  localStorage.setItem('retake.project', JSON.stringify({ dir: $('fFolder').value.trim(), url: $('fUrl').value.trim() }));
+}
+document.querySelectorAll('[data-welcome-intent]').forEach((button) => {
+  button.onclick = () => {
+    welcomeIntent = button.dataset.welcomeIntent;
+    document.querySelectorAll('[data-welcome-intent]').forEach((option) => {
+      const selected = option === button;
+      option.classList.toggle('selected', selected);
+      option.setAttribute('aria-pressed', String(selected));
+    });
+    $('welcomeFolder').focus();
+  };
+});
+function enterWorkspace(info, returning) {
+  const dir = info?.dir || $('fFolder').value.trim();
+  activeProjectInfo = info;
+  if (activeProject !== dir) {
+    activeProject = dir;
+    clearPinnedDemo();
+    $('thread').innerHTML = '';
+  }
+  $('projectName').textContent = info?.name ? `· ${info.name}` : '';
+  $('main').classList.remove('onboarding');
+  rememberProject(); drawTags(); loadProjects();
+  if (!$('thread').children.length) {
+    const h = block();
+    if (returning) prose(h, `Ready to keep working on ${info.name}. Tell me what to record or what to change.`);
+    else {
+      prose(h, `I read ${info.name}: ${info.files} files, ${info.routes.length} routes${info.auth ? ', and a sign-in flow' : ''}.`);
+      prose(h, info.start ? `Tell me the story you want to show. I can start the app with ${info.start.command} whenever the workflow needs it.` : 'Tell me the story you want to show, just like you would explain it to another person.');
+    }
+    starterPrompts(h);
+  }
+  if (welcomeIntent === 'record') {
+    box.value = 'Create a demo that shows ';
+    box.dispatchEvent(new Event('input'));
+  }
+  const intent = welcomeIntent; welcomeIntent = '';
+  setTimeout(() => {
+    if (intent === 'scan') scanForIdeas(info);
+    else box.focus();
+  }, 50);
+}
+async function chooseProject(dir, returning = false) {
+  dir = (dir || '').trim();
+  if (!dir) { $('welcomeError').textContent = 'Choose a project folder first.'; return; }
+  $('welcomeError').textContent = returning ? '' : 'Reading the project…';
+  $('useFolder').disabled = true; $('pickFolder').disabled = true;
+  try {
+    const info = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) });
+    $('fFolder').value = info.dir || dir;
+    $('welcomeFolder').value = info.dir || dir;
+    $('welcomeError').textContent = '';
+    enterWorkspace(info, returning);
+  } catch (e) {
+    localStorage.removeItem('retake.project');
+    $('welcomeError').textContent = e.message;
+  } finally {
+    $('useFolder').disabled = false; $('pickFolder').disabled = false;
+  }
+}
+$('useFolder').onclick = () => chooseProject($('welcomeFolder').value);
+$('welcomeFolder').addEventListener('keydown', (e) => { if (e.key === 'Enter') chooseProject($('welcomeFolder').value); });
+$('pickFolder').onclick = async () => {
+  $('welcomeError').textContent = 'Opening the folder picker…';
+  try {
+    const r = await api('/api/pick-folder', { method: 'POST' });
+    if (r.dir) { $('welcomeFolder').value = r.dir; await chooseProject(r.dir); }
+    else $('welcomeError').textContent = '';
+  } catch (e) { $('welcomeError').textContent = e.message; }
+};
+$('newProject').onclick = () => {
+  if (busy) { $('foot').textContent = 'Stop the current work before switching projects.'; return; }
+  activeProject = null; activeProjectInfo = null; welcomeIntent = '';
+  clearPinnedDemo();
+  $('fFolder').value = ''; $('fUrl').value = ''; $('welcomeFolder').value = '';
+  $('projectName').textContent = ''; $('thread').innerHTML = ''; $('welcomeError').textContent = '';
+  document.querySelectorAll('[data-welcome-intent]').forEach((option) => { option.classList.remove('selected'); option.setAttribute('aria-pressed', 'false'); });
+  localStorage.removeItem('retake.project');
+  $('main').classList.add('onboarding');
+  drawTags(); loadProjects();
+  setTimeout(() => $('welcomeFolder').focus(), 50);
+};
+
+// ---- talking --------------------------------------------------------------
+const box = $('say');
+box.addEventListener('input', () => { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight, 160) + 'px'; });
+box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+$('send').onclick = () => send();
+
+async function send(text) {
+  const message = (text ?? box.value).trim();
+  if (!message || busy) return;
+  const provider = activeProvider();
+  const guided = provider === 'groq' || provider === 'mistral' || provider === 'local';
+  sayMine(message);
+  box.value = ''; box.style.height = 'auto';
+  busy = true; $('send').classList.add('hidden'); $('stop').classList.toggle('hidden', guided);
+  const host = block();
+  const thinking = line(host, 'Thinking…', 'now');
+  try {
+    if (guided) {
+      if (currentDemo) {
+        const fix = await api('/api/fix/' + currentDemo, { method:'POST', body:JSON.stringify({ instruction:message }) });
+        thinking.remove();
+        if (!fix.applied?.length) {
+          prose(host, fix.note || 'I could not find a change to make.');
+          busy = false; $('send').classList.remove('hidden');
+          return;
+        }
+        prose(host, fix.note || `Applied ${fix.applied.length} change${fix.applied.length === 1 ? '' : 's'}.`);
+        const run = await api('/api/run/' + currentDemo + '?mode=preview&reuse=1', { method:'POST' });
+        followGuided(currentDemo, host, null, run.startedAt);
+        return;
+      }
+      const url = $('fUrl').value.trim();
+      if (!/^https?:\/\//.test(url)) throw new Error(`${providerLabel(provider)} uses the guided workflow. Add the running app URL before asking for a new demo.`);
+      const r = await api('/api/create', { method:'POST', body:JSON.stringify({ url, describe:message, project:$('fFolder').value.trim() || undefined }) });
+      followGuided(r.name, host, thinking, r.startedAt);
+      return;
+    }
+    const r = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message, project: $('fFolder').value.trim() || undefined, url: $('fUrl').value.trim() || undefined, demo: currentDemo || undefined }) });
+    activeSession = r.id; follow(r.id, host, thinking);
+  } catch (e) {
+    thinking.remove(); line(host, e.message, 'bad'); busy = false; activeSession = null; $('send').classList.remove('hidden'); $('stop').classList.add('hidden');
+  }
+}
+$('stop').onclick = async () => {
+  if (!activeSession) return;
+  $('foot').textContent = 'Stopping after the current action…';
+  await api('/api/operator/' + activeSession + '/stop', { method: 'POST' }).catch((e) => { $('foot').textContent = e.message; });
+};
+
+function followGuided(name, host, thinking) {
+  if (es) es.close();
+  es = new EventSource('/api/run/' + name + '/stream');
+  let current = null;
+  const settle = () => { if (current) { current.classList.remove('now'); current.classList.add('done'); current = null; } };
+  es.onmessage = (ev) => {
+    const t = JSON.parse(ev.data);
+    if (t === '__DOWN__') return;
+    thinking?.remove(); settle();
+    current = line(host, String(t).replace(/^✓\s*/, ''), /✗/.test(t) ? 'bad' : 'now');
+  };
+  es.addEventListener('stage', (ev) => {
+    const s = JSON.parse(ev.data).stage;
+    const labels = { scouting:'Looking at the app…', drafting:'Drafting the demo…', checking:'Checking every step…', capture:'Recording a preview…', render:'Rendering the video…' };
+    if (!labels[s]) return;
+    thinking?.remove(); settle(); current = line(host, labels[s], 'now');
+  });
+  es.addEventListener('done', async (ev) => {
+    es.close(); es = null; thinking?.remove(); settle();
+    const d = JSON.parse(ev.data);
+    busy = false; $('send').classList.remove('hidden'); $('stop').classList.add('hidden');
+    await loadProjects();
+    if (d.code === 0) { await pin(name); prose(host, 'The preview is ready. Tell me what you want to change.'); }
+    else line(host, 'I stopped before the preview was ready. The details above show what needs attention.', 'bad');
+  });
+}
+
+function follow(id, host, thinking) {
+  if (es) es.close();
+  es = new EventSource('/api/operator/' + id + '/stream');
+  let current = null;
+  let finished = false;
+  const settle = (el) => { if (el) { el.classList.remove('now'); el.classList.add('done'); } };
+  const finish = async (d) => {
+    if (finished) return;
+    finished = true;
+    es?.close(); es = null; thinking?.remove(); settle(current);
+    busy = false; activeSession = null; $('send').classList.remove('hidden'); $('stop').classList.add('hidden');
+    if (d.summary) prose(host, d.summary);
+    else line(host, d.code === 0 ? 'The operator finished without returning a result. Please send that request again.' : 'The operator stopped before the demo was ready.', 'bad');
+    await loadProjects();
+    if (d.demo) await pin(d.demo);
+    if (d.cost) $('foot').textContent = `Last turn: ${d.turns || '?'} steps · $${d.cost.toFixed(2)}`;
+  };
+  es.addEventListener('line', (ev) => {
+    const t = JSON.parse(ev.data);
+    if (t === '__DOWN__') return;
+    thinking?.remove();
+    if (/^→ /.test(t)) { settle(current); current = line(host, t.replace(/^→ /, ''), 'now'); return; }
+    if (/^ {2}/.test(t)) return;                       // the agent's own notes
+    if (/^✓ /.test(t)) { settle(current); current = null; prose(host, t.replace(/^✓ /, '')); return; }
+    settle(current); current = null; line(host, t, /✗/.test(t) ? 'bad' : 'done');
+  });
+  es.addEventListener('pending', (ev) => {
+    const p = JSON.parse(ev.data);
+    thinking?.remove(); settle(current); current = null;
+    const w = document.createElement('div'); w.className = 'ask-human';
+    w.innerHTML = `<div class="q">${esc(p.text)}</div>${p.detail ? `<div class="detail">${esc(p.detail)}</div>` : ''}<div class="row"></div>`;
+    const row = w.querySelector('.row');
+    const answer = async (a) => { w.querySelectorAll('button,input').forEach((x) => x.disabled = true); await api('/api/operator/' + id + '/answer', { method: 'POST', body: JSON.stringify({ id: p.id, answer: a }) }); line(host, a === 'yes' ? 'You said yes' : `You said: ${a}`, 'done'); };
+    if (p.kind === 'approve') {
+      const yes = document.createElement('button'); yes.className = 'btn primary'; yes.textContent = 'Yes, start it'; yes.onclick = () => answer('yes');
+      const no = document.createElement('button'); no.className = 'btn'; no.textContent = 'No'; no.onclick = () => answer('no');
+      row.append(yes, no);
+    } else {
+      const inp = document.createElement('input'); inp.placeholder = 'Your answer…';
+      const ok = document.createElement('button'); ok.className = 'btn primary'; ok.textContent = 'Send';
+      const go = () => inp.value.trim() && answer(inp.value.trim());
+      ok.onclick = go; inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      row.append(inp, ok); setTimeout(() => inp.focus(), 50);
+    }
+    host.appendChild(w); scroll(true);
+  });
+  es.addEventListener('done', async (ev) => {
+    await finish(JSON.parse(ev.data));
+  });
+  es.onerror = async () => {
+    if (finished) return;
+    try {
+      const state = await api('/api/operator/' + id);
+      if (state.done) await finish(state);
+      // Otherwise EventSource reconnects by itself; keep showing live work.
+    } catch {
+      await finish({ code: 2, summary: 'This work was interrupted because Retake restarted. Send the request again and it will start cleanly.' });
+    }
+  };
+}
+
+// ---- provider picker and settings -----------------------------------------
+const PROVIDERS = [
+  { id:'claude-code', name:'Claude Code', cap:'Full agent', desc:'Uses the Claude CLI you are signed into.' },
+  { id:'codex', name:'Codex', cap:'Full agent', desc:'Uses the Codex CLI you are signed into.' },
+  { id:'groq', name:'Groq', cap:'Guided', desc:'Fast hosted drafting with your API key.' },
+  { id:'mistral', name:'Mistral', cap:'Guided', desc:'Hosted drafting with your API key.' },
+  { id:'local', name:'Local model', cap:'Guided', desc:'Ollama or LM Studio on this machine.' },
+];
+let chosenProvider = '';
+const providerInfo = (id) => PROVIDERS.find((p) => p.id === id);
+const activeProvider = () => settings?.model || (settings?.active || '').split(' · ')[0] || '';
+const configuredProvider = (id) => (settings?.available || []).includes(id);
+function providerLabel(id) { return providerInfo(id)?.name || id || 'Choose provider'; }
+let modelData = null;
+const modelSettingKey = (provider) => provider === 'claude-code' ? 'claudeModel' : provider === 'codex' ? 'codexModel' : provider === 'groq' ? 'groqModel' : provider === 'mistral' ? 'mistralModel' : 'localModel';
+async function refreshModelLabel() {
+  const provider = activeProvider();
+  if (!provider) { $('modelName').textContent = 'Choose model'; return; }
+  try {
+    modelData = await api('/api/models?provider=' + encodeURIComponent(provider));
+    const chosen = modelData.models.find((m) => m.id === modelData.selected);
+    let label = chosen?.name || modelData.selected || 'Recommended';
+    if (provider === 'codex') {
+      const effort = modelData.reasoning || chosen?.defaultReasoning;
+      if (effort) label += ` · ${effort}`;
+    }
+    $('modelName').textContent = label;
+  } catch { $('modelName').textContent = 'Model unavailable'; }
+}
+async function openModelPicker(e) {
+  e.stopPropagation();
+  await refreshModelLabel();
+  const provider = activeProvider();
+  const host = $('modelOptions'); host.innerHTML = '';
+  const options = provider === 'codex' ? [{ id:'', name:'Recommended' }, ...modelData.models] : modelData.models;
+  for (const m of options) {
+    const row = document.createElement('div'); row.className = 'row2';
+    row.innerHTML = `<span class="dot ${modelData.selected === m.id ? 'ok' : ''}"></span><span class="nm">${esc(m.name)}</span><small>${modelData.selected === m.id ? 'in use' : ''}</small>`;
+    row.onclick = async () => {
+      const body = { [modelSettingKey(provider)]: m.id };
+      if (provider === 'codex') body.codexReasoning = m.id ? (m.defaultReasoning || 'medium') : '';
+      settings = await api('/api/settings', { method:'PUT', body:JSON.stringify(body) });
+      await refreshModelLabel(); renderModelReasoning();
+    };
+    host.appendChild(row);
+  }
+  renderModelReasoning(); openPop('modelPop');
+}
+function renderModelReasoning() {
+  const provider = activeProvider();
+  const chosen = modelData?.models.find((m) => m.id === modelData.selected);
+  const efforts = chosen?.reasoning || [];
+  $('reasoningWrap').classList.toggle('hidden', provider !== 'codex' || !efforts.length);
+  $('reasoningOptions').innerHTML = '';
+  for (const effort of efforts) {
+    const row = document.createElement('div'); row.className = 'row2';
+    row.innerHTML = `<span class="dot ${modelData.reasoning === effort.effort ? 'ok' : ''}"></span><span class="nm">${esc(effort.effort)}</span><small>${esc(effort.description || '')}</small>`;
+    row.onclick = async () => { settings = await api('/api/settings', { method:'PUT', body:JSON.stringify({ codexReasoning:effort.effort }) }); modelData.reasoning = effort.effort; await refreshModelLabel(); renderModelReasoning(); };
+    $('reasoningOptions').appendChild(row);
+  }
+}
+$('modelBtn').onclick = openModelPicker;
+
+function renderQuickProviders() {
+  const host = $('quickProviders'); host.innerHTML = '';
+  const ready = PROVIDERS.filter((p) => configuredProvider(p.id));
+  if (!ready.length) host.innerHTML = '<div class="quiet">No provider is ready yet. Open Provider settings.</div>';
+  for (const p of ready) {
+    const el = document.createElement('div'); el.className = 'row2';
+    el.innerHTML = `<span class="dot ok"></span><span class="nm">${esc(p.name)}</span><small>${activeProvider() === p.id ? 'in use' : p.cap}</small>`;
+    el.onclick = async () => {
+      try {
+        settings = await api('/api/settings', { method: 'PUT', body: JSON.stringify({ model: p.id }) });
+        await loadSettings(); $('setPop').classList.remove('show');
+        $('foot').textContent = `${p.name} will handle the next request · ${p.cap.toLowerCase()}.`;
+      } catch (e) { $('foot').textContent = e.message; }
+    };
+    host.appendChild(el);
+  }
+}
+
+function renderSettingsProviders() {
+  const host = $('settingsProviders'); host.innerHTML = '';
+  for (const p of PROVIDERS) {
+    const cliMissing = (p.id === 'claude-code' || p.id === 'codex') && !configuredProvider(p.id);
+    const configured = configuredProvider(p.id);
+    const el = document.createElement('button');
+    el.type = 'button'; el.className = 'provider-card' + (chosenProvider === p.id ? ' selected' : '');
+    el.disabled = cliMissing;
+    el.innerHTML = `<span class="dot ${configured ? 'ok' : ''}"></span><span class="copy"><b>${esc(p.name)}</b><small>${esc(cliMissing ? 'Sign in with the CLI, then restart Retake.' : p.desc)}</small></span><span class="cap">${esc(p.cap)}</span>`;
+    if (!cliMissing) el.onclick = () => { chosenProvider = p.id; renderSettingsProviders(); };
+    host.appendChild(el);
+  }
+}
+
+async function loadSettings() {
+  try { settings = await api('/api/settings'); } catch { return; }
+  const active = activeProvider();
+  $('modelTag').textContent = providerLabel(active);
+  $('setBtn').classList.toggle('on', !active);
+  renderQuickProviders();
+  await refreshModelLabel();
+}
+
+async function openSettings() {
+  await loadSettings();
+  chosenProvider = activeProvider() || settings.available?.[0] || 'local';
+  $('setLocalUrl').value = settings.env.localUrl || '';
+  $('setLocalModel').value = settings.env.localModel || '';
+  $('setOut').value = settings.outDir === settings.outDefault ? '' : settings.outDir || '';
+  $('setOut').placeholder = settings.outDefault || 'outputs/';
+  $('setGroq').value = ''; $('setMistral').value = '';
+  $('groqState').textContent = settings.env.groq ? 'configured' : '';
+  $('mistralState').textContent = settings.env.mistral ? 'configured' : '';
+  $('settingsNote').textContent = settings.active ? `Currently using ${providerLabel(activeProvider())}.` : 'Choose and configure a provider.';
+  $('settingsNote').classList.remove('bad');
+  renderSettingsProviders();
+  $('settingsShade').classList.add('show');
+}
+function closeSettings() { $('settingsShade').classList.remove('show'); }
+$('setBtn').onclick = (e) => { e.stopPropagation(); openPop('setPop'); };
+$('settingsBtn').onclick = openSettings;
+$('openSettings').onclick = () => { $('setPop').classList.remove('show'); openSettings(); };
+$('settingsClose').onclick = closeSettings;
+$('settingsCancel').onclick = closeSettings;
+$('settingsShade').onclick = (e) => { if (e.target === $('settingsShade')) closeSettings(); };
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  closeSettings();
+  pops.forEach((id) => $(id)?.classList.remove('show'));
+});
+$('settingsSave').onclick = async () => {
+  const note = $('settingsNote');
+  const groqKey = $('setGroq').value.trim(), mistralKey = $('setMistral').value.trim();
+  const localUrl = $('setLocalUrl').value.trim(), localModel = $('setLocalModel').value.trim();
+  if (chosenProvider === 'groq' && !settings.env.groq && !groqKey) { note.textContent = 'Enter a Groq API key first.'; note.classList.add('bad'); return; }
+  if (chosenProvider === 'mistral' && !settings.env.mistral && !mistralKey) { note.textContent = 'Enter a Mistral API key first.'; note.classList.add('bad'); return; }
+  if (chosenProvider === 'local' && !localUrl) { note.textContent = 'Enter the local model endpoint first.'; note.classList.add('bad'); return; }
+  const body = { model: chosenProvider, localUrl, localModel, outDir: $('setOut').value.trim() };
+  if (groqKey) body.groqKey = groqKey;
+  if (mistralKey) body.mistralKey = mistralKey;
+  $('settingsSave').disabled = true; note.classList.remove('bad'); note.textContent = 'Saving…';
+  try {
+    settings = await api('/api/settings', { method:'PUT', body:JSON.stringify(body) });
+    if (!settings.active) throw new Error('That provider is configured but not available yet.');
+    await loadSettings(); closeSettings();
+    $('foot').textContent = `Settings saved · ${providerLabel(activeProvider())} is ready.`;
+  } catch (e) { note.textContent = e.message; note.classList.add('bad'); }
+  finally { $('settingsSave').disabled = false; }
+};
+
+// ---- opening ---------------------------------------------------------------
+(async () => {
+  await loadSettings();
+  setLibrary(localStorage.getItem('retake.library') !== 'closed');
+  loadProjects(); drawTags();
+
+  $('fFolder').addEventListener('change', async () => {
+    drawTags();
+    const dir = $('fFolder').value.trim(); if (!dir) return;
+    try {
+      const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) });
+      $('fFolder').value = r.dir || dir;
+      $('welcomeFolder').value = r.dir || dir;
+      enterWorkspace(r, false);
+      if ($('fUrl').value.trim()) suggest(block(), r.dir || dir);
+    } catch (e) { const h = block(); line(h, e.message, 'bad'); }
+  });
+  $('fUrl').addEventListener('change', () => {
+    drawTags(); rememberProject();
+    if ($('fFolder').value.trim() && $('fUrl').value.trim()) suggest(block(), $('fFolder').value.trim());
+  });
+
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('retake.project') || 'null'); } catch { /* start fresh */ }
+  if (saved?.dir) {
+    $('fUrl').value = saved.url || '';
+    $('welcomeFolder').value = saved.dir;
+    await chooseProject(saved.dir, true);
+  } else {
+    $('main').classList.add('onboarding');
+    setTimeout(() => $('welcomeFolder').focus(), 50);
+  }
+})();
+
+async function suggest(host, dir) {
+  const url = $('fUrl').value.trim(); if (!url) return;
+  const l = line(host, 'Looking for demos worth making…', 'now');
+  try {
+    const r = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ url, project: dir || undefined }) });
+    l.remove(); prose(host, 'Here is what I would record:');
+    const wrap = document.createElement('div'); wrap.className = 'ideas';
+    for (const i of r.ideas) {
+      const b = document.createElement('button'); b.className = 'idea';
+      b.innerHTML = `<b>${esc(i.title)}</b><span>${esc(i.story || '')}${i.length ? ' · ' + esc(i.length) : ''}</span>`;
+      b.onclick = () => send(i.story || i.title);
+      wrap.appendChild(b);
+    }
+    host.appendChild(wrap);
+    if (r.file) prose(host, `Saved the full list to ${r.file}.`);
+    scroll(true);
+  } catch (e) {
+    l.remove();
+    line(host, e.message, 'bad');
+    if (e.down) prose(host, 'Say “start it” and I will bring your app up, if the folder has a dev script.');
+  }
+}
+
+async function scanForIdeas(info) {
+  if (busy) return;
+  const dir = info?.dir || $('fFolder').value.trim();
+  if (!dir) return;
+  const host = block();
+  busy = true; $('send').disabled = true;
+  try {
+    let url = $('fUrl').value.trim();
+    if (!url) {
+      if (!info?.start?.command) {
+        prose(host, 'I could not find a dev, start, serve, or preview script in this project. Add a running app URL and I’ll continue from there.');
+        showPop('attachPop'); setTimeout(() => $('fUrl').focus(), 40);
+        return;
+      }
+      const starting = line(host, `Starting ${info.name} with ${info.start.command}…`, 'now');
+      const started = await api('/api/start', { method:'POST', body:JSON.stringify({ dir, command:info.start.command }) });
+      starting.classList.remove('now'); starting.classList.add('done');
+      starting.textContent = `${info.name} is running at ${started.url}.`;
+      url = started.url;
+      $('fUrl').value = url;
+      rememberProject(); drawTags();
+    }
+    await suggest(host, dir);
+  } catch (e) {
+    line(host, e.message, 'bad');
+  } finally {
+    busy = false; $('send').disabled = false;
+  }
+}
+</script>
+</body>
+</html>

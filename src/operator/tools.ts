@@ -31,15 +31,24 @@ import { applyEdits, receiptsFor } from "../edits.js";
 const ROOT = process.env.RETAKE_ROOT || process.cwd();
 const DEMOS = path.join(ROOT, "demos");
 const OUT = process.env.RETAKE_OUT ? path.resolve(process.env.RETAKE_OUT.replace(/^~/, os.homedir())) : path.join(ROOT, "outputs");
+let LAST_DEMO = "";                                // what the agent is working on
 const UI = process.env.RETAKE_UI || "";           // e.g. http://localhost:4310
 const SESSION = process.env.RETAKE_SESSION || ""; // operator session id
+const PROJECT = process.env.RETAKE_PROJECT || "";
 
 loadDotenv(ROOT);
+// A selected project already owns the environment used by its dev server. Make
+// those same values available to ${ENV_VAR} references during dry/run without
+// copying secrets into manifests or exposing them to the coding-agent process.
+if (PROJECT) loadDotenv(PROJECT, [".env.local", ".env"]);
 
 // --- talking to the UI ------------------------------------------------------
 
 async function tell(line: string) {
-  if (!UI || !SESSION) { process.stderr.write(line + "\n"); return; }
+  if (!UI) { process.stderr.write(line + "\n"); return; }
+  // Driven from somebody else's agent there is no session, but the app is
+  // still open on the desk — report to the activity feed so it can be watched.
+  if (!SESSION) { await fetch(`${UI}/api/activity`, { method: "POST", body: JSON.stringify({ line, who: process.env.RETAKE_WHO || "your agent", demo: LAST_DEMO || undefined }) }).catch(() => {}); return; }
   await fetch(`${UI}/api/operator/${SESSION}/log`, { method: "POST", body: JSON.stringify({ line }) }).catch(() => {});
 }
 
@@ -74,25 +83,28 @@ function summariseTake(take: Take): string {
 // --- the server --------------------------------------------------------------
 
 const server = new McpServer({ name: "retake", version: "0.1.0" });
+const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
+const READ_LIVE_APP = { ...READ_ONLY, openWorldHint: true } as const;
+const RETAKE_WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } as const;
 
-server.registerTool("ports", { description: "Which local TCP ports have something listening. Use this before assuming an app is down — dev servers often come up on the next free port (3000 → 3001/3022).", inputSchema: {} }, async () => {
+server.registerTool("ports", { description: "Which local TCP ports have something listening. Use this before assuming an app is down — dev servers often come up one port over (3000 → 3001/3022).", inputSchema: {}, annotations: READ_ONLY }, async () => {
   const ps = ports();
   return text(ps.length ? `Listening: ${ps.map((p) => ":" + p).join(", ")}` : "Nothing is listening on any local port.");
 });
 
-server.registerTool("read_project", { description: "Read an app's source folder: stack, how it starts, routes, sign-in fields, stable selectors, env vars, things that make recordings flaky. Cheap and local. Do this first when a folder is given.", inputSchema: { dir: z.string().describe("path to the project folder") } }, async ({ dir }) => {
+server.registerTool("read_project", { description: "Read an app's source folder: stack, how it starts, routes, sign-in fields, stable selectors, env vars, things that make recordings flaky. Cheap and local. Do this first when a folder is given.", inputSchema: { dir: z.string().describe("path to the project folder") }, annotations: READ_ONLY }, async ({ dir }) => {
   const d = digest(dir.replace(/^~/, os.homedir()));
   await tell(`Read ${d.name}: ${d.files} files · ${d.routes.length} routes · ${d.selectors.length} stable selectors · ${d.flaky.length} things to watch`);
   return text(d.text);
 });
 
-server.registerTool("scout", { description: "Open a URL headlessly and list what is on it: headings, visible controls with unique selectors, page text. Use the selectors it returns verbatim.", inputSchema: { url: z.string().url() } }, async ({ url }) => {
+server.registerTool("scout", { description: "Open a URL headlessly and list what is on it: headings, visible controls with unique selectors, page text. Use the selectors it returns verbatim.", inputSchema: { url: z.string().url() }, annotations: READ_LIVE_APP }, async ({ url }) => {
   const sc = await scout(url);
   await tell(`Looked at ${url}: ${sc.elements.length} controls${sc.headings[0] ? ` · “${sc.headings[0]}”` : ""}`);
   return text([`title: ${sc.title}`, `headings: ${sc.headings.join(" | ")}`, "controls (tag · selector · text):", ...sc.elements.map((e) => `- ${e.tag} · ${e.selector} · ${e.text || e.placeholder || e.href || ""}`), "", `text: ${sc.text.slice(0, 1200)}`].join("\n"));
 });
 
-server.registerTool("wait_for_url", { description: "Wait until a URL answers (up to the timeout). Use after starting an app.", inputSchema: { url: z.string().url(), seconds: z.number().int().min(5).max(180).default(60) } }, async ({ url, seconds }) => {
+server.registerTool("wait_for_url", { description: "Wait until a URL answers (up to the timeout). Use after starting an app.", inputSchema: { url: z.string().url(), seconds: z.number().int().min(5).max(180).default(60) }, annotations: READ_LIVE_APP }, async ({ url, seconds }) => {
   await tell(`Waiting for ${url}…`);
   const ok = await waitUrl(url, seconds * 1000);
   await tell(ok ? `${url} is answering.` : `${url} did not answer within ${seconds}s.`);
@@ -100,21 +112,15 @@ server.registerTool("wait_for_url", { description: "Wait until a URL answers (up
 });
 
 server.registerTool("start_app", {
-  description: "Start the person's app from its folder and report the URL it actually came up on. Requires the person's say-so: inside the Retake app they click a button; driven from your own agent it only works if they enabled it when they added Retake (RETAKE_ALLOW_START=1). Never presented as automatic.",
+  description: "Start the person's app from its folder and report the URL it actually came up on. Requests initiated inside Retake are already authorized by the project workflow. When driven from an external agent, RETAKE_ALLOW_START=1 remains required.",
   inputSchema: { dir: z.string(), command: z.string().describe("e.g. npm run dev, or vercel dev --listen 3200"), expect_url: z.string().url().optional().describe("if you know the URL, wait for it") },
+  annotations: RETAKE_WRITE,
 }, async ({ dir, command, expect_url }) => {
   const cwd = dir.replace(/^~/, os.homedir());
-  try {
-    const answer = await waitForHuman("approve", "Start the app?", `${command}\nin ${cwd}`);
-    if (!/^(yes|y|ok|allow|approve|start)/i.test(answer.trim())) { await tell("Not starting the app — you said no."); return text("DENIED by the person. Do not retry. Ask how they would like to proceed."); }
-  } catch (e) {
-    if (!(e instanceof NoUI)) throw e;
-    // No window means nobody here can click, and a parameter the model fills in
-    // is not consent — it will happily set it. The only real gate is one the
-    // person set themselves, out of reach of whatever is calling this.
-    if (process.env.RETAKE_ALLOW_START !== "1") {
-      return text(`NOT RUN. Retake will not start processes when it is driven from outside its own window, unless the person allowed it when they set Retake up. Tell them: to let this work, add RETAKE_ALLOW_START=1 to Retake's MCP config env and restart. Otherwise ask them to start the app themselves, then call scout again.`);
-    }
+  // A Retake UI session exists only after the person has selected this project
+  // and asked for a scan/recording. Outside the UI, preserve the explicit gate.
+  if ((!UI || !SESSION) && process.env.RETAKE_ALLOW_START !== "1") {
+    return text(`NOT RUN. Retake will not start processes when it is driven from outside its own window, unless the person allowed it when they set Retake up. Tell them: to let this work, add RETAKE_ALLOW_START=1 to Retake's MCP config env and restart.`);
   }
   await tell(`Starting: ${command}`);
   const r = await reallyStartApp({ dir: cwd, command, expectUrl: expect_url, onProgress: (l) => void tell(l) });
@@ -123,7 +129,7 @@ server.registerTool("start_app", {
   return text(`FAILED: ${r.why}\nlog tail:\n${r.log.slice(-800)}`);
 });
 
-server.registerTool("ask", { description: "Ask the person ONE question and wait for the answer. Use only when genuinely blocked (which app, a credential name, a choice between two things). Keep it one sentence, with the evidence.", inputSchema: { question: z.string() } }, async ({ question }) => {
+server.registerTool("ask", { description: "Ask the person ONE question and wait for the answer. Use only when genuinely blocked (which app, a credential name, a choice between two things). Keep it one sentence, with the evidence.", inputSchema: { question: z.string() }, annotations: RETAKE_WRITE }, async ({ question }) => {
   try {
     const a = await waitForHuman("question", question);
     return text(`They answered: ${a}`);
@@ -133,7 +139,7 @@ server.registerTool("ask", { description: "Ask the person ONE question and wait 
   }
 });
 
-server.registerTool("list_demos", { description: "Demos that exist, with their last take.", inputSchema: {} }, async () => {
+server.registerTool("list_demos", { description: "Demos that exist, with their last take.", inputSchema: {}, annotations: READ_ONLY }, async () => {
   if (!fs.existsSync(DEMOS)) return text("no demos yet");
   const rows = fs.readdirSync(DEMOS).filter((f) => /\.ya?ml$/.test(f)).map((f) => {
     const name = f.replace(/\.ya?ml$/, "");
@@ -145,12 +151,12 @@ server.registerTool("list_demos", { description: "Demos that exist, with their l
   return text(rows.join("\n") || "no demos yet");
 });
 
-server.registerTool("read_manifest", { description: "The YAML of a demo.", inputSchema: { name: z.string() } }, async ({ name }) => {
+server.registerTool("read_manifest", { description: "The YAML of a demo.", inputSchema: { name: z.string() }, annotations: READ_ONLY }, async ({ name }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   return text(fs.readFileSync(manifestPath(name), "utf8"));
 });
 
-server.registerTool("write_manifest", { description: "Create or replace a demo's YAML. It is validated; errors come back instead of being written. Prefer `edit` for small changes to an existing demo.", inputSchema: { name: z.string(), yaml: z.string() } }, async ({ name, yaml }) => {
+server.registerTool("write_manifest", { description: "Create or replace a demo's YAML. It is validated; errors come back instead of being written. Prefer `edit` for small changes to an existing demo.", inputSchema: { name: z.string(), yaml: z.string() }, annotations: RETAKE_WRITE }, async ({ name, yaml }) => { LAST_DEMO = name;
   if (!safe(name)) return text("name must be kebab-case");
   let parsed;
   try { parsed = YAML.parse(yaml); } catch (e) { return text(`not valid YAML: ${(e as Error).message}`); }
@@ -163,7 +169,7 @@ server.registerTool("write_manifest", { description: "Create or replace a demo's
   return text(`written: demos/${name}.yaml (${r.data.steps.length} steps)`);
 });
 
-server.registerTool("draft", { description: "Let Retake draft a manifest from a sentence: scouts the URL (and reads the project if given) and writes demos/<name>.yaml. Then dry-run it.", inputSchema: { name: z.string(), url: z.string().url(), describe: z.string(), project: z.string().optional() } }, async ({ name, url, describe, project }) => {
+server.registerTool("draft", { description: "Let Retake draft a manifest from a sentence: scouts the URL (and reads the project if given) and writes demos/<name>.yaml. Then dry-run it.", inputSchema: { name: z.string(), url: z.string().url(), describe: z.string(), project: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ name, url, describe, project }) => { LAST_DEMO = name;
   if (!safe(name)) return text("name must be kebab-case");
   const provider = pickProvider();
   if (!provider) return text("no drafting model configured; write the manifest yourself with write_manifest");
@@ -176,14 +182,14 @@ server.registerTool("draft", { description: "Let Retake draft a manifest from a 
   return text(`drafted demos/${name}.yaml (${m.steps.length} steps). Next: dry.\n\n${d.yaml}`);
 });
 
-server.registerTool("edit", { description: "Make small structured changes to a demo (captions, camera, holds, trim, waits, selectors, text, delete a step). Keeps comments. Returns what changed and whether it needs re-recording.", inputSchema: { name: z.string(), edits: z.array(z.object({ op: z.string() }).passthrough()) } }, async ({ name, edits }) => {
+server.registerTool("edit", { description: "Make small structured changes to a demo (captions, camera, holds, trim, waits, selectors, text, delete a step). Keeps comments. Returns what changed and whether it needs re-recording.", inputSchema: { name: z.string(), edits: z.array(z.object({ op: z.string() }).passthrough()) }, annotations: RETAKE_WRITE }, async ({ name, edits }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const a = applyEdits(manifestPath(name), edits as Edit[]);
   for (const d of a.done) await tell(d);
   return text([`applied: ${a.done.join("; ") || "nothing"}`, a.skipped.length ? `skipped: ${a.skipped.join("; ")}` : "", a.rerecord ? "needs re-record" : "render-only change"].filter(Boolean).join("\n"));
 });
 
-server.registerTool("dry", { description: "Run a demo with no camera: every selector and wait, strict. Seconds, not minutes. ALWAYS do this before run. Failures include what was on screen.", inputSchema: { name: z.string() } }, async ({ name }) => {
+server.registerTool("dry", { description: "Run a demo with no camera: every selector and wait, strict. Seconds, not minutes. ALWAYS do this before run. Failures include what was on screen.", inputSchema: { name: z.string() }, annotations: RETAKE_WRITE }, async ({ name }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const { manifest } = loadManifest(manifestPath(name));
   await tell(`Checking every step of ${name} on the page…`);
@@ -192,7 +198,7 @@ server.registerTool("dry", { description: "Run a demo with no camera: every sele
   return text(r.ok ? `ok: all ${manifest.steps.length} steps resolve` : r.lines.join("\n"));
 });
 
-server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story. Returns the receipts.", inputSchema: { name: z.string(), preview: z.boolean().default(true) } }, async ({ name, preview }) => {
+server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story. Returns the receipts.", inputSchema: { name: z.string(), preview: z.boolean().default(true) }, annotations: RETAKE_WRITE }, async ({ name, preview }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const loaded = loadManifest(manifestPath(name));
   const manifest = preview ? { ...loaded.manifest, preset: "preview-fast" } : loaded.manifest;
@@ -212,7 +218,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   }
 });
 
-server.registerTool("render", { description: "Re-render the last recording of a demo with the current manifest (captions, camera, trim, format). No browser, seconds.", inputSchema: { name: z.string() } }, async ({ name }) => {
+server.registerTool("render", { description: "Re-render the last recording of a demo with the current manifest (captions, camera, trim, format). No browser, seconds.", inputSchema: { name: z.string() }, annotations: RETAKE_WRITE }, async ({ name }) => { LAST_DEMO = name;
   const outDir = path.join(OUT, name);
   const tp = path.join(outDir, "take.json");
   if (!fs.existsSync(tp)) return text("no recording yet — run first");
@@ -224,7 +230,7 @@ server.registerTool("render", { description: "Re-render the last recording of a 
   return text(`rendered: ${a.mp4}`);
 });
 
-server.registerTool("receipts", { description: "What happened in the last take of a demo: per-step pass/fail with timings, scene times, stubs. Read this before deciding what to change.", inputSchema: { name: z.string() } }, async ({ name }) => {
+server.registerTool("receipts", { description: "What happened in the last take of a demo: per-step pass/fail with timings, scene times, stubs. Read this before deciding what to change.", inputSchema: { name: z.string() }, annotations: READ_ONLY }, async ({ name }) => { LAST_DEMO = name;
   const tp = path.join(OUT, name, "take.json");
   if (!fs.existsSync(tp) || !fs.existsSync(manifestPath(name))) return text("no take yet");
   const take = JSON.parse(fs.readFileSync(tp, "utf8")) as Take;
@@ -232,8 +238,9 @@ server.registerTool("receipts", { description: "What happened in the last take o
   return text(receiptsFor(take, manifest.steps as never));
 });
 
-server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() } }, async ({ summary, demo }) => {
+server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {
   await tell(`Done: ${summary}`);
+  if (UI && !SESSION) await fetch(`${UI}/api/activity`, { method: "POST", body: JSON.stringify({ line: summary, demo, done: true }) }).catch(() => {});
   if (UI && SESSION) await fetch(`${UI}/api/operator/${SESSION}/done`, { method: "POST", body: JSON.stringify({ summary, demo }) }).catch(() => {});
   return text("ok");
 });

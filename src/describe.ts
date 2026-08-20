@@ -25,12 +25,14 @@ import YAML from "yaml";
 import { Manifest } from "./manifest.js";
 import { digest, type Digest } from "./digest.js";
 
-export function loadDotenv(root: string) {
-  const f = path.join(root, ".env");
-  if (!fs.existsSync(f)) return;
-  for (const line of fs.readFileSync(f, "utf8").split("\n")) {
-    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+export function loadDotenv(root: string, files = [".env"]) {
+  for (const name of files) {
+    const f = path.join(root, name);
+    if (!fs.existsSync(f)) continue;
+    for (const line of fs.readFileSync(f, "utf8").split("\n")) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
+      if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    }
   }
 }
 
@@ -109,8 +111,15 @@ function chatCli(p: Provider, system: string, user: string, projectDir?: string)
     }
   } else {
     const out = path.join(os.tmpdir(), `retake-codex-${process.pid}.txt`);
-    r = spawnSync(p.baseUrl, ["exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "--color", "never", ...(projectDir ? ["-C", projectDir] : []), "-o", out, ...(modelArgs.length ? ["-m", p.model] : []), "-"], { input: prompt, encoding: "utf8", timeout: 180_000, maxBuffer: 8e6, env });
-    if (fs.existsSync(out)) { const t = fs.readFileSync(out, "utf8"); fs.rmSync(out, { force: true }); if (t.trim()) return t; }
+    const catalogPath = path.join(os.tmpdir(), `retake-codex-models-${process.pid}.json`);
+    try {
+      const bundled = spawnSync(p.baseUrl, ["debug", "models", "--bundled"], { encoding: "utf8", timeout: 15_000, maxBuffer: 4e6, env });
+      if (bundled.status !== 0 || !bundled.stdout) throw new Error(`could not read Codex's bundled model catalog: ${bundled.stderr || "no output"}`);
+      JSON.parse(bundled.stdout);
+      fs.writeFileSync(catalogPath, bundled.stdout);
+      r = spawnSync(p.baseUrl, ["exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "--color", "never", "-c", `model_catalog_json=${JSON.stringify(catalogPath)}`, ...(process.env.RETAKE_CODEX_REASONING ? ["-c", `model_reasoning_effort=${JSON.stringify(process.env.RETAKE_CODEX_REASONING)}`] : []), ...(projectDir ? ["-C", projectDir] : []), "-o", out, ...(modelArgs.length ? ["-m", p.model] : []), "-"], { input: prompt, encoding: "utf8", timeout: 180_000, maxBuffer: 8e6, env });
+      if (fs.existsSync(out)) { const t = fs.readFileSync(out, "utf8"); fs.rmSync(out, { force: true }); if (t.trim()) return t; }
+    } finally { fs.rmSync(catalogPath, { force: true }); }
   }
   if (r.error) throw new Error(`${p.name}: ${r.error.message}`);
   if (r.status !== 0) throw new Error(`${p.name} exited ${r.status}: ${(r.stderr || r.stdout || "").slice(0, 300)}`);

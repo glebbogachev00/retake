@@ -24,7 +24,7 @@ import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { Manifest, loadManifest } from "../manifest.js";
@@ -48,6 +48,7 @@ function outRoot(): string {
 }
 const OUT_DEFAULT = path.join(ROOT, "outputs");
 const DRAFTS = path.join(ROOT, ".drafts");
+const DEMO_PROJECTS = path.join(DRAFTS, "demo-projects.json");
 
 /** Unfinished "new demo" flows. Saved on every keystroke, so walking away at
     step 4 loses nothing; named "project-N" until the person names it. */
@@ -109,8 +110,30 @@ const readBody = (req: http.IncomingMessage) =>
 const safeName = (s: string) => /^[a-z0-9-]+$/.test(s);
 const MIME: Record<string, string> = { ".mp4": "video/mp4", ".gif": "image/gif", ".png": "image/png", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
 
-function listDemos() {
+function projectKey(project: string): string {
+  return path.resolve(project.replace(/^~/, os.homedir()).trim());
+}
+function demoProjects(): Record<string, string> {
+  try { return JSON.parse(fs.readFileSync(DEMO_PROJECTS, "utf8")) as Record<string, string>; }
+  catch { return {}; }
+}
+function assignDemoProject(name: string, project: string) {
+  const map = demoProjects();
+  map[name] = projectKey(project);
+  fs.mkdirSync(DRAFTS, { recursive: true });
+  fs.writeFileSync(DEMO_PROJECTS, JSON.stringify(map, null, 2) + "\n");
+}
+function unassignDemoProject(name: string) {
+  const map = demoProjects();
+  if (!(name in map)) return;
+  delete map[name];
+  fs.writeFileSync(DEMO_PROJECTS, JSON.stringify(map, null, 2) + "\n");
+}
+
+function listDemos(project?: string) {
   if (!fs.existsSync(DEMOS)) return [];
+  const wanted = project?.trim() ? projectKey(project) : null;
+  const assignments = wanted ? demoProjects() : null;
   return fs
     .readdirSync(DEMOS)
     .filter((f) => /\.ya?ml$/.test(f))
@@ -146,7 +169,8 @@ function listDemos() {
         } catch { /* ignore */ }
       }
       return { name, file: f, title, url, valid, settings, lastTake, needsRecord };
-    });
+    })
+    .filter((demo) => !wanted || assignments?.[demo.name] === wanted);
 }
 
 function starterManifest(name: string, url: string, describe: string): string {
@@ -251,6 +275,9 @@ function writeEnv(set: Record<string, string | undefined>) {
 function envSummary() {
   return { localUrl: process.env.RETAKE_LOCAL_URL ?? "", localModel: process.env.RETAKE_LOCAL_MODEL ?? "", groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY };
 }
+function modelSelection() {
+  return { claude: process.env.RETAKE_CLAUDE_MODEL ?? "", codex: process.env.RETAKE_CODEX_MODEL ?? "", codexReasoning: process.env.RETAKE_CODEX_REASONING ?? "", groq: process.env.RETAKE_GROQ_MODEL ?? "", mistral: process.env.RETAKE_MISTRAL_MODEL ?? "", local: process.env.RETAKE_LOCAL_MODEL ?? "" };
+}
 
 /** A navigation error, said the way a person would say it. */
 function unreachable(url: string, e: Error): string {
@@ -266,14 +293,59 @@ function unreachable(url: string, e: Error): string {
   return m.split("\n")[0];
 }
 
+/** Native folder selection for the local UI. Browsers intentionally hide an
+    absolute path, but Retake needs one so its operator can read the app. */
+function pickFolder(): Promise<string | null> {
+  return new Promise((done, fail) => {
+    let command: string, args: string[];
+    if (process.platform === "darwin") {
+      command = "osascript";
+      args = ["-e", "POSIX path of (choose folder with prompt \"Choose the app Retake should record\")"];
+    } else if (process.platform === "win32") {
+      command = "powershell";
+      args = ["-NoProfile", "-Command", "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; if($d.ShowDialog() -eq 'OK'){$d.SelectedPath}"];
+    } else {
+      command = "zenity";
+      args = ["--file-selection", "--directory", "--title=Choose the app Retake should record"];
+    }
+    execFile(command, args, { encoding: "utf8", maxBuffer: 64_000 }, (error, stdout) => {
+      if (error) {
+        // Native pickers use a non-zero exit when the person cancels.
+        if (String((error as { code?: string | number }).code) === "1") return done(null);
+        return fail(error);
+      }
+      done(stdout.trim().replace(/\/$/, "") || null);
+    });
+  });
+}
+
+/** A live view of agent-driven work, so the app is a window and not a folder. */
+type Activity = { active: boolean; who: string; demo?: string; lines: string[]; startedAt: number; finishedAt?: number };
+const activity: Activity = { active: false, who: "", lines: [], startedAt: 0 };
+const activityWatchers = new Set<(ev: { type: string; data: unknown }) => void>();
+
+function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: string }) {
+  if (!activity.active && !b.done) { activity.active = true; activity.startedAt = Date.now(); activity.lines = []; activity.finishedAt = undefined; }
+  if (b.who) activity.who = b.who;
+  if (b.demo) activity.demo = b.demo;
+  if (b.line) { activity.lines.push(b.line); if (activity.lines.length > 200) activity.lines.shift(); }
+  if (b.done) { activity.active = false; activity.finishedAt = Date.now(); }
+  for (const w of activityWatchers) w({ type: b.done ? "finished" : "line", data: { ...activity, latest: b.line } });
+}
+
 export function serve(port: number) {
   loadDotenv(ROOT);
   const page = fs.readFileSync(path.join(HERE, "index.html"), "utf8");
+  const chatPage = fs.readFileSync(path.join(HERE, "chat.html"), "utf8");
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://x");
       const p = url.pathname;
       if (p === "/" && req.method === "GET") {
+        res.writeHead(200, { "content-type": "text/html" });
+        return res.end(chatPage);
+      }
+      if (p === "/classic" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(page);
       }
@@ -296,7 +368,19 @@ export function serve(port: number) {
         res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "max-age=86400" });
         return res.end(fs.readFileSync(f));
       }
-      if (p === "/api/demos" && req.method === "GET") return json(res, 200, listDemos());
+      if (p === "/api/demos" && req.method === "GET") return json(res, 200, listDemos(url.searchParams.get("project") ?? undefined));
+      const mproject = /^\/api\/demos\/([a-z0-9-]+)\/project$/.exec(p);
+      if (mproject && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { project: string };
+        if (!b.project?.trim()) return json(res, 400, { error: "project folder is required" });
+        if (!fs.existsSync(path.join(DEMOS, `${mproject[1]}.yaml`))) return json(res, 404, { error: "demo not found" });
+        assignDemoProject(mproject[1], b.project);
+        return json(res, 200, { ok: true, name: mproject[1], project: projectKey(b.project) });
+      }
+      if (p === "/api/pick-folder" && req.method === "POST") {
+        try { return json(res, 200, { dir: await pickFolder() }); }
+        catch (e) { return json(res, 500, { error: `Could not open the folder picker: ${(e as Error).message}` }); }
+      }
       if (p === "/api/provider" && req.method === "GET") return json(res, 200, providerStatus());
       if (p === "/api/presets" && req.method === "GET") return json(res, 200, Object.values(PRESETS));
       if (p === "/api/drafts" && req.method === "GET") return json(res, 200, listDrafts());
@@ -335,6 +419,7 @@ export function serve(port: number) {
         fs.mkdirSync(trash, { recursive: true });
         if (fs.existsSync(file)) fs.renameSync(file, path.join(trash, `${mdel[1]}.${Date.now()}.yaml`));
         if (fs.existsSync(out)) fs.rmSync(out, { recursive: true, force: true });
+        unassignDemoProject(mdel[1]);
         return json(res, 200, { ok: true });
       }
       const mg = /^\/api\/gif\/([a-z0-9-]+)$/.exec(p);
@@ -387,6 +472,7 @@ export function serve(port: number) {
             const d = await draftManifest({ name, url: b.url, describe: b.describe, scout: sc, provider, project });
             fs.mkdirSync(DEMOS, { recursive: true });
             fs.writeFileSync(file, d.yaml);
+            if (project) assignDemoProject(name, project);
             const m = loadManifest(file).manifest;
             emit(run, `Drafted ${m.steps.length} steps, ${m.steps.filter((s) => s.action === "scene").length} scenes`);
             setStage(run, "checking");
@@ -420,6 +506,39 @@ export function serve(port: number) {
         return json(res, 200, { name, startedAt: run.startedAt, estimate: run.estimate });
       }
 
+      // ---------- chat: one continuing conversation per project ----------
+      if (p === "/api/chat" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { message: string; project?: string; url?: string; demo?: string };
+        if (!b.message?.trim()) return json(res, 400, { error: "say something" });
+        const prov = pickProvider();
+        const which = prov?.name === "codex" ? "codex" : prov?.name === "claude-code" ? "claude-code" : null;
+        if (!which) return json(res, 400, { error: "Chat needs Claude Code or Codex — pick one in Settings." });
+        const ui = `http://localhost:${(req.socket.localPort as number) || 4310}`;
+        const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
+        const s2 = startOperator({ describe: b.message, url: b.url?.trim() || undefined, project, name: b.demo && safeName(b.demo) ? b.demo : undefined, ui, root: ROOT, provider: which, onDemo: (demo) => { if (project && safeName(demo)) assignDemoProject(demo, project); } });
+        return json(res, 200, { id: s2.id, startedAt: s2.startedAt });
+      }
+
+      // ---------- what somebody else's agent is doing right now ----------
+      // Claude Code or Codex can drive Retake over MCP from their own window.
+      // Without this, the app shows nothing until a file lands — so the tools
+      // report here, and the page watches, and the person can see the work.
+      if (p === "/api/activity" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { line?: string; demo?: string; done?: boolean; who?: string };
+        noteActivity(b);
+        return json(res, 200, { ok: true });
+      }
+      if (p === "/api/activity" && req.method === "GET") return json(res, 200, activity);
+      if (p === "/api/activity/stream" && req.method === "GET") {
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+        res.write(`event: state\ndata: ${JSON.stringify(activity)}\n\n`);
+        const send = (ev: { type: string; data: unknown }) => res.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev.data)}\n\n`);
+        activityWatchers.add(send);
+        const beat = setInterval(() => res.write(": ping\n\n"), 25_000);
+        req.on("close", () => { activityWatchers.delete(send); clearInterval(beat); });
+        return;
+      }
+
       // ---------- the operator: the coding agent drives Retake, fenced to its tools ----------
       if (p === "/api/operator" && req.method === "POST") {
         const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; project?: string; name?: string };
@@ -428,7 +547,8 @@ export function serve(port: number) {
         const which = prov?.name === "codex" ? "codex" : prov?.name === "claude-code" ? "claude-code" : null;
         if (!which) return json(res, 400, { error: "The operator needs Claude Code or Codex (Settings). With another model, use “Take it from here” — same result, fixed steps." });
         const ui = `http://localhost:${(req.socket.localPort as number) || 4310}`;
-        const s = startOperator({ describe: b.describe, url: b.url?.trim() || undefined, project: b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined, name: b.name && safeName(b.name) ? b.name : undefined, ui, root: ROOT, provider: which });
+        const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
+        const s = startOperator({ describe: b.describe, url: b.url?.trim() || undefined, project, name: b.name && safeName(b.name) ? b.name : undefined, ui, root: ROOT, provider: which, onDemo: (demo) => { if (project && safeName(demo)) assignDemoProject(demo, project); } });
         return json(res, 200, { id: s.id, startedAt: s.startedAt, provider: which });
       }
       const mop = /^\/api\/operator\/([a-z0-9]+)(?:\/(log|pending|done|stream|stop|answer)(?:\/([a-z0-9]+))?)?$/.exec(p);
@@ -473,7 +593,7 @@ export function serve(port: number) {
         const b = JSON.parse(await readBody(req)) as { dir: string; command?: string; url?: string };
         const off = startOffer(b.dir);
         const command = b.command?.trim() || off?.command;
-        if (!command) return json(res, 400, { error: "No start script found in that folder — start the app yourself, then try again." });
+        if (!command) return json(res, 400, { error: "No dev, start, serve, or preview script was found. Add a running app URL instead." });
         const r = await startApp({ dir: b.dir, command, expectUrl: b.url });
         return json(res, r.ok ? 200 : 400, r.ok ? { ok: true, url: r.url, pid: r.pid } : { error: r.why ?? "could not start", log: r.log.slice(-1200) });
       }
@@ -488,7 +608,21 @@ export function serve(port: number) {
           return json(res, 400, { error: (e as Error).message });
         }
       }
-      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", gifski: !!gifskiBin(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT });
+      if (p === "/api/models" && req.method === "GET") {
+        const provider = url.searchParams.get("provider") || pickProvider()?.name;
+        if (provider === "codex") {
+          try {
+            const raw = execFileSync("codex", ["debug", "models", "--bundled"], { encoding: "utf8", timeout: 15_000, maxBuffer: 4e6 });
+            const catalog = JSON.parse(raw) as { models?: { slug: string; display_name?: string; visibility?: string; default_reasoning_level?: string; supported_reasoning_levels?: { effort: string; description?: string }[] }[] };
+            return json(res, 200, { provider, selected: process.env.RETAKE_CODEX_MODEL ?? "", reasoning: process.env.RETAKE_CODEX_REASONING ?? "", models: (catalog.models ?? []).filter((m) => m.visibility === "list").map((m) => ({ id: m.slug, name: m.display_name || m.slug, defaultReasoning: m.default_reasoning_level, reasoning: m.supported_reasoning_levels ?? [] })) });
+          } catch (e) { return json(res, 500, { error: `Could not read Codex models: ${(e as Error).message}` }); }
+        }
+        if (provider === "claude-code") return json(res, 200, { provider, selected: process.env.RETAKE_CLAUDE_MODEL ?? "", models: [{ id: "", name: "Recommended" }, { id: "sonnet", name: "Sonnet" }, { id: "opus", name: "Opus" }, { id: "haiku", name: "Haiku" }] });
+        const key = provider === "groq" ? "RETAKE_GROQ_MODEL" : provider === "mistral" ? "RETAKE_MISTRAL_MODEL" : "RETAKE_LOCAL_MODEL";
+        const selected = process.env[key] ?? "";
+        return json(res, 200, { provider, selected, models: [{ id: selected, name: selected || "Configured default" }] });
+      }
+      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", selection: modelSelection(), gifski: !!gifskiBin(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT });
       const mopen = /^\/api\/open\/([a-z0-9-]+)$/.exec(p);
       if (mopen && req.method === "POST") {
         const dir = path.join(outRoot(), mopen[1]);
@@ -498,15 +632,15 @@ export function serve(port: number) {
         return json(res, 200, { ok: true, dir });
       }
       if (p === "/api/settings" && req.method === "PUT") {
-        const b = JSON.parse(await readBody(req)) as { model?: string; localUrl?: string; localModel?: string; groqKey?: string; mistralKey?: string; outDir?: string };
+        const b = JSON.parse(await readBody(req)) as { model?: string; localUrl?: string; localModel?: string; claudeModel?: string; codexModel?: string; codexReasoning?: string; groqModel?: string; mistralModel?: string; groqKey?: string; mistralKey?: string; outDir?: string };
         if (b.outDir !== undefined && b.outDir.trim()) {
           const d = path.resolve(b.outDir.trim().replace(/^~/, os.homedir()));
           try { fs.mkdirSync(d, { recursive: true }); fs.accessSync(d, fs.constants.W_OK); } catch { return json(res, 400, { error: `Can't write to ${d}` }); }
         }
-        const set: Record<string, string | undefined> = { RETAKE_MODEL: b.model, RETAKE_LOCAL_URL: b.localUrl, RETAKE_LOCAL_MODEL: b.localModel, GROQ_API_KEY: b.groqKey, MISTRAL_API_KEY: b.mistralKey, RETAKE_OUT: b.outDir === undefined ? undefined : b.outDir.trim() };
+        const set: Record<string, string | undefined> = { RETAKE_MODEL: b.model, RETAKE_LOCAL_URL: b.localUrl, RETAKE_LOCAL_MODEL: b.localModel, RETAKE_CLAUDE_MODEL: b.claudeModel, RETAKE_CODEX_MODEL: b.codexModel, RETAKE_CODEX_REASONING: b.codexReasoning, RETAKE_GROQ_MODEL: b.groqModel, RETAKE_MISTRAL_MODEL: b.mistralModel, GROQ_API_KEY: b.groqKey, MISTRAL_API_KEY: b.mistralKey, RETAKE_OUT: b.outDir === undefined ? undefined : b.outDir.trim() };
         writeEnv(set);
         for (const [k, v] of Object.entries(set)) if (v !== undefined) { if (v === "") delete process.env[k]; else process.env[k] = v; }
-        return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT });
+        return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", selection: modelSelection(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT });
       }
       const ms = /^\/api\/demos\/([a-z0-9-]+)\/settings$/.exec(p);
       if (ms && req.method === "PATCH") {
@@ -541,16 +675,18 @@ export function serve(port: number) {
         const d = await draftManifest({ name: b.name, url: b.url, describe: b.describe, scout: sc, provider, project });
         fs.mkdirSync(DEMOS, { recursive: true });
         fs.writeFileSync(file, d.yaml);
+        if (project) assignDemoProject(b.name, project);
         return json(res, 200, { name: b.name, provider: d.provider, retried: d.retried, scouted: sc.elements.length, read: d.digest ? d.digest.files : 0 });
       }
       if (p === "/api/demos" && req.method === "POST") {
-        const b = JSON.parse(await readBody(req)) as { name: string; url: string; describe: string };
+        const b = JSON.parse(await readBody(req)) as { name: string; url: string; describe: string; project?: string };
         if (!b.name) b.name = nextProjectName();
         if (!safeName(b.name)) return json(res, 400, { error: "name must be kebab-case" });
         const file = path.join(DEMOS, `${b.name}.yaml`);
         if (fs.existsSync(file)) return json(res, 409, { error: "a demo with that name exists" });
         fs.mkdirSync(DEMOS, { recursive: true });
         fs.writeFileSync(file, starterManifest(b.name, b.url, b.describe ?? ""));
+        if (b.project) assignDemoProject(b.name, b.project);
         return json(res, 200, { name: b.name });
       }
       let m = /^\/api\/demos\/([a-z0-9-]+)$/.exec(p);
