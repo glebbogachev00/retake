@@ -251,6 +251,7 @@
           <button class="btn ghost" id="fCancel">Cancel</button>
         </div>
         <div class="note" id="fBusy"></div>
+        <div class="row hidden" id="startRow" style="margin-top:10px"><button class="btn primary" id="startBtn">Start it</button><span class="hint" id="startHint"></span></div>
         <div class="progress" id="fProgress">
           <div class="bar"><i id="fBar"></i></div>
           <div class="stagetext"><span id="fStage">Starting…</span><span id="fEta"></span></div>
@@ -286,7 +287,11 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let current = null, dirty = false, es = null, demoList = [], settings = null, tick = null, pendingRender = false, needsRecord = true, lastTake = null, sceneTimes = {}, quality = localStorage.getItem('retake.quality') || 'final';
-async function api(url, opts) { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j; }
+async function api(url, opts) {
+  const r = await fetch(url, opts); const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.error || r.statusText); Object.assign(e, j); throw e; }
+  return j;
+}
 function setMsg(t, cls) { const m = $('msg'); m.textContent = t; m.className = 'msg ' + (cls || ''); }
 function show(view) { for (const v of ['viewDemo', 'viewNew', 'viewSettings']) $(v).classList.toggle('hidden', v !== view); }
 function setQuality(q) { quality = q; localStorage.setItem('retake.quality', q); $('qFinalSw').checked = q === 'final'; paintAction(); }
@@ -320,6 +325,32 @@ async function loadDemos() {
   await loadDrafts();
   return demoList;
 }
+// What the folder told us about starting the app, if anything — and where a
+// "nothing is running" failure last happened, so typing a folder afterwards
+// brings the Start-it offer straight up.
+let startInfo = null, lastDownWhere = null;
+
+/** Offer to run the project's own dev script — never do it unasked. */
+function offerStart(where) {
+  if (!startInfo) { $('startRow').classList.add('hidden'); return false; }
+  $('startRow').classList.remove('hidden');
+  $('startHint').textContent = `Found \`${startInfo.command}\` in ${startInfo.dir.replace(/^\/Users\/[^/]+/, '~')}`;
+  $('startBtn').onclick = async () => {
+    $('startBtn').disabled = true; $('startHint').textContent = 'Starting… (watching for the port it comes up on)';
+    try {
+      const r = await api('/api/start', { method: 'POST', body: JSON.stringify({ dir: startInfo.dir, command: startInfo.command, url: $('fUrl').value.trim() || undefined }) });
+      $('startRow').classList.add('hidden'); lastDownWhere = null;
+      if (r.url && r.url !== $('fUrl').value.trim()) { $('fUrl').value = r.url; saveDraftSoon(); }
+      $('fBusy').textContent = `Running at ${r.url}. Picking up where we left off…`;
+      (where === 'create' ? $('fGo') : $('fIdeas')).click();
+    } catch (e) {
+      $('startHint').textContent = e.message;
+      if (e.log) $('fBusy').textContent = e.log;
+    } finally { $('startBtn').disabled = false; }
+  };
+  return true;
+}
+
 let undoTimer = null;
 function offerUndo(name) {
   clearTimeout(undoTimer);
@@ -528,6 +559,7 @@ function attachStream(name, startedAt, est, onDone) {
     const bad = /✗|failed|Error/i.test(line), ok = /^✓|all steps ok|check: pass|Checked:|Found the page|Drafted|Fixed/.test(line);
     log.innerHTML += `<div>${esc(line)}</div>`;
     // the human-readable checkpoints only
+    if (line === '__DOWN__') return;
     if (/^(Found the page|Read |Drafting|Drafted|Fixed|Checked|Recording|✗|⚠|No repair|\d+ step)/.test(line)) { steps.innerHTML += `<div class="${bad ? 'bad' : ok ? 'ok' : ''}">${esc(line)}</div>`; }
   };
   es.addEventListener('done', async (ev) => {
@@ -564,20 +596,33 @@ $('runBtn').onclick = () => run('main');
 $('forceBtn').onclick = () => { $('forceBtn').dataset.force = '1'; run('main'); };
 
 // ---------- new demo: one card ----------
-function openNew() { draftId = 'd' + Date.now().toString(36); for (const id of ['fUrl', 'fDesc', 'fProject']) $(id).value = ''; $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = ''; show('viewNew'); setTimeout(() => $('fUrl').focus(), 50); }
+function openNew() { draftId = 'd' + Date.now().toString(36); startInfo = null; lastDownWhere = null; $('startRow').classList.add('hidden'); for (const id of ['fUrl', 'fDesc', 'fProject']) $(id).value = ''; $('fBusy').textContent = ''; $('fProjectNote').textContent = ''; $('ideaList').innerHTML = ''; show('viewNew'); setTimeout(() => $('fUrl').focus(), 50); }
 $('newBtn').onclick = openNew;
 $('fCancel').onclick = () => { if (current) show('viewDemo'); };
 for (const id of ['fUrl', 'fDesc', 'fProject']) $(id).addEventListener('input', saveDraftSoon);
-$('fProject').addEventListener('change', async () => {
-  const dir = $('fProject').value.trim(); if (!dir) { $('fProjectNote').textContent = ''; return; }
+let projTimer = null;
+async function checkProject() {
+  const dir = $('fProject').value.trim();
+  if (!dir) { $('fProjectNote').textContent = ''; startInfo = null; return; }
   $('fProjectNote').textContent = 'Reading…';
-  try { const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) }); const bits = [`${r.files} files`, r.stack.length ? r.stack.join(', ') : null, r.routes.length ? `${r.routes.length} routes` : null, r.selectors ? `${r.selectors} stable selectors` : null, r.auth ? 'a sign-in' : null, r.flaky ? `${r.flaky} things to watch` : null].filter(Boolean); $('fProjectNote').innerHTML = `<span style="color:var(--ok)">Found ${esc(r.name)}</span> — ${esc(bits.join(' · '))}`; } catch (e) { $('fProjectNote').textContent = e.message; }
-});
+  try {
+    const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ dir }) });
+    startInfo = r.start || null;
+    if (startInfo && lastDownWhere) offerStart(lastDownWhere);
+    const bits = [`${r.files} files`, r.stack.length ? r.stack.join(', ') : null, r.routes.length ? `${r.routes.length} routes` : null, r.selectors ? `${r.selectors} stable selectors` : null, r.auth ? 'a sign-in' : null, r.flaky ? `${r.flaky} things to watch` : null, startInfo ? `starts with ${startInfo.command}` : null].filter(Boolean);
+    $('fProjectNote').innerHTML = `<span style="color:var(--ok)">Found ${esc(r.name)}</span> — ${esc(bits.join(' · '))}`;
+  } catch (e) { $('fProjectNote').textContent = e.message; startInfo = null; }
+}
+$('fProject').addEventListener('change', checkProject);
+$('fProject').addEventListener('input', () => { clearTimeout(projTimer); projTimer = setTimeout(checkProject, 700); });
 $('fIdeas').onclick = async () => {
   const u = $('fUrl').value.trim(); if (!/^https?:\/\//.test(u)) { $('fUrl').focus(); return; }
   $('fIdeas').disabled = true; $('fIdeasNote').textContent = 'Looking at the app…';
   try { const r = await api('/api/ideas', { method: 'POST', body: JSON.stringify({ url: u, project: $('fProject').value.trim() || undefined }) }); $('ideaList').innerHTML = r.ideas.map((i, n) => `<button class="idea" data-i="${n}"><b>${esc(i.title)}</b><span>${esc(i.story || '')}${i.length ? ' · ' + esc(i.length) : ''}</span></button>`).join(''); $('fIdeasNote').textContent = `Saved to ${r.file}`; for (const b of $('ideaList').querySelectorAll('button[data-i]')) b.onclick = () => { const i = r.ideas[Number(b.dataset.i)]; $('fDesc').value = i.story || i.title; $('ideaList').innerHTML = ''; $('fDesc').focus(); }; }
-  catch (e) { $('fIdeasNote').textContent = e.message; } finally { $('fIdeas').disabled = false; }
+  catch (e) {
+    $('fIdeasNote').textContent = e.message;
+    if (e.down) { lastDownWhere = 'ideas'; if (!offerStart('ideas')) { if ($('fProject').value.trim()) checkProject(); else { $('fIdeasNote').textContent += ' Point me at the code folder below and I can start it for you.'; $('fProject').focus(); } } }
+  } finally { $('fIdeas').disabled = false; }
 };
 $('fGo').onclick = async () => {
   const url = $('fUrl').value.trim(), describe = $('fDesc').value.trim();
@@ -593,7 +638,20 @@ $('fGo').onclick = async () => {
     attachStream(r.name, r.startedAt, r.estimate, async (code) => {
       $('fGo').disabled = false;
       const exists = await api('/api/demos/' + r.name).then(() => true).catch(() => false);
-      if (!exists) { $('fRetryRow').classList.remove('hidden'); return; }   // nothing was drafted — retry from here
+      if (!exists) {
+        // Nothing was drafted. If the app was simply down and we know how to
+        // start it, offer that instead of a bare Try again.
+        const wasDown = $('fSteps').textContent.includes('Nothing is running');
+        if (wasDown) {
+          lastDownWhere = 'create';
+          if (!offerStart('create')) {
+            if ($('fProject').value.trim()) { $('fBusy').textContent = 'Checking that folder for a way to start it…'; checkProject(); }
+            else { $('fBusy').textContent = 'Point me at the code folder (below) and I can start it for you — or start the app yourself and press Try again.'; $('fProject').focus(); }
+            $('fRetryRow').classList.remove('hidden');
+          }
+        } else $('fRetryRow').classList.remove('hidden');
+        return;
+      }
       if (draftId) { api('/api/drafts/' + draftId, { method: 'DELETE' }).catch(() => {}); draftId = null; }
       await loadDemos();
       current = r.name; show('viewDemo');
