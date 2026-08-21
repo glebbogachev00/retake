@@ -14,9 +14,8 @@ demos/*.yaml
 !demos/todo-basics.yaml
 !demos/store-checkout.yaml
 # working files describe private apps — local only
-demos/ideas.md
-demos/plan.json
-demos/style.md
+demos/*.md
+demos/*.json
 demos/seeds/*
 !demos/seeds/.gitkeep
 scripts/capture-dev.sh
