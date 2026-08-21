@@ -10,7 +10,9 @@ const click = (n: number) => Array.from({ length: n }, (_, i) => ({ action: "cli
 test("duplicate scene labels are refused at the schema", () => {
   const r = Manifest.safeParse({ ...base, steps: [{ action: "scene", label: "ask" }, { action: "wait", ms: 100 }, { action: "scene", label: "ask" }] });
   assert.equal(r.success, false);
-  assert.match(JSON.stringify(r.error!.issues), /duplicate scene label "ask"/);
+  const msg = r.error!.issues.map((i) => i.message).join(" | ");
+  assert.match(msg, /duplicate scene label/);
+  assert.match(msg, /also step 0/);
 });
 
 test("too many cursor moves warns (the overlay cannot survive it)", () => {
