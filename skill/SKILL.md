@@ -23,6 +23,15 @@ for X. Say it once and I'll remember it for this project." Then offer the
 first concrete step: suggest ideas from their app, or record the flow they
 name.
 
+## You have Retake's tools and nothing else
+
+When you are driving Retake you usually have no shell, no file reader, no
+grep. Do not reach for them — every call to a tool you do not have is a
+wasted turn. `scout` and `read_project` are your eyes on the app; `receipts`
+and `look` are your eyes on the take; `ask` only works when a Retake window
+is open, and `start_app` needs the person's say-so. If you are truly stuck,
+say so in one line and stop.
+
 ## The order that wins
 
 1. **`read_project`** (if you have the source folder) — routes, start

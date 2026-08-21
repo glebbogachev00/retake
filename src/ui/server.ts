@@ -345,6 +345,14 @@ type Activity = { active: boolean; who: string; demo?: string; lines: string[]; 
 const activity: Activity = { active: false, who: "", lines: [], startedAt: 0 };
 const activityWatchers = new Set<(ev: { type: string; data: unknown }) => void>();
 
+/** An agent that stops reporting without calling done would otherwise look
+    busy forever; ten quiet minutes means it is gone. */
+function withStaleness(a: Activity): Activity & { stale?: boolean } {
+  const last = a.lines.length ? a.startedAt : 0;
+  if (a.active && Date.now() - Math.max(last, a.startedAt) > 10 * 60_000 && !a.lines.length) return { ...a, active: false, stale: true };
+  return a;
+}
+
 function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: string }) {
   if (!activity.active && !b.done) { activity.active = true; activity.startedAt = Date.now(); activity.lines = []; activity.finishedAt = undefined; }
   if (b.who) activity.who = b.who;
@@ -568,7 +576,7 @@ export function serve(port: number) {
         noteActivity(b);
         return json(res, 200, { ok: true });
       }
-      if (p === "/api/activity" && req.method === "GET") return json(res, 200, activity);
+      if (p === "/api/activity" && req.method === "GET") return json(res, 200, withStaleness(activity));
       if (p === "/api/activity/stream" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
         res.write(`event: state\ndata: ${JSON.stringify({ ...activity, boot: BOOT })}\n\n`);
