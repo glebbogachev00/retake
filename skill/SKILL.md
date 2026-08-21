@@ -31,9 +31,10 @@ name.
    If the URL refuses, check `ports`; dev servers often sit one port over.
    Do not start the app yourself unless the person says to.
 3. **What to record?** If the person asked for suggestions, call `ideas` —
-   do not invent ideas blind. For a batch, `plan_set` the list first and
-   `plan_mark` each item as you go; an unfinished plan survives into the
-   next session (`plan` shows it).
+   do not invent ideas blind. Show them the list in the chat, numbered, and
+   **stop**: they pick, drop, or reword before anything is recorded. Only
+   then `plan_set` their choices and `plan_mark` each item as you go; an
+   unfinished plan survives into the next session (`plan` shows it).
 4. **`draft`** the manifest from the person's sentence, then read it and fix
    the obvious with `edit`: wait for results instead of timers, unique
    selectors, logins under `auth.setup` with `${ENV}` placeholders and
