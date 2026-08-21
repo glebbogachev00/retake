@@ -99,6 +99,13 @@ again. Do not `look` at a failed take; images cost, and the text already
 says what went wrong. Never call `done` on a take with a failed step.
 Four rounds without a passing take → stop and ask the person.
 
+## Two footguns worth knowing
+
+- **Wait for durable state, not its announcement.** Toasts and banners clear
+  themselves; wait for the row, the count, the heading that persists.
+- **A one-line `script:` with braces is YAML, not JS** — use a block
+  (`script: |`). Retake's validation error now says so too.
+
 ## Rules
 
 - Real interactions read as real: type actual text, scroll to what you use,

@@ -451,7 +451,12 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       break;
     case "scroll": {
       let dy = step.y;
-      if (step.to) {
+      if (step.to === "top" || step.to === "bottom") {
+        // Absolute: the page's ends. A relative y: 0 is, correctly, no move.
+        const want = step.to;
+        const cur = await page.evaluate(() => ({ y: window.scrollY, max: document.documentElement.scrollHeight - window.innerHeight }));
+        dy = Math.round((want === "top" ? 0 : cur.max) - cur.y);
+      } else if (step.to) {
         // Work out how far to move so the element sits where we asked, then let
         // testreel animate that distance (an eased scroll, not a jump).
         const box = await page.locator(step.to).first().boundingBox({ timeout });
@@ -571,15 +576,34 @@ async function firstPaintWallClock(page: Page): Promise<number> {
 
 // --- seeding -------------------------------------------------------------
 
-async function runFileOrCommandSeed(s: Seed, dir: string, log: (l: string) => void) {
+/** "-12d" → twelve days ago, "+6h" → six hours from now, "now" → now; all
+    as epoch ms. Anything else passes through untouched. */
+export function resolveRelativeDates<T>(value: T, now = Date.now()): T {
+  const UNIT: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000, w: 7 * 86_400_000 };
+  const walk = (v: unknown): unknown => {
+    if (typeof v === "string") {
+      if (v === "now") return now;
+      const m = /^([+-])(\d+(?:\.\d+)?)([mhdw])$/.exec(v);
+      if (m) return now + (m[1] === "-" ? -1 : 1) * Number(m[2]) * UNIT[m[3]];
+      return v;
+    }
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(value) as T;
+}
+
+export async function runFileOrCommandSeed(s: Seed, dir: string, log: (l: string) => void) {
   if (s.kind === "file") {
     const src = path.resolve(dir, s.from);
     const dest = path.resolve(dir, expandEnv(s.path));
-    const body = fs.readFileSync(src, "utf8");
-    JSON.parse(body); // fail loudly on a broken seed
+    let body = fs.readFileSync(src, "utf8");
+    const parsed = JSON.parse(body); // fail loudly on a broken seed
+    if (s.relativeDates) body = JSON.stringify(resolveRelativeDates(parsed));
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, body);
-    log(`seed: wrote ${path.relative(process.cwd(), dest)}`);
+    log(`seed: wrote ${path.relative(process.cwd(), dest)}${s.relativeDates ? " (relative dates resolved)" : ""}`);
   } else if (s.kind === "command") {
     log(`seed: $ ${s.run}`);
     execSync(expandEnv(s.run), { stdio: "inherit", cwd: dir });

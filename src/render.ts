@@ -617,6 +617,7 @@ function renderProof(m: Manifest, take: Take, q: Resolved, a: Partial<Artifacts>
     `- mp4: ${size("mp4")}`,
     `- gif: ${size("gif")}`,
     `- thumbnail: ${size("thumbnail")}`,
+    `- stills: one PNG per scene in stills/, each taken at the MIDDLE of its scene (not the end) — judge a beat from these, not from the next beat's first frame`,
     ...(f ? [`- output: ${f.width}×${f.height} @ ${f.fps}fps · ${f.duration.toFixed(1)}s · ${f.encoder} · gif via ${f.gifTool} · camera on ${f.cameraScenes} scenes${f.cached ? " · cached" : ""}`, `- render time: ${Object.entries(f.timings ?? {}).map(([k, v]) => `${k} ${v}s`).join(" · ") || "—"}`] : []),
     "",
     "## Shot list",

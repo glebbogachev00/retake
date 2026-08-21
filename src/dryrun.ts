@@ -8,15 +8,26 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { runFileOrCommandSeed } from "./record.js";
 import { chromium, type Page, type BrowserContext } from "playwright";
 import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
 
 export type DryResult = { ok: boolean; lines: string[]; failures: number };
 
-export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void): Promise<DryResult> {
+export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean } = {}): Promise<DryResult> {
   const q = resolve(m);
   const lines: string[] = [];
   let failures = 0;
+  // Seeds run here too (file and command kinds — the cheap, out-of-page
+  // ones). Without them dry checks a different app state than run will,
+  // and a selector failure that is really a state difference looks like a
+  // selector failure. --no-seed opts out.
+  const fileSeeds = m.seed.filter((s) => s.kind !== "evaluate");
+  if (opts.seed !== false && fileSeeds.length) {
+    for (const s of fileSeeds) await runFileOrCommandSeed(s, manifestDir, log);
+  } else if (fileSeeds.length) {
+    log("dry: seeds skipped (--no-seed) — app state may not match what run will see");
+  }
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: q.viewport,

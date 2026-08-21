@@ -117,3 +117,11 @@ recording-relevant changed, and the UI's one button works this out for you.
 - Two runs on the same demo at once are refused (a lock); wait for the first.
 - Deleted demos go to `.trash/`; `POST /api/demos/<name>/restore` or copy the
   file back.
+- **Wait for durable state, not its announcement.** Toasts and banners clear
+  themselves (and often share a class with other notices); a wait on one can
+  time out while the thing it announced sits on the board. Wait for the row,
+  the count, the heading — `.act >> nth=1` beats `.landed`.
+- `dry` runs file/command seeds first so it sees the state `run` will
+  (`--no-seed` to skip). `evaluate` seeds only run with a camera.
+- A one-line `script:` with braces is a YAML mapping, not a string — write
+  `script: |` and put the JS on the next line.

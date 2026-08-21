@@ -46,7 +46,9 @@ export const Step = z.discriminatedUnion("action", [
     action: z.literal("scroll"),
     x: z.number().optional(),
     y: z.number().optional(),
-    to: Selector.optional(),
+    /** A selector to bring into view, or "top" / "bottom" of the page.
+        (x/y are a relative nudge in pixels — y: 0 moves nothing.) */
+    to: z.union([z.literal("top"), z.literal("bottom"), Selector]).optional(),
     /** Where the target should end up: top | center (default) | bottom. */
     align: z.enum(["top", "center", "bottom"]).default("center"),
   }),
@@ -118,7 +120,13 @@ export type Stub = z.infer<typeof Stub>;
 export const Seed = z.discriminatedUnion("kind", [
   /** Write a JSON document to a file before the app is touched. Good for apps
       with a file-backed sync hub (Capture: SYNC_DATA_DIR/sync.json). */
-  z.object({ kind: z.literal("file"), path: z.string(), from: z.string() }),
+  z.object({
+    kind: z.literal("file"), path: z.string(), from: z.string(),
+    /** Resolve "-12d", "+6h", "now" strings in the JSON to epoch ms at seed
+        time, so a fixture that says "three days ago" still says it next
+        month. Every app with relative dates in its UI needs this. */
+    relativeDates: z.boolean().default(false),
+  }),
   /** Run JS in the page before recording starts, then reload. Good for
       IndexedDB / localStorage-backed apps. `from` is a JSON file exposed as
       `window.__seed` for the script. */
@@ -209,10 +217,28 @@ export type LoadedManifest = { manifest: Manifest; file: string; dir: string };
 export function loadManifest(file: string): LoadedManifest {
   const abs = path.resolve(file);
   const raw = fs.readFileSync(abs, "utf8");
-  const data = abs.endsWith(".json") ? JSON.parse(raw) : YAML.parse(raw);
+  let data: unknown;
+  try {
+    data = abs.endsWith(".json") ? JSON.parse(raw) : YAML.parse(raw);
+  } catch (e) {
+    // The classic trap: a one-line JS object literal under `script:` is a
+    // YAML mapping, and the parser fails before validation ever runs. Find
+    // the line it choked on; if that line carries a script, say so.
+    const err = e as Error & { linePos?: { line: number }[] };
+    const line = err.linePos?.[0]?.line;
+    const src = line ? raw.split("\n")[line - 1] ?? "" : "";
+    const hint = /\bscript:/.test(src) || /compact mappings/.test(err.message) ? "\n  hint: a one-line script with braces parses as YAML, not JS — write it as a block:\n    script: |\n      window.scrollTo({ top: 0 })" : "";
+    throw new Error(`Could not parse ${file}: ${err.message.split("\n")[0]}${hint}`);
+  }
   const parsed = Manifest.safeParse(data);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`).join("\n");
+    const issues = parsed.error.issues.map((i) => {
+      const where = i.path.join(".") || "(root)";
+      // The classic trap: a one-line JS object literal under `script:` parses
+      // as a YAML mapping. Name it, or everyone hits it once.
+      const hint = where.endsWith(".script") && /expected string/i.test(i.message) ? " — a one-line script with braces parses as YAML; write it as a block:  script: |" : "";
+      return `  - ${where}: ${i.message}${hint}`;
+    }).join("\n");
     throw new Error(`Invalid manifest ${file}:\n${issues}`);
   }
   return { manifest: parsed.data, file: abs, dir: path.dirname(abs) };

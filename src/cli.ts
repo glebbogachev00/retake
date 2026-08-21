@@ -205,10 +205,11 @@ program
   .command("dry")
   .description("run the manifest with no camera and report what would fail")
   .argument("<manifest>")
-  .action(async (file: string) => {
+  .option("--no-seed", "do not run seeds first (by default dry seeds, so it sees the state run will see)")
+  .action(async (file: string, opts: { seed: boolean }) => {
     const { manifest, dir } = loadManifest(file);
     const { dryRun } = await import("./dryrun.js");
-    const r = await dryRun(manifest, dir, say);
+    const r = await dryRun(manifest, dir, say, { seed: opts.seed });
     if (!r.ok) process.exitCode = 3;
   });
 
