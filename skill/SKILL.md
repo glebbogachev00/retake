@@ -55,6 +55,19 @@ name.
 
 ## Style — how the person wants their videos to look
 
+Do not ask about knobs before the first take — nobody has opinions about
+zooms or caption tone until they have seen one. Two moves instead:
+
+1. **One question, about the destination:** "Where is this going — a
+   post, docs, or a client?" Post → `post-square` or `post-vertical`,
+   short captions. Docs → landscape or `docs-gif`, plain captions. Client
+   → landscape, still camera, a hold on the payoff. Skip the question if
+   the project's style note already answers it.
+2. **The first take is the menu.** Record the calm default as a preview,
+   let them watch it, then offer two or three concrete alternatives as
+   sentences ("Square for a post? Captions off? Zoom on the result?").
+   Whatever they choose, save it with `style` so it never comes up again.
+
 Anything they would tell a videographer maps to a knob, in plain English:
 
 - "no zooms" / "keep the camera still" → `camera: static` on scenes
