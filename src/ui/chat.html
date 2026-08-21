@@ -60,7 +60,10 @@
   .under { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--muted); flex-wrap:wrap; }
   .under a, .under button { color:var(--ink); text-decoration:none; border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:5px 12px; cursor:pointer; font-size:13px; }
   .under a:hover, .under button:hover { border-color:var(--ink); }
-  .under select { color:var(--ink); border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:5px 10px; font-size:13px; cursor:pointer; -webkit-appearance:none; appearance:none; }
+  /* A native select with its arrow removed leaves lopsided padding; make it
+     sit exactly like the pills beside it, text centred, same height. */
+  .under select { color:var(--ink); border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:0 12px; height:29px; line-height:27px; font-size:13px; font-family:inherit; text-align:center; text-align-last:center; cursor:pointer; -webkit-appearance:none; appearance:none; min-width:58px; }
+  .under a, .under button { height:29px; line-height:17px; box-sizing:border-box; }
   .under select:hover { border-color:var(--ink); }
   .stills { display:flex; gap:8px; margin-top:10px; overflow-x:auto; padding-bottom:4px; }
   .stills img { height:64px; border-radius:7px; border:1px solid var(--rule2); box-shadow:0 2px 6px rgba(24,28,24,.06); cursor:pointer; flex:none; }
