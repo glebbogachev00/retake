@@ -150,6 +150,10 @@ function listDemos(project?: string) {
   if (!fs.existsSync(DEMOS)) return [];
   const wanted = project?.trim() ? projectKey(project) : null;
   const assignments = demoProjects();
+  const byUrl = new Map<string, string>();
+  for (const f of fs.readdirSync(DEMOS).filter((x) => /\.ya?ml$/.test(x))) {
+    try { const mm = loadManifest(path.join(DEMOS, f)).manifest; const asg = assignments[mm.name]; if (asg && mm.url && !byUrl.has(mm.url)) byUrl.set(mm.url, asg); } catch { /* invalid manifest: no vote */ }
+  }
   return fs
     .readdirSync(DEMOS)
     .filter((f) => /\.ya?ml$/.test(f))
@@ -172,7 +176,10 @@ function listDemos(project?: string) {
       } catch {
         valid = false;
       }
-      const assigned = assignments[name];
+      // A demo nobody assigned to a folder inherits the folder of any demo
+      // that points at the same app — otherwise an agent's new draft for
+      // Capture lands in a second "localhost:3100" fold next to "capture".
+      const assigned = assignments[name] ?? (url ? byUrl.get(url) : undefined);
       const group = assigned ? path.basename(assigned) : shortGroup(url);
       const take = path.join(outRoot(), name, "take.json");
       let lastTake: unknown = null;
