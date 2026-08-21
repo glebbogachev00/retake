@@ -112,7 +112,7 @@ export function cursorMoves(m: Manifest): number {
 /** A point, read from the page's own geometry. Playwright's locator engine
     refuses elements whose handlers intercept pointer events (Blockly's toolbox
     categories, for one); getBoundingClientRect does not care. */
-async function resolvePoint(page: Page, p: Point, timeout: number): Promise<{ x: number; y: number }> {
+export async function resolvePoint(page: Page, p: Point, timeout: number): Promise<{ x: number; y: number }> {
   if (typeof p === "object" && "x" in p) return { x: p.x, y: p.y };
   const selector = typeof p === "string" ? p : p.selector;
   const dx = typeof p === "string" ? 0 : p.dx;
@@ -121,11 +121,21 @@ async function resolvePoint(page: Page, p: Point, timeout: number): Promise<{ x:
   // (so an element whose handlers intercept pointer events still yields a
   // rect — locator.boundingBox() waits for visibility and can time out on
   // Blockly's toolbox).
-  const handle = await page.locator(selector).first().elementHandle({ timeout });
-  if (!handle) throw new Error(`no element for point target "${selector}"`);
-  const rect = await handle.evaluate((el) => { const r = (el as Element).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height }; });
-  await handle.dispose();
-  if (!rect.w && !rect.h) throw new Error(`point target "${selector}" has no size`);
+  // Poll: a zero-size box usually means the panel is still animating in, not
+  // that the selector is wrong.
+  const until = Date.now() + timeout;
+  let rect: { x: number; y: number; w: number; h: number } | null = null;
+  while (Date.now() < until) {
+    const handle = await page.locator(selector).first().elementHandle({ timeout: Math.max(500, until - Date.now()) });
+    if (handle) {
+      rect = await handle.evaluate((el) => { const r = (el as Element).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height }; });
+      await handle.dispose();
+      if (rect && (rect.w || rect.h)) break;
+    }
+    await page.waitForTimeout(250);
+  }
+  if (!rect) throw new Error(`no element for point target "${selector}"`);
+  if (!rect.w && !rect.h) throw new Error(`point target "${selector}" never got a size (still hidden or collapsed?)`);
   return { x: rect.x + dx, y: rect.y + dy };
 }
 
@@ -134,6 +144,19 @@ async function resolvePoint(page: Page, p: Point, timeout: number): Promise<{ x:
     it animate between them while the page gets the many small moves it needs
     to believe a drag is happening. Two keyframes, so a drag costs the overlay
     what a click costs. */
+export async function dragPoints(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, o: { steps: number; holdMs: number; durationMs: number }) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  if (o.holdMs) await page.waitForTimeout(o.holdMs);
+  await page.mouse.move(from.x + 8, from.y + 8);
+  const per = Math.max(4, Math.round(o.durationMs / o.steps));
+  for (let i = 1; i <= o.steps; i++) {
+    await page.mouse.move(from.x + ((to.x - from.x) * i) / o.steps, from.y + ((to.y - from.y) * i) / o.steps);
+    await page.waitForTimeout(per);
+  }
+  await page.mouse.up();
+}
+
 async function performDrag(page: Page, step: Extract<Step, { action: "drag" }>, q: Resolved, timeout: number) {
   const from = await resolvePoint(page, step.from, timeout);
   const to = await resolvePoint(page, step.to, timeout);

@@ -8,7 +8,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { runFileOrCommandSeed } from "./record.js";
+import { runFileOrCommandSeed, resolvePoint, dragPoints } from "./record.js";
 import { chromium, type Page, type BrowserContext } from "playwright";
 import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
 
@@ -69,18 +69,32 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     try {
       // A point step (click/hover `at`, or a drag) is verified by resolving
       // its target's rect in the page — the same way the recorder will.
-      const point = async (t: unknown) => {
-        if (t && typeof t === "object" && "x" in (t as Record<string, unknown>)) return true;
+      const point = async (t: unknown): Promise<{ x: number; y: number }> => {
+        if (t && typeof t === "object" && "x" in (t as Record<string, unknown>)) return t as { x: number; y: number };
         const sel = typeof t === "string" ? t : (t as { selector: string }).selector;
-        const handle = await page.locator(sel).first().elementHandle({ timeout: short });
-        if (!handle) throw new Error(`no element for point target "${sel}"`);
-        const box = await handle.evaluate((el) => { const r = (el as Element).getBoundingClientRect(); return { w: r.width, h: r.height }; });
-        await handle.dispose();
-        if (!box.w && !box.h) throw new Error(`point target "${sel}" has no size`);
-        return true;
+        const until = Date.now() + short;
+        let box: { w: number; h: number } | null = null;
+        while (Date.now() < until) {
+          const handle = await page.locator(sel).first().elementHandle({ timeout: Math.max(400, until - Date.now()) });
+          if (handle) { box = await handle.evaluate((el) => { const r = (el as Element).getBoundingClientRect(); return { w: r.width, h: r.height }; }); await handle.dispose(); if (box && (box.w || box.h)) break; }
+          await page.waitForTimeout(250);
+        }
+        if (!box) throw new Error(`no element for point target "${sel}"`);
+        if (!box.w && !box.h) throw new Error(`point target "${sel}" never got a size (still hidden or collapsed?)`);
+        return resolvePoint(page, t as never, short);
       };
-      if (step.action === "drag") { await point(step.from); await point(step.to); }
-      else if ((step.action === "click" || step.action === "hover") && step.at) { await point(step.at); }
+      // Point steps are PERFORMED here, not just resolved: a dry run that skips
+      // the click that opens a panel then reports every later step in that
+      // panel as broken. Drags run compressed — the gesture, not the pacing.
+      if (step.action === "drag") {
+        const f = await point(step.from), t = await point(step.to);
+        await dragPoints(page, f, t, { steps: 6, holdMs: 60, durationMs: 240 });
+        await page.waitForTimeout(400);
+      } else if ((step.action === "click" || step.action === "hover") && step.at) {
+        const pt = await point(step.at);
+        if (step.action === "click") { await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(400); }
+        else await page.mouse.move(pt.x, pt.y);
+      }
       else switch (step.action) {
         case "navigate": await page.goto(expandEnv(step.url), { waitUntil: "domcontentloaded", timeout: 60000 }); await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {}); break;
         case "waitFor": await page.waitForSelector(step.selector, { timeout: Math.min(step.timeout ?? 15000, 15000) }); break;

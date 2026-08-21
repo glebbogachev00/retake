@@ -118,7 +118,31 @@ hat, drag `move 10 steps` under it, click the green flag, `look` — the cat
 has moved. ~30s, under the cursor cap, `dry` passes, `check` passes, the end
 still shows the cat displaced.
 
-## Phase C — GDevelop
+## Phase C — DONE (2026-08-21)
+
+`demos/gdevelop-scene-and-events.yaml`: 23s on camera, 43s of navigation
+trimmed off the front, dry 11/11, check pass. The payoff frame shows the event
+sheet reading *"At the beginning of the scene → Hide KnightHitBox"*.
+
+Three findings, all of which cost a take:
+
+- **The in-app tutorial locks the UI to its own next step** — and that step is
+  Preview, which opens a second tab Retake cannot record. Setup clicks *Quit
+  tutorial*; the project stays open and the editor becomes explorable. Until
+  then, tab clicks silently did nothing and the captions lied over the wrong
+  screen.
+- **A click belongs before the scene it causes.** With the click at the end of
+  a scene, that scene's last frames show the next action instead of the
+  payoff. Every scene here starts after the click that earns it.
+- **Event groups start collapsed** (`button.rst__expandButton` opens them), and
+  the events tab shows a promo card. Setup visits the tab once, dismisses the
+  card with a selector-plus-offset point, and returns — so the recording never
+  contains an advert.
+
+Editor handles are stable ids: `#tab-layout-Level-1-button`,
+`#tab-layout-events-Level-1-button`, `#main-toolbar-project-manager-button`.
+
+## Phase C — GDevelop (original plan)
 
 Start from the in-app platformer tutorial (official, logged-out). Put any
 "open example" / dismiss-prompt clicks in `setup`. Expect: panels and dialogs
