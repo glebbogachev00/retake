@@ -118,7 +118,42 @@ hat, drag `move 10 steps` under it, click the green flag, `look` — the cat
 has moved. ~30s, under the cursor cap, `dry` passes, `check` passes, the end
 still shows the cat displaced.
 
-## Phase C — DONE (2026-08-21)
+## GDevelop's ceiling, logged out (probed 2026-08-21)
+
+Worth stating before the demo below is mistaken for a lesson: **it is a tour,
+not a tutorial.** It opens someone else's finished project and clicks two tabs.
+Nothing is created and the learner sees no result they caused. Two hard limits
+put that ceiling there:
+
+1. **A project cannot be created without an account.** Create → new game →
+   Empty project reaches "Where to store this project: GDevelop Cloud / Save on
+   your computer" and then a login wall. So "build a game from nothing" is not
+   recordable logged out.
+2. **Preview opens a second tab**, and Retake records one page (testreel binds
+   to it). The payoff of any game lesson — watching the game run — is therefore
+   off camera.
+
+What is still a real lesson inside those limits: open the official tutorial
+project, **change something**, and show the change *in the editor* — add a
+behavior to an object, place an object, edit a value. The learner causes a
+result; the result is visible without Preview.
+
+What would remove the ceiling, in order of cost:
+
+- **An account.** Credentials in `.env`, sign-in under `auth.setup` (Retake
+  already does this and keeps the session). Project creation, cloud save and a
+  full tutorial flow all open up. This is how a TechBash pipeline would really
+  run.
+- **Multi-tab recording.** A genuine engine gap that also blocks OAuth popups,
+  payment flows and anything that opens a window. Playwright records every page
+  in a context to its own file; testreel binds to one. Real work, worth doing
+  only when a lesson actually needs Preview.
+
+For TechBash, this makes **Scratch the better first platform**: everything
+happens in one page, the stage is beside the blocks, and `scratch-first-script`
+is already a genuine build-and-run lesson.
+
+## Phase C — a tour of the editor (2026-08-21)
 
 `demos/gdevelop-scene-and-events.yaml`: 23s on camera, 43s of navigation
 trimmed off the front, dry 11/11, check pass. The payoff frame shows the event

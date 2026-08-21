@@ -1,4 +1,8 @@
-# GDevelop, Phase C. Two findings shape this file:
+# GDevelop, Phase C. A TOUR, not a tutorial: logged out you cannot create a
+# project (login wall at the storage step) and Preview opens a second tab
+# Retake cannot record. See docs/canvas-plan.md for the ceiling and the two
+# ways out (an account; multi-tab recording).
+# Two findings shape this file:
 #  1. The in-app tutorial LOCKS the UI to its own next step (and that step is
 #     Preview, which opens a second tab Retake cannot record) — so setup quits
 #     the tutorial and keeps the project.
