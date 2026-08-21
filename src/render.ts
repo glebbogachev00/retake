@@ -63,7 +63,7 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, cap: m.captions, theme: m.theme, camera: m.camera, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -320,6 +320,14 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   }
   // Captions, holds, camera zooms and trim come from the manifest as it is now.
   take = applyManifest(m, take);
+  // Tempo: the source is cut in its own time (-ss/-t below), then every
+  // clock downstream — captions, camera keys, stills — runs in output time.
+  const srcTake = take;
+  const tempo = m.tempo ?? 1;
+  if (tempo !== 1) {
+    const k = 1 / tempo;
+    take = { ...take, trimBefore: take.trimBefore * k, duration: take.duration * k, timeline: take.timeline.map((e) => ({ ...e, start: e.start * k, end: e.end * k })) };
+  }
   const t = { start: Date.now(), marks: {} as Record<string, number> };
   const mark = (k: string) => { const now = Date.now(); t.marks[k] = Math.round((now - t.start) / 100) / 10; t.start = now; };
 
@@ -350,7 +358,7 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   const layout = q.layout;
 
   // --- 1. compose master.mp4 -----------------------------------------------
-  const filters: string[] = [`fps=${fps}`];
+  const filters: string[] = [...(tempo !== 1 ? [`setpts=PTS/${tempo}`] : []), `fps=${fps}`];
   // Scenes decided their cameras at record time (manifest policy + per-scene
   // overrides); render just honours whatever boxes were captured.
   const cam = cameraFilter(take, SW, SH, fps);
@@ -394,7 +402,7 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   const graph = frameInput
     ? `[0:v]${filters.join(",")}[v];[v][1:v]overlay=0:0:format=auto${captionFilters.length ? "," + captionFilters.join(",") : ""}[out]`
     : `[0:v]${[...filters, ...captionFilters].join(",")}[out]`;
-  const inputs = ["-ss", take.trimBefore.toFixed(3), "-t", (take.duration - take.trimBefore).toFixed(3), "-i", src, ...(frameInput ? ["-i", frameInput] : [])];
+  const inputs = ["-ss", srcTake.trimBefore.toFixed(3), "-t", (srcTake.duration - srcTake.trimBefore).toFixed(3), "-i", src, ...(frameInput ? ["-i", frameInput] : [])];
   const compose = ["-filter_complex", graph, "-map", "[out]", "-r", String(fps), "-an", "-pix_fmt", "yuv420p", "-movflags", "+faststart"];
   const vt = ["-c:v", "h264_videotoolbox", "-b:v", `${Math.max(4, Math.round((W * H * fps * 0.15) / 1e6))}M`, "-allow_sw", "1"]; // ~0.15 bit/px → ~9 Mbit/s at 1080p30
   const x264 = (crf: number, preset: string) => ["-c:v", "libx264", "-crf", String(crf), "-preset", preset];

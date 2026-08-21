@@ -177,6 +177,11 @@ export const Manifest = z.object({
       at the failure, so nobody gets one interaction and ten minutes of
       nothing. "continue": keep rolling — for demos that tolerate a miss. */
   onFail: z.enum(["stop", "continue"]).default("stop"),
+  /** Playback tempo applied at render time: 0.8 slows the whole take for a
+      client who needs it gentler; 1.2 tightens it. Cursor and clicks stay in
+      sync by construction (they are pixels in the recording); captions are
+      retimed to match. Re-render only — never a re-record. */
+  tempo: z.number().min(0.5).max(2).default(1),
   /** Hard ceiling on a take, seconds. A demo that runs past this is a demo
       that is stuck, not a long demo. */
   maxSeconds: z.number().int().min(10).max(1800).default(240),

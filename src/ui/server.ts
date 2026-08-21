@@ -166,6 +166,7 @@ function listDemos(project?: string) {
           camera: typeof m.camera === "string" ? m.camera : "auto",
           cursor: m.cursor === false ? "none" : typeof m.cursor === "object" && m.cursor.style === "touch" ? "touch" : "default",
           trim: m.trim,
+          tempo: m.tempo ?? 1,
           scenes: m.steps.filter((st) => st.action === "scene").map((st) => ({ label: st.label, caption: st.caption ?? "", holdMs: st.holdMs ?? null, camera: st.camera === "static" ? "static" : typeof st.camera === "object" && st.camera.zoom ? st.camera.zoom : "auto" })),
         };
       } catch {
@@ -687,7 +688,7 @@ export function serve(port: number) {
         if (!fs.existsSync(file)) return json(res, 404, { error: "not found" });
         const b = JSON.parse(await readBody(req)) as Record<string, unknown>;
         const doc = YAML.parseDocument(fs.readFileSync(file, "utf8"));
-        for (const k of ["preset", "layout", "camera", "cursor", "title"]) {
+        for (const k of ["preset", "layout", "camera", "cursor", "title", "tempo"]) {
           if (!(k in b)) continue;
           if (b[k] === null || b[k] === "" || b[k] === "default") doc.delete(k);
           else doc.set(k, b[k]);
