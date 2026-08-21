@@ -39,6 +39,7 @@ import { digest } from "../digest.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 
 const ROOT = process.cwd();
+const VERSION = (() => { try { return (JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as { version?: string }).version ?? "dev"; } catch { return "dev"; } })();
 const DEMOS = path.join(ROOT, "demos");
 /** Where takes land. Default outputs/ in the project; changeable in Settings
     (RETAKE_OUT). Read lazily so a settings change applies without a restart. */
@@ -645,7 +646,7 @@ export function serve(port: number) {
         const selected = process.env[key] ?? "";
         return json(res, 200, { provider, selected, models: [{ id: selected, name: selected || "Configured default" }] });
       }
-      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", selection: modelSelection(), gifski: !!gifskiBin(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT });
+      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", selection: modelSelection(), gifski: !!gifskiBin(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT, version: VERSION });
       const mopen = /^\/api\/open\/([a-z0-9-]+)$/.exec(p);
       if (mopen && req.method === "POST") {
         const dir = path.join(outRoot(), mopen[1]);

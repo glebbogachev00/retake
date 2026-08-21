@@ -113,6 +113,7 @@
     <h1>Retake</h1>
     <span class="sp"></span>
     <a class="chip" href="/guide" style="text-decoration:none">How it works</a>
+    <button class="chip" id="gremlinBtn" title="Something's off? Tell me.">Gremlin?</button>
   </div>
   <div class="wrap two">
     <div class="col-main">
@@ -146,8 +147,59 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-let current = null, demos = [];
+let current = null, demos = [], settings = null;
 async function api(u, o) { const r = await fetch(u, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j; }
+
+const REPO = 'https://github.com/glebbogachev00/retake';
+document.getElementById('gremlinBtn').onclick = async () => {
+  const veil = document.createElement('div');
+  veil.className = 'veil';
+  const hasDemo = !!current;
+  veil.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="width:min(92vw,440px)">
+    <h3>Spotted a gremlin?</h3>
+    <p>Say it however it broke. Retake fills in the boring half — version, demo, and what the last take actually did — you just write the sentence.</p>
+    <textarea id="gremText" rows="4" placeholder="It was supposed to… but instead…" style="width:100%;border:1px solid var(--rule2);border-radius:10px;padding:10px 12px;font:inherit;resize:vertical;margin-bottom:10px"></textarea>
+    <input id="gremContact" type="text" placeholder="Where can I find you? GitHub or X handle — optional" style="width:100%;border:1px solid var(--rule);border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:10px" />
+    ${hasDemo ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:14px"><input type="checkbox" id="gremAttach" checked> Attach the receipts for “${esc(current)}”</label>` : ''}
+    <div class="row">
+      <button class="btn" data-no>Never mind</button>
+      <button class="btn" data-copy>Copy report</button>
+      <button class="btn danger" style="background:var(--accent);border-color:var(--accent)" data-go>File it on GitHub</button>
+    </div>
+    <p style="margin:12px 0 0;font-size:12px">Goes to the public issue tracker — no email involved, mine or yours.</p>
+  </div>`;
+  const close = () => veil.remove();
+  veil.addEventListener('click', (e) => { if (e.target === veil) close(); });
+  veil.querySelector('[data-no]').onclick = close;
+  const build = async () => {
+    const text = veil.querySelector('#gremText').value.trim() || '(they typed nothing — the gremlin was apparently self-explanatory)';
+    const contact = veil.querySelector('#gremContact').value.trim();
+    let boring = `Retake ${settings?.version || 'dev'} · ${navigator.platform}`;
+    const attach = veil.querySelector('#gremAttach');
+    if (attach && attach.checked && current) {
+      try {
+        const d = await api('/api/take/' + current);
+        const t = d.take;
+        boring += `\ndemo: ${current} · ${t.ok ? 'all steps passed' : 'a step FAILED'} · ${(t.duration - t.trimBefore).toFixed(0)}s`;
+        const tail = (d.proof || '').split('\n').filter((l) => /\| \d+ \|/.test(l)).slice(-8).join('\n');
+        if (tail) boring += '\n\nlast steps of the take:\n' + tail;
+      } catch { /* no take, no receipts */ }
+    }
+    return `**What happened**\n\n${text}\n\n${contact ? `**Where to find them:** ${contact}\n\n` : ''}---\n_The boring half, filled in by Retake:_\n\n\u0060\u0060\u0060\n${boring}\n\u0060\u0060\u0060\n`;
+  };
+  veil.querySelector('[data-copy]').onclick = async () => {
+    await navigator.clipboard.writeText(await build()).catch(() => {});
+    veil.querySelector('[data-copy]').textContent = 'Copied';
+  };
+  veil.querySelector('[data-go]').onclick = async () => {
+    const body = await build();
+    const title = 'gremlin: ' + (veil.querySelector('#gremText').value.trim().slice(0, 60) || 'something is off');
+    window.open(REPO + '/issues/new?labels=gremlin&title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body).slice(0, 6500), '_blank');
+    close();
+  };
+  document.body.appendChild(veil);
+  setTimeout(() => veil.querySelector('#gremText').focus(), 40);
+};
 
 function ask(title, body, confirmLabel) {
   return new Promise((done) => {
@@ -287,7 +339,7 @@ function watchActivity() {
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };
 }
 
-(async () => { await drawDemos(); await newest(); watchActivity(); setInterval(drawDemos, 30000); })();
+(async () => { settings = await api('/api/settings').catch(() => null); await drawDemos(); await newest(); watchActivity(); setInterval(drawDemos, 30000); })();
 </script>
 </body>
 </html>
