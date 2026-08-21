@@ -118,6 +118,40 @@ hat, drag `move 10 steps` under it, click the green flag, `look` — the cat
 has moved. ~30s, under the cursor cap, `dry` passes, `check` passes, the end
 still shows the cat displaced.
 
+## GDevelop with an account (probed 2026-08-21, throwaway login)
+
+The account was made and tried. What it changed, and what it did not:
+
+- **Login works** and the create flow opens: Create → Create new game →
+  Empty project → size/name dialog → *Create new game* → the editor appears
+  with an empty scene and an Objects panel. Selectors are stable ids
+  (`#toolbar-preview-button`, `#toolbar-open-objects-panel-button`,
+  `#objects-list`). The email-confirmation dialog dismisses with
+  *"I'll do it later"*.
+- **`keepInTab` removes the Preview ceiling.** Proven: Preview navigated the
+  same tab to `/browser_sw_preview/1/preview/index.html` with a full
+  1440×900 game canvas and **zero extra tabs**. A game lesson can end on the
+  game running.
+- **But the good templates are premium.** Choosing *Platformer* opens a
+  detail page whose buttons are *Back · Upgrade to GDevelop Premium · Cancel ·
+  Create new game*, and creation does not proceed. So "make a real game from a
+  template" is paywalled; only **Empty project** is free — and an empty
+  project previews as a blank screen, which is a weak payoff.
+- **Sessions cannot be reused.** GDevelop authenticates through Firebase,
+  which keeps its session in **IndexedDB**; Playwright's `storageState` saves
+  cookies and localStorage only. So `auth.storageState` writes a file that
+  looks fresh and restores nothing — Retake then *skips* the sign-in and
+  records a logged-out run. **For Firebase-auth apps, put the login in plain
+  `setup`, not `auth.setup`.**
+- The tutorial project's toolbar is not the same as a created project's: it has
+  a Preview button but no `#toolbar-preview-button`.
+
+**Judgement:** GDevelop's free surface is thin for teaching — the tour records
+well, a real "build a game" lesson is either paywalled or starts from a blank
+screen. Scratch remains where TechBash lessons should live: free, one page,
+and a genuine build-and-run story already recorded. Revisit GDevelop if a
+premium account exists, or teach it by *modifying* the free tutorial project.
+
 ## GDevelop's ceiling, logged out (probed 2026-08-21)
 
 Worth stating before the demo below is mistaken for a lesson: **it is a tour,
