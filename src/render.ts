@@ -452,8 +452,11 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     if (typeof m.outputs.thumbnail === "object") {
       const want = m.outputs.thumbnail.scene;
       const s = sc.find((x) => x.label === want);
-      if (!s) throw new Error(`thumbnail scene "${want}" not found`);
-      at = s.start - take.trimBefore + 1.0;
+      // On a take that stopped early the chosen scene may never have happened;
+      // fall back to the last scene that did rather than failing the render.
+      const pick = s ?? sc.at(-1);
+      at = pick ? pick.start - take.trimBefore + 1.0 : Math.max(0, take.duration - take.trimBefore - 0.5);
+      if (!s) log?.(`thumbnail: scene "${want}" never happened — using ${pick ? `"${pick.label}"` : "the end"}`);
     } else {
       const last = sc.at(-1);
       at = last ? last.start - take.trimBefore + 1.0 : Math.max(0, take.duration - take.trimBefore - 0.5);

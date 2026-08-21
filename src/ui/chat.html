@@ -233,7 +233,9 @@ async function pin(name) {
     if (d.files.includes('thumbnail.png')) $('vid').poster = `/out/${name}/thumbnail.png${q}`;
   }
   const t = d.take;
-  $('vidMeta').textContent = `${name} · ${(t.duration - t.trimBefore).toFixed(0)}s · ${t.ok ? 'all steps passed' : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
+  const failed = (t.timeline || []).find((e) => e.ok === false);
+  $('vidMeta').textContent = `${name} · ${(t.duration - t.trimBefore).toFixed(0)}s · ${t.ok ? 'all steps passed' : failed ? `stopped at step ${failed.index}: ${failed.summary}` : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
+  $('vidMeta').title = failed?.screen ? 'On screen at that moment: ' + failed.screen : '';
   $('vidDl').href = `/out/${name}/demo.mp4${q}`; $('vidDl').setAttribute('download', name + '.mp4');
   $('vidFolder').onclick = () => api('/api/open/' + name, { method: 'POST' }).catch(() => {});
   $('vidEdit').href = '/classic#' + encodeURIComponent(name);

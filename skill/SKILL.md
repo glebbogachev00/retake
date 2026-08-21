@@ -81,6 +81,15 @@ The first time the person expresses taste, save it with the `style` tool
 (or write `demos/style.md`) — every later draft in the project reads it, so
 they never have to say it twice. Their stated taste always beats defaults.
 
+## When a take fails
+
+The camera stops at the first failed step, so a failed take is short and
+its receipts name the step, the error, and what was on screen. **Fix from
+that text** — usually a selector or a missing wait — then `dry` and `run`
+again. Do not `look` at a failed take; images cost, and the text already
+says what went wrong. Never call `done` on a take with a failed step.
+Four rounds without a passing take → stop and ask the person.
+
 ## Rules
 
 - Real interactions read as real: type actual text, scroll to what you use,

@@ -287,7 +287,11 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     await tell(`Rendering…`);
     const a = await render(manifest, take, outDir, {});
     const c = check(outDir, manifest);
-    await tell(`${take.ok ? "Take done — all steps ok" : "Take done — some steps failed"} · ${(take.duration - take.trimBefore).toFixed(0)}s`);
+    const failed = take.timeline.find((e) => e.ok === false);
+    await tell(failed ? `Stopped at step ${failed.index}: ${failed.summary}` : `Take done — all steps ok · ${(take.duration - take.trimBefore).toFixed(0)}s`);
+    // A failed take is a finding, not a result: say exactly where and what
+    // the page showed, so even a small model gets a one-line repair.
+    if (failed) return text(`FAILED at step ${failed.index} — ${failed.summary}: ${failed.error ?? "error"}${failed.screen ? `\nOn screen at that moment: “${failed.screen}”` : ""}\nThe camera stopped there (${(take.duration - take.trimBefore).toFixed(0)}s recorded). This is not a demo yet: edit the manifest, dry, run again. Do NOT call done on a failed take.\n\n${summariseTake(take)}`);
     return text(`${summariseTake(take)}\nvideo: ${a.mp4 ?? "none"}\ncheck: ${c.ok ? "pass" : "FAIL"}\n${c.lines.filter((l) => l.startsWith("FAIL")).join("\n")}`);
   } finally {
     releaseLock(outDir);

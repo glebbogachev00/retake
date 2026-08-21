@@ -30,6 +30,8 @@ export type TimelineEntry = {
   label?: string;
   caption?: string;
   holdMs?: number;
+  /** What the page said at the moment a step failed (first 240 chars). */
+  screen?: string;
   /** Where the camera looks (video-pixel box) and how far in. */
   camera?: { zoom: number; box: { x: number; y: number; width: number; height: number }; focus: string };
 };
@@ -259,11 +261,30 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         ok = false;
         entry.ok = false;
         entry.error = (e as Error).message.split("\n")[0];
-        log(`     ✗ ${entry.error}`);
-        // Keep rolling: a partial take is still useful for debugging the manifest.
+        // What the page actually showed at the moment of failure is worth
+        // more than the error: it is how a reader (or agent) sees that the
+        // login never happened, or the modal never closed.
+        try { entry.screen = (await page.evaluate(() => document.body?.innerText ?? "")).replace(/\s+/g, " ").trim().slice(0, 240); } catch { /* page gone */ }
+        log(`     ✗ ${entry.error}${entry.screen ? ` — on screen: “${entry.screen.slice(0, 120)}”` : ""}`);
+        entry.end = sec(Date.now() - t0);
+        timeline.push(entry);
+        if (m.onFail === "stop") {
+          // The camera stops here. One interaction and ten minutes of nothing
+          // is the worst thing a demo tool can hand someone.
+          partial = `stopped at step ${i} (${entry.summary}) — ${entry.error}`;
+          log(`■ ${partial}`);
+          break;
+        }
+        continue;
       }
       entry.end = sec(Date.now() - t0);
       timeline.push(entry);
+      if ((Date.now() - t0) / 1000 > m.maxSeconds) {
+        ok = false;
+        partial = `stopped: the take passed ${m.maxSeconds}s (maxSeconds) — something is stuck`;
+        log(`■ ${partial}`);
+        break;
+      }
     }
     endMs = Date.now();
 

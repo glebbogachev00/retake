@@ -173,6 +173,13 @@ export const Manifest = z.object({
   /** Cursor overlay (testreel). false → none; {style: touch} → tap dot. Size is preset-scaled unless set. */
   cursor: z.union([z.boolean(), z.object({ style: z.enum(["default", "pointer", "text", "touch"]).optional(), size: z.number().optional(), idleHideMs: z.number().optional() })]).default(true),
   seed: z.array(Seed).default([]),
+  /** What a failed step does to the take. "stop" (default): the camera stops
+      at the failure, so nobody gets one interaction and ten minutes of
+      nothing. "continue": keep rolling — for demos that tolerate a miss. */
+  onFail: z.enum(["stop", "continue"]).default("stop"),
+  /** Hard ceiling on a take, seconds. A demo that runs past this is a demo
+      that is stuck, not a long demo. */
+  maxSeconds: z.number().int().min(10).max(1800).default(240),
   /** Canned network responses, armed before the first navigation. */
   stub: z.array(Stub).default([]),
   /** Steps run before the camera rolls. */
