@@ -13,6 +13,8 @@ demos/*.yaml
 !demos/example.yaml
 !demos/todo-basics.yaml
 !demos/store-checkout.yaml
+!demos/scratch-first-move.yaml
+!demos/scratch-first-script.yaml
 # working files describe private apps — local only
 demos/*.md
 demos/*.json

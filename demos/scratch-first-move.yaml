@@ -1,0 +1,63 @@
+# Phase A of docs/canvas-plan.md: no new features. In Scratch, clicking a block
+# in the palette runs it — so a first lesson beat needs no dragging at all.
+name: scratch-first-move
+title: Scratch — your first block makes the cat move
+url: https://scratch.mit.edu/projects/editor/
+preset: post-landscape
+viewport: { width: 1440, height: 900 }
+scale: 1
+waitForSelector: ".blocklyFlyout text"
+camera: static
+setup:
+  - { action: waitFor, selector: "[class*='green-flag_green-flag-button']", timeout: 60000 }
+  - { action: wait, ms: 1500 }
+steps:
+  - action: scene
+    label: palette
+    caption: Every block on the left is a thing the cat can do
+    camera: static
+  - action: wait
+    ms: 1800
+  - action: hover
+    selector: ".blocklyFlyout text:has-text('move')"
+    pauseAfter: 600
+  - action: scene
+    label: click-to-run
+    caption: Click a block and it runs — watch the stage
+    camera: static
+  - action: click
+    selector: ".blocklyFlyout text:has-text('move')"
+    pauseAfter: 700
+  - action: click
+    selector: ".blocklyFlyout text:has-text('move')"
+    pauseAfter: 700
+  - action: click
+    selector: ".blocklyFlyout text:has-text('move')"
+    pauseAfter: 700
+  - action: click
+    selector: ".blocklyFlyout text:has-text('move')"
+    pauseAfter: 700
+  - action: click
+    selector: ".blocklyFlyout text:has-text('move')"
+    pauseAfter: 900
+  - action: scene
+    label: turn
+    caption: Blocks do exactly what they say
+    camera: static
+  - action: click
+    selector: ".blocklyFlyout text:has-text('turn') >> nth=0"
+    pauseAfter: 700
+  - action: click
+    selector: ".blocklyFlyout text:has-text('turn') >> nth=0"
+    pauseAfter: 900
+  - action: scene
+    label: stage
+    caption: The cat moved. That is programming.
+    camera: static
+  - action: wait
+    ms: 2400
+outputs:
+  mp4: true
+  gif: false
+  thumbnail:
+    scene: stage
