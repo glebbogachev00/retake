@@ -395,7 +395,11 @@ async function bringIntoView(page: Page, selector: string, timeout: number) {
   await loc.waitFor({ state: "visible", timeout });
   const box = await loc.boundingBox();
   const vh = page.viewportSize()?.height ?? 800;
-  if (box && (box.y < 0 || box.y + box.height > vh)) {
+  // Off-screen is obvious; the subtler case is a target hugging the bottom
+  // edge — visible, but cramped against the caption band and half-cut in
+  // the video. Keep a safe zone top and bottom and centre anything inside it.
+  const safe = vh * 0.12;
+  if (box && (box.y < safe || box.y + box.height > vh - safe)) {
     await loc.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "smooth" }));
     await page.waitForTimeout(450);
   }

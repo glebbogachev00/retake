@@ -43,13 +43,25 @@ thing." rather than "Capture a thought exactly as it comes." Its demo
 sentence is the verified one (eight runs, one action + one thread every
 time) — do not swap it.
 
-**distill-messy** — *Too tangled to capture?*
-The only existing demo that opens with a wound. Keep the opening, rewrite
-the middle: "capture talks it through with you" is feature voice. The beat
-that matters is the engine *stating* a draft rather than interrogating, so
-the caption on that scene should be the draft's own words. `plan.json` has
-it failing on a missing model key — the isolated server reads the repo's
-`.env.local`, so confirm that is still true before assuming it.
+**distill-messy** — *Too tangled to even say?*
+A different species of thought from the hero, and it has to open that way
+or it reads as the hero with extra steps. The hero's wound is "I know what I
+mean, I said it messily." This one's is "I don't know what I mean yet" —
+the torn-between-two-options state builders live in half the week.
+
+The beat that earns the film is the engine *stating* what it thinks you
+mean instead of asking questions — the "propose, don't interrogate" work.
+Chat tools cannot make that claim; they ask forever. So the caption on that
+scene is the engine's own draft sentence, not a description of it.
+
+"capture talks it through with you" goes — feature voice. Records last:
+it has the most model surface of any demo (two or three turns plus a
+settle), is the likeliest to need retakes, and the only one that could say
+something dumb on camera. Same rule as the hero: only record a tangle whose
+output has already been seen several times. Never a fresh sentence on
+recording day. `plan.json` has it failing on a missing model key — the
+isolated server reads the repo's `.env.local`, so confirm before scheduling.
+If it fights for an afternoon, park it; the other six do not need it.
 
 ### New
 
@@ -136,8 +148,9 @@ demo junk into synced, real data. Delete, do not retarget.
 
 it-learns first — smallest, fully deterministic once the sorter lands the
 first capture as a thread, and the strongest claim. Then the-honest-list.
-Then tidy-the-pile, because it is the only one that needs retakes and should
-not be the thing that decides whether the afternoon worked.
+Then tidy-the-pile, because it needs retakes and should not be the thing
+that decides whether the afternoon worked. Distill last, for the same
+reason, doubled.
 
 ## Open questions for Gleb
 
@@ -147,6 +160,3 @@ not be the thing that decides whether the afternoon worked.
 - **Captions voice.** The hero's captions are in the landing-page register
   ("not a new pile"). The old shorts were in manual register ("Tap a quoted
   starter"). This brief assumes everything moves to the hero's voice. Yes?
-- **Distill stays?** It is the weakest of the keepers — valuable, but its
-  payoff is a better sentence, which is a quieter thing to film than a
-  board getting lighter. Keep, or park until the other four are done?
