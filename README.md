@@ -185,4 +185,4 @@ Recording and cursor rendering come from [testreel](https://github.com/greentfra
 
 Works, in daily use, still moving. Next: a prompt-first path — describe the demo, get a first take, then fix it in plain English — with the draft dry-run-validated against the page before anything records.
 
-**Known issue:** page `scale` uses CSS `zoom`, which shifts the coordinate space some in-page rect math relies on; on certain forms the focus click misses and typing goes nowhere. Workaround: `scale: 1`. The fix is to move to Playwright's `deviceScaleFactor` and scale the cursor overlay instead.
+**Known issue:** page `scale` uses CSS `zoom`, which shifts the coordinate space some in-page rect math relies on; on certain forms the focus click misses and typing goes nowhere. Workaround: `scale: 1`. Note: `deviceScaleFactor` is **not** the fix — Playwright's screencast captures at CSS-pixel size and never upscales, so native high-DPI yields a soft, letterboxed video. The real fix is narrower: correct the focus-click path under zoom.
