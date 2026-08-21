@@ -67,20 +67,34 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     const tag = isSetup ? "setup" : String(index).padStart(3, "0");
     const short = 8000; // long enough for a click that navigates, short enough to stay fast
     try {
-      switch (step.action) {
+      // A point step (click/hover `at`, or a drag) is verified by resolving
+      // its target's rect in the page — the same way the recorder will.
+      const point = async (t: unknown) => {
+        if (t && typeof t === "object" && "x" in (t as Record<string, unknown>)) return true;
+        const sel = typeof t === "string" ? t : (t as { selector: string }).selector;
+        const handle = await page.locator(sel).first().elementHandle({ timeout: short });
+        if (!handle) throw new Error(`no element for point target "${sel}"`);
+        const box = await handle.evaluate((el) => { const r = (el as Element).getBoundingClientRect(); return { w: r.width, h: r.height }; });
+        await handle.dispose();
+        if (!box.w && !box.h) throw new Error(`point target "${sel}" has no size`);
+        return true;
+      };
+      if (step.action === "drag") { await point(step.from); await point(step.to); }
+      else if ((step.action === "click" || step.action === "hover") && step.at) { await point(step.at); }
+      else switch (step.action) {
         case "navigate": await page.goto(expandEnv(step.url), { waitUntil: "domcontentloaded", timeout: 60000 }); await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {}); break;
         case "waitFor": await page.waitForSelector(step.selector, { timeout: Math.min(step.timeout ?? 15000, 15000) }); break;
         // noWaitAfter: a click that submits a form starts a navigation, and
         // waiting for the element to settle afterwards reports a false failure
         // for a click that actually worked.
         case "click":
-          await page.locator(step.selector).waitFor({ timeout: short }); // strict, like the recorder
-          await page.locator(step.selector).first().click({ timeout: short, noWaitAfter: true });
+          await page.locator(step.selector!).waitFor({ timeout: short }); // strict, like the recorder
+          await page.locator(step.selector!).first().click({ timeout: short, noWaitAfter: true });
           await page.waitForLoadState("domcontentloaded", { timeout: 5000 }).catch(() => {});
           break;
         case "type": await page.locator(step.selector).waitFor({ timeout: short }); await page.locator(step.selector).fill(expandEnv(step.text), { timeout: short }); break;
         case "fill": await page.locator(step.selector).waitFor({ timeout: short }); await page.locator(step.selector).fill(expandEnv(step.text), { timeout: short }); break;
-        case "hover": await page.locator(step.selector).first().hover({ timeout: short }); break;
+        case "hover": await page.locator(step.selector!).first().hover({ timeout: short }); break;
         case "scroll": if (step.to) await page.locator(step.to).first().boundingBox({ timeout: short }); break;
         case "upload": await page.locator(step.selector).first().waitFor({ timeout: short }); break;
         case "evaluate": await page.evaluate(step.script); break;

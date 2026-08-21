@@ -58,7 +58,28 @@ What it proves: selectors on Blockly SVG resolve in `dry`; clicks land on
 SVG targets through the overlay; the canvas result is visible to `look`.
 What it cannot prove: anything about dragging.
 
-## Phase B — `drag`
+## Phase B — DONE (2026-08-21)
+
+`demos/scratch-first-script.yaml`: 19s, dry 13/13, check pass. The final frame
+shows `when flag clicked` with `move 10 steps` snapped under it and the sprite
+at x: 10 — a child's first script, built by dragging, on video.
+
+What the build actually needed, beyond the plan:
+
+- **Playwright finds, the page measures.** `locator.boundingBox()` waits for
+  visibility and times out on Blockly's toolbox categories (they intercept
+  their own pointer events). `locator.elementHandle()` + `getBoundingClientRect`
+  in the page returns a rect for anything attached — and keeps Playwright
+  selector syntax (`:has-text`, `>> nth=`), which raw `querySelectorAll`
+  cannot parse.
+- **Two cursor keyframes, many mouse moves.** `moveCursorToPoint` (exported by
+  testreel) logs the overlay's start and end; the page gets 16 small moves in
+  between. A drag therefore costs the cursor expression what a click costs —
+  without this, three drags would exceed ffmpeg's nesting limit and the cursor
+  would vanish.
+- **An 8px nudge after mousedown**, or Blockly never starts the drag.
+
+## Phase B — `drag` (design as built)
 
 ### Schema
 

@@ -13,8 +13,8 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { execFileSync, execSync } from "node:child_process";
 import { chromium, type Page } from "playwright";
-import { recordPage, type PageRecorder } from "testreel";
-import { expandEnv, resolve, type Manifest, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
+import { recordPage, moveCursorToPoint, type PageRecorder } from "testreel";
+import { expandEnv, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
 import { ffmpegBin, videoDuration } from "./render.js";
 
 export type TimelineEntry = {
@@ -107,6 +107,49 @@ export function capSecondsFor(m: Manifest): number {
 export const CURSOR_MOVE_LIMIT = 45;
 export function cursorMoves(m: Manifest): number {
   return m.steps.filter((s) => ["click", "type", "fill", "hover", "scroll", "upload"].includes(s.action)).length;
+}
+
+/** A point, read from the page's own geometry. Playwright's locator engine
+    refuses elements whose handlers intercept pointer events (Blockly's toolbox
+    categories, for one); getBoundingClientRect does not care. */
+async function resolvePoint(page: Page, p: Point, timeout: number): Promise<{ x: number; y: number }> {
+  if (typeof p === "object" && "x" in p) return { x: p.x, y: p.y };
+  const selector = typeof p === "string" ? p : p.selector;
+  const dx = typeof p === "string" ? 0 : p.dx;
+  const dy = typeof p === "string" ? 0 : p.dy;
+  // Playwright finds it (so :has-text and >> nth= work), the page measures it
+  // (so an element whose handlers intercept pointer events still yields a
+  // rect — locator.boundingBox() waits for visibility and can time out on
+  // Blockly's toolbox).
+  const handle = await page.locator(selector).first().elementHandle({ timeout });
+  if (!handle) throw new Error(`no element for point target "${selector}"`);
+  const rect = await handle.evaluate((el) => { const r = (el as Element).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height }; });
+  await handle.dispose();
+  if (!rect.w && !rect.h) throw new Error(`point target "${selector}" has no size`);
+  return { x: rect.x + dx, y: rect.y + dy };
+}
+
+/** Press, move, release, with the cursor overlay following. testreel records
+    cursor keyframes only for its own actions, so we log two of our own and let
+    it animate between them while the page gets the many small moves it needs
+    to believe a drag is happening. Two keyframes, so a drag costs the overlay
+    what a click costs. */
+async function performDrag(page: Page, step: Extract<Step, { action: "drag" }>, q: Resolved, timeout: number) {
+  const from = await resolvePoint(page, step.from, timeout);
+  const to = await resolvePoint(page, step.to, timeout);
+  const opts = q.cursor === false ? undefined : { style: q.cursor.style, size: q.cursor.size };
+  if (opts) await moveCursorToPoint(page, from.x, from.y, opts);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  if (step.holdMs) await page.waitForTimeout(step.holdMs);
+  await page.mouse.move(from.x + 8, from.y + 8);   // cross the editor's drag threshold
+  if (opts) void moveCursorToPoint(page, to.x, to.y, { ...opts, transitionMs: step.durationMs });
+  const per = Math.max(8, Math.round(step.durationMs / step.steps));
+  for (let i = 1; i <= step.steps; i++) {
+    await page.mouse.move(from.x + ((to.x - from.x) * i) / step.steps, from.y + ((to.y - from.y) * i) / step.steps);
+    await page.waitForTimeout(per);
+  }
+  await page.mouse.up();
 }
 
 export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
@@ -492,8 +535,24 @@ async function bringIntoView(page: Page, selector: string, timeout: number) {
 async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, ctx: StepCtx): Promise<void> {
   const timeout = step.timeout ?? 8000;
   if (step.waitFor) await page.waitForSelector(step.waitFor, { timeout });
-  if ((step.action === "click" || step.action === "type" || step.action === "fill" || step.action === "hover") && "selector" in step) {
+  if ((step.action === "click" || step.action === "type" || step.action === "fill" || step.action === "hover") && "selector" in step && step.selector) {
     await bringIntoView(page, step.selector, timeout);
+  }
+  const q = resolve(m);
+  if ((step.action === "click" || step.action === "hover") && step.at) {
+    // A point click: the cursor travels there on camera, then the real
+    // pointer does the same. For canvases, and for elements whose own
+    // handlers make Playwright's actionability checks time out.
+    const pt = await resolvePoint(page, step.at, timeout);
+    if (q.cursor !== false) await moveCursorToPoint(page, pt.x, pt.y, { style: q.cursor.style, size: q.cursor.size });
+    if (step.action === "click") await page.mouse.click(pt.x, pt.y);
+    if (step.pauseAfter) await page.waitForTimeout(step.pauseAfter);
+    return;
+  }
+  if (step.action === "drag") {
+    await performDrag(page, step, q, timeout);
+    if (step.pauseAfter) await page.waitForTimeout(step.pauseAfter);
+    return;
   }
   const pause = step.pauseAfter;
   switch (step.action) {
@@ -501,7 +560,7 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       await rec.wait(step.ms);
       return; // wait's own duration is the pause
     case "click":
-      await rec.click(step.selector, { timeout, zoom: step.zoom });
+      await rec.click(step.selector!, { timeout, zoom: step.zoom });
       break;
     case "type":
       await rec.type(step.selector, expandEnv(step.text), { delay: step.delay ?? 70, clear: step.clear, timeout });
@@ -510,7 +569,7 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       await rec.fill(step.selector, expandEnv(step.text), { timeout });
       break;
     case "hover":
-      await rec.hover(step.selector, { timeout });
+      await rec.hover(step.selector!, { timeout });
       break;
     case "scroll": {
       let dy = step.y;
@@ -590,19 +649,24 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
   if (pause) await page.waitForTimeout(pause / m.speed);
 }
 
+const pointName = (p: Point | undefined): string =>
+  p === undefined ? "?" : typeof p === "string" ? p : "x" in p ? `(${Math.round(p.x)},${Math.round(p.y)})` : `${p.selector}+(${p.dx},${p.dy})`;
+
 export function describe(step: Step): string {
   switch (step.action) {
     case "wait":
       return `wait ${step.ms}ms`;
     case "click":
-      return `click ${step.selector}${step.zoom ? ` (zoom ${step.zoom}x)` : ""}`;
+      return `click ${step.selector ?? pointName(step.at)}${step.zoom ? ` (zoom ${step.zoom}x)` : ""}`;
+    case "drag":
+      return `drag ${pointName(step.from)} → ${pointName(step.to)}`;
     case "type":
       if (step.secret) return `type •••••• → ${step.selector}`;
       return `type "${step.text.length > 48 ? step.text.slice(0, 45) + "…" : step.text}" → ${step.selector}`;
     case "fill":
       return `fill ${step.selector}${step.secret ? " ••••••" : ""}`;
     case "hover":
-      return `hover ${step.selector}`;
+      return `hover ${step.selector ?? pointName(step.at)}`;
     case "scroll":
       return step.to ? `scroll to ${step.to} (${step.align})` : `scroll x=${step.x ?? 0} y=${step.y ?? 0}`;
     case "zoom":

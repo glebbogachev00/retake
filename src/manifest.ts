@@ -15,6 +15,18 @@ import { DEFAULT_PRESET, PRESETS, type Layout, type Preset } from "./presets.js"
 
 const Selector = z.string().min(1);
 
+/** Where a pointer goes: a selector (its centre), a raw viewport point, or a
+    selector plus an offset. Points are resolved by reading the rect in the
+    page rather than through Playwright's locator engine, because canvas
+    editors (Blockly, PixiJS) intercept pointer events and make ordinary
+    locators time out. */
+export const Point = z.union([
+  Selector,
+  z.object({ x: z.number(), y: z.number() }),
+  z.object({ selector: Selector, dx: z.number().default(0), dy: z.number().default(0) }),
+]);
+export type Point = z.infer<typeof Point>;
+
 const Base = z.object({
   /** ms to rest after the step. */
   pauseAfter: z.number().nonnegative().optional(),
@@ -29,7 +41,7 @@ const Base = z.object({
 
 export const Step = z.discriminatedUnion("action", [
   Base.extend({ action: z.literal("wait"), ms: z.number().nonnegative().default(1000) }),
-  Base.extend({ action: z.literal("click"), selector: Selector, zoom: z.number().positive().optional() }),
+  Base.extend({ action: z.literal("click"), selector: Selector.optional(), at: Point.optional(), zoom: z.number().positive().optional() }),
   Base.extend({
     action: z.literal("type"),
     selector: Selector,
@@ -38,10 +50,25 @@ export const Step = z.discriminatedUnion("action", [
     clear: z.boolean().optional(),
   }),
   Base.extend({ action: z.literal("fill"), selector: Selector, text: z.string() }),
-  Base.extend({ action: z.literal("hover"), selector: Selector }),
+  Base.extend({ action: z.literal("hover"), selector: Selector.optional(), at: Point.optional() }),
   /** Scroll by a pixel delta, or `to` a selector — which computes the delta so
       the element lands where you want it and animates there, so the viewer sees
       the page move rather than jumping. */
+  /** Press at one point, move, release: the gesture that block editors,
+      canvases and sortable lists are built on. The cursor overlay gets two
+      keyframes (start, end) while the page gets many small moves, so a drag
+      costs the overlay no more than a click does. */
+  Base.extend({
+    action: z.literal("drag"),
+    from: Point,
+    to: Point,
+    /** Intermediate mouse moves. The page needs several to believe a drag. */
+    steps: z.number().int().min(4).max(60).default(16),
+    /** Pause after pressing, before moving. Some editors need it. */
+    holdMs: z.number().int().min(0).max(2000).default(120),
+    /** How long the move takes, ms. */
+    durationMs: z.number().int().min(120).max(6000).default(700),
+  }),
   Base.extend({
     action: z.literal("scroll"),
     x: z.number().optional(),
@@ -101,7 +128,11 @@ export const Step = z.discriminatedUnion("action", [
       .union([z.literal("static"), z.literal("auto"), z.object({ focus: Selector.optional(), zoom: z.number().min(1).max(3).optional() })])
       .optional(),
   }),
-]);
+]).superRefine((st, ctx) => {
+  if ((st.action === "click" || st.action === "hover") && !st.selector && !st.at) {
+    ctx.addIssue({ code: "custom", message: `${st.action} needs either a selector or an \`at\` point` });
+  }
+});
 export type Step = z.infer<typeof Step>;
 
 /** Answer a network call with canned data for the length of a take.
@@ -220,6 +251,11 @@ const ManifestShape = z.object({
     .prefault({}),
 });
 export const Manifest = ManifestShape.superRefine((m, ctx) => {
+  [...m.steps, ...m.setup].forEach((st, i) => {
+    if ((st.action === "click" || st.action === "hover") && !st.selector && !st.at) {
+      ctx.addIssue({ code: "custom", path: ["steps", i], message: `${st.action} needs either a selector or an \`at\` point` });
+    }
+  });
   // Scenes are addressed by label (thumbnail, captions, camera, stills,
   // until); two with the same label make every one of those ambiguous.
   const seen = new Map<string, number>();
