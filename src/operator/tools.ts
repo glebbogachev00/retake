@@ -274,7 +274,7 @@ server.registerTool("dry", { description: "Run a demo with no camera: every sele
   return text(r.ok ? `ok: all ${manifest.steps.length} steps resolve` : r.lines.join("\n"));
 });
 
-server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story. Returns the receipts.", inputSchema: { name: z.string(), preview: z.boolean().default(true) }, annotations: RETAKE_WRITE }, async ({ name, preview }) => { LAST_DEMO = name;
+server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story. Returns the receipts.", inputSchema: { name: z.string(), preview: z.boolean().default(true), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo") }, annotations: RETAKE_WRITE }, async ({ name, preview, until }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const loaded = loadManifest(manifestPath(name));
   const manifest = preview ? { ...loaded.manifest, preset: "preview-fast" } : loaded.manifest;
@@ -283,7 +283,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   try {
     for (const f of fs.existsSync(outDir) ? fs.readdirSync(outDir) : []) if (f !== ".retake-lock") fs.rmSync(path.join(outDir, f), { recursive: true, force: true });
     await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);
-    const take = await record(manifest, { outDir, manifestDir: DEMOS, locked: true, log: () => {} });
+    const take = await record(manifest, { outDir, manifestDir: DEMOS, locked: true, until, log: () => {} });
     await tell(`Rendering…`);
     const a = await render(manifest, take, outDir, {});
     const c = check(outDir, manifest);

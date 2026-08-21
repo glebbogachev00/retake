@@ -45,7 +45,8 @@ program
   .option("--preset <name>", `override the manifest's preset (${presetNames().join(", ")})`)
   .option("--reuse", "reuse the last raw recording if nothing that shapes it changed (re-render only)", false)
   .option("--gif", "also produce a GIF (overrides the manifest)", false)
-  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean }) => {
+  .option("--until <scene>", "record up to the end of this scene, then stop (iterate on one beat without paying for the whole take)")
+  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; until?: string }) => {
     const loaded = loadManifest(file);
     let manifest = opts.preset ? { ...loaded.manifest, preset: opts.preset } : loaded.manifest;
     if (opts.gif) manifest = { ...manifest, outputs: { ...manifest.outputs, gif: true } };
@@ -72,7 +73,7 @@ program
       // Wipe everything except the lock.
       for (const f of fs.readdirSync(outDir)) if (f !== ".retake-lock") fs.rmSync(path.join(outDir, f), { recursive: true, force: true });
       try {
-        take = await record(manifest, { outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
+        take = await record(manifest, { until: opts.until, outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
       } catch (e) {
         releaseLock(outDir);
         throw e;

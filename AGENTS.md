@@ -129,3 +129,8 @@ recording-relevant changed, and the UI's one button works this out for you.
   idle — each fade is a nested `if()` in testreel's ffmpeg expression and the
   parser has a depth limit. `cursor: { idleHide: false }` forces it off at any
   length; `true` forces it on (and may fail past ~60 steps).
+- Iterating on one beat of a long demo: `run demos/x.yaml --until <scene>`
+  records up to the end of that scene and stops (MCP: `run` with `until`).
+  Better still, keep demos short — above ~40 steps, split the story.
+- If Retake itself fails (render/ffmpeg error, crash), stop and report it —
+  do not patch around the tool.

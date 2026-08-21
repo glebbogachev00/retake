@@ -80,6 +80,8 @@ export function captureHash(m: Manifest): string {
 }
 
 export type RecordOptions = {
+  /** Record up to the end of this scene label, then stop. */
+  until?: string;
   outDir: string;
   /** The caller already holds the folder lock. */
   locked?: boolean;
@@ -249,7 +251,13 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // 170-step walkthrough is long, not stuck.
     const explicitWaits = m.steps.reduce((n, st) => n + (st.action === "wait" ? st.ms / 1000 : 0) + ((st as { pauseAfter?: number }).pauseAfter ?? 0) / 1000, 0);
     const capSeconds = m.maxSeconds ?? Math.min(3600, Math.max(240, Math.round(m.steps.length * 10 + explicitWaits)));
+    let pastUntil = false;
     for (const [i, step] of m.steps.entries()) {
+      // --until <scene>: record that scene in full, stop at the next one.
+      if (opts.until && step.action === "scene") {
+        if (pastUntil) { partial = `stopped after scene "${opts.until}" (until)`; log(`■ ${partial}`); break; }
+        if (step.label === opts.until) pastUntil = true;
+      }
       const start = Date.now();
       const entry: TimelineEntry = {
         index: i,

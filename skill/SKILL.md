@@ -106,6 +106,24 @@ Four rounds without a passing take → stop and ask the person.
 - **A one-line `script:` with braces is YAML, not JS** — use a block
   (`script: |`). Retake's validation error now says so too.
 
+## When Retake itself breaks — stop, don't patch
+
+A failed *step* is yours to fix (selector, wait, state). A failed *tool* is
+not: a render error, an ffmpeg message, a crash, a cap you did not set.
+Do not work around it, do not read Retake's or testreel's source, do not
+try variations hoping one sticks. Say in one line what failed and which
+demo, and stop. The person files it (the Bug? button) and it gets fixed
+once, for everyone — an agent patching the tool is the most expensive
+outcome there is.
+
+## Long demos: split, and record up to the beat you are fixing
+
+A take is real time: a six-minute walkthrough costs six minutes per
+attempt and nobody watches six minutes. Above ~40 steps, split the story
+into several 30–60s demos — each fails fast and re-records in a minute.
+While iterating on one beat, `run` with `until: <scene label>` records only
+up to the end of that scene.
+
 ## Rules
 
 - Real interactions read as real: type actual text, scroll to what you use,
