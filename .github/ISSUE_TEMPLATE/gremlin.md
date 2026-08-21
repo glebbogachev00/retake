@@ -1,5 +1,5 @@
 ---
-name: Gremlin
+name: Bug (a gremlin)
 about: Something's off. Say it however it broke.
 title: "gremlin: "
 labels: gremlin
