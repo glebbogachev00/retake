@@ -144,6 +144,12 @@ What would remove the ceiling, in order of cost:
   already does this and keeps the session). Project creation, cloud save and a
   full tutorial flow all open up. This is how a TechBash pipeline would really
   run.
+- **`keepInTab` (built 2026-08-21).** The cheap 80%: `window.open` navigates in
+  place and `target="_blank"` is stripped, so popup logins and "open in a new
+  tab" flows stay on camera in one continuous video. Proven on a fixture —
+  without it two tabs open and the recorded page never leaves the start page;
+  with it, zero extra tabs and the page arrives. Does not help where the app
+  needs the second window to keep existing.
 - **Multi-tab recording.** A genuine engine gap that also blocks OAuth popups,
   payment flows and anything that opens a window. Playwright records every page
   in a context to its own file; testreel binds to one. Real work, worth doing

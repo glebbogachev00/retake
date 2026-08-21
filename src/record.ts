@@ -215,7 +215,23 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // element attributes against the server HTML, so style.zoom on <html> made
   // every React app report a hydration mismatch — with a dev badge in shot.
   if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="html{zoom:${q.scale}}";document.head.appendChild(st)})`);
-  // Dev servers decorate themselves — Next's issues badge, Vite's error
+  // One page is what gets recorded, so keep the flow in it: window.open
+  // navigates in place, and target=_blank is stripped as it appears. A demo
+  // that spawned a second tab used to simply lose its subject.
+  if (m.keepInTab) {
+    await context.addInitScript(`
+      (() => {
+        const orig = window.open;
+        window.open = function (url) { if (url) { location.href = String(url); return window; } return orig.apply(window, arguments); };
+        const strip = (root) => { for (const a of root.querySelectorAll ? root.querySelectorAll('a[target="_blank"]') : []) a.removeAttribute('target'); };
+        addEventListener('DOMContentLoaded', () => {
+          strip(document);
+          new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) strip(n); }).observe(document.documentElement, { childList: true, subtree: true });
+        });
+      })();
+    `);
+  }
+    // Dev servers decorate themselves — Next's issues badge, Vite's error
   // overlay, webpack's. None of that belongs in a product video, and no
   // manifest should have to know about it.
   await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="nextjs-portal,#__next-build-watcher,vite-error-overlay,#webpack-dev-server-client-overlay,#react-refresh-overlay{display:none!important}";document.head.appendChild(st)})`);

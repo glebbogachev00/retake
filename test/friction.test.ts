@@ -53,3 +53,9 @@ test("cursor.idleHide is accepted and carried through resolve", async () => {
   const plain = resolve(Manifest.parse({ name: "t", url: "http://localhost:3000", steps: [{ action: "wait", ms: 100 }] }));
   assert.equal((plain.cursor as { idleHide?: boolean }).idleHide, undefined, "unset means: decide by length at record time");
 });
+
+test("keepInTab defaults on and can be turned off", () => {
+  const base = { name: "t", url: "http://localhost:3000", steps: [{ action: "wait", ms: 100 }] };
+  assert.equal(Manifest.parse(base).keepInTab, true, "a demo that opens a tab loses its subject; default protects it");
+  assert.equal(Manifest.parse({ ...base, keepInTab: false }).keepInTab, false);
+});

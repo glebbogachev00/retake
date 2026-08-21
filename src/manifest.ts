@@ -223,6 +223,11 @@ const ManifestShape = z.object({
   /** What a failed step does to the take. "stop" (default): the camera stops
       at the failure, so nobody gets one interaction and ten minutes of
       nothing. "continue": keep rolling — for demos that tolerate a miss. */
+  /** A demo that opens a second tab loses its subject: Retake records one
+      page. By default new tabs are folded back into this one (window.open and
+      target=_blank navigate in place), so the flow stays on camera. Set false
+      when a demo genuinely needs a separate window. */
+  keepInTab: z.boolean().default(true),
   onFail: z.enum(["stop", "continue"]).default("stop"),
   /** Playback tempo applied at render time: 0.8 slows the whole take for a
       client who needs it gentler; 1.2 tightens it. Cursor and clicks stay in

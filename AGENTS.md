@@ -140,3 +140,8 @@ recording-relevant changed, and the UI's one button works this out for you.
   `check` FAILs. Split long stories; `cursor: false` if you must go long.
 - Stills: `NN-label.png` is mid-scene, `NN-label-end.png` the last moment.
 - Scroll pacing defaults to constant pixels-per-second; `speed:` overrides.
+- **New tabs are folded back into the recorded page** (`keepInTab`, default
+  true): `window.open` navigates in place and `target="_blank"` is stripped.
+  Retake records one page, so a popup login or a "preview" button used to lose
+  the demo's subject entirely. Set `keepInTab: false` if a flow genuinely needs
+  a separate window — and know it will not be on camera.
