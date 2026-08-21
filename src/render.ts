@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
+import { capSecondsFor } from "./record.js";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { resolve, type Manifest, type Resolved, type Step } from "./manifest.js";
@@ -489,9 +490,14 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
       const next = sc[i + 1] ? sc[i + 1].start - take.trimBefore : end;
       const from = sce.start - take.trimBefore;
       const at = Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
-      const file = path.join(dir, `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}.png`);
+      const base = `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}`;
+      const file = path.join(dir, `${base}.png`);
       ff(["-ss", at.toFixed(2), "-i", mp4, "-frames:v", "1", file], log);
       stills.push(file);
+      // And the scene's last moment: the caption names what the scene
+      // achieves, and that is usually on screen at the end, not the middle.
+      const atEnd = Math.min(Math.max(from + 0.4, next - 0.6), Math.max(0, end - 0.2));
+      if (atEnd - at > 0.5) { const fe = path.join(dir, `${base}-end.png`); ff(["-ss", atEnd.toFixed(2), "-i", mp4, "-frames:v", "1", fe], log); stills.push(fe); }
     }
     if (sc.length) mark(`stills ×${sc.length}`);
   }
@@ -563,7 +569,7 @@ export function check(outDir: string, m?: Manifest): Check {
   /* A take may legitimately run long — a full product walkthrough does.
      The manifest's own maxSeconds is the author's stated bound; a take
      inside it is not a runaway, so do not fail it for length. */
-  const longest = m?.maxSeconds ?? 300;
+  const longest = m ? capSecondsFor(m) : 300;
   say(p.duration >= 5 && p.duration <= longest, `duration: ${p.duration.toFixed(1)}s`);
   if (p.duration > 60) lines.push(`—     ${p.duration.toFixed(0)}s is long for a social post (aim for 15–45s); fine for a walkthrough`);
   const mb = (f: string) => (fs.statSync(f).size / 1e6).toFixed(1) + " MB";
@@ -577,6 +583,7 @@ export function check(outDir: string, m?: Manifest): Check {
   say(fs.existsSync(path.join(outDir, "proof-log.md")), "proof log exists");
   say(take.ok, take.ok ? "all steps passed" : "some steps failed");
   say(!take.partial, take.partial ? `partial: ${take.partial}` : "polished render (not fallback)");
+  if (take.partial && /NO CURSOR/.test(take.partial)) say(false, "cursor overlay failed — the video has no cursor (split the demo or set cursor: false)");
   const sc = scenes(m ? applyManifest(m, take) : take);
   say(sc.length >= 2, `${sc.length} scenes`);
   const cams = sc.filter((s) => s.camera).length;
@@ -621,7 +628,7 @@ function renderProof(m: Manifest, take: Take, q: Resolved, a: Partial<Artifacts>
     `- mp4: ${size("mp4")}`,
     `- gif: ${size("gif")}`,
     `- thumbnail: ${size("thumbnail")}`,
-    `- stills: one PNG per scene in stills/, each taken at the MIDDLE of its scene (not the end) — judge a beat from these, not from the next beat's first frame`,
+    `- stills: per scene in stills/ — NN-label.png is the MIDDLE of the scene, NN-label-end.png its last moment (the payoff). Judge 'did it happen' from -end, 'what was it doing' from the middle.`,
     ...(f ? [`- output: ${f.width}×${f.height} @ ${f.fps}fps · ${f.duration.toFixed(1)}s · ${f.encoder} · gif via ${f.gifTool} · camera on ${f.cameraScenes} scenes${f.cached ? " · cached" : ""}`, `- render time: ${Object.entries(f.timings ?? {}).map(([k, v]) => `${k} ${v}s`).join(" · ") || "—"}`] : []),
     "",
     "## Shot list",

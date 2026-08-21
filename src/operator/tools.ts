@@ -324,9 +324,9 @@ server.registerTool("receipts", { description: "What happened in the last take o
 // as images, or any frame by timestamp, scaled down so a look costs little.
 server.registerTool("look", {
   description: "SEE the last take of a demo: returns one image per scene (the frame mid-scene), or the frame at a given second. Use after run/render, before deciding what to change — receipts tell you what happened, look tells you how it looks. Downscaled to keep it cheap; ask for a single scene or a specific second to go closer.",
-  inputSchema: { name: z.string(), scene: z.string().optional().describe("one scene label only"), at: z.number().optional().describe("a second into the video instead of scenes"), width: z.number().int().min(320).max(1280).default(800) },
+  inputSchema: { name: z.string(), scene: z.string().optional().describe("one scene label only"), at: z.number().optional().describe("a second into the video instead of scenes"), frame: z.enum(["mid", "end"]).default("end").describe("end = the scene's last moment (did it happen?), mid = halfway (what was it doing?)"), width: z.number().int().min(320).max(1280).default(800) },
   annotations: READ_ONLY,
-}, async ({ name, scene, at, width }) => { LAST_DEMO = name;
+}, async ({ name, scene, at, frame: which, width }) => { LAST_DEMO = name;
   const dir = path.join(OUT, name);
   const mp4 = path.join(dir, "demo.mp4");
   if (!fs.existsSync(mp4)) return text("no rendered take yet — run first");
@@ -350,7 +350,9 @@ server.registerTool("look", {
     const idx = scenes.indexOf(sc);
     const from = sc.start - take.trimBefore;
     const next = scenes[idx + 1] ? scenes[idx + 1].start - take.trimBefore : end;
-    const t = Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
+    const t = which === "end"
+      ? Math.min(Math.max(from + 0.4, next - 0.6), Math.max(0, end - 0.2))
+      : Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
     content.push({ type: "text", text: `scene ${idx + 1}/${scenes.length} “${sc.label}” · ${from.toFixed(1)}–${next.toFixed(1)}s${sc.caption ? ` · caption: ${sc.caption}` : ""}` });
     content.push(frame(t, `${i}-${sc.label}`));
   }

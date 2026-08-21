@@ -140,7 +140,7 @@ export const Seed = z.discriminatedUnion("kind", [
 ]);
 export type Seed = z.infer<typeof Seed>;
 
-export const Manifest = z.object({
+const ManifestShape = z.object({
   name: z.string().regex(/^[a-z0-9-]+$/, "kebab-case only"),
   title: z.string().optional(),
   url: z.string().url(),
@@ -219,6 +219,16 @@ export const Manifest = z.object({
     })
     .prefault({}),
 });
+export const Manifest = ManifestShape.superRefine((m, ctx) => {
+  // Scenes are addressed by label (thumbnail, captions, camera, stills,
+  // until); two with the same label make every one of those ambiguous.
+  const seen = new Map<string, number>();
+  m.steps.forEach((st, i) => {
+    if (st.action !== "scene") return;
+    if (seen.has(st.label)) ctx.addIssue({ code: "custom", path: ["steps", i, "label"], message: `duplicate scene label "${st.label}" (also step ${seen.get(st.label)}) — labels must be unique` });
+    else seen.set(st.label, i);
+  });
+});
 export type Manifest = z.infer<typeof Manifest>;
 
 export type LoadedManifest = { manifest: Manifest; file: string; dir: string };
@@ -266,6 +276,15 @@ export function warnings(m: Manifest): string[] {
     }
   }
   if (m.auth && !m.auth.setup.length && !m.setup.length) w.push("`auth.storageState` is set but there are no sign-in steps under `auth.setup` — there is nothing to save a session from.");
+  const moves = m.steps.filter((st) => ["click", "type", "fill", "hover", "scroll", "upload"].includes(st.action)).length;
+  if (m.cursor !== false && moves > 45) w.push(`~${moves} cursor moves — the cursor overlay (testreel/ffmpeg) cannot exceed ~45 in one take and will be MISSING from the video. Split the demo into shorter ones, or set \`cursor: false\`.`);
+  m.steps.forEach((st, i) => {
+    if (st.action !== "scene") return;
+    const rest = m.steps.slice(i + 1);
+    const nextScene = rest.findIndex((x) => x.action === "scene");
+    const between = nextScene === -1 ? rest : rest.slice(0, nextScene);
+    if (between.length && between.every((x) => x.action === "wait")) w.push(`scene "${st.label}" has only waits before the next scene — nothing happens on camera in it.`);
+  });
   return w;
 }
 

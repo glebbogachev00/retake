@@ -134,3 +134,9 @@ recording-relevant changed, and the UI's one button works this out for you.
   Better still, keep demos short — above ~40 steps, split the story.
 - If Retake itself fails (render/ffmpeg error, crash), stop and report it —
   do not patch around the tool.
+- **Cursor cap: ~45 moves per take.** testreel draws the cursor with one nested
+  `if()` per move and ffmpeg's parser stops at 98 levels. Past it the overlay
+  silently drops — `validate` now warns, the recorder detects the failure and
+  `check` FAILs. Split long stories; `cursor: false` if you must go long.
+- Stills: `NN-label.png` is mid-scene, `NN-label-end.png` the last moment.
+- Scroll pacing defaults to constant pixels-per-second; `speed:` overrides.

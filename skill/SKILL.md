@@ -118,6 +118,10 @@ outcome there is.
 
 ## Long demos: split, and record up to the beat you are fixing
 
+Hard limit to know: the cursor overlay cannot survive more than ~45 cursor
+moves in one take (an ffmpeg expression-depth limit in testreel). `validate`
+warns, `check` fails if it happened. Past that, split — or `cursor: false`.
+
 A take is real time: a six-minute walkthrough costs six minutes per
 attempt and nobody watches six minutes. Above ~40 steps, split the story
 into several 30–60s demos — each fails fast and re-records in a minute.
@@ -138,9 +142,9 @@ up to the end of that scene.
 
 | MCP tool | CLI |
 |---|---|
-| draft | `retake describe <name> <url> "<story>" -P <folder>` |
-| dry | `retake dry demos/<name>.yaml` |
-| run | `retake run demos/<name>.yaml` (`--preset preview-fast` for previews) |
-| render | `retake render outputs/<name>` |
+| draft | `npm run retake -- describe <name> <url> "<story>" -P <folder>` |
+| dry | `npm run retake -- dry demos/<name>.yaml` |
+| run | `npm run retake -- run demos/<name>.yaml` (`--preset preview-fast` for previews, `--until <scene>`) |
+| render | `npm run retake -- render outputs/<name>` |
 | receipts | read `outputs/<name>/proof-log.md` |
-| ideas | `retake ideas <url> -P <folder>` |
+| ideas | `npm run retake -- ideas <url> -P <folder>` |

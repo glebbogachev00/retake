@@ -93,6 +93,22 @@ export type RecordOptions = {
 
 const noop = () => {};
 
+
+/** The take's time ceiling: the manifest's own maxSeconds, else ≈10s per
+    step plus explicit waits, never under 240s or over an hour. Used by the
+    recorder and by check(), so the two can never disagree. */
+export function capSecondsFor(m: Manifest): number {
+  if (m.maxSeconds) return m.maxSeconds;
+  const waits = m.steps.reduce((n, st) => n + (st.action === "wait" ? st.ms / 1000 : 0) + ((st as { pauseAfter?: number }).pauseAfter ?? 0) / 1000, 0);
+  return Math.min(3600, Math.max(240, Math.round(m.steps.length * 10 + waits)));
+}
+
+/** Roughly how many times the cursor will move on camera. */
+export const CURSOR_MOVE_LIMIT = 45;
+export function cursorMoves(m: Manifest): number {
+  return m.steps.filter((s) => ["click", "type", "fill", "hover", "scroll", "upload"].includes(s.action)).length;
+}
+
 export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const log = opts.log ?? noop;
   const startedAt = new Date().toISOString();
@@ -247,10 +263,12 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     }
     setupEnd = Date.now();
 
-    // The cap scales with the demo unless the manifest says otherwise: a
-    // 170-step walkthrough is long, not stuck.
-    const explicitWaits = m.steps.reduce((n, st) => n + (st.action === "wait" ? st.ms / 1000 : 0) + ((st as { pauseAfter?: number }).pauseAfter ?? 0) / 1000, 0);
-    const capSeconds = m.maxSeconds ?? Math.min(3600, Math.max(240, Math.round(m.steps.length * 10 + explicitWaits)));
+    const capSeconds = capSecondsFor(m);
+    // testreel draws the cursor with one nested if() per move, and ffmpeg's
+    // expression parser stops at 98 levels — about 49 moves. Past that the
+    // overlay silently fails and the video ships with no cursor at all.
+    const moves = cursorMoves(m);
+    if (q.cursor !== false && moves > CURSOR_MOVE_LIMIT) log(`cursor: ~${moves} cursor moves — testreel's overlay cannot exceed ~${CURSOR_MOVE_LIMIT}; the cursor may be MISSING from this video. Split the demo, or set cursor: false to be honest about it.`);
     let pastUntil = false;
     for (const [i, step] of m.steps.entries()) {
       // --until <scene>: record that scene in full, stop at the next one.
@@ -308,13 +326,36 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     endMs = Date.now();
 
     // testreel: close context, save video, composite cursor/zoom/chrome, mp4.
+    // Its ffmpeg pass prints multi-kilobyte expression dumps and, when the
+    // cursor expression is too deep, "Error initializing filters" — then
+    // carries on and reports success. We listen, trim, and refuse to call
+    // that a clean take.
+    const compositeLog: string[] = [];
+    const origOut = process.stdout.write.bind(process.stdout);
+    const origErr = process.stderr.write.bind(process.stderr);
+    const tap = (orig: typeof origOut) => ((chunk: unknown, ...rest: unknown[]) => {
+      const text = String(chunk);
+      compositeLog.push(text);
+      const trimmed = text.length > 400 ? text.slice(0, 220) + ` … [${text.length - 220} more chars of ffmpeg expression trimmed]\n` : text;
+      return (orig as (c: unknown, ...r: unknown[]) => boolean)(trimmed, ...rest);
+    }) as typeof origOut;
+    process.stdout.write = tap(origOut); process.stderr.write = tap(origErr);
     try {
       const result = await rec.stop();
       video = result.video;
       screenshots = result.screenshots;
+      const joined = compositeLog.join("");
+      if (/Error initializing filters|Missing '\)' or too many args/.test(joined)) {
+        const why = `cursor overlay failed in testreel's ffmpeg pass (expression too deep — ~${moves} moves, limit ~${CURSOR_MOVE_LIMIT}); the video has NO CURSOR. Split the demo or set cursor: false.`;
+        partial = partial ? `${partial}; ${why}` : why;
+        ok = false;
+        log(`✗ ${why}`);
+      }
     } catch (e) {
       partial = `testreel stop() failed: ${(e as Error).message.split("\n")[0]}`;
       log(`✗ ${partial}`);
+    } finally {
+      process.stdout.write = origOut; process.stderr.write = origErr;
     }
   } catch (e) {
     ok = false;
@@ -485,7 +526,13 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
           dy = Math.round(box.y - want);
         }
       }
-      if (dy || step.x) await rec.scroll({ x: step.x, y: dy, scrollSpeed: step.speed });
+      // A viewer's eye wants roughly constant pixels per second, not a fixed
+      // 600ms per scroll: unset, speed derives from distance (~1100 px/s,
+      // never faster than 0.4s, never slower than 2.5s).
+      const dist = Math.abs(dy ?? 0) + Math.abs(step.x ?? 0);
+      const autoMs = Math.min(2500, Math.max(400, (dist / 1100) * 1000));
+      const scrollSpeed = step.speed ?? (dist ? 600 / autoMs : 1);
+      if (dy || step.x) await rec.scroll({ x: step.x, y: dy, scrollSpeed });
       break;
     }
     case "zoom":
