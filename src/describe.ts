@@ -254,6 +254,8 @@ export const EDIT_VERBS = [
   "set_text",         // {step: <step index>, text}   for type/fill steps
   "replace_selector", // {step: <step index>, selector}
   "delete_step",      // {step: <step index>}
+  "insert_step",      // {after: <step index, -1 for the start>, step: {action: ..., ...}}   add one step, validated
+  "set_step",         // {step: <step index>, value: {action: ..., ...}}   replace one step in place, validated
   "set_cursor",       // {cursor: "default"|"touch"|"none"}
   "rerecord",         // {}  throw the recording away and record again
 ] as const;
@@ -276,6 +278,8 @@ export async function proposeEdits(input: { instruction: string; yaml: string; r
     '  {"op":"set_text","step":<step index>,"text":"..."}   — what gets typed',
     '  {"op":"replace_selector","step":<step index>,"selector":"..."}',
     '  {"op":"delete_step","step":<step index>}',
+    '  {"op":"insert_step","after":<step index or -1>,"step":{"action":"click","selector":"..."}}  — add one step after that index (any step shape: click, type, waitFor, scroll, scene…)',
+    '  {"op":"set_step","step":<step index>,"value":{"action":"waitFor","selector":"..."}}        — replace one step in place',
     '  {"op":"set_cursor","cursor":"default"|"touch"|"none"}',
     '  {"op":"rerecord"}',
     "Rules: make the SMALLEST change that does what was asked; never rewrite things that were not mentioned; use scene labels and step indexes exactly as given; if the request is impossible or unclear, return an empty edits list and say why in note.",

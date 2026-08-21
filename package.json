@@ -12,7 +12,8 @@
     "run": "tsx src/cli.ts run",
     "validate": "tsx src/cli.ts validate",
     "ui": "tsx src/cli.ts ui",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

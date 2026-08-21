@@ -8,7 +8,7 @@
  */
 import fs from "node:fs";
 import YAML from "yaml";
-import { Manifest } from "./manifest.js";
+import { Manifest, Step } from "./manifest.js";
 import type { Edit } from "./describe.js";
 import type { Take } from "./record.js";
 
@@ -47,6 +47,31 @@ export function applyEdits(file: string, edits: Edit[]): Applied {
         case "set_text": { const n = step(e.step); if (!n || !["type", "fill"].includes(String(n.get("action")))) throw new Error(`step ${e.step} does not type`); n.set("text", String(e.text)); done.push(`Step ${e.step} now types “${e.text}”`); rerecord = true; break; }
         case "replace_selector": { const n = step(e.step); if (!n || !n.has("selector")) throw new Error(`step ${e.step} has no selector`); n.set("selector", String(e.selector)); done.push(`Step ${e.step} now targets ${e.selector}`); rerecord = true; break; }
         case "delete_step": { const i = Number(e.step); if (!steps || !steps.items[i]) throw new Error(`no step ${i}`); const n = steps.items[i] as YAML.YAMLMap; const what = typeof n.get === "function" ? `${n.get("action")}${n.has("selector") ? " " + n.get("selector") : ""}` : `step ${i}`; steps.items.splice(i, 1); done.push(`Removed ${what}`); rerecord = true; break; }
+        // Structural edits. Without these the only way to add a click or a
+        // scene was rewriting the whole file — which an agent under pressure
+        // would rather not do, so it gave up instead (distill-messy, day one).
+        // The new step is checked against the schema before it is allowed in.
+        case "insert_step": {
+          if (!steps) throw new Error("manifest has no steps");
+          const after = Number(e.after);
+          if (!Number.isInteger(after) || after < -1 || after >= steps.items.length) throw new Error(`after must be -1 (start) … ${steps.items.length - 1}`);
+          const parsedStep = Step.safeParse(e.step);
+          if (!parsedStep.success) throw new Error("invalid step: " + parsedStep.error.issues.map((i) => `${i.path.join(".") || "step"}: ${i.message}`).join("; "));
+          steps.items.splice(after + 1, 0, doc.createNode(parsedStep.data));
+          const st = parsedStep.data as { action: string; selector?: string; label?: string };
+          done.push(`Inserted ${st.action}${st.selector ? " " + st.selector : st.label ? ` "${st.label}"` : ""} as step ${after + 1}`);
+          rerecord = true; break;
+        }
+        case "set_step": {
+          const i = Number(e.step);
+          if (!steps || !steps.items[i]) throw new Error(`no step ${i}`);
+          const parsedStep = Step.safeParse(e.value);
+          if (!parsedStep.success) throw new Error("invalid step: " + parsedStep.error.issues.map((x) => `${x.path.join(".") || "step"}: ${x.message}`).join("; "));
+          steps.items.splice(i, 1, doc.createNode(parsedStep.data));
+          const st = parsedStep.data as { action: string; selector?: string; label?: string };
+          done.push(`Step ${i} is now ${st.action}${st.selector ? " " + st.selector : st.label ? ` "${st.label}"` : ""}`);
+          rerecord = true; break;
+        }
         case "rerecord": { done.push("Recording again from scratch"); rerecord = true; break; }
         default: skipped.push(`unknown edit ${String((e as { op: string }).op)}`);
       }

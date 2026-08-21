@@ -258,7 +258,7 @@ server.registerTool("draft", { description: "Let Retake draft a manifest from a 
   return text(`drafted demos/${name}.yaml (${m.steps.length} steps). Next: dry.\n\n${d.yaml}`);
 });
 
-server.registerTool("edit", { description: "Make small structured changes to a demo (captions, camera, holds, trim, waits, selectors, text, delete a step). Keeps comments. Returns what changed and whether it needs re-recording.", inputSchema: { name: z.string(), edits: z.array(z.object({ op: z.string() }).passthrough()) }, annotations: RETAKE_WRITE }, async ({ name, edits }) => { LAST_DEMO = name;
+server.registerTool("edit", { description: "Make small structured changes to a demo without rewriting it: captions, camera, holds, trim, waits, selectors, text; delete_step; insert_step {after, step:{action,…}} to add one step; set_step {step, value:{action,…}} to replace one. Steps are validated. Keeps comments. Returns what changed and whether it needs re-recording. Prefer this over write_manifest — one verb costs a line, a rewrite costs the file.", inputSchema: { name: z.string(), edits: z.array(z.object({ op: z.string() }).passthrough()) }, annotations: RETAKE_WRITE }, async ({ name, edits }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const a = applyEdits(manifestPath(name), edits as Edit[]);
   for (const d of a.done) await tell(d);
