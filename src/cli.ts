@@ -168,6 +168,8 @@ program
     say(`  args = ${JSON.stringify([tsx, tools])}`);
     say(`  env = { RETAKE_ROOT = ${JSON.stringify(process.cwd())}, RETAKE_UI = ${JSON.stringify(o.ui)} }`);
     say("");
+    say("");
+    say("One thing only you can do: RESTART Claude Code / Codex — they load new tools at the start of a session, not mid-way.");
     say("Then, in any project: “record a demo of my app showing the sign-up flow”.");
     say(`Keep ${o.ui} open to watch. Starting your app from an agent needs RETAKE_ALLOW_START=1 in the env above.`);
   });
