@@ -15,6 +15,7 @@ demos/*.yaml
 !demos/store-checkout.yaml
 !demos/scratch-first-move.yaml
 !demos/scratch-first-script.yaml
+!demos/gdevelop-scene-and-events.yaml
 # working files describe private apps — local only
 demos/*.md
 demos/*.json

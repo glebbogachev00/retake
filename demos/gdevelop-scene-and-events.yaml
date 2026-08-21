@@ -1,0 +1,70 @@
+# GDevelop, Phase C. Two findings shape this file:
+#  1. The in-app tutorial LOCKS the UI to its own next step (and that step is
+#     Preview, which opens a second tab Retake cannot record) — so setup quits
+#     the tutorial and keeps the project.
+#  2. Every click that causes a payoff comes BEFORE the scene that describes
+#     it, so the scene's frames show the result rather than the next action.
+name: gdevelop-scene-and-events
+title: GDevelop — what your game is, and what it does
+url: https://editor.gdevelop.io/
+preset: post-landscape
+viewport: { width: 1440, height: 900 }
+scale: 1
+camera: static
+setup:
+  - { action: wait, ms: 12000 }
+  - { action: click, selector: "text=\"Platformer\" >> nth=0", timeout: 30000 }
+  - { action: wait, ms: 6000 }
+  - { action: click, selector: "text=/let.s go/i >> nth=0", timeout: 20000 }
+  - { action: waitFor, selector: "#tab-layout-Level-1-button", timeout: 60000 }
+  - { action: wait, ms: 9000 }
+  - { action: click, selector: "text=/quit tutorial/i >> nth=0", timeout: 20000 }
+  - { action: wait, ms: 3000 }
+  # Visit the events tab once to dismiss its promo card, then come back, so the
+  # recording never shows an advert.
+  - { action: click, selector: "#tab-layout-events-Level-1-button", timeout: 20000 }
+  - { action: wait, ms: 4000 }
+  - { action: click, at: { selector: "text=Watch tutorial", dx: 94, dy: 0 } }
+  - { action: wait, ms: 1500 }
+  - { action: click, selector: "#tab-layout-Level-1-button", timeout: 20000 }
+  - { action: wait, ms: 3000 }
+steps:
+  - action: scene
+    label: scene
+    caption: A game is things in a world…
+    camera: static
+  - action: hover
+    at: { selector: "#tab-layout-Level-1-button" }
+    pauseAfter: 2600
+  - action: click
+    at: { selector: "#tab-layout-events-Level-1-button" }
+    pauseAfter: 2800
+  - action: scene
+    label: events
+    caption: …and rules for what happens
+    camera: static
+  - action: wait
+    ms: 1800
+  - action: click
+    at: { selector: "button.rst__expandButton" }
+    pauseAfter: 2600
+  - action: scene
+    label: rules
+    caption: Every rule reads as when → do
+    camera: static
+  - action: wait
+    ms: 3200
+  - action: click
+    at: { selector: "#tab-layout-Level-1-button" }
+    pauseAfter: 2400
+  - action: scene
+    label: back
+    caption: Two halves of the same game
+    camera: static
+  - action: wait
+    ms: 2400
+outputs:
+  mp4: true
+  gif: false
+  thumbnail:
+    scene: rules
