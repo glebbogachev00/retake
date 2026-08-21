@@ -68,9 +68,9 @@
   <div class="hero">
     <p class="kicker">Product demos, as code</p>
     <h1>Rerun the demo.<br><em>Don't re-record it.</em></h1>
-    <p class="lede">Retake turns a plain-English walkthrough into a repeatable demo of your real app. Your coding agent writes the flow; Retake checks every step, records it in 1080p, and keeps it rerunnable when the UI changes.</p>
+    <p class="lede">Retake turns a plain-English walkthrough into a repeatable demo of your real app. Your coding agent — Claude Code, Codex, Hermes, anything that speaks MCP — does the work. Retake checks every step, records it in 1080p, and keeps it rerunnable when the UI changes.</p>
     <div class="actions">
-      <a class="btn dark" href="https://github.com/glebbogachev00/retake">Install Retake</a>
+      <a class="btn dark" href="#start">Give it to your agent</a>
       <a class="btn light" href="#proof">Watch a demo</a>
     </div>
   </div>
@@ -79,27 +79,22 @@
   <p class="arrow">↓</p>
   <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
 
-  <section>
-    <h2>Two doors, same engine</h2>
-    <p class="sub">Drive it from Claude Code or Codex — or from Retake's own window, if you'd rather point and click.</p>
-    <pre><span class="c"># wire it into Claude Code or Codex, once:</span>
-retake install
-
-<span class="c"># then, in any project, just say:</span>
-<span class="c">#   "record a demo of my app showing checkout"</span>
-
-<span class="c"># or open the review window:</span>
-retake ui</pre>
+  <section id="start">
+    <h2>Paste this to your agent</h2>
+    <p class="sub">You never open a terminal. Your agent installs Retake, wires itself in, and from then on it's conversation.</p>
+    <div class="say" style="margin-top:0"><span class="who">In Claude Code, Codex, Hermes — wherever you already work</span><i>“Set up Retake from github.com/glebbogachev00/retake, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
+    <p class="sub" style="margin:14px 0 0">It clones, installs, registers Retake's tools, and tells you if your agent needs a restart to see them. After that, every demo is a sentence.</p>
   </section>
 
   <section id="how">
     <h2>How it works</h2>
     <p class="sub">You provide intent. The agent writes the flow. Retake verifies, records, and renders it.</p>
     <div class="how">
-      <div class="step"><div><b>Tell your agent what to show</b><p>"Record a demo of checkout." That sentence is the whole brief.</p></div></div>
-      <div class="step"><div><b>It builds and checks the flow</b><p>The agent reads your app — routes, selectors, sign-in fields, unstable UI states — writes the demo as a small readable file, and dry-runs every step in seconds. Nothing records until the walkthrough actually works.</p></div></div>
+      <div class="step"><div><b>You ask</b><p>"Record a demo of checkout." That sentence is the whole brief — say it to the agent you already use.</p></div></div>
+      <div class="step"><div><b>Your agent builds and checks the flow</b><p>It reads your app — routes, selectors, sign-in fields, unstable UI states — writes the demo as a small readable file, and dry-runs every step in seconds. Nothing records until the walkthrough actually works.</p></div></div>
       <div class="step"><div><b>Retake records the real interaction</b><p>Real typing, real clicks, real waits — then hands back demo.mp4, a still per scene, and a proof log of what happened, step by step.</p></div></div>
-      <div class="step"><div><b>Rerun or re-render when something changes</b><p>UI moved? Change one line, run again. Want it calmer, square, captionless? Say so — most changes re-render in seconds, no browser involved.</p></div></div>
+      <div class="step"><div><b>Your agent looks at what it made</b><p>It sees the frames, not just the log — the caption over the button, the badge in the corner — and fixes them before you ever watch.</p></div></div>
+      <div class="step"><div><b>You watch, then direct</b><p>The take lands in Retake's window. "No zooms." "Square for a post." "Re-run it" after the UI changes — said once, remembered, mostly re-rendered in seconds.</p></div></div>
     </div>
   </section>
 
