@@ -199,11 +199,18 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
 
     if (q.scale !== 1) await page.evaluate((z) => { document.documentElement.style.zoom = String(z); }, q.scale);
 
+    // Idle-hide fades are nested if()s in testreel's ffmpeg alpha expression;
+    // past roughly sixty steps the nesting exceeds ffmpeg's parser and the
+    // composite fails. Long demos get an always-visible cursor unless told
+    // otherwise — the fade was never the point of the video.
+    const LONG = 60;
+    const cursorIdleHide = q.cursor === false ? undefined : q.cursor.idleHide ?? (m.steps.length <= LONG);
+    if (q.cursor !== false && q.cursor.idleHide === undefined && m.steps.length > LONG) log(`cursor: ${m.steps.length} steps — idle-hide fades off (ffmpeg nesting limit); set cursor.idleHide to override`);
     const rec = await recordPage(page, {
       outputDir: opts.outDir,
       name: m.name,
       clean: false,
-      cursor: q.cursor === false ? false : { style: q.cursor.style, size: q.cursor.size, idleHideMs: q.cursor.idleHideMs },
+      cursor: q.cursor === false ? false : { style: q.cursor.style, size: q.cursor.size, idleHideMs: q.cursor.idleHideMs, idleHide: cursorIdleHide },
       chrome: false,
       background: false,
       speed: m.speed,

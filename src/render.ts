@@ -560,7 +560,11 @@ export function check(outDir: string, m?: Manifest): Check {
   if (wantW) say(p.width === wantW, `matches expected width ${wantW}`);
   say(p.width >= 960, `at least 960px wide`);
   say(true, `fps: ${p.fps}`);
-  say(p.duration >= 5 && p.duration <= 300, `duration: ${p.duration.toFixed(1)}s`);
+  /* A take may legitimately run long — a full product walkthrough does.
+     The manifest's own maxSeconds is the author's stated bound; a take
+     inside it is not a runaway, so do not fail it for length. */
+  const longest = m?.maxSeconds ?? 300;
+  say(p.duration >= 5 && p.duration <= longest, `duration: ${p.duration.toFixed(1)}s`);
   if (p.duration > 60) lines.push(`—     ${p.duration.toFixed(0)}s is long for a social post (aim for 15–45s); fine for a walkthrough`);
   const mb = (f: string) => (fs.statSync(f).size / 1e6).toFixed(1) + " MB";
   say(true, `demo.mp4: ${mb(mp4)}`);

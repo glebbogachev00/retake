@@ -183,7 +183,11 @@ export const Manifest = z.object({
   waitForSelector: Selector.optional(),
   speed: z.number().positive().default(1),
   /** Cursor overlay (testreel). false → none; {style: touch} → tap dot. Size is preset-scaled unless set. */
-  cursor: z.union([z.boolean(), z.object({ style: z.enum(["default", "pointer", "text", "touch"]).optional(), size: z.number().optional(), idleHideMs: z.number().optional() })]).default(true),
+  /** cursor.idleHide: fade the cursor out when idle (testreel default). Each
+      idle gap adds a nested if() to the ffmpeg alpha expression, and ffmpeg's
+      parser has a depth limit — long demos blow past it. Retake turns it off
+      automatically above 60 steps; set it explicitly either way. */
+  cursor: z.union([z.boolean(), z.object({ style: z.enum(["default", "pointer", "text", "touch"]).optional(), size: z.number().optional(), idleHideMs: z.number().optional(), idleHide: z.boolean().optional() })]).default(true),
   seed: z.array(Seed).default([]),
   /** What a failed step does to the take. "stop" (default): the camera stops
       at the failure, so nobody gets one interaction and ten minutes of
@@ -280,7 +284,7 @@ export type Resolved = Preset & {
   viewport: { width: number; height: number };
   layout: Layout;
   gif: { width: number; fps: number } | false;
-  cursor: false | { style: "default" | "pointer" | "text" | "touch"; size: number; idleHideMs: number };
+  cursor: false | { style: "default" | "pointer" | "text" | "touch"; size: number; idleHideMs: number; idleHide: boolean | undefined };
   captions: false | { fontSize: number; color?: string };
   theme: { background: string; ink: string };
 };
@@ -290,7 +294,7 @@ export function resolve(m: Manifest): Resolved {
   const viewport = { width: m.viewport?.width ?? p.width, height: m.viewport?.height ?? p.height };
   const gifOverride = m.outputs.gif;
   const gif = gifOverride === false ? false : gifOverride === true ? p.gif : p.gif === false ? { width: gifOverride.width ?? 720, fps: gifOverride.fps ?? 15 } : { width: gifOverride.width ?? p.gif.width, fps: gifOverride.fps ?? p.gif.fps };
-  const cursor = m.cursor === false ? (false as const) : { style: (m.cursor === true ? "default" : m.cursor.style ?? "default") as "default" | "pointer" | "text" | "touch", size: m.cursor === true ? p.cursorSize : m.cursor.size ?? p.cursorSize, idleHideMs: m.cursor === true ? 2000 : m.cursor.idleHideMs ?? 2000 };
+  const cursor = m.cursor === false ? (false as const) : { style: (m.cursor === true ? "default" : m.cursor.style ?? "default") as "default" | "pointer" | "text" | "touch", size: m.cursor === true ? p.cursorSize : m.cursor.size ?? p.cursorSize, idleHideMs: m.cursor === true ? 2000 : m.cursor.idleHideMs ?? 2000, idleHide: m.cursor === true ? undefined : m.cursor.idleHide };
   const captions = m.captions === false ? (false as const) : { fontSize: m.captions === true ? p.captionFontSize : m.captions.fontSize ?? p.captionFontSize, color: m.captions === true ? undefined : m.captions.color };
   return {
     ...p,
