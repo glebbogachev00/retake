@@ -214,18 +214,25 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // of `setup` always runs. (They were once the same list, which meant a
     // saved session silently skipped the steps that put the app on its opening
     // screen — a whole take of the wrong thing, with nothing in the log.)
-    for (const step of [...(stateFresh ? [] : (m.auth?.setup ?? [])), ...m.setup]) {
+    let authOk = true;
+    for (const step of [...(stateFresh ? [] : (m.auth?.setup ?? [])).map((st) => ({ st, auth: true })), ...m.setup.map((st) => ({ st, auth: false }))]) {
       try {
-        await runStep(rec, page, step, m, ctx);
+        await runStep(rec, page, step.st, m, ctx);
       } catch (e) {
-        log(`setup step failed: ${describe(step)} — ${(e as Error).message}`);
+        if (step.auth) authOk = false;
+        log(`setup step failed: ${describe(step.st)} — ${(e as Error).message}`);
       }
     }
-    // Persist the signed-in session so later takes skip the login entirely.
-    if (statePath && !stateFresh) {
+    // Persist the signed-in session so later takes skip the login entirely —
+    // but never a broken one: saving after a failed login poisons every later
+    // run, which then "reuses" a logged-out session and records the login
+    // page while believing it is signed in.
+    if (statePath && !stateFresh && authOk) {
       fs.mkdirSync(path.dirname(statePath), { recursive: true });
       await context.storageState({ path: statePath });
       log(`auth: saved session → ${path.relative(process.cwd(), statePath)}`);
+    } else if (statePath && !stateFresh) {
+      log("auth: a sign-in step failed — NOT saving this session");
     }
     setupEnd = Date.now();
 
