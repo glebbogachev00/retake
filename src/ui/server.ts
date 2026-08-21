@@ -111,6 +111,21 @@ const readBody = (req: http.IncomingMessage) =>
 const safeName = (s: string) => /^[a-z0-9-]+$/.test(s);
 const MIME: Record<string, string> = { ".mp4": "video/mp4", ".gif": "image/gif", ".png": "image/png", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
 
+/** A short name for "the app at this URL": the last path segment if there
+    is one (demo.playwright.dev/todomvc → todomvc), else the host without
+    www and TLD (www.saucedemo.com → saucedemo). localhost keeps its port —
+    that is the only thing telling two local apps apart. */
+function shortGroup(url: string): string {
+  if (!url) return "unsorted";
+  try {
+    const u = new URL(url);
+    const seg = u.pathname.split("/").filter(Boolean).pop();
+    if (seg) return seg.slice(0, 24);
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return `localhost:${u.port || "80"}`;
+    return u.hostname.replace(/^www\./, "").replace(/\.[a-z]{2,}$/i, "").slice(0, 24);
+  } catch { return url.replace(/^https?:\/\//, "").slice(0, 24); }
+}
+
 function projectKey(project: string): string {
   return path.resolve(project.replace(/^~/, os.homedir()).trim());
 }
@@ -157,7 +172,7 @@ function listDemos(project?: string) {
         valid = false;
       }
       const assigned = assignments[name];
-      const group = assigned ? path.basename(assigned) : (url ? url.replace(/^https?:\/\//, "") : "unsorted");
+      const group = assigned ? path.basename(assigned) : shortGroup(url);
       const take = path.join(outRoot(), name, "take.json");
       let lastTake: unknown = null;
       // Does the browser need to run again, or is a re-render enough? The

@@ -67,13 +67,17 @@
   .lib { border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 10px; position:sticky; top:14px; line-height:1.4; }
   .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:2px 0 10px 12px; }
   details.group { margin-bottom:0; }
-  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; padding:10px 12px; border-radius:11px; font-size:14.5px; color:var(--muted); min-height:40px; }
+  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; padding:12px 12px 12px 8px; border-radius:12px; font-size:15.5px; color:var(--muted); min-height:48px; }
   details.group summary::-webkit-details-marker { display:none; }
   details.group summary:hover { background:#eef1ea; color:var(--ink); }
-  details.group summary .tri { transition:transform .15s; font-size:11px; width:12px; text-align:center; }
+  details.group summary .tri { transition:transform .15s; font-size:12px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:8px; flex:none; }
+  details.group summary:hover .tri { background:#e6e9e1; }
+  details.group summary .fold { width:18px; height:14px; flex:none; position:relative; }
+  details.group summary .fold::before { content:""; position:absolute; inset:0; border-radius:3px; background:var(--amber); opacity:.9; }
+  details.group summary .fold::after { content:""; position:absolute; left:0; top:-3px; width:8px; height:5px; border-radius:2px 2px 0 0; background:var(--amber); opacity:.9; }
   details.group[open] summary .tri { transform:rotate(90deg); }
   details.group summary b { color:var(--ink); font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  details.group summary small { margin-left:auto; font-size:12px; }
+  details.group summary small { margin-left:auto; font-size:12.5px; }
   details.group .demo { margin-left:14px; }
   .demo { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; cursor:pointer; min-height:40px; }
   .demo:hover { background:#eef1ea; }
@@ -258,7 +262,7 @@ async function drawDemos() {
     det.className = 'group';
     const holdsCurrent = items.some((x) => x.name === current);
     if (open.has(g) || groups.size === 1 || holdsCurrent) det.open = true;
-    det.innerHTML = `<summary><span class="tri">▶</span><b>${esc(g)}</b><small>${items.length}</small></summary>`;
+    det.innerHTML = `<summary><span class="tri">▶</span><span class="fold" aria-hidden="true"></span><b>${esc(g)}</b><small>${items.length}</small></summary>`;
     det.addEventListener('toggle', () => {
       const now = [...document.querySelectorAll('details.group[open] summary b')].map((b) => b.textContent);
       localStorage.setItem('retake.openGroups', JSON.stringify(now));
