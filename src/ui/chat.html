@@ -27,7 +27,7 @@
   .pop { position:absolute; left:0; top:38px; z-index:40; background:#fff; border:1px solid var(--rule2); border-radius:14px; box-shadow:0 12px 34px rgba(24,28,24,.13); padding:8px; width:290px; display:none; }
   .pop.show { display:block; }
   .pop .ttl { font:11px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:6px 10px 8px; margin:0; }
-  .row2 { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:9px; cursor:pointer; font-size:14px; }
+  .row2 { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; cursor:pointer; font-size:14px; min-height:38px; }
   .row2:hover { background:#f1f3ee; }
   .row2 .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row2 small { color:var(--muted); font-size:12px; }
@@ -41,7 +41,7 @@
   /* wide screens: the library floats as its own card at the left, detached
      from the window edge; the video centers in the space beside it. */
   @media (min-width: 1000px) {
-    .wrap.two { grid-template-columns:232px minmax(0,1fr); gap:26px; }
+    .wrap.two { grid-template-columns:280px minmax(0,1fr); gap:30px; }
     .wrap.two .lib { position:sticky; top:14px; order:-1; }
   }
 
@@ -64,29 +64,30 @@
   .stills img { height:64px; border-radius:7px; border:1px solid var(--rule2); box-shadow:0 2px 6px rgba(24,28,24,.06); cursor:pointer; flex:none; }
   .stills img:hover { border-color:var(--ink); }
   /* the library: one quiet card at the video's side */
-  .lib { border:1px solid var(--rule); background:var(--card); border-radius:14px; padding:8px 6px; position:sticky; top:14px; line-height:1.35; }
-  .lib h2 { font:10.5px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:3px 0 4px 9px; }
+  .lib { border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 10px; position:sticky; top:14px; line-height:1.4; }
+  .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:2px 0 10px 12px; }
   details.group { margin-bottom:0; }
-  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:7px; padding:6px 9px; border-radius:9px; font-size:13px; color:var(--muted); }
+  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; padding:10px 12px; border-radius:11px; font-size:14.5px; color:var(--muted); min-height:40px; }
   details.group summary::-webkit-details-marker { display:none; }
   details.group summary:hover { background:#eef1ea; color:var(--ink); }
-  details.group summary .tri { transition:transform .15s; font-size:10px; }
+  details.group summary .tri { transition:transform .15s; font-size:11px; width:12px; text-align:center; }
   details.group[open] summary .tri { transform:rotate(90deg); }
-  details.group summary b { color:var(--ink); font-weight:600; }
+  details.group summary b { color:var(--ink); font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   details.group summary small { margin-left:auto; font-size:12px; }
-  details.group .demo { margin-left:4px; }
-  .demo { display:flex; align-items:center; gap:8px; padding:5px 9px; border-radius:8px; cursor:pointer; }
+  details.group .demo { margin-left:14px; }
+  .demo { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; cursor:pointer; min-height:40px; }
   .demo:hover { background:#eef1ea; }
   .demo.on { background:#fff; border:1px solid var(--rule); }
-  .demo .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
-  .demo small { color:var(--muted); font-size:11.5px; flex:none; }
-  .demo .zap { flex:none; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:13px; padding:0 2px; border-radius:5px; visibility:hidden; }
+  .demo .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14.5px; }
+  .demo small { color:var(--muted); font-size:12px; flex:none; }
+  .demo .zap { flex:none; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; width:26px; height:26px; border-radius:7px; visibility:hidden; }
+  .demo .zap:hover { background:#f3e9e6; }
   .demo:hover .zap { visibility:visible; }
   .demo .zap:hover { color:var(--bad); }
-  .arch { margin-top:6px; border-top:1px solid var(--rule); padding-top:6px; }
+  .arch { margin-top:10px; border-top:1px solid var(--rule); padding-top:10px; }
   .arch .row2 small { cursor:pointer; }
   .arch .row2 small:hover { color:var(--ink); text-decoration:underline; }
-  .arch .clear { display:block; width:100%; text-align:left; border:0; background:transparent; color:var(--muted); font-size:12.5px; padding:7px 9px; cursor:pointer; border-radius:8px; }
+  .arch .clear { display:block; width:100%; text-align:left; border:0; background:transparent; color:var(--muted); font-size:13px; padding:10px 12px; cursor:pointer; border-radius:10px; }
   .arch .clear:hover { background:#f3e9e6; color:var(--bad); }
   .veil { position:fixed; inset:0; background:rgba(24,28,24,.32); display:flex; align-items:center; justify-content:center; z-index:60; }
   .modal { background:#fff; border:1px solid var(--rule2); border-radius:16px; box-shadow:0 18px 50px rgba(24,28,24,.18); padding:22px 24px; width:min(92vw, 380px); }

@@ -21,7 +21,8 @@ import { z } from "zod";
 import YAML from "yaml";
 import { loadManifest, resolve } from "../manifest.js";
 import { record, captureHash, acquireLock, releaseLock, type Take } from "../record.js";
-import { render, check } from "../render.js";
+import { render, check, ffmpegBin } from "../render.js";
+import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
@@ -311,6 +312,45 @@ server.registerTool("receipts", { description: "What happened in the last take o
   const take = JSON.parse(fs.readFileSync(tp, "utf8")) as Take;
   const { manifest } = loadManifest(manifestPath(name));
   return text(receiptsFor(take, manifest.steps as never));
+});
+
+// "All steps passed" is not "looks right". The stills are how a reader with
+// eyes judges a take — a badge in the corner, a board full of leftovers, a
+// caption over the button. The agent gets the same eyes here: scene stills
+// as images, or any frame by timestamp, scaled down so a look costs little.
+server.registerTool("look", {
+  description: "SEE the last take of a demo: returns one image per scene (the frame mid-scene), or the frame at a given second. Use after run/render, before deciding what to change — receipts tell you what happened, look tells you how it looks. Downscaled to keep it cheap; ask for a single scene or a specific second to go closer.",
+  inputSchema: { name: z.string(), scene: z.string().optional().describe("one scene label only"), at: z.number().optional().describe("a second into the video instead of scenes"), width: z.number().int().min(320).max(1280).default(800) },
+  annotations: READ_ONLY,
+}, async ({ name, scene, at, width }) => { LAST_DEMO = name;
+  const dir = path.join(OUT, name);
+  const mp4 = path.join(dir, "demo.mp4");
+  if (!fs.existsSync(mp4)) return text("no rendered take yet — run first");
+  const frame = (seconds: number, label: string) => {
+    const out = path.join(os.tmpdir(), `retake-look-${process.pid}-${label.replace(/[^a-z0-9-]+/gi, "-")}.jpg`);
+    execFileSync(ffmpegBin(), ["-y", "-loglevel", "error", "-ss", seconds.toFixed(2), "-i", mp4, "-frames:v", "1", "-vf", `scale=${width}:-2`, "-q:v", "5", out]);
+    const b64 = fs.readFileSync(out).toString("base64");
+    fs.rmSync(out, { force: true });
+    return { type: "image" as const, data: b64, mimeType: "image/jpeg" };
+  };
+  if (at !== undefined) return { content: [{ type: "text" as const, text: `${name} at ${at.toFixed(1)}s` }, frame(at, `at-${at}`)] };
+  const tp = path.join(dir, "take.json");
+  const take = fs.existsSync(tp) ? (JSON.parse(fs.readFileSync(tp, "utf8")) as Take) : null;
+  const scenes = (take?.timeline ?? []).filter((e) => e.action === "scene");
+  if (!take || !scenes.length) return { content: [{ type: "text" as const, text: `${name}: no scenes — showing the middle` }, frame(1, "mid")] };
+  const end = take.duration - take.trimBefore;
+  const picked = scene ? scenes.filter((e) => e.label === scene) : scenes;
+  if (!picked.length) return text(`no scene "${scene}" — scenes: ${scenes.map((e) => e.label).join(", ")}`);
+  const content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[] = [];
+  for (const [i, sc] of picked.entries()) {
+    const idx = scenes.indexOf(sc);
+    const from = sc.start - take.trimBefore;
+    const next = scenes[idx + 1] ? scenes[idx + 1].start - take.trimBefore : end;
+    const t = Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
+    content.push({ type: "text", text: `scene ${idx + 1}/${scenes.length} “${sc.label}” · ${from.toFixed(1)}–${next.toFixed(1)}s${sc.caption ? ` · caption: ${sc.caption}` : ""}` });
+    content.push(frame(t, `${i}-${sc.label}`));
+  }
+  return { content };
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {
