@@ -238,6 +238,10 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     }
     setupEnd = Date.now();
 
+    // The cap scales with the demo unless the manifest says otherwise: a
+    // 170-step walkthrough is long, not stuck.
+    const explicitWaits = m.steps.reduce((n, st) => n + (st.action === "wait" ? st.ms / 1000 : 0) + ((st as { pauseAfter?: number }).pauseAfter ?? 0) / 1000, 0);
+    const capSeconds = m.maxSeconds ?? Math.min(3600, Math.max(240, Math.round(m.steps.length * 10 + explicitWaits)));
     for (const [i, step] of m.steps.entries()) {
       const start = Date.now();
       const entry: TimelineEntry = {
@@ -279,9 +283,9 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
       }
       entry.end = sec(Date.now() - t0);
       timeline.push(entry);
-      if ((Date.now() - t0) / 1000 > m.maxSeconds) {
+      if ((Date.now() - t0) / 1000 > capSeconds) {
         ok = false;
-        partial = `stopped: the take passed ${m.maxSeconds}s (maxSeconds) — something is stuck`;
+        partial = `stopped: the take passed ${capSeconds}s (the maxSeconds cap) at step ${i} of ${m.steps.length} — if the demo is meant to be this long, set maxSeconds in the manifest; if not, something is stuck`;
         log(`■ ${partial}`);
         break;
       }
@@ -466,7 +470,7 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
           dy = Math.round(box.y - want);
         }
       }
-      if (dy || step.x) await rec.scroll({ x: step.x, y: dy });
+      if (dy || step.x) await rec.scroll({ x: step.x, y: dy, scrollSpeed: step.speed });
       break;
     }
     case "zoom":

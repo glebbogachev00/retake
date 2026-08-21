@@ -51,6 +51,10 @@ export const Step = z.discriminatedUnion("action", [
     to: z.union([z.literal("top"), z.literal("bottom"), Selector]).optional(),
     /** Where the target should end up: top | center (default) | bottom. */
     align: z.enum(["top", "center", "bottom"]).default("center"),
+    /** How fast to move. 1 is the default 600ms; below 1 is slower, so
+        `speed: 0.4` takes 1.5s. A long scroll at full speed reads as a jump —
+        slow it down and the viewer can follow what went past. */
+    speed: z.number().positive().max(4).optional(),
   }),
   Base.extend({
     action: z.literal("zoom"),
@@ -190,9 +194,10 @@ export const Manifest = z.object({
       sync by construction (they are pixels in the recording); captions are
       retimed to match. Re-render only — never a re-record. */
   tempo: z.number().min(0.5).max(2).default(1),
-  /** Hard ceiling on a take, seconds. A demo that runs past this is a demo
-      that is stuck, not a long demo. */
-  maxSeconds: z.number().int().min(10).max(1800).default(240),
+  /** Hard ceiling on a take, seconds. Unset, it scales with the demo
+      (≈10s per step plus the explicit waits, never under 240s): the cap is
+      for a take that is stuck, not one that is long. Set it to override. */
+  maxSeconds: z.number().int().min(10).max(3600).optional(),
   /** Canned network responses, armed before the first navigation. */
   stub: z.array(Stub).default([]),
   /** Steps run before the camera rolls. */
