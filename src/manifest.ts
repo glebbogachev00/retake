@@ -283,7 +283,8 @@ export function warnings(m: Manifest): string[] {
     const rest = m.steps.slice(i + 1);
     const nextScene = rest.findIndex((x) => x.action === "scene");
     const between = nextScene === -1 ? rest : rest.slice(0, nextScene);
-    if (between.length && between.every((x) => x.action === "wait")) w.push(`scene "${st.label}" has only waits before the next scene — nothing happens on camera in it.`);
+    // A closing hold on the payoff is normal; only a waits-only scene *followed by another* is empty.
+    if (nextScene !== -1 && between.length && between.every((x) => x.action === "wait")) w.push(`scene "${st.label}" has only waits before the next scene — nothing happens on camera in it.`);
   });
   return w;
 }

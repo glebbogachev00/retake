@@ -52,7 +52,10 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
   const page = await context.newPage();
   try {
     for (const d of m.stub) await arm(d);
-    await page.goto(expandEnv(m.url), { waitUntil: "networkidle" });
+    // Document first; idle only if it comes quickly. Busy public sites never
+    // go network-idle, and the manifest's waitForSelector is the real gate.
+    await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
     for (const s of [...(m.auth?.setup ?? []), ...m.setup]) await run(s, true);
     for (const [i, s] of m.steps.entries()) await run(s, false, i);
   } finally {
@@ -65,7 +68,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     const short = 8000; // long enough for a click that navigates, short enough to stay fast
     try {
       switch (step.action) {
-        case "navigate": await page.goto(expandEnv(step.url), { waitUntil: "networkidle" }); break;
+        case "navigate": await page.goto(expandEnv(step.url), { waitUntil: "domcontentloaded", timeout: 60000 }); await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {}); break;
         case "waitFor": await page.waitForSelector(step.selector, { timeout: Math.min(step.timeout ?? 15000, 15000) }); break;
         // noWaitAfter: a click that submits a form starts a navigation, and
         // waiting for the element to settle afterwards reports a false failure

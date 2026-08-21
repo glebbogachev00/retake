@@ -201,7 +201,10 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     if (process.env.RETAKE_PAGE_CONSOLE) page.on("console", (msg) => log(`  [page] ${msg.text().slice(0, 200)}`));
 
     // --- setup phase (still inside the video; trimmed later by `trimBefore`) ---
-    await page.goto(expandEnv(m.url), { waitUntil: "networkidle" });
+    // Document first; idle only if it comes quickly. Busy public sites never
+    // go network-idle, and the manifest's waitForSelector is the real gate.
+    await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
     if (!opts.skipSeed) {
       for (const s of m.seed) {
         if (s.kind === "evaluate") await runEvaluateSeed(page, s, opts.manifestDir, log);
@@ -687,5 +690,6 @@ async function runEvaluateSeed(page: Page, s: Extract<Seed, { kind: "evaluate" }
     },
     { script: s.script, data },
   );
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* busy sites never idle; the selector gate decides */ });
 }

@@ -1,0 +1,112 @@
+# Canvas editors: Scratch and GDevelop — the plan
+
+Branch `canvas`, cut from `chat`. Merges back when one real Scratch lesson
+records clean. Read `docs/gdevelop-scratch-retake-claude-brief.md` first — this
+plan agrees with it, and resolves its one tension (below).
+
+## Probed facts (2026-08-21, headless Chromium, no login)
+
+| Fact | Scratch `scratch.mit.edu/projects/editor/` | GDevelop `editor.gdevelop.io` |
+|---|---|---|
+| Loads without account / modal | yes, `.blocklyFlyout` in ~10s | yes; in-app tutorials open from the home screen |
+| Block elements | SVG, `.blocklyFlyout g.blocklyDraggable[data-id]` — 187, all with ids; text in `.blocklyText` | React/Material UI panels; scene editor is a PixiJS canvas |
+| Fixed geometry at 1440×900 | stage canvas 480×360 at (951,93); workspace 942 wide; "move 10 steps" at (70,121) 103×38 | — |
+| Green flag | `[class*="green-flag_green-flag-button"]` (CSS-module class, stable prefix) | — |
+| Tutorial flow | — | clicking "Platformer" opens *"Let's make a platformer game"* (official in-app tutorial, `[role=dialog]`) |
+| testreel drag API | none — a drag must be composed | same |
+
+The brief's Scratch URL (`scratchfoundation.github.io/scratch-gui/develop/`)
+returns 404 — the repo is archived and its Pages build is gone. The official
+editor is the same GUI.
+
+## The tension, resolved
+
+The brief says *do not build features; avoid drag-and-drop*. In Scratch the
+lesson **is** dragging. Both are right, in order:
+
+- **Phase A — no features.** Clicking a block in the palette *runs it*: click
+  "move 10 steps" and the cat moves on the stage. A real lesson beat, zero
+  new engine work, and it proves Retake on an SVG editor + canvas stage today.
+- **Phase B — one step type.** `drag` is the only feature this market needs.
+  Built once, proven on one lesson, then widened by use.
+- **Phase C — GDevelop**, mostly DOM, rides on A + B.
+
+## Phase A — DONE (2026-08-21)
+
+`demos/scratch-first-move.yaml` records clean: 19s, 14/14 dry, check pass,
+sprite **x: 0 → 50** in the final frame. Two findings, both now in the engine
+or the manifest:
+
+- **Click the block's `<text>`, not its group.** `.blocklyFlyout text:has-text('move')`
+  runs the block. Playwright's click on `g.blocklyDraggable` times out (Blockly
+  intercepts pointer events on the group), and a raw mouse click at the group's
+  centre lands on the number input and does nothing. The first take passed every
+  check with the cat at x: 0 — proof that on canvas apps `look` is the assertion,
+  not `check`.
+- **`networkidle` is the wrong gate for public sites.** scratch.mit.edu never
+  goes idle, so `goto` timed out at 30s. Retake now waits for the document
+  (60s) and treats idle as a short bonus; `waitForSelector` is the real gate.
+
+## Phase A — Scratch, click-to-run (recipe)
+
+`demos/scratch-first-move.yaml`: open the editor, click "move 10 steps" in the
+palette three times (the cat walks), click "turn 15 degrees", hold on the
+stage. Selectors: `.blocklyFlyout g.blocklyDraggable:has-text("move")`.
+Camera static. Under 20 steps, well under the cursor cap.
+
+What it proves: selectors on Blockly SVG resolve in `dry`; clicks land on
+SVG targets through the overlay; the canvas result is visible to `look`.
+What it cannot prove: anything about dragging.
+
+## Phase B — `drag`
+
+### Schema
+
+```yaml
+- action: drag
+  from: ".blocklyFlyout g.blocklyDraggable:has-text('move')"   # selector | {x,y} | {selector, dx, dy}
+  to:   { selector: ".blocklyWorkspace", dx: 300, dy: 200 }     # same shapes
+  steps: 18          # intermediate mouse moves (smoothness); default 16
+  holdMs: 120        # pause after mousedown before moving; default 100
+```
+
+Click and hover gain the same target shapes (`at: {x,y}` / `{selector,dx,dy}`)
+for canvas hits — the Scratch stage, GDevelop's scene editor.
+
+### Mechanics (the spike)
+
+testreel records cursor keyframes only from its own actions. A drag is
+composed as: `rec.hover(from)` (cursor travels on camera) → `page.mouse.down()`
+→ N × `page.mouse.move` **paired with** testreel cursor-position events so the
+overlay follows → `page.mouse.up()`. The spike answers one question: does
+testreel expose a way to add cursor keyframes outside its actions (a
+`moveCursorTo` / event push)? If yes, the overlay follows exactly. If no, the
+fallback is a chain of `rec.hover` calls along the path with the button held —
+visually identical, slightly slower. Either way the cursor is on camera.
+
+### Dry run
+
+Resolves both ends (exists + visible), checks point targets are inside the
+viewport, never performs the drag. Canvas results are not checkable by `dry`;
+the skill says: on canvas apps, `look` is the assertion.
+
+### Acceptance (the merge condition)
+
+"Make the cat move when the flag is clicked": drag the `when flag clicked`
+hat, drag `move 10 steps` under it, click the green flag, `look` — the cat
+has moved. ~30s, under the cursor cap, `dry` passes, `check` passes, the end
+still shows the cat displaced.
+
+## Phase C — GDevelop
+
+Start from the in-app platformer tutorial (official, logged-out). Put any
+"open example" / dismiss-prompt clicks in `setup`. Expect: panels and dialogs
+are plain DOM; object placement in the scene editor needs the point targets
+from Phase B. Split by tutorial step; each video ends on a visible result
+(the preview running, the character moving).
+
+## Non-goals
+
+No "canvas mode", no generic drag heuristics, no UI changes, no desktop apps.
+Long lessons are chapters of 30–45s — the cursor cap and the viewer's
+attention agree on that number.
