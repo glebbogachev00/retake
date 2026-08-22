@@ -572,6 +572,29 @@ export function check(outDir: string, m?: Manifest): Check {
   const longest = m ? capSecondsFor(m) : 300;
   say(p.duration >= 5 && p.duration <= longest, `duration: ${p.duration.toFixed(1)}s`);
   if (p.duration > 60) lines.push(`—     ${p.duration.toFixed(0)}s is long for a social post (aim for 15–45s); fine for a walkthrough`);
+  /* A step that stalls is not a failed step, so nothing above notices it — but
+     the camera keeps rolling on the last painted frame and the viewer watches
+     a still image for the duration. One 46s navigation shipped in a take whose
+     other seven navigations took under four seconds; every check passed.
+     `wait` and `scene` are excluded because their whole job is to take time. */
+  const PATIENCE = 8;
+  const stalled = (take.timeline || [])
+    .filter((t) => t.action !== "wait" && t.action !== "scene" && t.action !== "stub")
+    .map((t) => ({ ...t, took: t.end - t.start }))
+    .filter((t) => t.took > PATIENCE)
+    .sort((a, b) => b.took - a.took);
+  if (stalled.length) {
+    const worst = stalled[0];
+    say(false, `${stalled.length} step${stalled.length > 1 ? "s" : ""} stalled over ${PATIENCE}s — ` +
+      `the take holds a still frame there. Worst: ${worst.took.toFixed(1)}s at ` +
+      `${Math.floor(worst.start / 60)}:${String(Math.floor(worst.start % 60)).padStart(2, "0")} — ${worst.summary}`);
+    for (const t of stalled.slice(1, 4)) {
+      lines.push(`—     also ${t.took.toFixed(1)}s: ${t.summary}`);
+    }
+  } else {
+    say(true, `no step stalled (nothing over ${PATIENCE}s)`);
+  }
+
   const mb = (f: string) => (fs.statSync(f).size / 1e6).toFixed(1) + " MB";
   say(true, `demo.mp4: ${mb(mp4)}`);
   const master = path.join(outDir, "master.mp4");

@@ -228,6 +228,10 @@ const ManifestShape = z.object({
       target=_blank navigate in place), so the flow stays on camera. Set false
       when a demo genuinely needs a separate window. */
   keepInTab: z.boolean().default(true),
+  /** Demos that share live state (one Capture hub, one test account) must
+      not run at once: the second take's seed wipes the first take's board
+      mid-video. Name the shared thing; takes holding the same name queue. */
+  lock: z.string().regex(/^[a-z0-9-]+$/).optional(),
   onFail: z.enum(["stop", "continue"]).default("stop"),
   /** Playback tempo applied at render time: 0.8 slows the whole take for a
       client who needs it gentler; 1.2 tightens it. Cursor and clicks stay in

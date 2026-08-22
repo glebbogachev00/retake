@@ -175,7 +175,32 @@ async function performDrag(page: Page, step: Extract<Step, { action: "drag" }>, 
   await page.mouse.up();
 }
 
+/** Wait for a named resource lock (outputs/.locks/<name>), up to 10 min.
+    A stale lock from a dead process is reclaimed after its owner is gone. */
+async function acquireNamedLock(outRoot: string, name: string, log: (l: string) => void): Promise<() => void> {
+  const dir = path.join(outRoot, ".locks");
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${name}.lock`);
+  const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  const until = Date.now() + 10 * 60_000;
+  let waited = false;
+  while (Date.now() < until) {
+    try {
+      fs.writeFileSync(file, String(process.pid), { flag: "wx" });
+      if (waited) log(`lock "${name}": acquired`);
+      return () => { try { if (fs.readFileSync(file, "utf8") === String(process.pid)) fs.unlinkSync(file); } catch { /* gone */ } };
+    } catch {
+      const owner = Number(fs.readFileSync(file, "utf8").trim() || 0);
+      if (!owner || !alive(owner)) { fs.rmSync(file, { force: true }); continue; }
+      if (!waited) { log(`lock "${name}": another take (pid ${owner}) holds it — waiting so we do not wipe each other's state`); waited = true; }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  throw new Error(`lock "${name}": still held after 10 minutes`);
+}
+
 export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
+  let releaseNamed: (() => void) | null = null;
   const log = opts.log ?? noop;
   const startedAt = new Date().toISOString();
   fs.mkdirSync(opts.outDir, { recursive: true });
@@ -191,6 +216,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   log(`preset ${q.name} · canvas ${q.width}×${q.height} · viewport ${q.viewport.width}×${q.viewport.height} @ ${q.fps}fps · page scale ${q.scale}×`);
 
   if (!opts.skipSeed) {
+    if (m.lock) releaseNamed = await acquireNamedLock(path.dirname(opts.outDir), m.lock, log);
     for (const s of m.seed) await runFileOrCommandSeed(s, opts.manifestDir, log);
   }
 
@@ -490,6 +516,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     captureHash: captureHash(m),
     captureSec: Math.round((Date.parse(finishedAt) - Date.parse(startedAt)) / 100) / 10,
   };
+  releaseNamed?.();
   fs.writeFileSync(path.join(opts.outDir, "take.json"), JSON.stringify(take, null, 2));
   return take;
 }
