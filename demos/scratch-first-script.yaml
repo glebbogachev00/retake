@@ -15,7 +15,7 @@ setup:
 steps:
   - action: scene
     label: start
-    caption: A script starts with when — when something happens
+    caption: He's too lazy to record his own screen. So I'm doing it.
     camera: static
   - action: wait
     ms: 1600
