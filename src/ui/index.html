@@ -381,7 +381,9 @@ function saveDraftSoon() { clearTimeout(draftTimer); draftTimer = setTimeout(asy
 }, 500); }
 
 // ---------- demo view ----------
-const PRESET_LABEL = { 'post-landscape': '1080p', 'post-square': 'square', 'post-vertical': 'vertical', 'docs-gif': 'docs', 'proof-fast': 'small', 'master': 'master', 'preview-fast': 'preview' };
+// Shape, not a resolution: the video is the page plus the caption band, so
+// "1080p" was never true of what post-landscape actually writes (1920×1230).
+const PRESET_LABEL = { 'post-landscape': 'landscape', 'post-square': 'square', 'post-vertical': 'vertical', 'docs-gif': 'docs', 'proof-fast': 'small', 'master': 'master', 'preview-fast': 'preview', 'draft': 'draft' };
 async function select(name) {
   if (dirty && !confirm('Discard unsaved manifest edits?')) return;
   current = name; dirty = false; setMsg('');
@@ -708,7 +710,7 @@ document.addEventListener('keydown', (e) => {
 // ---------- boot ----------
 (async () => {
   setQuality(quality);
-  try { const ps = await api('/api/presets'); $('sPreset').innerHTML = ps.filter((p) => p.name !== 'preview-fast').map((p) => `<option value="${p.name}">${p.name} — ${p.width}×${p.height}</option>`).join(''); } catch {}
+  try { const ps = await api('/api/presets'); $('sPreset').innerHTML = ps.filter((p) => p.name !== 'preview-fast').map((p) => { const h = p.layout === 'card' ? p.height : p.height + (p.layout === 'band' ? p.bandHeight : 0); return `<option value="${p.name}">${p.name} — ${p.width}×${h}</option>`; }).join(''); } catch {}
   try { settings = await api('/api/settings'); $('modelTag').textContent = settings.active ? 'model: ' + settings.active : 'no model — set one in Settings'; } catch {}
   const list = await loadDemos();
   // Arriving from the review page's Edit link: /classic#<demo> opens that demo.
