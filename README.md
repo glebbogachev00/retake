@@ -82,7 +82,7 @@ preset: post-landscape            # `retake presets` — 1920×1080 page + capti
 viewport: { width: 1440, height: 1080 }
 scale: 1.8                        # page drawn at 1.8× so text stays crisp
 reducedMotion: true
-camera: auto                      # each scene eases toward the last thing touched
+camera: static                    # still (the default); `auto` eases toward the last thing touched
 
 seed: []                          # put the app in a known state first
 setup: []                         # runs before the camera; trimmed off the video
@@ -125,7 +125,7 @@ Think in the publishing format, not the browser window.
 
 **The video is the page area plus the caption band.** Landscape keeps a full 1920×1080 page and the band goes under it (1920×1230) — the captions never cover the app. Square and vertical fit the band inside the canvas, because a feed that wants 1:1 or 9:16 will letterbox anything else. A manifest's `viewport` replaces the page area and the video follows it, so a 1240×1080 viewport gives a 1240×1230 video. `retake presets` prints this table, and `retake validate` tells you the exact size of the video a manifest will produce before you record it.
 
-**Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text reads on a phone. **Camera** eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at — per scene: `camera: static` or `camera: { focus: ".result", zoom: 1.3 }`. Captions, camera, speed, trim, format and layout are all render-time: change them and `retake render` takes seconds, never touches the browser.
+**Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text reads on a phone. **Camera** is still by default — a calm demo reads as real. `camera: auto` eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at; per scene: `camera: { focus: ".result", zoom: 1.3 }`. Zoom is something you ask for after seeing a take, not something that happens to you. Captions, camera, speed, trim, format and layout are all render-time: change them and `retake render` takes seconds, never touches the browser.
 
 ## Behind a login
 

@@ -402,7 +402,7 @@ function fillSettings(d) {
   const st = d.settings || {};
   $('sPreset').value = st.preset || 'post-landscape';
   $('sLayout').value = (st.layout === 'band' || !st.layout) ? 'default' : st.layout;
-  $('sCamera').value = st.camera || 'auto';
+  $('sCamera').value = st.camera || 'static';
   $('sCursor').value = st.cursor || 'default';
   paintAction();
 }
@@ -499,7 +499,7 @@ function openScene(label, t) {
   sceneOpen = label;
   $('sceneWho').textContent = `Scene “${label}” · ${t.toFixed(1)}s`;
   $('sceneCap').value = sc?.caption || '';
-  $('sceneCam').value = typeof sc?.camera === 'number' ? String(sc.camera) : (sc?.camera || 'auto');
+  $('sceneCam').value = typeof sc?.camera === 'number' ? String(sc.camera) : (sc?.camera || 'static');
   $('sceneEdit').classList.add('show');
   $('scrub').querySelectorAll('b').forEach((b) => b.classList.toggle('on', b.dataset.label === label));
   const v = $('stage').querySelector('video'); if (v) { v.currentTime = t; v.pause(); }

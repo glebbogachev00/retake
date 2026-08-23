@@ -81,8 +81,9 @@ Full reference: `README.md` → "Demo-as-code". The short version:
   elements fails. Prefer ids, `data-testid`, `aria-label`, then
   `button:has-text("…")`; append `>> nth=0` only when duplicates are intended.
 - **Scenes carry the story.** `{ action: scene, label, caption }` at each beat;
-  captions burn into the video; the camera eases toward the last thing touched
-  (or `camera: { focus: <selector>, zoom: 1.3 }` / `camera: static`).
+  captions burn into the video. The camera is still by default; `camera: auto`
+  eases toward the last thing touched, or per scene `camera: { focus:
+  <selector>, zoom: 1.3 }`. Add zoom only when the person asks.
 - **Logins go in `auth.setup`**, never in `steps` — see "Logins" below.
 - **Backend not available?** `stub:` answers API calls with canned JSON for the
   take, and a `stub` step swaps the answer mid-demo. Every stub is named in the

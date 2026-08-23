@@ -77,9 +77,11 @@ zooms or caption tone until they have seen one. Two moves instead:
    → landscape, still camera, a hold on the payoff. Skip the question if
    the project's style note already answers it.
 2. **The first take is the menu.** Record the calm default as a preview,
-   let them watch it, then offer two or three concrete alternatives as
-   sentences ("Square for a post? Captions off? Zoom on the result?").
-   Whatever they choose, save it with `style` so it never comes up again.
+   let them watch it, then one line — no list, no questions before it:
+   "Want it different? A zoom on the result, cursor off, square for a post —
+   say so and I'll re-render." Whatever they choose, save it with `style`
+   so it never comes up again in this project. Never ask about zoom or
+   cursor before they have seen a take.
 
 Anything they would tell a videographer maps to a knob, in plain English:
 
@@ -89,7 +91,9 @@ Anything they would tell a videographer maps to a knob, in plain English:
 - "slower" / "hold the ending" → `pauseAfter`, scene `holdMs`, end waits
 - "square" / "vertical" / "for X" → preset `post-square` / `post-vertical`
 
-The default is already calm: still camera, cursor shown, plain captions.
+The default is calm and real: still camera (`camera: static` is the
+manifest default — write `auto` only when asked), cursor shown, plain
+captions.
 The first time the person expresses taste, save it with the `style` tool
 (or write `demos/style.md`) — every later draft in the project reads it, so
 they never have to say it twice. Their stated taste always beats defaults.

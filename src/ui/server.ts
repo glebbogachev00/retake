@@ -809,7 +809,7 @@ export function serve(port: number) {
           if (b.holdMs !== undefined) { if (!b.holdMs) node.delete("holdMs"); else node.set("holdMs", Number(b.holdMs)); }
           if (b.camera !== undefined) {
             if (b.camera === "static") node.set("camera", "static");
-            else if (b.camera === "auto") node.delete("camera");
+            else if (b.camera === "auto") node.set("camera", "auto");
             else if (typeof b.camera === "object") node.set("camera", b.camera);
           }
         }

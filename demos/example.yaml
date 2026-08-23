@@ -17,7 +17,7 @@ preset: post-landscape        # 1080p @ 30fps · see `retake presets`
 viewport: { width: 1440, height: 1080 }   # match your app's natural shape
 scale: 1.8                    # page drawn at 1.8× so text stays crisp at 1080p
 reducedMotion: true           # calms infinite spinners and entrance animations
-camera: auto                  # each scene eases toward the last thing touched
+camera: static                # still by default; `auto` eases toward the last thing touched
 
 # Put the app in a known state before the camera rolls. Pick what fits:
 #   - { kind: file, path: /tmp/app/state.json, from: seeds/empty.json }

@@ -189,7 +189,11 @@ const ManifestShape = z.object({
   /** band (default): the site fills the frame, caption strip below · card: the recording framed on a soft canvas · overlay-*: caption over the video · none */
   layout: z.enum(["band", "card", "overlay-bottom", "overlay-top", "none"]).optional(),
   /** auto: each scene zooms toward the last element the demo touched · static: no camera moves. */
-  camera: z.union([z.literal("auto"), z.literal("static"), z.object({ zoom: z.number().min(1).max(3) })]).default("auto"),
+  /** Still by default. A zoom is something a person asks for after seeing a
+      take, never something that happens to them: a calm demo reads as real
+      and can never crop the wrong thing. `auto` eases toward the last thing
+      touched; a scene can override either way. */
+  camera: z.union([z.literal("auto"), z.literal("static"), z.object({ zoom: z.number().min(1).max(3) })]).default("static"),
   /** Seconds cut from the head/tail of the finished video. Render-only: change
       it and re-render, no re-recording. */
   trim: z.object({ head: z.number().nonnegative().default(0), tail: z.number().nonnegative().default(0) }).prefault({}),
