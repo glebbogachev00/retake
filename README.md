@@ -146,8 +146,7 @@ Apps that keep their session in IndexedDB (Firebase) can't be restored from `sto
 ## Limits worth knowing
 
 - **One page.** Retake records one tab. `keepInTab` (on by default) folds `window.open` and `target="_blank"` back into it, so popup logins and "preview" buttons stay on camera; flows that genuinely need a second window do not.
-- **~45 cursor moves per take.** The cursor overlay is one nested expression per move and ffmpeg's parser has a depth limit. `validate` warns, the recorder detects it, `check` fails. Split long stories into chapters of 30–45 seconds — the viewer agrees.
-- **`scale` uses CSS zoom**, which shifts the coordinate space some forms rely on for focus; if typing goes nowhere, `scale: 1`. (`deviceScaleFactor` is not the fix — Playwright's screencast never upscales.)
+- **~180 cursor moves per take.** Retake flattens testreel's cursor expressions at install time (the stock ones hit ffmpeg's nesting limit at ~45 moves); the remaining ceiling is the filter's size as one process argument. `validate` warns, the recorder detects it, `check` fails. Long stories still want chapters of 30–45 seconds — for the viewer, not the tool.
 - **macOS is where it's used daily.** `videotoolbox` hardware encoding falls back to libx264 elsewhere; Linux is untested beyond CI.
 
 ## How it's built

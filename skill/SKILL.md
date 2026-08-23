@@ -122,9 +122,9 @@ outcome there is.
 
 ## Long demos: split, and record up to the beat you are fixing
 
-Hard limit to know: the cursor overlay cannot survive more than ~45 cursor
-moves in one take (an ffmpeg expression-depth limit in testreel). `validate`
-warns, `check` fails if it happened. Past that, split — or `cursor: false`.
+Hard limit to know: ~180 cursor moves in one take (the cursor filter must
+fit in one ffmpeg argument). `validate` warns, `check` fails if it happened.
+Past that, split — or `cursor: false`.
 
 A take is real time: a six-minute walkthrough costs six minutes per
 attempt and nobody watches six minutes. Above ~40 steps, split the story

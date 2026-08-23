@@ -1,6 +1,6 @@
 {
   "name": "retake-demos",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Demo-as-code for coding agents: a YAML manifest in, a product walkthrough video out. Rerun the demo instead of re-recording it.",
   "keywords": [
     "demo",
@@ -37,10 +37,12 @@
     "demos/example.yaml",
     ".env.example",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "scripts/patch-testreel.mjs"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",
+    "postinstall": "node scripts/patch-testreel.mjs",
     "prepare": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test",
     "retake": "tsx src/cli.ts",
@@ -52,7 +54,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "commander": "^14.0.3",
     "playwright": "^1.58.2",
-    "testreel": "^0.2.0",
+    "testreel": "0.2.0",
     "yaml": "^2.8.3",
     "zod": "^4.4.3"
   },

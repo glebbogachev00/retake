@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.2 — 2026-08-23
+
+Two limits from the README's "Limits worth knowing" retired, with recorded
+proof for each (`demos/cursor-hundred.yaml`, `demos/zoom-probe.yaml`).
+
+- **Cursor cap lifted from ~45 to ~180 moves per take.** testreel builds its
+  cursor overlay as nested `if()` expressions and ffmpeg's parser stops at 98
+  levels; `scripts/patch-testreel.mjs` (run on install, testreel pinned to
+  0.2.0) rewrites the four builders as flat sums of windowed segments —
+  identical frame for frame (test covers 120k samples including overlapping
+  transitions), depth 2 at 200 moves. A 100-click take now records with the
+  cursor on every button and the idle fade intact. The remaining ceiling is
+  the filter's size as one process argument (~630 bytes a move vs Linux's
+  128 KB); `validate` warns at 180.
+- Idle fade is no longer forced off above 60 steps — that was a workaround for
+  the same cap.
+- **The CSS-zoom focus bug is gone** and is now a regression demo: typing
+  lands on the AvexJets forms at scale 1.8, 2 and 2.5. Earlier engine changes
+  (zoom via a `<style>` tag, bring-into-view safe zone) had fixed it without
+  anyone re-testing the claim.
+
 ## 0.2.1 — 2026-08-23
 
 Found by testing the published package as a stranger would.

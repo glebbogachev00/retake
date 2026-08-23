@@ -1,0 +1,116 @@
+# Regression for the cursor cap: 100 clicks = 100 cursor moves in one take.
+# Before the flat-expression patch the overlay vanished past ~45 moves.
+name: cursor-hundred
+title: "A hundred cursor moves in one take"
+url: file://../test/fixtures/grid.html   # relative to this manifest
+preset: draft
+reducedMotion: true
+camera: static
+# idle fade on (the default) — the old cap forced it off past 60 steps
+maxSeconds: 600
+steps:
+  - { action: scene, label: start, caption: "A hundred buttons." }
+  - { action: waitFor, selector: "#b100" }
+  - { action: click, selector: "#b1", pauseAfter: 60 }
+  - { action: click, selector: "#b2", pauseAfter: 60 }
+  - { action: click, selector: "#b3", pauseAfter: 60 }
+  - { action: click, selector: "#b4", pauseAfter: 60 }
+  - { action: click, selector: "#b5", pauseAfter: 60 }
+  - { action: click, selector: "#b6", pauseAfter: 60 }
+  - { action: click, selector: "#b7", pauseAfter: 60 }
+  - { action: click, selector: "#b8", pauseAfter: 60 }
+  - { action: click, selector: "#b9", pauseAfter: 60 }
+  - { action: click, selector: "#b10", pauseAfter: 60 }
+  - { action: click, selector: "#b11", pauseAfter: 60 }
+  - { action: click, selector: "#b12", pauseAfter: 60 }
+  - { action: click, selector: "#b13", pauseAfter: 60 }
+  - { action: click, selector: "#b14", pauseAfter: 60 }
+  - { action: click, selector: "#b15", pauseAfter: 60 }
+  - { action: click, selector: "#b16", pauseAfter: 60 }
+  - { action: click, selector: "#b17", pauseAfter: 60 }
+  - { action: click, selector: "#b18", pauseAfter: 60 }
+  - { action: click, selector: "#b19", pauseAfter: 60 }
+  - { action: click, selector: "#b20", pauseAfter: 60 }
+  - { action: click, selector: "#b21", pauseAfter: 60 }
+  - { action: click, selector: "#b22", pauseAfter: 60 }
+  - { action: click, selector: "#b23", pauseAfter: 60 }
+  - { action: click, selector: "#b24", pauseAfter: 60 }
+  - { action: click, selector: "#b25", pauseAfter: 60 }
+  - { action: click, selector: "#b26", pauseAfter: 60 }
+  - { action: click, selector: "#b27", pauseAfter: 60 }
+  - { action: click, selector: "#b28", pauseAfter: 60 }
+  - { action: click, selector: "#b29", pauseAfter: 60 }
+  - { action: click, selector: "#b30", pauseAfter: 60 }
+  - { action: click, selector: "#b31", pauseAfter: 60 }
+  - { action: click, selector: "#b32", pauseAfter: 60 }
+  - { action: click, selector: "#b33", pauseAfter: 60 }
+  - { action: click, selector: "#b34", pauseAfter: 60 }
+  - { action: click, selector: "#b35", pauseAfter: 60 }
+  - { action: click, selector: "#b36", pauseAfter: 60 }
+  - { action: click, selector: "#b37", pauseAfter: 60 }
+  - { action: click, selector: "#b38", pauseAfter: 60 }
+  - { action: click, selector: "#b39", pauseAfter: 60 }
+  - { action: click, selector: "#b40", pauseAfter: 60 }
+  - { action: click, selector: "#b41", pauseAfter: 60 }
+  - { action: click, selector: "#b42", pauseAfter: 60 }
+  - { action: click, selector: "#b43", pauseAfter: 60 }
+  - { action: click, selector: "#b44", pauseAfter: 60 }
+  - { action: click, selector: "#b45", pauseAfter: 60 }
+  - { action: click, selector: "#b46", pauseAfter: 60 }
+  - { action: click, selector: "#b47", pauseAfter: 60 }
+  - { action: click, selector: "#b48", pauseAfter: 60 }
+  - { action: click, selector: "#b49", pauseAfter: 60 }
+  - { action: click, selector: "#b50", pauseAfter: 60 }
+  - { action: click, selector: "#b51", pauseAfter: 60 }
+  - { action: click, selector: "#b52", pauseAfter: 60 }
+  - { action: click, selector: "#b53", pauseAfter: 60 }
+  - { action: click, selector: "#b54", pauseAfter: 60 }
+  - { action: click, selector: "#b55", pauseAfter: 60 }
+  - { action: click, selector: "#b56", pauseAfter: 60 }
+  - { action: click, selector: "#b57", pauseAfter: 60 }
+  - { action: click, selector: "#b58", pauseAfter: 60 }
+  - { action: click, selector: "#b59", pauseAfter: 60 }
+  - { action: click, selector: "#b60", pauseAfter: 60 }
+  - { action: click, selector: "#b61", pauseAfter: 60 }
+  - { action: click, selector: "#b62", pauseAfter: 60 }
+  - { action: click, selector: "#b63", pauseAfter: 60 }
+  - { action: click, selector: "#b64", pauseAfter: 60 }
+  - { action: click, selector: "#b65", pauseAfter: 60 }
+  - { action: click, selector: "#b66", pauseAfter: 60 }
+  - { action: click, selector: "#b67", pauseAfter: 60 }
+  - { action: click, selector: "#b68", pauseAfter: 60 }
+  - { action: click, selector: "#b69", pauseAfter: 60 }
+  - { action: click, selector: "#b70", pauseAfter: 60 }
+  - { action: click, selector: "#b71", pauseAfter: 60 }
+  - { action: click, selector: "#b72", pauseAfter: 60 }
+  - { action: click, selector: "#b73", pauseAfter: 60 }
+  - { action: click, selector: "#b74", pauseAfter: 60 }
+  - { action: click, selector: "#b75", pauseAfter: 60 }
+  - { action: click, selector: "#b76", pauseAfter: 60 }
+  - { action: click, selector: "#b77", pauseAfter: 60 }
+  - { action: click, selector: "#b78", pauseAfter: 60 }
+  - { action: click, selector: "#b79", pauseAfter: 60 }
+  - { action: click, selector: "#b80", pauseAfter: 60 }
+  - { action: click, selector: "#b81", pauseAfter: 60 }
+  - { action: click, selector: "#b82", pauseAfter: 60 }
+  - { action: click, selector: "#b83", pauseAfter: 60 }
+  - { action: click, selector: "#b84", pauseAfter: 60 }
+  - { action: click, selector: "#b85", pauseAfter: 60 }
+  - { action: click, selector: "#b86", pauseAfter: 60 }
+  - { action: click, selector: "#b87", pauseAfter: 60 }
+  - { action: click, selector: "#b88", pauseAfter: 60 }
+  - { action: click, selector: "#b89", pauseAfter: 60 }
+  - { action: click, selector: "#b90", pauseAfter: 60 }
+  - { action: click, selector: "#b91", pauseAfter: 60 }
+  - { action: click, selector: "#b92", pauseAfter: 60 }
+  - { action: click, selector: "#b93", pauseAfter: 60 }
+  - { action: click, selector: "#b94", pauseAfter: 60 }
+  - { action: click, selector: "#b95", pauseAfter: 60 }
+  - { action: click, selector: "#b96", pauseAfter: 60 }
+  - { action: click, selector: "#b97", pauseAfter: 60 }
+  - { action: click, selector: "#b98", pauseAfter: 60 }
+  - { action: click, selector: "#b99", pauseAfter: 60 }
+  - { action: click, selector: "#b100", pauseAfter: 60 }
+  - { action: scene, label: done, caption: "A hundred presses, one cursor." }
+  - { action: waitFor, selector: "text=100 pressed" }
+  - { action: wait, ms: 1200 }

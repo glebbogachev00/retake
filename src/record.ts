@@ -104,7 +104,11 @@ export function capSecondsFor(m: Manifest): number {
 }
 
 /** Roughly how many times the cursor will move on camera. */
-export const CURSOR_MOVE_LIMIT = 45;
+/** Cursor moves per take. testreel's nested-if overlay died at ~45 (ffmpeg's
+    parser stops at 98 levels); scripts/patch-testreel.mjs flattens those
+    expressions, so the ceiling is now the size of the filter graph as one
+    argv string — ~630 bytes a move against Linux's 128 KB per-argument cap. */
+export const CURSOR_MOVE_LIMIT = 180;
 export function cursorMoves(m: Manifest): number {
   return m.steps.filter((s) => ["click", "type", "fill", "hover", "scroll", "upload"].includes(s.action)).length;
 }
@@ -332,9 +336,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // past roughly sixty steps the nesting exceeds ffmpeg's parser and the
     // composite fails. Long demos get an always-visible cursor unless told
     // otherwise — the fade was never the point of the video.
-    const LONG = 60;
-    const cursorIdleHide = q.cursor === false ? undefined : q.cursor.idleHide ?? (m.steps.length <= LONG);
-    if (q.cursor !== false && q.cursor.idleHide === undefined && m.steps.length > LONG) log(`cursor: ${m.steps.length} steps — idle-hide fades off (ffmpeg nesting limit); set cursor.idleHide to override`);
+    const cursorIdleHide = q.cursor === false ? undefined : q.cursor.idleHide;
     const rec = await recordPage(page, {
       outputDir: opts.outDir,
       name: m.name,
@@ -379,7 +381,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // expression parser stops at 98 levels — about 49 moves. Past that the
     // overlay silently fails and the video ships with no cursor at all.
     const moves = cursorMoves(m);
-    if (q.cursor !== false && moves > CURSOR_MOVE_LIMIT) log(`cursor: ~${moves} cursor moves — testreel's overlay cannot exceed ~${CURSOR_MOVE_LIMIT}; the cursor may be MISSING from this video. Split the demo, or set cursor: false to be honest about it.`);
+    if (q.cursor !== false && moves > CURSOR_MOVE_LIMIT) log(`cursor: ~${moves} cursor moves — past ~${CURSOR_MOVE_LIMIT} the cursor filter no longer fits in one ffmpeg argument and the overlay may be MISSING. Split the demo (a viewer wants chapters anyway), or set cursor: false to be honest about it.`);
     let pastUntil = false;
     for (const [i, step] of m.steps.entries()) {
       // --until <scene>: record that scene in full, stop at the next one.
@@ -457,7 +459,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
       screenshots = result.screenshots;
       const joined = compositeLog.join("");
       if (/Error initializing filters|Missing '\)' or too many args/.test(joined)) {
-        const why = `cursor overlay failed in testreel's ffmpeg pass (expression too deep — ~${moves} moves, limit ~${CURSOR_MOVE_LIMIT}); the video has NO CURSOR. Split the demo or set cursor: false.`;
+        const why = `cursor overlay failed in testreel's ffmpeg pass (~${moves} moves; the filter is too large past ~${CURSOR_MOVE_LIMIT}); the video has NO CURSOR. Split the demo or set cursor: false.`;
         partial = partial ? `${partial}; ${why}` : why;
         ok = false;
         log(`✗ ${why}`);

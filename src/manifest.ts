@@ -214,10 +214,9 @@ const ManifestShape = z.object({
   waitForSelector: Selector.optional(),
   speed: z.number().positive().default(1),
   /** Cursor overlay (testreel). false → none; {style: touch} → tap dot. Size is preset-scaled unless set. */
-  /** cursor.idleHide: fade the cursor out when idle (testreel default). Each
-      idle gap adds a nested if() to the ffmpeg alpha expression, and ffmpeg's
-      parser has a depth limit — long demos blow past it. Retake turns it off
-      automatically above 60 steps; set it explicitly either way. */
+  /** cursor.idleHide: fade the cursor out when idle (testreel default). Long
+      demos used to lose it (nested-if depth in ffmpeg); the flat cursor
+      expressions lifted that, so it is simply on unless you say otherwise. */
   cursor: z.union([z.boolean(), z.object({ style: z.enum(["default", "pointer", "text", "touch"]).optional(), size: z.number().optional(), idleHideMs: z.number().optional(), idleHide: z.boolean().optional() })]).default(true),
   seed: z.array(Seed).default([]),
   /** What a failed step does to the take. "stop" (default): the camera stops
@@ -305,7 +304,13 @@ export function loadManifest(file: string): LoadedManifest {
     }).join("\n");
     throw new Error(`Invalid manifest ${file}:\n${issues}`);
   }
-  return { manifest: parsed.data, file: abs, dir: path.dirname(abs) };
+  const dir = path.dirname(abs);
+  // A fixture page can live next to its manifest: `url: file://./page.html`
+  // resolves against the manifest's folder, so a cloned repo's demos work.
+  const m = parsed.data;
+  const rel = /^file:\/\/(\.{1,2}\/.*)$/.exec(m.url);
+  if (rel) m.url = "file://" + path.resolve(dir, rel[1]);
+  return { manifest: m, file: abs, dir };
 }
 
 /** Things worth saying out loud before a run. Not errors — the run proceeds. */
@@ -322,7 +327,7 @@ export function warnings(m: Manifest): string[] {
   }
   if (m.auth && !m.auth.setup.length && !m.setup.length) w.push("`auth.storageState` is set but there are no sign-in steps under `auth.setup` — there is nothing to save a session from.");
   const moves = m.steps.filter((st) => ["click", "type", "fill", "hover", "scroll", "upload"].includes(st.action)).length;
-  if (m.cursor !== false && moves > 45) w.push(`~${moves} cursor moves — the cursor overlay (testreel/ffmpeg) cannot exceed ~45 in one take and will be MISSING from the video. Split the demo into shorter ones, or set \`cursor: false\`.`);
+  if (m.cursor !== false && moves > 180) w.push(`~${moves} cursor moves — past ~180 in one take the cursor filter no longer fits in one ffmpeg argument and the overlay will be MISSING. Split the demo into chapters, or set \`cursor: false\`.`);
   m.steps.forEach((st, i) => {
     if (st.action !== "scene") return;
     const rest = m.steps.slice(i + 1);

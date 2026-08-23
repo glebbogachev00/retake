@@ -131,19 +131,15 @@ recording-relevant changed, and the UI's one button works this out for you.
   (`--no-seed` to skip). `evaluate` seeds only run with a camera.
 - A one-line `script:` with braces is a YAML mapping, not a string — write
   `script: |` and put the JS on the next line.
-- Long demos (> 60 steps): the cursor stays visible instead of fading when
-  idle — each fade is a nested `if()` in testreel's ffmpeg expression and the
-  parser has a depth limit. `cursor: { idleHide: false }` forces it off at any
-  length; `true` forces it on (and may fail past ~60 steps).
 - Iterating on one beat of a long demo: `run demos/x.yaml --until <scene>`
   records up to the end of that scene and stops (MCP: `run` with `until`).
   Better still, keep demos short — above ~40 steps, split the story.
 - If Retake itself fails (render/ffmpeg error, crash), stop and report it —
   do not patch around the tool.
-- **Cursor cap: ~45 moves per take.** testreel draws the cursor with one nested
-  `if()` per move and ffmpeg's parser stops at 98 levels. Past it the overlay
-  silently drops — `validate` now warns, the recorder detects the failure and
-  `check` FAILs. Split long stories; `cursor: false` if you must go long.
+- **Cursor cap: ~180 moves per take.** (Was ~45; Retake now flattens testreel's
+  cursor expressions at install.) `validate` warns past it, the recorder
+  detects a failed overlay and `check` FAILs. Split long stories anyway —
+  above ~40 steps nobody is watching.
 - Stills: `NN-label.png` is mid-scene, `NN-label-end.png` the last moment.
 - Scroll pacing defaults to constant pixels-per-second; `speed:` overrides.
 - **New tabs are folded back into the recorded page** (`keepInTab`, default

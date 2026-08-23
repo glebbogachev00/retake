@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf-8"><title>grid</title>
+<style>body{margin:0;font:16px system-ui;background:#f4f4f2}h1{margin:24px 32px 8px}
+.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:10px;padding:16px 32px}
+button{height:44px;border:1px solid #bbb;border-radius:8px;background:#fff;cursor:pointer}
+button.on{background:#1d3b8b;color:#fff}#n{margin:0 32px;color:#555}</style>
+<h1>A hundred buttons</h1><p id="n">0 pressed</p><div class="grid" id="g"></div>
+<script>const g=document.getElementById('g');let k=0;for(let i=1;i<=100;i++){const b=document.createElement('button');b.id='b'+i;b.textContent=i;b.onclick=()=>{b.classList.add('on');document.getElementById('n').textContent=(++k)+' pressed'};g.appendChild(b)}</script>
