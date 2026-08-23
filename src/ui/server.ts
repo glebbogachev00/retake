@@ -586,6 +586,9 @@ export function serve(port: number) {
         const b = JSON.parse(await readBody(req)) as { names?: string[]; why?: string };
         const names = (b.names ?? []).filter((n) => SECRET_NAME.test(n));
         if (!names.length) return json(res, 400, { error: "names must be like APP_PASSWORD" });
+        // The same ask twice is one form, not two stacked ones.
+        const dup = [...secretRequests.values()].find((x) => !x.filled && x.names.join() === names.join());
+        if (dup) return json(res, 200, { id: dup.id });
         const r: SecretRequest = { id: "s" + Date.now().toString(36), names, why: String(b.why ?? "").slice(0, 300), filled: false, at: Date.now() };
         secretRequests.set(r.id, r);
         for (const w of activityWatchers) w({ type: "secrets", data: { id: r.id, names: r.names, why: r.why } });

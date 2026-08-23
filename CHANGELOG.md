@@ -4,7 +4,9 @@
 
 Logins, done so that no model ever sees a password.
 
-- **`secrets` MCP tool.** The agent asks for credentials *by name*
+- **`secrets` MCP tool.** Returns at once with the exact words and the link
+  for the agent to relay — a first-timer is walked to the window, not left
+  waiting on a silent tool. The agent asks for credentials *by name*
   (`APP_USER`, `APP_PASSWORD`, `APP_TOTP_SECRET`); a form appears in the Retake
   window, the person types the values, they are written to the workspace
   `.env` (mode 600) and the agent hears only "set". Without a window the tool

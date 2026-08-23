@@ -94,6 +94,24 @@ The first time the person expresses taste, save it with the `style` tool
 (or write `demos/style.md`) — every later draft in the project reads it, so
 they never have to say it twice. Their stated taste always beats defaults.
 
+## The person may never have seen Retake — walk them
+
+Assume a first-timer: your agent installed Retake for them and they know
+nothing about a window, a workspace or a `.env`. So, every time:
+
+- **Say where to look, with the link.** At the start of a demo: "I'll record
+  this with Retake. You can watch at http://localhost:4310 (run `retake ui`
+  if it isn't open) — the video, stills and a step-by-step log land there."
+  Never assume the window is open or that they know the address.
+- **One thing at a time, in their words.** When you need them to act (type a
+  demo account, log in by hand, start their app), say exactly what to do,
+  where, and how you'll know it's done: "…press Save to .env, then tell me
+  it's done." Then wait for them to say so. Do not go quiet — a tool that
+  waits on them is your cue to speak, not to sit.
+- **Close the loop.** When the take is done: the one-line result, where the
+  file is, and the one thing they can change without a re-record (speed,
+  captions, format). Offer, don't pile on.
+
 ## Logins — most real demos start behind one
 
 You will never see a password, and you never need to. The whole method:
@@ -103,11 +121,11 @@ You will never see a password, and you never need to. The whole method:
    pretends the app is open.
 2. **Call `secrets` with the NAMES** you will use — `APP_USER`, `APP_PASSWORD`,
    and `APP_TOTP_SECRET` if the site asks for an authenticator code — and one
-   sentence of why. If the Retake window is open, a form appears there; the
-   person types the values and they go straight into the workspace `.env`.
-   You get back "set". If no window is open, the tool gives you the exact
-   sentence to relay (it names `retake secret …` and `retake ui`); relay it
-   verbatim, then call `secrets` again.
+   sentence of why. It returns immediately with the words to say: a form is
+   open in the window at a link, or a one-line terminal command. **Relay
+   those words in full, link included**, then stop and wait for "done". Call
+   `secrets` again; it answers "set" and you carry on. The values went
+   straight into the workspace `.env` — you never saw them.
 3. **Write the sign-in under `auth.setup`**, referencing `${APP_USER}` and
    `${APP_PASSWORD}` with `secret: true`, and set `auth.storageState` to
    `.auth/<name>.json`. The login runs before the camera and is trimmed off;
