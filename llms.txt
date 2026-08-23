@@ -1,0 +1,11 @@
+# Retake
+
+> Demo-as-code for coding agents: a YAML manifest in, a product walkthrough video out. Rerun the demo instead of re-recording it.
+
+An agent that was handed this repository should read README.md first — its "If you are a coding agent" section is the setup sequence — then AGENTS.md (the CLI loop, manifests, logins, what trips agents up) and skill/SKILL.md (the method Claude Code loads as a skill).
+
+- README.md: https://raw.githubusercontent.com/glebbogachev00/retake/main/README.md
+- AGENTS.md: https://raw.githubusercontent.com/glebbogachev00/retake/main/AGENTS.md
+- skill/SKILL.md: https://raw.githubusercontent.com/glebbogachev00/retake/main/skill/SKILL.md
+- demos/example.yaml: https://raw.githubusercontent.com/glebbogachev00/retake/main/demos/example.yaml
+- npm: https://www.npmjs.com/package/retake-demos

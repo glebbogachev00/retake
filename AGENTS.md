@@ -14,6 +14,21 @@ clone of this repo the same commands run from source as `npm run retake -- …`.
 The MCP route is better than the CLI when it exists: `retake install` registers
 the tools and the skill with Claude Code, so the loop below becomes tool calls.
 
+## Starting from nothing (the person pasted the repo link)
+
+```
+npm install -g retake-demos
+mkdir -p ~/retake-demos && cd ~/retake-demos && retake install   # workspace + tools + skill
+retake ui                                                         # their window: http://localhost:4310
+```
+
+`retake install` registers the MCP tools with Claude Code (user scope) and
+prints the Codex / Cursor config. Tools load at the start of a session, so
+in the session that ran the install, use the CLI loop below and tell the
+person to restart you afterwards. `retake doctor` says what, if anything,
+is missing. Always tell the person the window's address — they may not know
+it exists.
+
 ## The loop an agent should run
 
 ```

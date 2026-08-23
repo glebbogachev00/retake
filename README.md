@@ -19,6 +19,19 @@ It is built for the way people work now: **you ask your coding agent for a demo 
 
 <p align="center"><img src="assets/window.png" width="900" alt="The Retake window: your demos on the left, the video and its scenes in the middle"></p>
 
+## If you are a coding agent reading this
+
+Someone pasted this link and wants demos recorded. Do this, in order, and say what you are doing as you go — assume they have never seen Retake:
+
+1. `npm install -g retake-demos` (Node 20+; ffmpeg is bundled, Chromium downloads once).
+2. Make a workspace and set up from inside it: `mkdir -p ~/retake-demos && cd ~/retake-demos && retake install`. This creates `demos/` and `outputs/`, registers Retake's tools with Claude Code and installs its skill, and prints the config for Codex/Cursor — apply it if that is what you are.
+3. **Your tools arrive at your next session.** For this one, drive Retake from the CLI exactly as [`AGENTS.md`](AGENTS.md) describes (`validate → dry → run → check`). Tell the person: "Restart me after this and I'll have Retake's tools directly."
+4. Start the window for them — `retake ui` in the workspace — and give them the link: http://localhost:4310. That is where the video, stills and proof log appear.
+5. If they did not say what to record, ask one question: which app (URL) and what to show. If the app needs a login, read the "Behind a login" section below — you never handle the password yourself.
+6. Read [`skill/SKILL.md`](skill/SKILL.md) once: it is the method (order of operations, failures as text, when to stop) and it is what Claude Code loads automatically after step 2.
+
+Everything below is for the person; it is accurate for you too.
+
 ## Install
 
 Needs Node 20+. ffmpeg ships with the package; Chromium is downloaded once.

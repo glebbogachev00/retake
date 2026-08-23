@@ -38,7 +38,9 @@
     ".env.example",
     "README.md",
     "LICENSE",
-    "scripts/patch-testreel.mjs"
+    "scripts/patch-testreel.mjs",
+    "AGENTS.md",
+    "llms.txt"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",
