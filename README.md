@@ -17,7 +17,7 @@ Retake drives a real browser through a web app, records it, and hands back an MP
 
 It is built for the way people work now: **you ask your coding agent for a demo in one sentence**, the agent drafts the file, dry-runs every selector, records a preview, reads the proof log, fixes what failed, and records the real one. Claude Code, Codex, Cursor and anything else that speaks MCP get Retake's tools; `retake ui` is the window you watch it in.
 
-<p align="center"><img src="assets/ui.png" width="900" alt="The Retake window: your demos on the left, the video and its scenes in the middle"></p>
+<p align="center"><img src="assets/window.png" width="900" alt="The Retake window: your demos on the left, the video and its scenes in the middle"></p>
 
 ## Install
 
