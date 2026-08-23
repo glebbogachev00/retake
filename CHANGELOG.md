@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 — 2026-08-23
+
+Logins, done so that no model ever sees a password.
+
+- **`secrets` MCP tool.** The agent asks for credentials *by name*
+  (`APP_USER`, `APP_PASSWORD`, `APP_TOTP_SECRET`); a form appears in the Retake
+  window, the person types the values, they are written to the workspace
+  `.env` (mode 600) and the agent hears only "set". Without a window the tool
+  returns the one sentence to relay. `ask` now refuses the job for passwords.
+- **`retake secret NAME…`** — the same without a window: typed into the
+  terminal, hidden, kept local.
+- **`retake signin demos/x.yaml`** — for SMS codes, SSO, captchas: a real
+  browser opens, the person logs in once, Retake keeps the session.
+- **`${TOTP:APP_TOTP_SECRET}`** — authenticator codes computed at fill time
+  (RFC 6238, verified against the reference vectors).
+- A take with `auth.storageState`, no fresh session and no `auth.setup` now
+  refuses to run instead of recording logged out.
+- A blank `APP_USER=` counts as unset (it used to pass as an empty login);
+  one `.env` parser everywhere, so a password with quotes or `#` survives.
+- The method is written for agents in `skill/SKILL.md` and `AGENTS.md`, and
+  for people in the README, the guide and the landing page.
+
 ## 0.2.2 — 2026-08-23
 
 Two limits from the README's "Limits worth knowing" retired, with recorded

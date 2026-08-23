@@ -231,6 +231,9 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const statePath = m.auth ? path.resolve(opts.manifestDir, expandEnv(m.auth.storageState)) : null;
   const stateFresh = !!statePath && fs.existsSync(statePath) && (Date.now() - fs.statSync(statePath).mtimeMs) / 3.6e6 < (m.auth?.maxAgeHours ?? 72);
   if (statePath) log(stateFresh ? `auth: reusing session ${path.relative(process.cwd(), statePath)}` : `auth: no fresh session — running setup to sign in`);
+  // No session and nothing that could create one: stop here rather than record
+  // a logged-out take that passes every check.
+  if (statePath && !stateFresh && !(m.auth?.setup?.length)) throw new Error(`no fresh session at ${path.relative(process.cwd(), statePath)} and no auth.setup to sign in with — run \`retake signin ${path.relative(process.cwd(), path.join(opts.manifestDir, m.name + ".yaml"))}\` and log in once by hand, or add the sign-in steps under auth.setup`);
   const context = await browser.newContext({
     viewport: size,
     colorScheme: m.colorScheme,
@@ -370,6 +373,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     if (statePath && !stateFresh && authOk) {
       fs.mkdirSync(path.dirname(statePath), { recursive: true });
       await context.storageState({ path: statePath });
+      try { fs.chmodSync(statePath, 0o600); } catch { /* windows */ }
       log(`auth: saved session → ${path.relative(process.cwd(), statePath)}`);
     } else if (statePath && !stateFresh) {
       log("auth: a sign-in step failed — NOT saving this session");

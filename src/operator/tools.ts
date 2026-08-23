@@ -28,6 +28,7 @@ import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit
 import { digest } from "../digest.js";
 import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
 import { applyEdits, receiptsFor } from "../edits.js";
+import { SECRET_NAME, missingSecrets, readEnvFile } from "../env.js";
 
 const ROOT = process.env.RETAKE_ROOT || process.cwd();
 const DEMOS = path.join(ROOT, "demos");
@@ -130,7 +131,46 @@ server.registerTool("start_app", {
   return text(`FAILED: ${r.why}\nlog tail:\n${r.log.slice(-800)}`);
 });
 
-server.registerTool("ask", { description: "Ask the person ONE question and wait for the answer. Use only when genuinely blocked (which app, a credential name, a choice between two things). Keep it one sentence, with the evidence.", inputSchema: { question: z.string() }, annotations: RETAKE_WRITE }, async ({ question }) => {
+server.registerTool("secrets", {
+  description: [
+    "Get the person's demo-account credentials into place WITHOUT ever seeing them. Call this the moment a demo needs a login (read_project found sign-in fields, scout found a password field, or they said so): pass the variable NAMES you will use (APP_USER, APP_PASSWORD, and APP_TOTP_SECRET if the site asks for an authenticator code).",
+    "What happens: if the Retake window is open, a form appears there and the person types the values, which go straight into the workspace .env — you get back 'set'. If no window is open, you get back the one-line instruction to relay. Either way, the manifest then references them as ${APP_USER} / ${APP_PASSWORD} with `secret: true`, inside auth.setup, and the values never appear in any log, the video, or this conversation.",
+    "Never ask for a password in chat, never put a literal credential in a manifest, never invent values. For logins a script cannot do (SMS code, SSO, captcha) the answer is `retake signin demos/<name>.yaml` — the person signs in once in a real window and Retake keeps the session.",
+  ].join(" "),
+  inputSchema: {
+    names: z.array(z.string().regex(SECRET_NAME, "UPPER_SNAKE names like APP_PASSWORD")).min(1).describe("the environment variable names the manifest will reference"),
+    why: z.string().describe("one sentence the person will read: what the login is for, e.g. 'The dashboard demo starts behind the admin sign-in.'"),
+  },
+  annotations: RETAKE_WRITE,
+}, async ({ names, why }) => {
+  const reload = () => { for (const [k, v] of Object.entries(readEnvFile(ROOT))) if (v.trim()) process.env[k] = v; };
+  reload();
+  const how = (missing: string[]) => `Reference them as ${names.map((n) => "${" + n + "}").join(", ")} with \`secret: true\` inside auth.setup (a TOTP secret as ${"${TOTP:" + (names.find((n) => /TOTP/.test(n)) ?? "APP_TOTP_SECRET") + "}"} — Retake computes the current code).` + (missing.length ? "" : " The values stay in .env; you never see them, and they are never on camera.");
+  let missing = missingSecrets(ROOT, names);
+  if (!missing.length) return text(`All set already: ${names.join(", ")} are in the workspace .env. ${how([])}`);
+  const relay = `Tell the person, in these words: “Retake needs a demo account for this. Run \`retake secret ${missing.join(" ")}\` in your Retake workspace and type the values there (they stay on your machine) — or open \`retake ui\` and I'll ask you there. If the sign-in needs a code from your phone, SSO or a captcha, run \`retake signin demos/<name>.yaml\` instead and log in once by hand.” Then call this tool again.`;
+  if (!UI) return text(`Missing: ${missing.join(", ")}. No Retake window is open. ${relay}`);
+  let id: string;
+  try {
+    const r = await fetch(`${UI}/api/secrets/request`, { method: "POST", body: JSON.stringify({ names: missing, why }) });
+    if (!r.ok) throw new Error(String(r.status));
+    id = ((await r.json()) as { id: string }).id;
+  } catch {
+    return text(`Missing: ${missing.join(", ")}. The Retake window at ${UI} is not answering. ${relay}`);
+  }
+  await tell(`Waiting for you: ${missing.join(", ")} — a form is open in the window.`);
+  const deadline = Date.now() + 10 * 60_000;
+  while (Date.now() < deadline) {
+    await new Promise((ok) => setTimeout(ok, 1500));
+    const st = await fetch(`${UI}/api/secrets/${id}`).then((x) => x.json()).catch(() => null) as { filled?: boolean; missing?: string[] } | null;
+    if (st?.filled) { reload(); return text(`Set: ${names.join(", ")} — typed into the Retake window and saved to the workspace .env. ${how([])} Continue.`); }
+  }
+  reload(); missing = missingSecrets(ROOT, names);
+  if (!missing.length) return text(`Set: ${names.join(", ")}. ${how([])} Continue.`);
+  return text(`Still missing after ten minutes: ${missing.join(", ")}. The form is open in the Retake window; ${relay}`);
+});
+
+server.registerTool("ask", { description: "Ask the person ONE question and wait for the answer. Use only when genuinely blocked (which app, a choice between two things). Keep it one sentence, with the evidence. NEVER for passwords or tokens — that is what `secrets` is for.", inputSchema: { question: z.string() }, annotations: RETAKE_WRITE }, async ({ question }) => {
   try {
     const a = await waitForHuman("question", question);
     return text(`They answered: ${a}`);

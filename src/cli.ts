@@ -29,6 +29,7 @@ import { acquireLock, captureHash, record, releaseLock, type Take } from "./reco
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
+import { SECRET_NAME, writeEnvFile } from "./env.js";
 
 // The manifest may reference ${VARS}; load .env before any command reads one.
 // (`describe` and the UI used to do this individually, so a plain `run` from
@@ -288,6 +289,92 @@ program
     say("Then just say: “record a demo of my app at localhost:3000 showing the sign-up flow”.");
     say(`Keep ${o.ui} open while it works — the plan, the run and the video appear there.`);
     say("Retake will not start your app from outside its own window unless you add RETAKE_ALLOW_START=1 above.");
+  });
+
+/** Read one line from stdin. On a terminal, `hide` switches to raw mode so the
+    characters are not echoed; on a pipe, lines are simply consumed in order. */
+let stdinBuf = "";
+function promptLine(label: string, hide: boolean): Promise<string> {
+  process.stdout.write(label);
+  const tty = !!process.stdin.isTTY;
+  const raw = hide && tty;
+  if (raw) process.stdin.setRawMode(true);
+  process.stdin.resume();
+  return new Promise((resolve) => {
+    const finish = (line: string) => {
+      process.stdin.off("data", onData);
+      if (raw) process.stdin.setRawMode(false);
+      process.stdin.pause();
+      if (raw) process.stdout.write("\n");
+      resolve(line.trim());
+    };
+    const take = () => {
+      const i = stdinBuf.search(/\r|\n/);
+      if (i < 0) return false;
+      const line = stdinBuf.slice(0, i);
+      stdinBuf = stdinBuf.slice(i + 1).replace(/^\n/, "");
+      finish(line);
+      return true;
+    };
+    const onData = (d: Buffer) => {
+      const sIn = d.toString();
+      if (raw) {
+        for (const ch of sIn) {
+          if (ch === "\u0003") { process.stdout.write("\n"); process.exit(130); }
+          if (ch === "\u007f" || ch === "\b") { stdinBuf = stdinBuf.slice(0, -1); continue; }
+          stdinBuf += ch;
+        }
+      } else stdinBuf += sIn;
+      take();
+    };
+    if (take()) return;
+    process.stdin.on("data", onData);
+  });
+}
+
+program
+  .command("secret")
+  .description("put a demo account into this workspace's .env without opening the file — typed here, hidden, kept on this machine only")
+  .argument("<names...>", "variable names, e.g. APP_USER APP_PASSWORD APP_TOTP_SECRET")
+  .action(async (names: string[]) => {
+    const bad = names.filter((n) => !SECRET_NAME.test(n));
+    if (bad.length) throw new Error(`names look like APP_PASSWORD — not: ${bad.join(", ")}`);
+    say(`Stays on this computer: written to ${path.join(process.cwd(), ".env")} (readable by you only), never sent anywhere, never shown to an agent. Use a demo account.`);
+    const values: Record<string, string> = {};
+    for (const n of names) {
+      const v = await promptLine(`${n}${/PASS|SECRET|TOKEN|KEY|PIN|OTP/.test(n) ? " (hidden)" : ""}: `, /PASS|SECRET|TOKEN|KEY|PIN|OTP/.test(n));
+      if (v) values[n] = v;
+    }
+    const set = writeEnvFile(process.cwd(), values);
+    if (!set.length) { say("nothing saved"); return; }
+    say(`✓ ${set.join(", ")} saved to ${path.join(process.cwd(), ".env")} (mode 600). A manifest references them as \${NAME} with secret: true — the values never go on camera.`);
+  });
+
+program
+  .command("signin")
+  .description("sign in by hand once — 2FA, SSO, captcha, anything — and keep the session for every later take")
+  .argument("<manifest>", "the demo whose auth.storageState should be saved")
+  .action(async (file: string) => {
+    const { manifest, dir } = loadManifest(file);
+    if (!manifest.auth?.storageState) throw new Error(`${file} has no auth.storageState — add:\n  auth:\n    storageState: .auth/${manifest.name}.json\n    maxAgeHours: 24`);
+    const { resolve, expandEnv } = await import("./manifest.js");
+    const { chromium } = await import("playwright");
+    const q = resolve(manifest);
+    const statePath = path.resolve(dir, expandEnv(manifest.auth.storageState));
+    const browser = await chromium.launch({ headless: false });
+    const context = await browser.newContext({ viewport: q.viewport });
+    const page = await context.newPage();
+    await page.goto(manifest.url, { waitUntil: "domcontentloaded" }).catch(() => {});
+    say(`A browser is open at ${manifest.url}.`);
+    say(`Sign in there — codes, SSO, captcha, whatever it asks. When you can see the signed-in app, come back here and press Enter.`);
+    say(`(Nothing is recorded. Only the session is kept, in ${path.relative(process.cwd(), statePath)}, good for ${manifest.auth.maxAgeHours}h.)`);
+    await new Promise<void>((ok) => { process.stdin.resume(); process.stdin.once("data", () => ok()); });
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    await context.storageState({ path: statePath });
+    fs.chmodSync(statePath, 0o600);
+    await browser.close();
+    say(`✓ session saved → ${path.relative(process.cwd(), statePath)}. Takes of ${manifest.name} now start signed in; run this again when it goes stale.`);
+    process.exit(0);
   });
 
 program

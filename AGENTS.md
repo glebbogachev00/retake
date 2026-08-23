@@ -83,14 +83,38 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 - **Scenes carry the story.** `{ action: scene, label, caption }` at each beat;
   captions burn into the video; the camera eases toward the last thing touched
   (or `camera: { focus: <selector>, zoom: 1.3 }` / `camera: static`).
-- **Logins go in `auth.setup`**, never in `steps` — they run before the camera
-  and are trimmed off. Secrets are `${ENV_VARS}` with `secret: true`; never
-  literal passwords in YAML.
+- **Logins go in `auth.setup`**, never in `steps` — see "Logins" below.
 - **Backend not available?** `stub:` answers API calls with canned JSON for the
   take, and a `stub` step swaps the answer mid-demo. Every stub is named in the
   proof log.
 - **Long forms:** `{ action: scroll, to: <selector>, align: center }` before
   filling them, so the viewer sees the whole thing.
+
+## Logins
+
+Most real demos start behind a sign-in. The agent never sees a password:
+
+- **Ask by name, not for the value.** Over MCP, call `secrets` with the
+  variable names (`APP_USER`, `APP_PASSWORD`, `APP_TOTP_SECRET` for an
+  authenticator) and a one-line why. With the Retake window open, a form
+  appears there and the values go straight into the workspace `.env` — the
+  tool returns "set". Without a window, the tool returns the sentence to
+  relay: the person runs `retake secret APP_USER APP_PASSWORD` (typed into
+  their terminal, hidden, kept on their machine) and the agent calls
+  `secrets` again. From the CLI only, say the same sentence yourself.
+- **Put the sign-in under `auth.setup`** with `${APP_USER}` / `${APP_PASSWORD}`
+  and `secret: true`, plus `auth.storageState: .auth/<name>.json`. It runs
+  before the camera, is trimmed off, and the session is reused by later takes.
+  A failed sign-in never saves a session.
+- **Authenticator codes:** `${TOTP:APP_TOTP_SECRET}` is the current six-digit
+  code, computed when the field is filled.
+- **SMS, SSO, captcha:** a script cannot; a person can, once.
+  `retake signin demos/<name>.yaml` opens a real window, they log in, press
+  Enter, and the session is saved. Leave `auth.setup` empty; a take with no
+  fresh session and no setup refuses to run rather than record logged out.
+- **Firebase-style sessions** (IndexedDB) cannot be restored from a saved
+  session: put the login under plain `setup` so it runs every take.
+- **Demo accounts only.** The output is a video.
 
 ## Reading the results
 

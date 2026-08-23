@@ -38,6 +38,7 @@ import { captureHash } from "../record.js";
 import { digest } from "../digest.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
+import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
 
 const ROOT = PROJECT_ROOT;
 const DEMOS = path.join(ROOT, "demos");
@@ -286,19 +287,7 @@ function startRun(name: string, mode: { preview?: boolean; reuse?: boolean; gif?
 }
 
 /** Read/write the .env in the project root — only the keys we own. */
-function writeEnv(set: Record<string, string | undefined>) {
-  const file = path.join(ROOT, ".env");
-  const lines = fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n") : [];
-  for (const [k, v] of Object.entries(set)) {
-    if (v === undefined) continue;
-    const i = lines.findIndex((l) => l.startsWith(k + "="));
-    const line = `${k}=${v}`;
-    if (v === "") { if (i >= 0) lines.splice(i, 1); }
-    else if (i >= 0) lines[i] = line;
-    else lines.push(line);
-  }
-  fs.writeFileSync(file, lines.filter((l, i, a) => l !== "" || i < a.length - 1).join("\n").replace(/\n*$/, "\n"));
-}
+function writeEnv(set: Record<string, string | undefined>) { writeEnvFile(ROOT, set); }
 function envSummary() {
   return { localUrl: process.env.RETAKE_LOCAL_URL ?? "", localModel: process.env.RETAKE_LOCAL_MODEL ?? "", groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY };
 }
@@ -360,6 +349,12 @@ function withStaleness(a: Activity): Activity & { stale?: boolean } {
   if (a.active && Date.now() - Math.max(last, a.startedAt) > 10 * 60_000 && !a.lines.length) return { ...a, active: false, stale: true };
   return a;
 }
+
+/** An agent asking for credentials BY NAME. The window collects the values
+    and they go straight into .env here — the agent only ever learns "set". */
+type SecretRequest = { id: string; names: string[]; why: string; filled: boolean; at: number };
+const secretRequests = new Map<string, SecretRequest>();
+const openSecretRequests = () => [...secretRequests.values()].filter((r) => !r.filled).map(({ id, names, why }) => ({ id, names, why }));
 
 function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: string }) {
   if (!activity.active && !b.done) { activity.active = true; activity.startedAt = Date.now(); activity.lines = []; activity.finishedAt = undefined; }
@@ -585,9 +580,38 @@ export function serve(port: number) {
         return json(res, 200, { ok: true });
       }
       if (p === "/api/activity" && req.method === "GET") return json(res, 200, withStaleness(activity));
+
+      // ---------- secrets: asked for by name, typed into the window, written here ----------
+      if (p === "/api/secrets/request" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { names?: string[]; why?: string };
+        const names = (b.names ?? []).filter((n) => SECRET_NAME.test(n));
+        if (!names.length) return json(res, 400, { error: "names must be like APP_PASSWORD" });
+        const r: SecretRequest = { id: "s" + Date.now().toString(36), names, why: String(b.why ?? "").slice(0, 300), filled: false, at: Date.now() };
+        secretRequests.set(r.id, r);
+        for (const w of activityWatchers) w({ type: "secrets", data: { id: r.id, names: r.names, why: r.why } });
+        return json(res, 200, { id: r.id });
+      }
+      if (p === "/api/secrets/pending" && req.method === "GET") return json(res, 200, openSecretRequests());
+      if (p === "/api/secrets/fill" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { id: string; values?: Record<string, string> };
+        const r = secretRequests.get(b.id);
+        if (!r) return json(res, 404, { error: "no such request" });
+        const values: Record<string, string> = {};
+        for (const [k, v] of Object.entries(b.values ?? {})) if (r.names.includes(k) && typeof v === "string" && v.trim()) values[k] = v;
+        if (!Object.keys(values).length) return json(res, 400, { error: "nothing to save" });
+        writeEnvFile(ROOT, values);
+        if (!missingSecrets(ROOT, r.names).length) r.filled = true;
+        for (const w of activityWatchers) w({ type: "secrets-done", data: { id: r.id, filled: r.filled } });
+        return json(res, 200, { ok: true, filled: r.filled, set: Object.keys(values) });
+      }
+      const msec = /^\/api\/secrets\/(s[a-z0-9]+)$/.exec(p);
+      if (msec && req.method === "GET") {
+        const r = secretRequests.get(msec[1]);
+        return r ? json(res, 200, { filled: r.filled, missing: missingSecrets(ROOT, r.names) }) : json(res, 404, { error: "no such request" });
+      }
       if (p === "/api/activity/stream" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-        res.write(`event: state\ndata: ${JSON.stringify({ ...activity, boot: BOOT })}\n\n`);
+        res.write(`event: state\ndata: ${JSON.stringify({ ...activity, boot: BOOT, secrets: openSecretRequests() })}\n\n`);
         const send = (ev: { type: string; data: unknown }) => res.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev.data)}\n\n`);
         activityWatchers.add(send);
         const beat = setInterval(() => res.write(": ping\n\n"), 25_000);
@@ -678,7 +702,7 @@ export function serve(port: number) {
         const selected = process.env[key] ?? "";
         return json(res, 200, { provider, selected, models: [{ id: selected, name: selected || "Configured default" }] });
       }
-      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", selection: modelSelection(), gifski: !!gifskiBin(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT, version: VERSION });
+      if (p === "/api/settings" && req.method === "GET") return json(res, 200, { envPath: path.join(ROOT, ".env"), ...providerStatus(), model: process.env.RETAKE_MODEL ?? "", selection: modelSelection(), gifski: !!gifskiBin(), env: envSummary(), outDir: outRoot(), outDefault: OUT_DEFAULT, version: VERSION });
       const mopen = /^\/api\/open\/([a-z0-9-]+)$/.exec(p);
       if (mopen && req.method === "POST") {
         const dir = path.join(outRoot(), mopen[1]);

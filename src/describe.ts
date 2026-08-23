@@ -26,14 +26,24 @@ import { Manifest } from "./manifest.js";
 import { digest, type Digest } from "./digest.js";
 
 export function loadDotenv(root: string, files = [".env"]) {
+  // One parser for every reader of .env (see env.ts), so a password written
+  // by the window or `retake secret` is typed back exactly as entered.
   for (const name of files) {
-    const f = path.join(root, name);
-    if (!fs.existsSync(f)) continue;
-    for (const line of fs.readFileSync(f, "utf8").split("\n")) {
-      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
-      if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
-    }
+    for (const [k, v] of Object.entries(parseEnvText(root, name))) if (process.env[k] === undefined) process.env[k] = v;
   }
+}
+function parseEnvText(root: string, name: string): Record<string, string> {
+  const f = path.join(root, name);
+  if (!fs.existsSync(f)) return {};
+  const out: Record<string, string> = {};
+  for (const raw of fs.readFileSync(f, "utf8").split(/\r?\n/)) {
+    const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(raw);
+    if (!m) continue;
+    const v = m[2].trim();
+    if (v.startsWith('"') && v.endsWith('"')) { try { out[m[1]] = JSON.parse(v); continue; } catch { /* literal */ } }
+    out[m[1]] = v.replace(/^(["'])(.*)\1$/, "$2");
+  }
+  return out;
 }
 
 export type Provider = { name: "claude-code" | "codex" | "groq" | "mistral" | "local"; baseUrl: string; key: string; model: string };

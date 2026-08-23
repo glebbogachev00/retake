@@ -357,6 +357,41 @@ $('vidSpeed').addEventListener('change', async () => {
   } catch (e) { $('vidMeta').textContent = `${current} · could not re-render: ${e.message}`; }
 });
 
+// ---- secrets: the agent asks by name; the value goes to .env, never to it ----
+const secretOpen = new Set();
+function askSecrets(r) {
+  if (!r || secretOpen.has(r.id)) return;
+  secretOpen.add(r.id);
+  const isSecret = (n) => /PASS|SECRET|TOKEN|KEY|PIN|OTP/.test(n);
+  const veil = document.createElement('div');
+  veil.className = 'veil';
+  veil.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="width:min(92vw,460px)">
+    <h3>Your agent needs a sign-in</h3>
+    <p>${esc(r.why || 'The demo starts behind a login.')}</p>
+    <p style="font-size:13px;color:var(--muted)"><b>This stays on your computer.</b> What you type is written to one local file — <code>${esc(settings?.envPath || '.env')}</code>, readable by you only — so Retake can sign in during recording. It is not sent to the agent, to any server, or to us; the agent only learns that the names are set. Use a <b>demo account</b>: the result is a video.</p>
+    <form id="secForm" autocomplete="off">
+      ${r.names.map((n) => `<label style="display:block;margin:10px 0 4px;font-size:12.5px;letter-spacing:.04em;color:var(--muted)">${esc(n)}</label>
+        <input name="${esc(n)}" type="${isSecret(n) ? 'password' : 'text'}" autocomplete="${isSecret(n) ? 'new-password' : 'off'}" style="width:100%;border:1px solid var(--rule2);border-radius:10px;padding:10px 12px;font:inherit" />`).join('')}
+      <div class="row" style="margin-top:16px">
+        <button class="btn" type="button" data-no>Not now</button>
+        <button class="btn" type="submit" style="background:var(--accent);border-color:var(--accent);color:#fff">Save to .env</button>
+      </div>
+    </form>
+  </div>`;
+  const close = () => { veil.remove(); secretOpen.delete(r.id); };
+  veil.querySelector('[data-no]').onclick = close;
+  veil.querySelector('#secForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const values = {};
+    for (const n of r.names) { const v = veil.querySelector(`input[name="${n}"]`).value; if (v.trim()) values[n] = v; }
+    if (!Object.keys(values).length) return;
+    try { await api('/api/secrets/fill', { method: 'POST', body: JSON.stringify({ id: r.id, values }) }); close(); }
+    catch (err) { veil.querySelector('h3').textContent = 'Could not save: ' + err.message; }
+  };
+  document.body.appendChild(veil);
+  setTimeout(() => veil.querySelector('input')?.focus(), 40);
+}
+
 // ---- the live feed: an agent working shows up here as it works -------------
 function watchActivity() {
   const es = new EventSource('/api/activity/stream');
@@ -374,8 +409,10 @@ function watchActivity() {
     if (window.__boot && d.boot && d.boot !== window.__boot) location.reload();
     window.__boot = d.boot || window.__boot;
     apply(d);
+    for (const r of d.secrets || []) askSecrets(r);
   });
   es.addEventListener('line', (ev) => apply(JSON.parse(ev.data)));
+  es.addEventListener('secrets', (ev) => askSecrets(JSON.parse(ev.data)));
   es.addEventListener('finished', async (ev) => { apply(JSON.parse(ev.data)); await drawDemos(); await newest(); setTimeout(() => $('live').classList.remove('show'), 8000); });
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };
 }

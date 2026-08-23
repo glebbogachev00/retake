@@ -8,6 +8,7 @@
  *   - `outputs`  which artifacts to produce and how
  */
 import fs from "node:fs";
+import { createHmac } from "node:crypto";
 import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
@@ -341,11 +342,31 @@ export function warnings(m: Manifest): string[] {
 
 /** `${VAR}` substitution against process.env, like testreel. */
 export function expandEnv(s: string): string {
-  return s.replace(/\$\{([A-Z0-9_]+)\}/g, (_, k) => {
+  return s.replace(/\$\{(TOTP:)?([A-Z0-9_]+)\}/g, (_, fn: string | undefined, k: string) => {
     const v = process.env[k];
-    if (v === undefined) throw new Error(`manifest references \${${k}} but it is not set`);
-    return v;
+    // `APP_USER=` with nothing after it is the template, not a value — a blank
+    // login that "succeeds" is worse than a loud stop.
+    if (v === undefined || v.trim() === "") throw new Error(`manifest references \${${k}} but it is not set — add it to .env (a demo account, never a real one)`);
+    // ${TOTP:APP_TOTP_SECRET}: the six-digit code for right now, from an
+    // authenticator enrolment secret. Computed at fill time, so it is valid.
+    return fn ? totp(v) : v;
   });
+}
+
+/** RFC 6238 TOTP (SHA-1, 6 digits, 30s) from a base32 secret — what every
+    authenticator app enrols with. */
+export function totp(base32Secret: string, nowMs = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const clean = base32Secret.toUpperCase().replace(/[^A-Z2-7]/g, "");
+  let bits = "";
+  for (const c of clean) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(nowMs / 30000)));
+  const h = createHmac("sha1", key).update(counter).digest();
+  const off = h[h.length - 1] & 0xf;
+  const code = ((h[off] & 0x7f) << 24 | h[off + 1] << 16 | h[off + 2] << 8 | h[off + 3]) % 1_000_000;
+  return String(code).padStart(6, "0");
 }
 
 /** The preset with the manifest's overrides applied. */

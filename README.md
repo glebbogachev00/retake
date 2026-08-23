@@ -127,21 +127,42 @@ Think in the publishing format, not the browser window.
 
 **Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text reads on a phone. **Camera** eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at — per scene: `camera: static` or `camera: { focus: ".result", zoom: 1.3 }`. Captions, camera, speed, trim, format and layout are all render-time: change them and `retake render` takes seconds, never touches the browser.
 
-## Signing in
+## Behind a login
+
+Most real demos start on the far side of a sign-in. You never put a password anywhere an agent can read it.
+
+**With the window open** (`retake ui`): when the agent sees the app needs a login, a small form appears in the window asking for a demo account by name — `APP_USER`, `APP_PASSWORD`. You type them; they are written to one local file, the workspace `.env` (readable by you only), and never sent to the agent, to any server, or to anyone. The agent learns only that the names are set.
+
+**Without the window:** the agent relays one line — run this in your workspace and type the values (hidden):
+
+```bash
+retake secret APP_USER APP_PASSWORD
+```
+
+**Then:** the login runs *before the camera* and is trimmed off the front; the video starts signed in. The session is saved to `.auth/`, so later takes skip the login. A wrong password stops the take instead of recording a logged-out one.
+
+**Two-factor.** Authenticator apps: add the enrolment secret as `APP_TOTP_SECRET` and the manifest uses `${TOTP:APP_TOTP_SECRET}` — Retake computes the current code when it fills the field. SMS codes, SSO, captchas — anything only a person can do:
+
+```bash
+retake signin demos/<name>.yaml
+```
+
+opens a real browser; you log in by hand, press Enter, and Retake keeps the session (not the password) for every later take.
+
+What the agent writes:
 
 ```yaml
 auth:
   storageState: .auth/myapp.json   # session saved here, reused until stale
   maxAgeHours: 8
-setup:
-  - { action: fill, selector: "#user", text: "${APP_USER}" }
-  - { action: fill, selector: "#password", text: "${APP_PASSWORD}", secret: true }
-  - { action: click, selector: "button[type=submit]" }
+  setup:
+    - { action: fill, selector: "#user", text: "${APP_USER}" }
+    - { action: fill, selector: "#password", text: "${APP_PASSWORD}", secret: true }
+    - { action: fill, selector: "#code", text: "${TOTP:APP_TOTP_SECRET}", secret: true }   # only if asked
+    - { action: click, selector: "button[type=submit]" }
 ```
 
-Secrets live in `.env`, never in a manifest. `secret: true` keeps a value out of the terminal, the window and the proof log — but not out of the video, which is why `validate` warns when a secret step is in `steps` rather than `setup`. A session is only saved when the sign-in actually succeeded. Use a demo account: the output is a video you may publish.
-
-Apps that keep their session in IndexedDB (Firebase) can't be restored from `storageState`; put the login in plain `setup` instead.
+`secret: true` keeps a value out of the terminal, the window and the proof log — but not out of the video, which is why `validate` warns when a secret step is in `steps` rather than `auth.setup`. Use a demo account: the output is a video you may publish. Apps that keep their session in IndexedDB (Firebase) can't be restored from a saved session; put the login under plain `setup` instead.
 
 ## Limits worth knowing
 

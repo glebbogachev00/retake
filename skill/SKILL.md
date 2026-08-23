@@ -94,6 +94,40 @@ The first time the person expresses taste, save it with the `style` tool
 (or write `demos/style.md`) — every later draft in the project reads it, so
 they never have to say it twice. Their stated taste always beats defaults.
 
+## Logins — most real demos start behind one
+
+You will never see a password, and you never need to. The whole method:
+
+1. **Notice it early.** `read_project` reports sign-in fields; `scout` shows a
+   password input; or the person says so. Do not draft a manifest that
+   pretends the app is open.
+2. **Call `secrets` with the NAMES** you will use — `APP_USER`, `APP_PASSWORD`,
+   and `APP_TOTP_SECRET` if the site asks for an authenticator code — and one
+   sentence of why. If the Retake window is open, a form appears there; the
+   person types the values and they go straight into the workspace `.env`.
+   You get back "set". If no window is open, the tool gives you the exact
+   sentence to relay (it names `retake secret …` and `retake ui`); relay it
+   verbatim, then call `secrets` again.
+3. **Write the sign-in under `auth.setup`**, referencing `${APP_USER}` and
+   `${APP_PASSWORD}` with `secret: true`, and set `auth.storageState` to
+   `.auth/<name>.json`. The login runs before the camera and is trimmed off;
+   the session is saved and later takes skip the login entirely. A failed
+   sign-in is never saved as a session, so a wrong password stops the take
+   instead of recording a logged-out one.
+4. **Authenticator codes:** `text: "${TOTP:APP_TOTP_SECRET}"` — Retake
+   computes the six-digit code at the moment it fills the field.
+5. **SMS codes, SSO, captchas, anything only a human can do:** do not try.
+   Tell the person: "run `retake signin demos/<name>.yaml` and log in once by
+   hand — Retake keeps the session." Then run as normal. The manifest still
+   needs `auth.storageState`; `auth.setup` can be empty.
+6. **Firebase-style apps** keep the session in IndexedDB, which a saved
+   session cannot restore: put the login under plain `setup` instead, so it
+   runs every take (still before the camera, still trimmed).
+
+Never ask for a credential in chat. Never write a literal one into a
+manifest. Never invent one. Tell the person to use a demo account — the
+output is a video they may publish.
+
 ## When a take fails
 
 The camera stops at the first failed step, so a failed take is short and
@@ -136,8 +170,8 @@ up to the end of that scene.
 
 - Real interactions read as real: type actual text, scroll to what you use,
   hold on the result. No zoom tricks unless asked.
-- Secrets never go in a manifest. `${ENV_VAR}` + `secret: true`, and tell
-  the person which variable to set.
+- Secrets never go in a manifest and never into chat: the `secrets` tool
+  gets them into `.env` by name; you reference `${NAME}` with `secret: true`.
 - Never invent selectors — only what scout/read_project returned.
 - If the backend is down, prefer a `stub:` block over giving up.
 - Starting the person's app needs their explicit say-so, every time.
