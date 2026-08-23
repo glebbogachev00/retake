@@ -169,7 +169,7 @@ document.getElementById('gremlinBtn').onclick = async () => {
   veil.className = 'veil';
   const hasDemo = !!current;
   veil.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="width:min(92vw,440px)">
-    <h3>Spotted a gremlin?</h3>
+    <h3>Something off?</h3>
     <p>Say it however it broke. Retake fills in the boring half — version, demo, and what the last take actually did — you just write the sentence.</p>
     <textarea id="gremText" rows="4" placeholder="It was supposed to… but instead…" style="width:100%;border:1px solid var(--rule2);border-radius:10px;padding:10px 12px;font:inherit;resize:vertical;margin-bottom:10px"></textarea>
     <input id="gremContact" type="text" placeholder="Where can I find you? GitHub or X handle — optional" style="width:100%;border:1px solid var(--rule);border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:10px" />
@@ -185,7 +185,7 @@ document.getElementById('gremlinBtn').onclick = async () => {
   veil.addEventListener('click', (e) => { if (e.target === veil) close(); });
   veil.querySelector('[data-no]').onclick = close;
   const build = async () => {
-    const text = veil.querySelector('#gremText').value.trim() || '(they typed nothing — the gremlin was apparently self-explanatory)';
+    const text = veil.querySelector('#gremText').value.trim() || '(they typed nothing — apparently it was self-explanatory)';
     const contact = veil.querySelector('#gremContact').value.trim();
     let boring = `Retake ${settings?.version || 'dev'} · ${navigator.platform}`;
     const attach = veil.querySelector('#gremAttach');
@@ -206,8 +206,8 @@ document.getElementById('gremlinBtn').onclick = async () => {
   };
   veil.querySelector('[data-go]').onclick = async () => {
     const body = await build();
-    const title = 'gremlin: ' + (veil.querySelector('#gremText').value.trim().slice(0, 60) || 'something is off');
-    window.open(REPO + '/issues/new?labels=gremlin&title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body).slice(0, 6500), '_blank');
+    const title = 'bug: ' + (veil.querySelector('#gremText').value.trim().slice(0, 60) || 'something is off');
+    window.open(REPO + '/issues/new?labels=bug&template=bug.md&title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body).slice(0, 6500), '_blank');
     close();
   };
   document.body.appendChild(veil);

@@ -1,122 +1,135 @@
 <p align="center"><img src="assets/hero.png" width="720" alt="Retake — rerun the demo, don't re-record it"></p>
 
 <p align="center">
-  <b>Describe a product walkthrough once. Get a silent demo video.</b><br>
-  Change the UI, change one line, run it again — nobody re-records anything by hand.
+  <b>Rerun the demo. Don't re-record it.</b><br>
+  A product walkthrough as a small YAML file. Your coding agent writes it, Retake records it, you watch and ship it.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/retake-demos"><img src="https://img.shields.io/npm/v/retake-demos?color=111&label=retake-demos" alt="npm"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111" alt="MIT"></a>
+  <a href="https://github.com/glebbogachev00/retake/actions/workflows/ci.yml"><img src="https://github.com/glebbogachev00/retake/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
 </p>
 
 ---
 
-Retake drives a real browser through your app, records it at 1080p, and hands back an MP4 (plus a thumbnail, an optional GIF, and a proof log of exactly what happened). The demo lives as a small YAML file, so when a button moves you edit a selector instead of re-shooting a screen recording.
+Retake drives a real browser through a web app, records it, and hands back an MP4 with burned-in captions, a still for every scene, and a proof log of exactly what happened. The demo is a file, so when a button moves you change a selector instead of re-shooting — and when the app changes, you rerun the same file.
 
-It does one job: **record the demo well, from what was asked.** What you do with the video afterwards is not its business.
+It is built for the way people work now: **you ask your coding agent for a demo in one sentence**, the agent drafts the file, dry-runs every selector, records a preview, reads the proof log, fixes what failed, and records the real one. Claude Code, Codex, Cursor and anything else that speaks MCP get Retake's tools; `retake ui` is the window you watch it in.
 
-<p align="center"><img src="assets/ui.png" width="900" alt="The Retake UI: demos on the left, the demo and its scenes in the middle, the last take on the right"></p>
+<p align="center"><img src="assets/ui.png" width="900" alt="The Retake window: your demos on the left, the video and its scenes in the middle"></p>
 
-## Quickstart
+## Install
 
-Already using Claude Code or Codex? See [`AGENTS.md`](AGENTS.md) — Retake's CLI is agent-shaped (`validate → dry → run → check`, non-zero exits), and that file is what those tools read when pointed at this folder.
-
-
-```bash
-npm install
-npx playwright install chromium
-npm run ui            # → http://localhost:4310
-```
-
-Point it at anything running locally, describe what to show, and press Record. Or drive it from the terminal:
+Needs Node 20+. ffmpeg ships with the package; Chromium is downloaded once.
 
 ```bash
-npm run retake -- run demos/example.yaml            # record + render
-npm run retake -- render outputs/example            # re-render only (no browser)
-npm run retake -- check outputs/example             # resolution, fps, duration, files: pass/fail
-npm run retake -- ideas http://localhost:3000 -P ~/my-app   # what's worth recording?
+npm install -g retake-demos
+mkdir my-demos && cd my-demos
+retake install
 ```
 
-Outputs land in `outputs/<name>/` (change the folder in the UI's Settings → "Save videos to", or `--out <dir>`; the UI shows the path under every take, with **Download MP4** and **Show in Finder**):
+`retake install` makes the folder a workspace (`demos/`, `outputs/`, `.env`, the `.gitignore` lines), downloads Chromium, registers the tools with Claude Code and installs its *recording-product-demos* skill, and prints the config for Codex. Restart your agent afterwards — agents load tools at the start of a session.
+
+Prefer not to install globally? `npx retake-demos install` works the same. Don't use Claude Code? `retake agent` prints the MCP config for Codex, Cursor, or anything else.
+
+Then, in your agent:
+
+> Record a demo of my app at localhost:3000 showing a new user creating their first project.
+
+and in another terminal, `retake ui` → http://localhost:4310 to watch it happen. The agent reports its plan and progress there; the video, stills and receipts land there when it's done.
+
+`retake doctor` tells you if anything is missing.
+
+## What you get
 
 ```
-demo.mp4        the shareable, captions burned in
-master.mp4      the CRF-14 keeper (post presets only)
-demo.gif        optional, via gifski when installed
-thumbnail.png   the frame at a chosen scene
-proof-log.md    result, shot list, every step's timing and pass/fail
-take.json       the raw timeline that render reads
+outputs/<name>/
+  demo.mp4        the shareable — captions burned in
+  master.mp4      the CRF-14 keeper (post presets only)
+  stills/         one PNG per scene, mid-scene and at its last moment
+  thumbnail.png   the frame at a chosen scene
+  proof-log.md    result, shot list, every step's timing, pass/fail, what was on screen when it failed
+  take.json       the raw timeline the renderer reads
 ```
 
-Exit codes: `0` all steps passed and a video exists · `2` a step failed, the run aborted, or the video is a raw fallback (the proof log says **partial** and why).
+In the window: play it, switch speed (0.75× to 2×, re-rendered in seconds), download, show in Finder, open the file to edit. Demos group by the app they point at; archive what you're done with.
 
 ## The loop
 
-**Auto mode** is four dropdowns and one button. The button says what will actually happen — *Record*, *Re-record*, or *Render again* — because Retake hashes what the recording depends on and knows whether the browser has to run at all.
+Everything an agent does, you can do from the terminal:
 
-**Refine** lives under the video: per-scene captions, camera on/off/zoom, hold length, and trim off each end. All of it is render-time, so **Re-render** takes seconds and never touches the browser. Scrub with `space` `←` `→` `J/K/L`; press `[` and `]` to set trim points from the playhead.
+```bash
+retake validate demos/x.yaml   # schema + warnings, instant
+retake dry demos/x.yaml        # every selector and wait, no camera (~30s)
+retake run demos/x.yaml --preset draft   # first take, quarter-size, fast
+retake check outputs/x         # resolution, fps, duration, files: pass/fail
+retake run demos/x.yaml        # the real one
+retake render outputs/x        # captions/camera/speed changed? re-render, no browser
+```
 
-**Manual mode** is the manifest itself, for when you want it.
+The expensive step comes last on purpose. `dry` catches most failures in seconds and prints the step, the error, and the text that was on screen; a failed `run` costs a minute and a confusing video. When a step fails during `run`, Retake stops, keeps what it has, and the proof log says which step and why — an agent fixes it from that text, never from watching the video.
+
+Exit codes: `0` good · `2` a step failed or the video is a raw fallback · `3` `dry`/`check` failed.
 
 ## Demo-as-code
 
 ```yaml
-name: example
-title: "Example — the shape of a demo"
+name: first-project
+title: "Creating your first project"
 url: http://localhost:3000
-preset: post-landscape           # 1080p @ 30fps
+preset: post-landscape            # 1080p @ 30fps · `retake presets`
 viewport: { width: 1440, height: 1080 }
-scale: 1.8                       # page rendered at 1.8× so text stays crisp
+scale: 1.8                        # page drawn at 1.8× so text stays crisp
 reducedMotion: true
-camera: auto                     # each scene eases toward the last thing touched
+camera: auto                      # each scene eases toward the last thing touched
 
-seed: []                         # put the app in a known state first
-setup: []                        # runs before the camera; trimmed off the video
+seed: []                          # put the app in a known state first
+setup: []                         # runs before the camera; trimmed off the video
 
 steps:
-  - { action: scene, label: start, caption: "The problem, before anything happens.", camera: static }
-  - { action: wait, ms: 1800 }
-  - { action: click, selector: "button:has-text('Get started')", pauseAfter: 900 }
-  - { action: type, selector: "input[name=title]", text: "A realistic thing a person would type", delay: 40 }
+  - { action: scene, label: start, caption: "An empty workspace.", camera: static }
+  - { action: wait, ms: 1500 }
+  - { action: click, selector: "button:has-text('New project')", pauseAfter: 800 }
+  - { action: type, selector: "input[name=title]", text: "Q3 launch plan", delay: 40 }
   - { action: click, selector: "button[type=submit]" }
-  - { action: waitFor, selector: ".result", timeout: 30000 }
-  - { action: scene, label: result, caption: "And the result, which is the whole point." }
-  - { action: wait, ms: 2600 }
+  - { action: waitFor, selector: ".project-header" }
+  - { action: scene, label: result, caption: "And it exists." }
+  - { action: wait, ms: 2500 }
 
 outputs:
-  mp4: true
-  gif: false                     # GIF is opt-in
   thumbnail: { scene: result }
 ```
 
-The full file lives at [`demos/example.yaml`](demos/example.yaml).
+The full template is [`demos/example.yaml`](demos/example.yaml); `retake init` copies it into a new workspace.
 
-**Steps** — `wait`, `click`, `type`, `fill`, `hover`, `scroll`, `keyboard`, `navigate`, `screenshot`, `waitFor`, `evaluate`, `upload`, `download`, `scene`. Each takes `pauseAfter`, `waitFor`, `timeout`, `secret`. `${VAR}` expands from the environment and fails loudly when unset.
+**Steps** — `click`, `type`, `fill`, `hover`, `drag`, `scroll`, `keyboard`, `navigate`, `wait`, `waitFor`, `evaluate`, `upload`, `download`, `screenshot`, `scene`. Every step takes `pauseAfter`, `waitFor`, `timeout`, `secret`. Targets are a selector, or a point — `{x, y}` or `{selector, dx, dy}` — for canvases and SVG editors. `${VAR}` expands from `.env` and fails loudly when unset.
 
-**Scenes** are the spine. They get their timestamps from the actual run, so captions land on the frames they describe even when a model call took 3 seconds this time and 11 the last.
+**Scenes** are the spine: `{ action: scene, label, caption }` at each beat. They take their timestamps from the actual run, so captions land on the frames they describe even when the app took 3 seconds this time and 11 the last.
 
-**Seeds** put the app in a known state: write a JSON file, run JS in the page (IndexedDB/localStorage), or run a shell command.
+**Seeds** put the app in a known state before the camera: write a JSON file, run JS in the page, or run a shell command. **Setup** is the stuff that runs before recording and is trimmed off the front — logins live there. **`tempo`** speeds the finished video up or down at render time; **`lock`** names a shared resource so two demos that touch the same backend don't record over each other.
 
 ## Quality
 
 Think in the publishing format, not the browser window.
 
-| Preset | Canvas | Encoder | Use |
-|---|---:|---|---|
-| `preview-fast` | 1920×1080 @ 24fps | VideoToolbox (hardware) | same framing as final, ~10× faster render |
-| `post-landscape` *(default)* | 1920×1080 @ 30fps | libx264 CRF 17 + CRF-14 master | the general-purpose demo |
-| `post-square` | 1080×1080 @ 30fps | libx264 | feed-friendly |
-| `post-vertical` | 1080×1920 @ 30fps | libx264 | shorts and reels |
-| `docs-gif` | 1440×900 @ 24fps | libx264 | README/docs GIF, 900px |
-| `master` | 1920×1080 @ 30fps | libx264 CRF 12 | archive |
+| Preset | Canvas | For |
+|---|---:|---|
+| `draft` | 960×540 @ 15fps | iterating — same layout as the finals at a quarter of the pixels, fastest |
+| `preview-fast` | 1920×1080 @ 24fps | checking timing and framing, hardware-encoded |
+| `post-landscape` *(default)* | 1920×1080 @ 30fps | the general-purpose demo, plus a CRF-14 master |
+| `post-square` | 1080×1080 @ 30fps | feeds |
+| `post-vertical` | 1080×1920 @ 30fps | shorts and reels |
+| `docs-gif` | 1440×900 @ 24fps | README and docs GIFs |
+| `master` | 1920×1080 @ 30fps | archive, CRF 12 |
 
-**Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text is readable on a phone. Set `viewport` to the app's natural shape — a 620px column suits 1440×1080 — and the recording fills the frame with the caption band below it.
-
-**Camera** eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at. Per scene: `camera: static`, or `camera: { focus: .result, zoom: 1.3 }`.
+**Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text reads on a phone. **Camera** eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at — per scene: `camera: static` or `camera: { focus: ".result", zoom: 1.3 }`. Captions, camera, speed, trim, format and layout are all render-time: change them and `retake render` takes seconds, never touches the browser.
 
 ## Signing in
 
-Logins belong in `setup`, which runs before the camera and is trimmed off the front:
-
 ```yaml
 auth:
-  storageState: .auth/myapp.json   # session saved here, reused until it goes stale
+  storageState: .auth/myapp.json   # session saved here, reused until stale
   maxAgeHours: 8
 setup:
   - { action: fill, selector: "#user", text: "${APP_USER}" }
@@ -124,65 +137,47 @@ setup:
   - { action: click, selector: "button[type=submit]" }
 ```
 
-- Secrets live in `.env`, never in the manifest. `secret: true` keeps values out of the terminal, the UI log and the proof log.
-- `auth.storageState` saves the signed-in session, so later takes skip the login entirely.
-- `retake validate` **warns** if a `secret` step sits in `steps` rather than `setup` — redaction hides text from logs, not from the video.
-- Use a demo account. The output is a video you may publish.
+Secrets live in `.env`, never in a manifest. `secret: true` keeps a value out of the terminal, the window and the proof log — but not out of the video, which is why `validate` warns when a secret step is in `steps` rather than `setup`. A session is only saved when the sign-in actually succeeded. Use a demo account: the output is a video you may publish.
 
-## Files and several apps
+Apps that keep their session in IndexedDB (Firebase) can't be restored from `storageState`; put the login in plain `setup` instead.
 
-`upload` attaches local files to a file input (hidden inputs included, no OS dialog). `download` catches a download into `outputs/<name>/downloads/`. `navigate` moves between apps mid-take — as long as the flow stays in one tab, it stays one continuous video.
+## Limits worth knowing
 
-Not supported: flows that open a **new tab or window** (Playwright records per page), and anything outside the browser.
-
-## Describe mode
-
-Give it a URL, a sentence, and optionally the app's source folder. Retake scouts the page for real, unique selectors, reads the project for routes / sign-in fields / things that animate forever, and a model drafts the manifest into the editor. **The AI never records** — it writes the YAML you read and run.
-
-```bash
-npm run retake -- describe onboarding http://localhost:3000 "Show a new user creating their first project" -P ~/my-app
-```
-
-Providers, in preference order — any one is enough, configured in `.env` (see `.env.example`) or the UI's Settings:
-
-| | Needs | Notes |
-|---|---|---|
-| Claude Code | the `claude` CLI you're already signed into | no key; best drafts so far |
-| Codex | the `codex` CLI you're already signed into | no key |
-| Groq | `GROQ_API_KEY` | fast, rougher drafts |
-| Mistral | `MISTRAL_API_KEY` | |
-| Local | `RETAKE_LOCAL_URL` (Ollama, LM Studio) | fully offline |
-
-## Speed
-
-Quality first, determinism second, speed third — but the hooks are there:
-
-- **Reuse** — if nothing that shapes the recording changed, the browser is skipped and only the render runs. Preset, layout and caption changes are render-only by definition.
-- **Render cache** — an unchanged render is a 0-second no-op.
-- **Preview** — hardware-encoded, ~5–10s.
-- **Scene rerender** — `retake render outputs/x --scene result`.
-
-A first take costs about a minute and a half (the demo has to actually be performed). Corrections cost seconds.
+- **One page.** Retake records one tab. `keepInTab` (on by default) folds `window.open` and `target="_blank"` back into it, so popup logins and "preview" buttons stay on camera; flows that genuinely need a second window do not.
+- **~45 cursor moves per take.** The cursor overlay is one nested expression per move and ffmpeg's parser has a depth limit. `validate` warns, the recorder detects it, `check` fails. Split long stories into chapters of 30–45 seconds — the viewer agrees.
+- **`scale` uses CSS zoom**, which shifts the coordinate space some forms rely on for focus; if typing goes nowhere, `scale: 1`. (`deviceScaleFactor` is not the fix — Playwright's screencast never upscales.)
+- **macOS is where it's used daily.** `videotoolbox` hardware encoding falls back to libx264 elsewhere; Linux is untested beyond CI.
 
 ## How it's built
 
 ```
 src/
-  cli.ts        run · render · check · validate · describe · ideas · gif · presets · ui
-  manifest.ts   zod schema, preset resolution, warnings
-  presets.ts    canvas, page scale, fps, crf, layout, camera
-  record.ts     Playwright + testreel → take.json (lock, auth, fallback)
-  render.ts     ffmpeg: camera → layout → captions → master/demo, gifski, check
-  describe.ts   scout the page, draft the manifest, suggest ideas
-  digest.ts     read a project: routes, sign-in, selectors, risks
-  ui/           a tiny http server + one page, no framework, no build
-demos/          one yaml per demo (+ seeds/)
+  cli.ts          install · init · doctor · ui · run · dry · render · check · validate · describe · ideas
+  manifest.ts     zod schema, presets, warnings
+  record.ts       Playwright + testreel → take.json (seeds, auth, locks, stop-on-fail, drag)
+  dryrun.ts       every selector and wait, no camera
+  render.ts       ffmpeg: camera → layout → captions → demo/master, stills, check
+  edits.ts        structural edits agents make to a manifest (comments preserved)
+  operator/       the MCP server: 22 tools, from `scout` and `draft` to `run`, `look` and `done`
+  ui/             one http server, three pages, no framework, no build step
+skill/SKILL.md    what the agent is taught: order of operations, failures as text, when to stop
+demos/            manifests; outputs/ is where takes land
 ```
 
-Recording and cursor rendering come from [testreel](https://github.com/greentfrapp/testreel) (MIT); GIFs from [gifski](https://github.com/ImageOptim/gifski) when installed. Retake adds what they lack for this job: waiting on selectors, seeding state, scenes with real timestamps, camera and captions at render time, quality presets, credentials, caching, and the receipts.
+Recording and the cursor come from [testreel](https://github.com/greentfrapp/testreel); GIFs from [gifski](https://github.com/ImageOptim/gifski) when installed; ffmpeg from `ffmpeg-static`. Retake adds what the job needs on top: waiting on selectors, seeds, scenes with real timestamps, camera and captions at render time, presets, credentials, locks, structural edits, and the receipts.
 
-## Status
+## Developing
 
-Works, in daily use, still moving. Next: a prompt-first path — describe the demo, get a first take, then fix it in plain English — with the draft dry-run-validated against the page before anything records.
+```bash
+git clone https://github.com/glebbogachev00/retake && cd retake
+npm install                      # also builds dist/
+npx playwright install chromium
+npm run retake -- run demos/todo-basics.yaml --preset draft   # a public app, no setup
+npm test && npm run typecheck
+```
 
-**Known issue:** page `scale` uses CSS `zoom`, which shifts the coordinate space some in-page rect math relies on; on certain forms the focus click misses and typing goes nowhere. Workaround: `scale: 1`. Note: `deviceScaleFactor` is **not** the fix — Playwright's screencast captures at CSS-pixel size and never upscales, so native high-DPI yields a soft, letterboxed video. The real fix is narrower: correct the focus-click path under zoom.
+`npm run retake -- …` runs the TypeScript source; `retake …` is the built package — same code. See [CONTRIBUTING.md](CONTRIBUTING.md), [BACKLOG.md](BACKLOG.md), and [AGENTS.md](AGENTS.md) (what coding agents read when pointed at this folder). Found something off? The **Bug?** button in the window pre-fills an issue with the receipts.
+
+## License
+
+[MIT](LICENSE) — Gleb Bogachev.

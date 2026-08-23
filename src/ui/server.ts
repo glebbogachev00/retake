@@ -37,9 +37,9 @@ import { gifskiBin, makeGif } from "../render.js";
 import { captureHash } from "../record.js";
 import { digest } from "../digest.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
+import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
 
-const ROOT = process.cwd();
-const VERSION = (() => { try { return (JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as { version?: string }).version ?? "dev"; } catch { return "dev"; } })();
+const ROOT = PROJECT_ROOT;
 const DEMOS = path.join(ROOT, "demos");
 /** Where takes land. Default outputs/ in the project; changeable in Settings
     (RETAKE_OUT). Read lazily so a settings change applies without a restart. */
@@ -235,9 +235,10 @@ function startRun(name: string, mode: { preview?: boolean; reuse?: boolean; gif?
   if (existing && !existing.done) return existing;
   const file = fs.readdirSync(DEMOS).find((f) => f.replace(/\.ya?ml$/, "") === name);
   if (!file) throw new Error(`no demos/${name}.yaml`);
+  const cli = entry("cli");
   const args = mode.renderOnly
-    ? [path.join(ROOT, "src", "cli.ts"), "render", path.join(outRoot(), name), ...(mode.gif ? ["--gif"] : [])]
-    : [path.join(ROOT, "src", "cli.ts"), "run", path.join(DEMOS, file), "--out", outRoot()];
+    ? [...cli.args, "render", path.join(outRoot(), name), ...(mode.gif ? ["--gif"] : [])]
+    : [...cli.args, "run", path.join(DEMOS, file), "--out", outRoot()];
   if (!mode.renderOnly) {
     if (mode.preview) args.push("--preset", "preview-fast", "--reuse");
     else {
@@ -245,7 +246,7 @@ function startRun(name: string, mode: { preview?: boolean; reuse?: boolean; gif?
       if (mode.gif) args.push("--gif");
     }
   }
-  const proc: ChildProcess = spawn(process.execPath, [path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs"), ...args], {
+  const proc: ChildProcess = spawn(cli.command, args, {
     cwd: ROOT,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
@@ -383,14 +384,14 @@ export function serve(port: number) {
         return res.end(chatPage);
       }
       if (p === "/landing" && req.method === "GET") {
-        const f = path.join(ROOT, "site", "index.html");
+        const f = path.join(PKG_ROOT, "site", "index.html");
         if (!fs.existsSync(f)) return json(res, 404, { error: "no site/index.html" });
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(fs.readFileSync(f));
       }
       const msite = /^\/landing\/media\/([A-Za-z0-9._-]+)$/.exec(p);
       if (msite && (req.method === "GET" || req.method === "HEAD")) {
-        const f = path.join(ROOT, "site", "media", msite[1]);
+        const f = path.join(PKG_ROOT, "site", "media", msite[1]);
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
         res.writeHead(200, { "content-type": MIME[path.extname(f)] ?? "application/octet-stream", "content-length": fs.statSync(f).size });
         if (req.method === "HEAD") return res.end();
@@ -416,10 +417,10 @@ export function serve(port: number) {
       const ic = /^\/icon-(192|512)\.png$/.exec(p);
       if (ic) {
         res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=86400" });
-        return res.end(fs.readFileSync(path.join(ROOT, "assets", `icon-${ic[1]}.png`)));
+        return res.end(fs.readFileSync(path.join(PKG_ROOT, "assets", `icon-${ic[1]}.png`)));
       }
       if (p === "/favicon.svg") {
-        const f = path.join(ROOT, "assets", "logo.svg");
+        const f = path.join(PKG_ROOT, "assets", "logo.svg");
         res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "max-age=86400" });
         return res.end(fs.readFileSync(f));
       }
@@ -561,7 +562,7 @@ export function serve(port: number) {
             emit(run, `Checked: all ${m.steps.length} steps resolve on the page`);
             setStage(run, "capture");
             emit(run, "Recording a fast preview…");
-            const child = spawn(process.execPath, [path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs"), path.join(ROOT, "src", "cli.ts"), "run", file, "--preset", "preview-fast", "--out", outRoot()], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+            const child = spawn(entry("cli").command, [...entry("cli").args, "run", file, "--preset", "preview-fast", "--out", outRoot()], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
             run.proc = child;
             const push = (chunk: Buffer) => { for (const raw of chunk.toString().split("\n")) { const l = raw.trimEnd(); if (!l || /^\$ ffmpeg|zoom filter|filter graph|^>/.test(l)) continue; const st = /^\[stage\] (\w+)/.exec(l); if (st) { setStage(run, st[1] === "done" ? "done" : st[1]); continue; } emit(run, l); } };
             child.stdout.on("data", push); child.stderr.on("data", push);

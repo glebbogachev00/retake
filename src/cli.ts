@@ -1,24 +1,34 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env node
 /**
  * retake — demo-as-code.
  *
- *   retake run demos/capture-hero.yaml            record + render → outputs/capture-hero/
+ *   retake install                                set up Claude Code / Codex + this folder as the workspace
+ *   retake init                                   just the workspace: demos/, outputs/, .env, .gitignore
+ *   retake doctor                                 is everything in place?
+ *   retake ui                                     the review window on :4310
+ *   retake run demos/x.yaml                       record + render → outputs/x/
  *   retake run demos/x.yaml --headed --no-render  watch the browser, keep only the raw take
- *   retake render outputs/capture-hero            re-render artifacts from an existing take (--preset to switch)
- *   retake check outputs/capture-hero             pass/fail on resolution, fps, duration, files
- *   retake presets                                list quality presets
+ *   retake render outputs/x                       re-render from the existing take (--preset to switch)
+ *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
+ *   retake dry demos/x.yaml                       every selector and wait, no camera
  *   retake validate demos/x.yaml                  schema check only
+ *   retake presets                                list quality presets
  *   retake list                                   manifests in ./demos
- *   retake ui                                     local one-window UI on :4310
  *   retake describe <name> <url> "<what>"         scout + model → demos/<name>.yaml
+ *
+ * Run from a clone, the `.ts` source goes through tsx (`npm run retake -- …`);
+ * installed from npm, dist/cli.js is the `retake` binary. Same file.
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
+import { spawnSync } from "node:child_process";
 import { Command } from "commander";
 import { loadManifest, warnings } from "./manifest.js";
 import { acquireLock, captureHash, record, releaseLock, type Take } from "./record.js";
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
+import { PKG_ROOT, VERSION, entry } from "./paths.js";
 
 // The manifest may reference ${VARS}; load .env before any command reads one.
 // (`describe` and the UI used to do this individually, so a plain `run` from
@@ -30,7 +40,7 @@ try {
 } catch { /* .env is optional */ }
 
 const program = new Command();
-program.name("retake").description("Rerun the demo instead of re-recording it.").version("0.1.0");
+program.name("retake").description("Rerun the demo instead of re-recording it.").version(VERSION);
 
 const say = (l: string) => process.stdout.write(l + "\n");
 
@@ -135,27 +145,115 @@ program
     await import("./operator/tools.js");
   });
 
+/** Files a workspace needs. Never overwrites; says what it did. */
+function initWorkspace(root: string, say: (l: string) => void): void {
+  const made: string[] = [];
+  for (const d of ["demos", "outputs"]) {
+    const p = path.join(root, d);
+    if (!fs.existsSync(p)) { fs.mkdirSync(p, { recursive: true }); made.push(d + "/"); }
+  }
+  const example = path.join(root, "demos", "example.yaml");
+  if (!fs.existsSync(example) && fs.readdirSync(path.join(root, "demos")).length === 0) {
+    fs.copyFileSync(path.join(PKG_ROOT, "demos", "example.yaml"), example);
+    made.push("demos/example.yaml");
+  }
+  const env = path.join(root, ".env");
+  if (!fs.existsSync(env)) { fs.copyFileSync(path.join(PKG_ROOT, ".env.example"), env); made.push(".env"); }
+  // Outputs are big and sessions are secrets: keep both out of the user's git.
+  const gi = path.join(root, ".gitignore");
+  const lines = ["outputs/", ".auth/", ".env", ".drafts/", ".trash/", "ideas/"];
+  const have = fs.existsSync(gi) ? fs.readFileSync(gi, "utf8") : "";
+  const missing = lines.filter((l) => !have.split(/\r?\n/).some((h) => h.trim() === l || h.trim() === l.replace(/\/$/, "")));
+  if (missing.length) {
+    fs.writeFileSync(gi, (have ? have.replace(/\n*$/, "\n\n") : "") + "# retake\n" + missing.join("\n") + "\n");
+    made.push(`.gitignore (+${missing.length})`);
+  }
+  say(made.length ? `✓ workspace ${root}: ${made.join(", ")}` : `✓ workspace ${root}: already set up`);
+}
+
+function chromiumPath(): string | null {
+  try {
+    const require = createRequire(import.meta.url);
+    const { chromium } = require("playwright") as typeof import("playwright");
+    const p = chromium.executablePath();
+    return fs.existsSync(p) ? p : null;
+  } catch { return null; }
+}
+
+/** `npx playwright install chromium`, but from wherever playwright actually is. */
+function installChromium(say: (l: string) => void): boolean {
+  const require = createRequire(import.meta.url);
+  let cli: string;
+  try { cli = path.join(path.dirname(require.resolve("playwright/package.json")), "cli.js"); } catch { return false; }
+  say("… downloading Chromium for Playwright (one time, ~150 MB)");
+  const r = spawnSync(process.execPath, [cli, "install", "chromium"], { stdio: "inherit" });
+  return r.status === 0;
+}
+
+/** The MCP server entry, for every config format. */
+function mcpServer(ui: string): { command: string; args: string[]; env: Record<string, string> } {
+  const tools = entry("operator/tools");
+  return { command: tools.command, args: tools.args, env: { RETAKE_ROOT: process.cwd(), RETAKE_UI: ui } };
+}
+const toml = (server: ReturnType<typeof mcpServer>) => [
+  "  [mcp_servers.retake]",
+  `  command = ${JSON.stringify(server.command)}`,
+  `  args = ${JSON.stringify(server.args)}`,
+  `  env = { ${Object.entries(server.env).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join(", ")} }`,
+].join("\n");
+
+program
+  .command("init")
+  .description("make this folder a Retake workspace: demos/, outputs/, .env, .gitignore entries")
+  .action(() => initWorkspace(process.cwd(), say));
+
+program
+  .command("doctor")
+  .description("check that everything Retake needs is in place")
+  .action(() => {
+    let bad = 0;
+    const ok = (l: string) => say(`✓ ${l}`);
+    const no = (l: string) => { bad++; say(`✗ ${l}`); };
+    const major = Number(process.versions.node.split(".")[0]);
+    (major >= 20 ? ok : no)(`node ${process.versions.node}${major < 20 ? " — Retake needs 20 or newer" : ""}`);
+    const chrome = chromiumPath();
+    chrome ? ok(`chromium ${chrome}`) : no("chromium not downloaded — run: retake install  (or: npx playwright install chromium)");
+    try {
+      const require = createRequire(import.meta.url);
+      const ff = require("ffmpeg-static") as string;
+      fs.existsSync(ff) ? ok(`ffmpeg ${ff}`) : no("ffmpeg-static is missing its binary — reinstall retake-demos");
+    } catch { no("ffmpeg-static not found — reinstall retake-demos"); }
+    const which = (bin: string) => spawnSync("which", [bin], { encoding: "utf8" }).stdout.trim();
+    say(which("gifski") ? `✓ gifski (better GIFs)` : `· gifski not installed — GIFs fall back to ffmpeg (brew install gifski)`);
+    say(which("claude") ? `✓ claude CLI — \`retake install\` can register the tools` : `· claude CLI not found — paste the config from \`retake agent\` into your agent`);
+    say(which("codex") ? `✓ codex CLI` : `· codex CLI not found (fine if you don't use Codex)`);
+    const root = process.cwd();
+    fs.existsSync(path.join(root, "demos")) ? ok(`workspace ${root}`) : say(`· ${root} is not a workspace yet — run: retake init`);
+    if (bad) process.exitCode = 1;
+  });
+
 program
   .command("install")
-  .description("set up Claude Code (and print the Codex config): tools + the demo-recording skill")
+  .description("set up this folder as the workspace, download Chromium, register the tools with Claude Code (and print the Codex config)")
   .option("--ui <url>", "the Retake window agents report into", "http://localhost:4310")
   .action(async (o: { ui: string }) => {
     const os = await import("node:os");
     const { execFileSync } = await import("node:child_process");
-    const node = process.execPath;
-    const tsx = path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
-    const tools = path.join(process.cwd(), "src", "operator", "tools.ts");
-    const env = { RETAKE_ROOT: process.cwd(), RETAKE_UI: o.ui };
-    const server = { command: node, args: [tsx, tools], env };
-    // 1. the tools, registered with Claude Code for every project
+    // 1. the workspace: demos/ and outputs/ live where the command was run
+    initWorkspace(process.cwd(), say);
+    // 2. the browser
+    if (chromiumPath()) say("✓ chromium present");
+    else if (!installChromium(say)) say("✗ could not download Chromium — run `npx playwright install chromium` and try again");
+    // 3. the tools, registered with Claude Code for every project
+    const server = mcpServer(o.ui);
     try {
       execFileSync("claude", ["mcp", "add-json", "retake", JSON.stringify(server), "--scope", "user"], { stdio: "pipe" });
       say("✓ Claude Code: retake tools registered (user scope)");
     } catch {
       say("✗ Claude Code CLI not found or refused — run `retake agent` and paste the config yourself");
     }
-    // 2. the skill: when to reach for the tools, and in what order
-    const skillSrc = path.join(process.cwd(), "skill", "SKILL.md");
+    // 4. the skill: when to reach for the tools, and in what order
+    const skillSrc = path.join(PKG_ROOT, "skill", "SKILL.md");
     const skillDst = path.join(os.homedir(), ".claude", "skills", "recording-product-demos");
     if (fs.existsSync(skillSrc)) {
       fs.mkdirSync(skillDst, { recursive: true });
@@ -164,15 +262,11 @@ program
     }
     say("");
     say("Codex — add to ~/.codex/config.toml (Codex has no skill store; the tool descriptions carry the method):");
-    say(`  [mcp_servers.retake]`);
-    say(`  command = ${JSON.stringify(node)}`);
-    say(`  args = ${JSON.stringify([tsx, tools])}`);
-    say(`  env = { RETAKE_ROOT = ${JSON.stringify(process.cwd())}, RETAKE_UI = ${JSON.stringify(o.ui)} }`);
-    say("");
+    say(toml(server));
     say("");
     say("One thing only you can do: RESTART Claude Code / Codex — they load new tools at the start of a session, not mid-way.");
     say("Then, in any project: “record a demo of my app showing the sign-up flow”.");
-    say(`Keep ${o.ui} open to watch. Starting your app from an agent needs RETAKE_ALLOW_START=1 in the env above.`);
+    say(`Start the window with \`retake ui\` and keep ${o.ui} open to watch. Starting your app from an agent needs RETAKE_ALLOW_START=1 in the env above.`);
   });
 
 program
@@ -180,21 +274,15 @@ program
   .description("print the config to paste into Claude Code, Codex, or Cursor")
   .option("--ui <url>", "the Retake window to report into", "http://localhost:4310")
   .action((o: { ui: string }) => {
-    const node = process.execPath;
-    const tsx = path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
-    const tools = path.join(process.cwd(), "src", "operator", "tools.ts");
     // RETAKE_UI is what makes the app a window onto the work rather than a
     // folder you check afterwards: the tools report progress there as they go.
-    const env = { RETAKE_ROOT: process.cwd(), RETAKE_UI: o.ui };
-    const cfg = { mcpServers: { retake: { command: node, args: [tsx, tools], env } } };
+    const server = mcpServer(o.ui);
+    const cfg = { mcpServers: { retake: server } };
     say("Add Retake to your agent, then ask it for a demo in plain English.\n");
     say("Claude Code — run this once:");
-    say(`  claude mcp add-json retake '${JSON.stringify(cfg.mcpServers.retake)}'\n`);
+    say(`  claude mcp add-json retake '${JSON.stringify(server)}'\n`);
     say("Codex — add to ~/.codex/config.toml:");
-    say(`  [mcp_servers.retake]`);
-    say(`  command = ${JSON.stringify(node)}`);
-    say(`  args = ${JSON.stringify([tsx, tools])}`);
-    say(`  env = { RETAKE_ROOT = ${JSON.stringify(process.cwd())}, RETAKE_UI = ${JSON.stringify(o.ui)} }\n`);
+    say(toml(server) + "\n");
     say("Cursor / anything else that speaks MCP — .cursor/mcp.json or equivalent:");
     say(JSON.stringify(cfg, null, 2) + "\n");
     say("Then just say: “record a demo of my app at localhost:3000 showing the sign-up flow”.");

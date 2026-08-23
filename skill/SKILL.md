@@ -146,9 +146,9 @@ up to the end of that scene.
 
 | MCP tool | CLI |
 |---|---|
-| draft | `npm run retake -- describe <name> <url> "<story>" -P <folder>` |
-| dry | `npm run retake -- dry demos/<name>.yaml` |
-| run | `npm run retake -- run demos/<name>.yaml` (`--preset preview-fast` for previews, `--until <scene>`) |
-| render | `npm run retake -- render outputs/<name>` |
+| draft | `retake describe <name> <url> "<story>" -P <folder>` |
+| dry | `retake dry demos/<name>.yaml` |
+| run | `retake run demos/<name>.yaml` (`--preset preview-fast` for previews, `--until <scene>`) |
+| render | `retake render outputs/<name>` |
 | receipts | read `outputs/<name>/proof-log.md` |
-| ideas | `npm run retake -- ideas <url> -P <folder>` |
+| ideas | `retake ideas <url> -P <folder>` |

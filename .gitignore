@@ -27,3 +27,5 @@ SUMMARY.md
 .trash/
 demos/*/
 site/media/
+dist/
+*.tgz

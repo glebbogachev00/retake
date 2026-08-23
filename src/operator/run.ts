@@ -10,9 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { fileURLToPath } from "node:url";
-
-const HERE = path.dirname(fileURLToPath(import.meta.url));
+import { entry } from "../paths.js";
 
 export type Pending = { id: string; kind: "question" | "approve"; text: string; detail?: string; answered: boolean; answer?: string; at: number };
 export type Session = {
@@ -78,10 +76,9 @@ export function startOperator(input: { describe: string; url?: string; project?:
   const s: Session = { id, proc: null, lines: [], pending: [], done: false, code: null, onDemo: input.onDemo, startedAt: Date.now(), listeners: new Set() };
   sessions.set(id, s);
 
-  const toolsEntry = path.join(HERE, "tools.ts");
-  const tsx = path.join(input.root, "node_modules", "tsx", "dist", "cli.mjs");
+  const tools = entry("operator/tools");
   const toolEnv = { RETAKE_ROOT: input.root, RETAKE_UI: input.ui, RETAKE_SESSION: id, RETAKE_OUT: process.env.RETAKE_OUT ?? "", RETAKE_PROJECT: input.project ?? "" };
-  const mcpConfig = { mcpServers: { retake: { command: process.execPath, args: [tsx, toolsEntry], env: toolEnv } } };
+  const mcpConfig = { mcpServers: { retake: { command: tools.command, args: tools.args, env: toolEnv } } };
   const cfgPath = path.join(input.root, ".drafts", `mcp-${id}.json`);
   fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
   fs.writeFileSync(cfgPath, JSON.stringify(mcpConfig));
@@ -119,8 +116,8 @@ export function startOperator(input: { describe: string; url?: string; project?:
       "-c", `model_catalog_json=${JSON.stringify(catalogPath)}`,
       ...(process.env.RETAKE_CODEX_MODEL ? ["-m", process.env.RETAKE_CODEX_MODEL] : []),
       ...(process.env.RETAKE_CODEX_REASONING ? ["-c", `model_reasoning_effort=${JSON.stringify(process.env.RETAKE_CODEX_REASONING)}`] : []),
-      "-c", `mcp_servers.retake.command="${process.execPath}"`,
-      "-c", `mcp_servers.retake.args=["${tsx}","${toolsEntry}"]`,
+      "-c", `mcp_servers.retake.command=${JSON.stringify(tools.command)}`,
+      "-c", `mcp_servers.retake.args=${JSON.stringify(tools.args)}`,
       "-c", `mcp_servers.retake.env={${Object.entries(toolEnv).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(",")}}`,
       "-c", "mcp_servers.retake.required=true",
       "-",

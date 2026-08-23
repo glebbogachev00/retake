@@ -405,8 +405,11 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     : `[0:v]${[...filters, ...captionFilters].join(",")}[out]`;
   const inputs = ["-ss", srcTake.trimBefore.toFixed(3), "-t", (srcTake.duration - srcTake.trimBefore).toFixed(3), "-i", src, ...(frameInput ? ["-i", frameInput] : [])];
   const compose = ["-filter_complex", graph, "-map", "[out]", "-r", String(fps), "-an", "-pix_fmt", "yuv420p", "-movflags", "+faststart"];
-  const vt = ["-c:v", "h264_videotoolbox", "-b:v", `${Math.max(4, Math.round((W * H * fps * 0.15) / 1e6))}M`, "-allow_sw", "1"]; // ~0.15 bit/px → ~9 Mbit/s at 1080p30
   const x264 = (crf: number, preset: string) => ["-c:v", "libx264", "-crf", String(crf), "-preset", preset];
+  // Hardware encode is a macOS thing; elsewhere the "fast" presets are a fast x264.
+  const vt = process.platform === "darwin"
+    ? ["-c:v", "h264_videotoolbox", "-b:v", `${Math.max(4, Math.round((W * H * fps * 0.15) / 1e6))}M`, "-allow_sw", "1"] // ~0.15 bit/px → ~9 Mbit/s at 1080p30
+    : x264(20, "veryfast");
 
   const mp4 = path.join(outDir, o.scene ? `scene-${o.scene}.mp4` : "demo.mp4");
   let master: string | undefined;
@@ -557,7 +560,9 @@ export function check(outDir: string, m?: Manifest): Check {
   const takePath = path.join(outDir, "take.json");
   if (!fs.existsSync(takePath)) return { ok: false, lines: ["FAIL  no take.json"] };
   const take = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take;
-  const q = m ? resolve(m) : null;
+  // The take knows which preset it was recorded with; a `--preset` on the run
+  // must win over the manifest's default, or a draft fails for lacking a master.
+  const q = m ? resolve(take.quality?.preset && take.quality.preset !== m.preset ? { ...m, preset: take.quality.preset } : m) : null;
   const mp4 = path.join(outDir, "demo.mp4");
   if (!fs.existsSync(mp4)) return { ok: false, lines: ["FAIL  demo.mp4 missing"] };
   const p = probe(mp4);

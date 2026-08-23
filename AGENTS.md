@@ -9,17 +9,22 @@ opening the UI.
 This file is also what Claude Code and Codex read when you point them at this
 folder, so it doubles as the tool's own instructions to them.
 
+`retake` here is the installed command (`npm install -g retake-demos`). From a
+clone of this repo the same commands run from source as `npm run retake -- …`.
+The MCP route is better than the CLI when it exists: `retake install` registers
+the tools and the skill with Claude Code, so the loop below becomes tool calls.
+
 ## The loop an agent should run
 
 ```
 write demos/<name>.yaml
-  → npm run retake -- validate demos/<name>.yaml      schema + warnings (instant)
-  → npm run retake -- dry demos/<name>.yaml           every selector & wait, no camera (~30–60s)
+  → retake validate demos/<name>.yaml      schema + warnings (instant)
+  → retake dry demos/<name>.yaml           every selector & wait, no camera (~30–60s)
   → fix what dry reports, repeat until "all N steps resolved"
-  → npm run retake -- run demos/<name>.yaml --preset preview-fast   first take (~2 min)
+  → retake run demos/<name>.yaml --preset preview-fast   first take (~2 min)
   → read outputs/<name>/proof-log.md                  what actually happened, per step
-  → npm run retake -- check outputs/<name>             pass/fail on the result
-  → adjust, then: npm run retake -- run demos/<name>.yaml          final quality
+  → retake check outputs/<name>             pass/fail on the result
+  → adjust, then: retake run demos/<name>.yaml          final quality
 ```
 
 Rule of thumb: **never go straight to `run`.** `dry` catches most failures in
@@ -47,15 +52,16 @@ codex "Using Retake (see AGENTS.md), make a 30-second demo of the sign-up
 
 Both CLIs read this file automatically when run in this directory, so the
 loop above is already in their context. If the agent works from *another*
-folder (your app's repo), add the Retake folder: `claude --add-dir ~/Documents/Retake`.
+folder (your app's repo), add the workspace: `claude --add-dir <your retake workspace>`
+— or skip all this with `retake install`, which gives the agent the tools directly.
 
 ## Letting the agent draft with Retake's own scouting
 
 The agent does not have to write the manifest from nothing:
 
 ```bash
-npm run retake -- describe <name> <url> "<one sentence of what to show>" -P <path-to-app-source>
-npm run retake -- ideas <url> -P <path-to-app-source>        # 5–7 demo ideas, saved to ideas/
+retake describe <name> <url> "<one sentence of what to show>" -P <path-to-app-source>
+retake ideas <url> -P <path-to-app-source>        # 5–7 demo ideas, saved to ideas/
 ```
 
 `describe` scouts the live page for real, unique selectors, reads the app's
@@ -94,7 +100,7 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 - `outputs/<name>/take.json` — the same, machine-readable.
 - `outputs/<name>/demo.mp4` — the video. `master.mp4` is the CRF-14 keeper
   on post presets.
-- `npm run retake -- check outputs/<name>` — resolution, fps, duration, files,
+- `retake check outputs/<name>` — resolution, fps, duration, files,
   pass/fail. Exit 3 on failure.
 
 Exit codes: `run` → 0 all steps passed, 2 something failed (video still
@@ -103,7 +109,7 @@ produced, proof log says why). `dry` → 3 if any step would fail.
 ## Fixing a take without re-recording
 
 Captions, camera zoom, hold length, trim, format and layout are **render-time**.
-Change them in the YAML and `npm run retake -- render outputs/<name>` — seconds,
+Change them in the YAML and `retake render outputs/<name>` — seconds,
 no browser. Only changes to what the browser *does* (steps, selectors, waits,
 viewport) need `run` again; `run --reuse` skips the browser when nothing
 recording-relevant changed, and the UI's one button works this out for you.

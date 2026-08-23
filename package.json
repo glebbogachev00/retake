@@ -1,16 +1,49 @@
 {
-  "name": "retake",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Demo-as-code: a YAML manifest in, a silent product walkthrough (MP4 + GIF + thumbnail + caption + proof log) out. Rerun instead of re-record.",
+  "name": "retake-demos",
+  "version": "0.2.0",
+  "description": "Demo-as-code for coding agents: a YAML manifest in, a product walkthrough video out. Rerun the demo instead of re-recording it.",
+  "keywords": [
+    "demo",
+    "screen-recording",
+    "playwright",
+    "mcp",
+    "claude-code",
+    "codex",
+    "video",
+    "documentation",
+    "agent"
+  ],
+  "homepage": "https://github.com/glebbogachev00/retake#readme",
+  "bugs": {
+    "url": "https://github.com/glebbogachev00/retake/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/glebbogachev00/retake.git"
+  },
+  "license": "MIT",
+  "author": "Gleb Bogachev",
   "type": "module",
   "bin": {
-    "retake": "./src/cli.ts"
+    "retake": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "skill",
+    "site/index.html",
+    "assets/logo.svg",
+    "assets/icon-192.png",
+    "assets/icon-512.png",
+    "demos/example.yaml",
+    ".env.example",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test",
     "retake": "tsx src/cli.ts",
-    "run": "tsx src/cli.ts run",
-    "validate": "tsx src/cli.ts validate",
     "ui": "tsx src/cli.ts ui",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts"
