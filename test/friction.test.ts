@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { resolveRelativeDates } from "../src/record.js";
-import { loadManifest, Manifest } from "../src/manifest.js";
+import { loadManifest, Manifest, resolve } from "../src/manifest.js";
 
 test("relative dates resolve to epoch ms at seed time, everything else passes through", () => {
   const now = 1_700_000_000_000;
@@ -59,3 +59,17 @@ test("keepInTab defaults on and can be turned off", () => {
   assert.equal(Manifest.parse(base).keepInTab, true, "a demo that opens a tab loses its subject; default protects it");
   assert.equal(Manifest.parse({ ...base, keepInTab: false }).keepInTab, false);
 });
+
+test("gif: true produces GIF settings on any preset, not only docs-gif", () => {
+  // `--gif` and `outputs.gif: true` used to resolve to the preset's own
+  // `gif: false` on every post preset, so the GIF was never made and nothing
+  // said so.
+  const base = { name: "g", url: "http://x", steps: [{ action: "wait", ms: 10 }] };
+  for (const preset of ["post-landscape", "post-square", "draft", "docs-gif"]) {
+    const m = Manifest.parse({ ...base, preset, outputs: { gif: true } });
+    const q = resolve(m);
+    assert.ok(q.gif && q.gif.width > 0, `${preset}: gif: true should resolve to real GIF settings`);
+  }
+  const off = resolve(Manifest.parse({ ...base, preset: "docs-gif", outputs: { gif: false } }));
+  assert.equal(off.gif, false, "gif: false still means no GIF");
+})

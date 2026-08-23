@@ -358,7 +358,14 @@ export function resolve(m: Manifest): Resolved {
   const p = PRESETS[m.preset] ?? PRESETS[DEFAULT_PRESET];
   const viewport = { width: m.viewport?.width ?? p.width, height: m.viewport?.height ?? p.height };
   const gifOverride = m.outputs.gif;
-  const gif = gifOverride === false ? false : gifOverride === true ? p.gif : p.gif === false ? { width: gifOverride.width ?? 720, fps: gifOverride.fps ?? 15 } : { width: gifOverride.width ?? p.gif.width, fps: gifOverride.fps ?? p.gif.fps };
+  /* `gif: true` means "yes, a GIF" on any preset. Only docs-gif carries GIF
+     settings, so asking for one anywhere else used to resolve to the preset's
+     `false` and produce nothing, silently. */
+  const GIF_DEFAULT = { width: 900, fps: 15 };
+  const gif = gifOverride === false ? false
+    : gifOverride === true ? (p.gif === false ? GIF_DEFAULT : p.gif)
+    : p.gif === false ? { width: gifOverride.width ?? GIF_DEFAULT.width, fps: gifOverride.fps ?? GIF_DEFAULT.fps }
+    : { width: gifOverride.width ?? p.gif.width, fps: gifOverride.fps ?? p.gif.fps };
   const cursor = m.cursor === false ? (false as const) : { style: (m.cursor === true ? "default" : m.cursor.style ?? "default") as "default" | "pointer" | "text" | "touch", size: m.cursor === true ? p.cursorSize : m.cursor.size ?? p.cursorSize, idleHideMs: m.cursor === true ? 2000 : m.cursor.idleHideMs ?? 2000, idleHide: m.cursor === true ? undefined : m.cursor.idleHide };
   const captions = m.captions === false ? (false as const) : { fontSize: m.captions === true ? p.captionFontSize : m.captions.fontSize ?? p.captionFontSize, color: m.captions === true ? undefined : m.captions.color };
   return {

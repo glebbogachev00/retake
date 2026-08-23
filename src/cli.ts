@@ -355,15 +355,27 @@ program
   .description("list quality presets")
   .action(async () => {
     const { PRESETS } = await import("./presets.js");
-    for (const p of Object.values(PRESETS)) say(`${p.name.padEnd(16)} ${String(p.width + "×" + p.height).padEnd(10)} ${p.fps}fps  scale ${p.scale}×  ${p.layout.padEnd(5)} — ${p.description}`);
+    say(`${"preset".padEnd(16)} ${"video".padEnd(11)} ${"page".padEnd(11)} fps  layout`);
+    for (const p of Object.values(PRESETS)) {
+      const video = p.layout === "card" ? `${p.width}×${p.height}` : `${p.width}×${p.height + (p.layout === "band" ? p.bandHeight : 0)}`;
+      say(`${p.name.padEnd(16)} ${video.padEnd(11)} ${String(p.width + "×" + p.height).padEnd(11)} ${String(p.fps).padEnd(4)} ${p.layout.padEnd(5)} — ${p.description}`);
+    }
+    say(`\nvideo = page + caption band. A manifest's \`viewport\` replaces the page size (the video follows it).`);
   });
 
 program
   .command("validate")
   .argument("<manifest>")
-  .action((file: string) => {
+  .action(async (file: string) => {
     const { manifest } = loadManifest(file);
+    const { resolve } = await import("./manifest.js");
+    const q = resolve(manifest);
+    // The video is the page area plus the caption band, so say the real number
+    // here rather than letting it surprise someone after a two-minute take.
+    const outW = q.layout === "card" ? q.width : q.viewport.width;
+    const outH = (q.layout === "card" ? q.height : q.viewport.height) + (q.layout === "band" ? q.bandHeight : 0);
     say(`ok: ${manifest.name} · ${manifest.steps.length} steps · ${manifest.steps.filter((s) => s.action === "scene").length} scenes`);
+    say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? ` (page ${q.viewport.width}×${q.viewport.height} + ${q.bandHeight}px caption band)` : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
   });
 

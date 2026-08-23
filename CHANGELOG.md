@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1 — 2026-08-23
+
+Found by testing the published package as a stranger would.
+
+- **`gif: true` (and `--gif`) made no GIF on any preset except `docs-gif`** —
+  it resolved to that preset's own `gif: false` and said nothing. It now
+  falls back to 900px @ 15fps anywhere. Regression test added.
+- `retake validate` prints the exact size of the video the manifest will
+  produce, and `retake presets` shows video size next to page size. The video
+  is the page plus the caption band, which the docs previously glossed over:
+  `post-landscape` is 1920×1230, not 1920×1080.
+
 ## 0.2.0 — 2026-08-23
 
 First public release on npm as `retake-demos`.
