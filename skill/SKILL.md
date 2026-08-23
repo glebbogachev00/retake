@@ -52,13 +52,17 @@ say so in one line and stop.
 5. **`dry`** — ALWAYS before `run`. Seconds, no camera, strict; failures
    include what was on screen. Fix and repeat until it passes. Never record
    a manifest whose dry run fails.
-6. **`run` with `preview=true`**, then read the `receipts` AND `look` at
+6. **While iterating, record at `--preset draft`** (CLI) — same layout as the
+   final at a quarter of the pixels, so a take costs ~real time instead of
+   real time plus an encoder. Switch to a post preset only for the take you
+   intend to keep.
+7. **`run` with `preview=true`**, then read the `receipts` AND `look` at
    the take. Receipts say what happened; `look` shows how it looks — one
    image per scene. Judge it like a viewer would: is the thing the caption
    names actually on screen? Anything in shot that shouldn't be (dev
    badges, leftover data, cut-off text)? Wrong story or failed step →
    `edit`, run again. More than four rounds → ask the person.
-7. When it is right: `run` with `preview=false` once (full quality), then
+8. When it is right: `run` with `preview=false` once (full quality), then
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
 

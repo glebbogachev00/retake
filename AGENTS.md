@@ -145,3 +145,9 @@ recording-relevant changed, and the UI's one button works this out for you.
   Retake records one page, so a popup login or a "preview" button used to lose
   the demo's subject entirely. Set `keepInTab: false` if a flow genuinely needs
   a separate window — and know it will not be on camera.
+- **Iterate at `--preset draft`.** Same 960px layout as the post presets (so
+  selectors, wrapping and timing match) at a quarter of the pixels. Measured on
+  a 22s demo: capture 22.4s vs 30.1s, render 1.2s vs 3.6s — the 1080p encoder
+  adds ~8s to every take and competes with the app being recorded. Ladder:
+  `draft` while fixing, `preview-fast` to check final framing, a post preset to
+  ship. Never ship a draft.

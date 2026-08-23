@@ -33,6 +33,19 @@ export type Preset = {
 };
 
 export const PRESETS: Record<string, Preset> = {
+  draft: {
+    /* Iteration mode: the SAME 960px layout as preview-fast and post-landscape
+       (so selectors, wrapping and timing match the final exactly) at a quarter
+       of the pixels — the encoder stops competing with the app being recorded
+       on a small machine. Never ship a draft; look at it, then re-record at a
+       post preset. */
+    name: "draft",
+    width: 960, height: 540, scale: 1, fps: 15, crf: 0,
+    gif: false, layout: "band", cameraZoom: 1.2,
+    cursorSize: 36, captionFontSize: 24, bandHeight: 76,
+    encoder: "videotoolbox", master: false,
+    description: "Fastest. Same layout as the final at a quarter of the pixels — for iterating, never for shipping.",
+  },
   "preview-fast": {
     name: "preview-fast",
     width: 1920, height: 1080, scale: 2, fps: 24, crf: 0,
