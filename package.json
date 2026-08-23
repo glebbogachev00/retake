@@ -25,7 +25,7 @@
   "author": "Gleb Bogachev",
   "type": "module",
   "bin": {
-    "retake": "./dist/cli.js"
+    "retake": "dist/cli.js"
   },
   "files": [
     "dist",
