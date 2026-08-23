@@ -4,6 +4,12 @@
 
 Found by testing the published package as a stranger would.
 
+- **`post-square` and `post-vertical` now produce a true 1080×1080 and
+  1080×1920.** The caption band used to be added below the canvas, so the
+  square preset wrote 1080×1210 and every feed letterboxed it. The band now
+  fits inside (page 1080×950 / 1080×1750). Takes recorded under the old
+  geometry need re-recording, not re-rendering — the page area is baked in.
+
 - **`gif: true` (and `--gif`) made no GIF on any preset except `docs-gif`** —
   it resolved to that preset's own `gif: false` and said nothing. It now
   falls back to 900px @ 15fps anywhere. Regression test added.

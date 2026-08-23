@@ -72,19 +72,22 @@ export const PRESETS: Record<string, Preset> = {
   },
   "post-square": {
     name: "post-square",
-    width: 1080, height: 1080, scale: 1.6, fps: 30, crf: 17,
+    /* The page area is the canvas minus the caption band, so the file really
+       is 1080×1080 — a square preset that produced 1080×1210 got letterboxed
+       by every feed. Landscape keeps its full-height page on purpose. */
+    width: 1080, height: 950, scale: 1.6, fps: 30, crf: 17,
     gif: false, layout: "band", cameraZoom: 1.25,
     cursorSize: 60, captionFontSize: 40, bandHeight: 130,
     encoder: "x264", master: true,
-    description: "1080×1080, feed-friendly.",
+    description: "A true 1080×1080 (page 1080×950 + caption band), feed-friendly.",
   },
   "post-vertical": {
     name: "post-vertical",
-    width: 1080, height: 1920, scale: 2, fps: 30, crf: 17,
+    width: 1080, height: 1750, scale: 2, fps: 30, crf: 17,
     gif: false, layout: "band", cameraZoom: 1.3,
     cursorSize: 60, captionFontSize: 44, bandHeight: 170,
     encoder: "x264", master: true,
-    description: "9:16 for shorts/reels. Apps with a narrow column suit it best.",
+    description: "A true 1080×1920 (page 1080×1750 + caption band) for shorts/reels. Narrow-column apps suit it best.",
   },
   "docs-gif": {
     name: "docs-gif",
