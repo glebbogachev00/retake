@@ -56,7 +56,9 @@
   /* the video */
   .pin { display:none; }
   .pin.show { display:block; }
-  .pin video { width:100%; height:auto; max-height:62vh; border-radius:12px; background:#000; display:block; border:1px solid var(--rule2); box-shadow:0 10px 30px rgba(24,28,24,.10); }
+  /* The element takes the video's own shape: width follows the height cap, so
+     a 1.6:1 take gets no black bars at the sides. */
+  .pin video { width:auto; max-width:100%; height:auto; max-height:62vh; margin:0 auto; border-radius:12px; background:#000; display:block; border:1px solid var(--rule2); box-shadow:0 10px 30px rgba(24,28,24,.10); }
   .under { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--muted); flex-wrap:wrap; }
   .under a, .under button { color:var(--ink); text-decoration:none; border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:5px 12px; cursor:pointer; font-size:13px; }
   .under a:hover, .under button:hover { border-color:var(--ink); }
