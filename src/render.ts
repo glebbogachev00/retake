@@ -18,6 +18,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { capSecondsFor } from "./record.js";
+import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { resolve, type Manifest, type Resolved, type Step } from "./manifest.js";
@@ -113,29 +114,6 @@ export function probe(file: string): { duration: number; width: number; height: 
   };
 }
 export const videoDuration = (file: string) => probe(file).duration;
-
-/** Word-wrap long captions; two-line captions break near the middle so no
-    word is left orphaned on the second line. */
-function wrap(text: string, max: number): string {
-  if (text.length <= max) return text;
-  const words = text.split(/\s+/);
-  if (text.length <= max * 2) {
-    let best = 1, bestDiff = Infinity;
-    for (let i = 1; i < words.length; i++) {
-      const a = words.slice(0, i).join(" ").length;
-      const b = words.slice(i).join(" ").length;
-      if (a <= max && b <= max && Math.abs(a - b) < bestDiff) { best = i; bestDiff = Math.abs(a - b); }
-    }
-    return words.slice(0, best).join(" ") + "\n" + words.slice(best).join(" ");
-  }
-  const out: string[] = [];
-  let line = "";
-  for (const w of words) {
-    if (line && (line + " " + w).length > max) { out.push(line); line = w; } else line = line ? line + " " + w : w;
-  }
-  if (line) out.push(line);
-  return out.join("\n");
-}
 
 /** ffmpeg drawtext needs a few characters escaped inside the filter graph. */
 function esc(s: string): string {
@@ -371,13 +349,14 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   let frameInput: string | null = null;
   let geom: CardGeom | null = null;
   const capSize = q.captions ? q.captions.fontSize : 0;
+  // One band height for the whole take, from its captions (see captions.ts).
+  const bandH = bandHeightFor(q, W, captionWindows(take).map((w) => w.text), H);
 
   if (layout === "band") {
-    // Site fills the frame; caption strip below it.
-    filters.push(`pad=${W}:${H + q.bandHeight}:0:0:color=${bg}`);
-    capY = `${H}+${q.bandHeight / 2}-th/2`;
+    // Site fills the frame; caption strip below it — none at all if captions are off.
+    if (bandH) { filters.push(`pad=${W}:${H + bandH}:0:0:color=${bg}`); capY = `${H}+${bandH / 2}-th/2`; }
   } else if (layout === "card") {
-    geom = cardGeometry(W, H, SW, SH, q.bandHeight);
+    geom = cardGeometry(W, H, SW, SH, bandH);
     frameInput = path.join(outDir, ".frame.png");
     await renderCardFrame(frameInput, W, H, geom, bg);
     filters.push(`scale=${geom.vw}:${geom.vh}:flags=lanczos`, `pad=${W}:${H}:${geom.vx}:${geom.vy}:color=${bg}`);
@@ -391,7 +370,7 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
 
   const captionFilters: string[] = [];
   if (q.captions && layout !== "none") {
-    const maxChars = Math.max(28, Math.round((W / capSize) * 1.55));
+    const maxChars = maxCharsFor(W, capSize);
     for (const w of captionWindows(take)) {
       captionFilters.push(
         `drawtext=${font}text='${esc(wrap(w.text, maxChars))}':fontsize=${capSize}:fontcolor=${capColor}${capBox}:line_spacing=${Math.round(capSize * 0.25)}` +

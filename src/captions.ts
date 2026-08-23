@@ -1,0 +1,57 @@
+/**
+ * Captions and the band they sit in.
+ *
+ * The band is decided at render time from the captions themselves: one line
+ * of text gets a band that fits one line, two lines a little more — one
+ * height for the whole take, so the frame never bounces between scenes.
+ * Presets whose canvas is the constraint (square, vertical) keep a fixed
+ * band instead, and the page area is the canvas minus that band.
+ */
+import type { Resolved } from "./manifest.js";
+
+/** Word-wrap long captions; two-line captions break near the middle so no
+    word is left orphaned on the second line. */
+export function wrap(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const words = text.split(/\s+/);
+  if (text.length <= max * 2) {
+    let best = 1, bestDiff = Infinity;
+    for (let i = 1; i < words.length; i++) {
+      const a = words.slice(0, i).join(" ").length;
+      const b = words.slice(i).join(" ").length;
+      if (a <= max && b <= max && Math.abs(a - b) < bestDiff) { best = i; bestDiff = Math.abs(a - b); }
+    }
+    return words.slice(0, best).join(" ") + "\n" + words.slice(best).join(" ");
+  }
+  const out: string[] = [];
+  let line = "";
+  for (const w of words) {
+    if (line && (line + " " + w).length > max) { out.push(line); line = w; } else line = line ? line + " " + w : w;
+  }
+  if (line) out.push(line);
+  return out.join("\n");
+}
+
+/** Characters per caption line at this width and font size. */
+export const maxCharsFor = (width: number, fontSize: number) => Math.max(28, Math.round((width / fontSize) * 1.55));
+
+/** How many lines the longest caption needs. */
+export function captionLines(texts: string[], width: number, fontSize: number): number {
+  const max = maxCharsFor(width, fontSize);
+  return Math.max(1, ...texts.map((t) => wrap(t, max).split("\n").length));
+}
+
+/** The band's height for this take: fitted to the text, or the preset's
+    fixed band when the canvas is the constraint. 0 when captions are off. */
+export function bandHeightFor(q: Pick<Resolved, "captions" | "layout" | "bandHeight" | "bandFit" | "height">, width: number, texts: string[], pageHeight = q.height): number {
+  if (q.layout !== "band" && q.layout !== "card") return 0;
+  if (!q.captions) return 0;
+  // Fixed canvas: whatever the page turned out to be (an older take may have
+  // a different page height), the band fills the rest so the canvas is exact.
+  if (q.bandFit === "fill") return Math.max(0, q.height + q.bandHeight - pageHeight);
+  const size = q.captions.fontSize;
+  const lines = captionLines(texts, width, size);
+  // glyph height ≈ 1.05 × size; line spacing 0.25 × size; breathing room above and below.
+  const h = size * 1.05 * lines + size * 0.25 * (lines - 1) + size * 1.1;
+  return Math.ceil(h / 2) * 2;
+}

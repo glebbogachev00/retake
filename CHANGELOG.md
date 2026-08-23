@@ -4,6 +4,14 @@
 
 Logins, done so that no model ever sees a password.
 
+- **The caption band fits the captions.** One line ≈ 100 px (was a fixed 150),
+  two lines ≈ 160, one height per take; landscape videos are 1920×1180 for
+  one-line captions. Square and vertical keep a fixed 120 px band and the
+  page gets the rest (1080×960, 1080×1800). `captions: false` → no band.
+  Render-time only: `retake render` re-cuts any existing take.
+- **Camera is still by default.** `camera: auto` (ease toward the last thing
+  touched) is something a person asks for after seeing a take.
+
 - **`secrets` MCP tool.** Returns at once with the exact words and the link
   for the agent to relay — a first-timer is walked to the window, not left
   waiting on a silent tool. The agent asks for credentials *by name*

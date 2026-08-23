@@ -442,12 +442,15 @@ program
   .description("list quality presets")
   .action(async () => {
     const { PRESETS } = await import("./presets.js");
-    say(`${"preset".padEnd(16)} ${"video".padEnd(11)} ${"page".padEnd(11)} fps  layout`);
+    const { bandHeightFor } = await import("./captions.js");
+    say(`${"preset".padEnd(16)} ${"video".padEnd(12)} ${"page".padEnd(11)} fps  layout`);
     for (const p of Object.values(PRESETS)) {
-      const video = p.layout === "card" ? `${p.width}×${p.height}` : `${p.width}×${p.height + (p.layout === "band" ? p.bandHeight : 0)}`;
-      say(`${p.name.padEnd(16)} ${video.padEnd(11)} ${String(p.width + "×" + p.height).padEnd(11)} ${String(p.fps).padEnd(4)} ${p.layout.padEnd(5)} — ${p.description}`);
+      const q = { captions: { fontSize: p.captionFontSize }, layout: p.layout, bandHeight: p.bandHeight, bandFit: p.bandFit, height: p.height };
+      const one = bandHeightFor(q, p.width, ["one line"]), two = bandHeightFor(q, p.width, ["a caption long enough to wrap ".repeat(6)]);
+      const video = p.layout === "card" ? `${p.width}×${p.height}` : p.layout !== "band" ? `${p.width}×${p.height}` : one === two ? `${p.width}×${p.height + one}` : `${p.width}×${p.height + one}–${p.height + two}`;
+      say(`${p.name.padEnd(16)} ${video.padEnd(12)} ${String(p.width + "×" + p.height).padEnd(11)} ${String(p.fps).padEnd(4)} ${p.layout.padEnd(5)} — ${p.description}`);
     }
-    say(`\nvideo = page + caption band. A manifest's \`viewport\` replaces the page size (the video follows it).`);
+    say(`\nvideo = page + caption band. On landscape presets the band fits the captions (one line, or two); square and vertical keep a fixed band so the canvas stays exact. A manifest's \`viewport\` replaces the page size (the video follows it). \`captions: false\` → no band.`);
   });
 
 program
@@ -459,10 +462,12 @@ program
     const q = resolve(manifest);
     // The video is the page area plus the caption band, so say the real number
     // here rather than letting it surprise someone after a two-minute take.
+    const { bandHeightFor } = await import("./captions.js");
     const outW = q.layout === "card" ? q.width : q.viewport.width;
-    const outH = (q.layout === "card" ? q.height : q.viewport.height) + (q.layout === "band" ? q.bandHeight : 0);
+    const band = bandHeightFor(q, outW, manifest.steps.flatMap((s) => (s.action === "scene" && s.caption ? [s.caption] : [])), q.viewport.height);
+    const outH = (q.layout === "card" ? q.height : q.viewport.height) + (q.layout === "band" ? band : 0);
     say(`ok: ${manifest.name} · ${manifest.steps.length} steps · ${manifest.steps.filter((s) => s.action === "scene").length} scenes`);
-    say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? ` (page ${q.viewport.width}×${q.viewport.height} + ${q.bandHeight}px caption band)` : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
+    say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? (band ? ` (page ${q.viewport.width}×${q.viewport.height} + ${band}px caption band${q.bandFit === "text" ? ", sized to the captions" : ""})` : " (captions off, no band)") : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
   });
 
