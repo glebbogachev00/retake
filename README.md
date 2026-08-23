@@ -53,7 +53,7 @@ outputs/<name>/
   take.json       the raw timeline the renderer reads
 ```
 
-In the window: play it, switch speed (0.75× to 2×, re-rendered in seconds), download, show in Finder, open the file to edit. Demos group by the app they point at; archive what you're done with.
+In the window: play it, switch speed (0.75× to 1.3×, re-rendered in seconds), download, or open its folder — stills, proof log, manifest. Demos group by the app they point at; archive what you're done with.
 
 ## The loop
 

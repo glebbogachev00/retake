@@ -140,15 +140,15 @@
           <option value="0.75">0.75×</option><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.15">1.15×</option><option value="1.3">1.3×</option>
         </select>
         <a id="vidDl" download>Download</a>
-        <button id="vidFolder">Show in Finder</button>
-        <a id="vidEdit" href="/classic">Edit</a>
+        <button id="vidFolder">Show in folder</button>
+        <!-- The workshop (/classic) still exists but is not advertised until it has been tested as carefully as this page. -->
       </div>
       <div class="stills" id="stills"></div>
     </div>
     <div class="empty" id="empty" style="display:none">
       <div class="mark"><i></i><i></i><i></i><i></i></div>
       <h2>Nothing recorded yet</h2>
-      <p>Ask your agent for a demo — <code>record a demo of my app showing the sign-up flow</code> —<br>or build one by hand in the <a href="/classic">workshop</a>. It will appear here.<br><a href="/guide">How Retake works</a> — one page, two minutes.</p>
+      <p>Ask your agent for a demo — <code>record a demo of my app showing the sign-up flow</code> —<br>It will appear here.<br><a href="/guide">How Retake works</a> — one page, two minutes.</p>
     </div>
     </div>
     <aside class="lib" id="lib" style="display:none">
@@ -246,7 +246,6 @@ async function pin(name) {
   $('vidMeta').title = failed?.screen ? 'On screen at that moment: ' + failed.screen : '';
   $('vidDl').href = `/out/${name}/demo.mp4${q}`; $('vidDl').setAttribute('download', name + '.mp4');
   $('vidFolder').onclick = () => api('/api/open/' + name, { method: 'POST' }).catch(() => {});
-  $('vidEdit').href = '/classic#' + encodeURIComponent(name);
   const tempo = (demos.find((x) => x.name === name)?.settings?.tempo) || 1;
   $('vidSpeed').value = String(tempo);
   $('vid').playbackRate = 1; // the file already carries its tempo
@@ -286,7 +285,7 @@ async function drawDemos() {
       const dot = p.lastTake ? (p.lastTake.ok && !p.lastTake.partial ? 'ok' : 'bad') : '';
       const when = p.lastTake ? new Date(p.lastTake.finishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no take yet';
       el.innerHTML = `<span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small><button class="zap" title="Archive this demo">✕</button>`;
-      el.onclick = () => { if (p.lastTake) pin(p.name); else location.href = '/classic#' + encodeURIComponent(p.name); };
+      el.onclick = () => { if (p.lastTake) pin(p.name); };
       el.querySelector('.zap').onclick = async (ev) => {
         ev.stopPropagation();
         // Archive, not destroy — but moving someone's work still deserves a beat.
