@@ -21,6 +21,14 @@ run it again if the domain ever changes. Commit the result.
 `vercel.json` at the repo root already says what this is: no install, no
 build, serve `site/`. A default import needs no settings.
 
+It has to say so because this repo is two things at once — an npm package
+and a landing page. Left to itself Vercel does the reasonable thing for the
+package: `npm install` (which runs the testreel patch), then `tsc`, then it
+looks for a `public/` directory that was never going to be there. The three
+lines that prevent all of it are `installCommand`, `buildCommand` and
+`outputDirectory`. Note that Vercel's schema rejects unknown keys, so the
+file cannot carry a `//` comment — that is what this paragraph is for.
+
 **From the dashboard** — import `glebbogachev00/retake` on vercel.com and
 press Deploy. Leave every setting alone: root directory `./`, framework
 "Other", build and install commands untouched. The config overrides them.
