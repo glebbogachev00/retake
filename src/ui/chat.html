@@ -16,13 +16,13 @@
   html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font:15px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
   button, input { font:inherit; color:inherit; }
   .app { min-height:100%; display:flex; flex-direction:column; }
-  .top { display:flex; align-items:center; gap:10px; padding:14px 22px; }
+  .top { display:flex; align-items:center; gap:10px; padding:0 24px; height:56px; border-bottom:1px solid var(--rule); background:var(--paper); }
   .mark { width:22px; height:22px; border-radius:7px; background:var(--accent); position:relative; flex:none; }
   .mark i { position:absolute; left:5.5px; height:2.5px; border-radius:2px; background:#eceee9; }
   .mark i:nth-child(1){top:4px;width:4px;opacity:.55} .mark i:nth-child(2){top:8px;width:7px;opacity:.8} .mark i:nth-child(3){top:12px;width:11px;background:var(--amber)} .mark i:nth-child(4){top:16px;width:7px;opacity:.8}
   .top h1 { font-size:15px; font-weight:600; margin:0; }
   .controls { position:relative; display:flex; align-items:center; gap:8px; margin-left:8px; }
-  .chip { border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:6px 13px; font-size:13px; color:var(--ink); cursor:pointer; }
+  .chip { border:1px solid var(--rule2); background:#fff; border-radius:999px; height:32px; padding:0 14px; display:inline-flex; align-items:center; font-size:13px; font-weight:500; color:var(--ink); cursor:pointer; transition:border-color .12s; }
   .chip:hover { border-color:var(--ink); }
   .pop { position:absolute; left:0; top:38px; z-index:40; background:#fff; border:1px solid var(--rule2); border-radius:14px; box-shadow:0 12px 34px rgba(24,28,24,.13); padding:8px; width:290px; display:none; }
   .pop.show { display:block; }
@@ -36,13 +36,13 @@
   @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
   .quiet { padding:8px 10px; color:var(--muted); font-size:13px; }
   .sp { flex:1; }
-  .wrap { width:100%; margin:0; padding:6px 22px 40px; display:grid; grid-template-columns:minmax(0,1fr); gap:26px; align-items:start; }
-  .col-main { max-width:720px; width:100%; margin:0 auto; min-width:0; }
+  .wrap { width:100%; margin:0; padding:24px 24px 56px; display:grid; grid-template-columns:minmax(0,1fr); gap:24px; align-items:start; }
+  .col-main { max-width:760px; width:100%; margin:0 auto; min-width:0; }
   /* wide screens: the library floats as its own card at the left, detached
      from the window edge; the video centers in the space beside it. */
   @media (min-width: 1000px) {
-    .wrap.two { grid-template-columns:280px minmax(0,1fr); gap:30px; }
-    .wrap.two .lib { position:sticky; top:14px; order:-1; }
+    .wrap.two { grid-template-columns:272px minmax(0,1fr); gap:32px; }
+    .wrap.two .lib { position:sticky; top:24px; order:-1; }
   }
 
   /* live activity — what an agent is doing to this library right now */
@@ -58,46 +58,58 @@
   .pin.show { display:block; }
   /* The element takes the video's own shape: width follows the height cap, so
      a 1.6:1 take gets no black bars at the sides. */
-  .pin video { width:auto; max-width:100%; height:auto; max-height:62vh; margin:0 auto; border-radius:12px; background:#000; display:block; border:1px solid var(--rule2); box-shadow:0 10px 30px rgba(24,28,24,.10); }
-  .under { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--muted); flex-wrap:wrap; }
-  .under a, .under button { color:var(--ink); text-decoration:none; border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:5px 12px; cursor:pointer; font-size:13px; }
+  .pin video { width:auto; max-width:100%; height:auto; max-height:60vh; margin:0 auto; border-radius:14px; background:#000; display:block; border:1px solid var(--rule2); box-shadow:0 16px 40px rgba(24,28,24,.10); }
+  .under { display:flex; align-items:baseline; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .vtitle { font-size:15px; font-weight:600; color:var(--ink); }
+  .vmeta { font-size:13px; color:var(--muted); }
+  .under a, .under button { color:var(--ink); text-decoration:none; border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:0 14px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; align-items:center; transition:border-color .12s; }
   .under a:hover, .under button:hover { border-color:var(--ink); }
   /* A native select with its arrow removed leaves lopsided padding; make it
      sit exactly like the pills beside it, text centred, same height. */
-  .under select { color:var(--ink); border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:0 12px; height:29px; line-height:27px; font-size:13px; font-family:inherit; text-align:center; text-align-last:center; cursor:pointer; -webkit-appearance:none; appearance:none; min-width:58px; }
-  .under a, .under button { height:29px; line-height:17px; box-sizing:border-box; }
+  .under select { color:var(--ink); border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:0 12px; height:32px; font-size:13px; font-weight:500; font-family:inherit; text-align:center; text-align-last:center; cursor:pointer; -webkit-appearance:none; appearance:none; min-width:58px; transition:border-color .12s; }
+  .under a, .under button { height:32px; box-sizing:border-box; align-self:center; }
   .under select:hover { border-color:var(--ink); }
-  .stills { display:flex; gap:8px; margin-top:10px; overflow-x:auto; padding-bottom:4px; }
-  .stills img { height:64px; border-radius:7px; border:1px solid var(--rule2); box-shadow:0 2px 6px rgba(24,28,24,.06); cursor:pointer; flex:none; }
+  .frames { margin-top:16px; border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 16px; }
+  .frames .fhead { display:flex; align-items:center; margin-bottom:10px; }
+  .frames .fhead .lab { font:11px ui-monospace, Menlo, monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .frames .fhead .hint { margin-left:10px; font-size:12.5px; color:var(--muted); }
+  .stills { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; align-items:center; }
+  .stills label.up { font-size:12.5px; font-weight:500; color:var(--muted); border:1px dashed var(--rule2); border-radius:8px; height:58px; display:inline-flex; align-items:center; padding:0 14px; cursor:pointer; flex:none; transition:border-color .12s, color .12s; }
+  .stills label.up:hover { border-color:var(--ink); color:var(--ink); }
+  .stills img { height:58px; border-radius:8px; border:1px solid var(--rule2); cursor:pointer; flex:none; transition:border-color .12s; }
   .stills img:hover { border-color:var(--ink); }
-  .stills img.poster, .coverrow img.poster { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
-  .coverrow { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
-  .coverrow img { height:64px; border-radius:7px; border:1px solid var(--rule2); cursor:pointer; }
+  .stills img.poster, .coverrow img.poster { border-color:var(--ink); box-shadow:0 0 0 2px var(--ink); }
+  .coverrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .coverrow:empty { display:none; margin:0; }
+  .coverrow img { height:58px; border-radius:8px; border:1px solid var(--rule2); cursor:pointer; transition:border-color .12s; }
   .coverrow img:hover { border-color:var(--ink); }
-  .coverrow .lab { font:11px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-  .coverrow label.up { font-size:12.5px; color:var(--muted); border:1px dashed var(--rule2); border-radius:8px; padding:8px 12px; cursor:pointer; }
+  .coverrow .lab { display:none; }
+  .coverrow label.up { font-size:12.5px; font-weight:500; color:var(--muted); border:1px dashed var(--rule2); border-radius:8px; height:58px; display:inline-flex; align-items:center; padding:0 14px; cursor:pointer; transition:border-color .12s, color .12s; }
   .coverrow label.up:hover { border-color:var(--ink); color:var(--ink); }
   /* the library: one quiet card at the video's side */
-  .lib { border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 10px; position:sticky; top:14px; line-height:1.4; }
-  .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:2px 0 10px 12px; }
+  .lib { border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:12px 8px; position:sticky; top:24px; line-height:1.4; }
+  .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:4px 4px 10px 14px; }
   details.group { margin-bottom:0; }
-  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; padding:12px 12px 12px 8px; border-radius:12px; font-size:15.5px; color:var(--muted); min-height:48px; }
+  details.group summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; padding:0 12px 0 6px; border-radius:10px; font-size:14px; color:var(--muted); height:38px; }
   details.group summary::-webkit-details-marker { display:none; }
   details.group summary:hover { background:#eef1ea; color:var(--ink); }
-  details.group summary .tri { transition:transform .15s; font-size:12px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:8px; flex:none; }
-  details.group summary:hover .tri { background:#e6e9e1; }
-  details.group summary .fold { width:18px; height:14px; flex:none; position:relative; }
-  details.group summary .fold::before { content:""; position:absolute; inset:0; border-radius:3px; background:var(--amber); opacity:.9; }
-  details.group summary .fold::after { content:""; position:absolute; left:0; top:-3px; width:8px; height:5px; border-radius:2px 2px 0 0; background:var(--amber); opacity:.9; }
+  details.group summary .tri { transition:transform .15s; font-size:9px; color:var(--rule2); width:18px; height:18px; display:flex; align-items:center; justify-content:center; flex:none; }
+  details.group summary:hover .tri { color:var(--muted); }
+  /* The folder mark is quiet: amber belongs to the brand and the live dot,
+     not to every row of a list. */
+  details.group summary .fold { width:15px; height:12px; flex:none; position:relative; opacity:.8; }
+  details.group summary .fold::before { content:""; position:absolute; inset:0; border-radius:2.5px; background:var(--rule2); }
+  details.group summary .fold::after { content:""; position:absolute; left:0; top:-2.5px; width:7px; height:4px; border-radius:2px 2px 0 0; background:var(--rule2); }
+  details.group[open] summary .fold::before, details.group[open] summary .fold::after { background:var(--amber); opacity:.85; }
   details.group[open] summary .tri { transform:rotate(90deg); }
-  details.group summary b { color:var(--ink); font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  details.group summary small { margin-left:auto; font-size:12.5px; }
-  details.group .demo { margin-left:14px; }
-  .demo { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px; cursor:pointer; min-height:40px; }
+  details.group summary b { color:var(--ink); font-weight:500; font-size:13.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  details.group summary small { margin-left:auto; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  details.group .demo { margin-left:24px; }
+  .demo { display:flex; align-items:center; gap:9px; padding:0 10px; border-radius:9px; cursor:pointer; height:34px; }
   .demo:hover { background:#eef1ea; }
-  .demo.on { background:#fff; border:1px solid var(--rule); }
-  .demo .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14.5px; }
-  .demo small { color:var(--muted); font-size:12px; flex:none; }
+  .demo.on { background:#fff; border:1px solid var(--rule); box-shadow:0 1px 3px rgba(24,28,24,.05); }
+  .demo .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13.5px; }
+  .demo small { color:var(--muted); font-size:11.5px; flex:none; font-variant-numeric:tabular-nums; }
   .demo .zap { flex:none; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; width:26px; height:26px; border-radius:7px; visibility:hidden; }
   .demo .zap:hover { background:#f3e9e6; }
   .demo:hover .zap { visibility:visible; }
@@ -143,18 +155,26 @@
     <div class="pin" id="pin">
       <video id="vid" controls playsinline></video>
       <div class="under">
-        <span id="vidMeta"></span>
+        <span class="vtitle" id="vidName"></span>
+        <span class="vmeta" id="vidMeta"></span>
         <span class="sp"></span>
         <select id="vidSpeed" title="Playback speed — preview now, and Download gets this speed">
           <option value="0.75">0.75×</option><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.15">1.15×</option><option value="1.3">1.3×</option>
         </select>
         <a id="vidDl" download>Download</a>
         <button id="vidFolder">Show in folder</button>
-        <button id="vidCover" title="Make the frame showing right now the poster">Use this frame</button>
         <!-- The workshop (/classic) still exists but is not advertised until it has been tested as carefully as this page. -->
       </div>
-      <div class="coverrow" id="coverrow"></div>
-      <div class="stills" id="stills"></div>
+      <div class="frames">
+        <div class="fhead">
+          <span class="lab">Poster & frames</span>
+          <span class="hint">click any frame to make it the poster</span>
+          <span class="sp"></span>
+          <button class="chip" id="vidCover" title="Make the frame showing right now the poster">Use current frame</button>
+        </div>
+        <div class="coverrow" id="coverrow"></div>
+        <div class="stills" id="stills"></div>
+      </div>
     </div>
     <div class="empty" id="empty" style="display:none">
       <div class="mark"><i></i><i></i><i></i><i></i></div>
@@ -163,7 +183,7 @@
     </div>
     </div>
     <aside class="lib" id="lib" style="display:none">
-      <h2 id="libTtl">Demos</h2>
+      <h2 id="libTtl">Library</h2>
       <div id="demos"></div>
     </aside>
   </div>
@@ -266,7 +286,8 @@ async function pin(name) {
   }
   const t = d.take;
   const failed = (t.timeline || []).find((e) => e.ok === false);
-  $('vidMeta').textContent = `${name} · ${(t.duration - t.trimBefore).toFixed(0)}s · ${t.ok ? 'all steps passed' : failed ? `stopped at step ${failed.index}: ${failed.summary}` : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
+  $('vidName').textContent = name;
+  $('vidMeta').textContent = `${(t.duration - t.trimBefore).toFixed(0)}s · ${t.ok ? 'all steps passed' : failed ? `stopped at step ${failed.index}: ${failed.summary}` : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
   $('vidMeta').title = failed?.screen ? 'On screen at that moment: ' + failed.screen : '';
   $('vidDl').href = `/out/${name}/demo.mp4${q}`; $('vidDl').setAttribute('download', name + '.mp4');
   $('vidFolder').onclick = () => api('/api/open/' + name, { method: 'POST' }).catch(() => {});
@@ -278,15 +299,17 @@ $('vidCover').onclick = () => setCover({ at: $('vid').currentTime });
   // here, not guessed: any scene still, any frame of the take, a generated
   // cover, or the person's own image. All of it just rewrites thumbnail.png,
   // so it costs no re-render.
+  // One tray: generated covers first, then every scene frame, then upload —
+  // a single row a person scans once, left to right.
   const st = (d.files || []).filter((f) => f.startsWith('stills/')).sort();
-  $('stills').innerHTML = st.map((f) => `<img src="/out/${name}/${f}${q}" title="Make this the poster — ${esc(f.slice(7, -4))}" loading="lazy" data-still="${esc(f.slice(7))}">`).join('');
-  for (const img of $('stills').querySelectorAll('img')) img.onclick = () => setCover({ still: img.dataset.still }, img);
-
   const covers = (d.files || []).filter((f) => f === 'cover.png' || f === 'cover-titled.png');
-  $('coverrow').innerHTML =
-    (covers.length ? `<span class="lab">poster</span>` + covers.map((f) => `<img src="/out/${name}/${f}${q}" title="${f === 'cover.png' ? 'The title card' : 'This frame, with the title on it'}" data-file="${f}">`).join('') : `<span class="lab">poster</span>`) +
+  $('coverrow').innerHTML = '';
+  $('stills').innerHTML =
+    covers.map((f) => `<img src="/out/${name}/${f}${q}" title="${f === 'cover.png' ? 'The title card' : 'This frame, with the title on it'}" data-file="${f}">`).join('') +
+    st.map((f) => `<img src="/out/${name}/${f}${q}" title="Make this the poster — ${esc(f.slice(7, -4))}" loading="lazy" data-still="${esc(f.slice(7))}">`).join('') +
     `<label class="up">Upload an image<input type="file" accept="image/png,image/jpeg,image/webp" hidden id="coverUp"></label>`;
-  for (const img of $('coverrow').querySelectorAll('img[data-file]')) img.onclick = () => setCover({ file: img.dataset.file }, img);
+  for (const img of $('stills').querySelectorAll('img[data-still]')) img.onclick = () => setCover({ still: img.dataset.still }, img);
+  for (const img of $('stills').querySelectorAll('img[data-file]')) img.onclick = () => setCover({ file: img.dataset.file }, img);
   $('coverUp').onchange = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -306,7 +329,7 @@ async function drawDemos() {
   $('empty').style.display = has ? 'none' : '';
   $('lib').style.display = has ? '' : 'none';
   document.body.classList.toggle('rail', has);
-  $('libTtl').textContent = `Demos · ${demos.length}`;
+  $('libTtl').textContent = `Library · ${demos.length}`;
   $('demos').innerHTML = '';
   const groups = new Map();
   for (const p of demos) { const g = p.group || 'unsorted'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p); }
