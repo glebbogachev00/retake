@@ -384,7 +384,9 @@ export function serve(port: number) {
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(fs.readFileSync(f));
       }
-      const msite = /^\/landing\/(media|logos)\/([A-Za-z0-9._-]+)$/.exec(p);
+      // Both prefixes: the page is served at /landing here and from a site
+      // root when deployed, so its asset paths are relative either way.
+      const msite = /^(?:\/landing)?\/(media|logos)\/([A-Za-z0-9._-]+)$/.exec(p);
       if (msite && (req.method === "GET" || req.method === "HEAD")) {
         const f = path.join(PKG_ROOT, "site", msite[1], msite[2]);
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });

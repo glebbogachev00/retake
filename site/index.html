@@ -21,6 +21,7 @@
   .hero { padding:52px 0 34px; }
   .flow { margin:26px 0 0; font:13px ui-monospace, Menlo, monospace; color:var(--muted); letter-spacing:.02em; }
   .flow span { color:var(--rule2); padding:0 2px; }
+  .terms { margin:10px 0 0; font-size:12.5px; color:var(--muted); }
   .kicker { font:12px ui-monospace, Menlo, monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 14px; }
   h1 { font-size:clamp(34px, 6vw, 54px); line-height:1.08; letter-spacing:-.025em; margin:0 0 18px; }
   h1 em { font-style:normal; color:var(--muted); }
@@ -84,6 +85,13 @@
   .case .meta { margin:0; font-size:12.5px; color:var(--muted); }
   .case .meta a { color:inherit; }
   @media (max-width: 560px) {
+    /* The diff is the page's best proof, so on a phone it wraps rather than
+       clipping — it stays the real selector line, not a shortened fake, and
+       nothing is hidden off the right edge. */
+    .diff { font-size:11.5px; line-height:1.8; }
+    .diff div { white-space:pre-wrap; word-break:break-word; }
+    /* Keep the − / + markers: colour alone is not a signal everyone gets. */
+    .diff .del, .diff .add { padding-left:18px; text-indent:-18px; }
     .copyline { flex-direction:column; }
     .copybtn { padding:12px 20px; }
   }
@@ -102,12 +110,13 @@
   <div class="hero">
     <p class="kicker">your product changed. your demo is outdated.</p>
     <h1>Demos that<br><em>re-record themselves.</em></h1>
-    <p class="lede">A demo is a small file your coding agent writes. When the UI changes, change one line and run it again — every format you published is current. For teams that ship UI faster than they can re-record it — the client walkthrough on Tuesday and the launch video on Friday, out of the same file.</p>
+    <p class="lede">A demo is a small file your coding agent writes. When the UI changes, change one line and run it again — every format comes back out of the same current take. For teams that ship UI faster than they can re-record it — the client walkthrough on Tuesday and the launch video on Friday, out of the same file.</p>
     <div class="actions">
       <a class="btn dark" href="#start">Copy the setup prompt</a>
-      <a class="btn light" href="#proof">Watch it work</a>
+      <a class="btn light" href="#proof">Watch the 14-second demo</a>
     </div>
-    <p class="flow">one prompt <span>→</span> a YAML demo <span>→</span> dry-run checked <span>→</span> recorded <span>→</span> rerunnable forever</p>
+    <p class="flow">one prompt <span>→</span> a YAML demo <span>→</span> dry-run checked <span>→</span> recorded <span>→</span> rerun on the next release</p>
+    <p class="terms">MIT licensed · runs on your machine · no account, nothing uploaded</p>
   </div>
 
   <div class="say"><span class="who">The release renamed a button. This is the whole fix</span>
@@ -121,22 +130,22 @@
   <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
 
   <section>
-    <h2>Three products already run on it</h2>
-    <p class="sub">Same maker, three real businesses — Retake was built inside them, not for a landing page.</p>
+    <h2>Built against three real workflows</h2>
+    <p class="sub" style="max-width:640px">Retake was built inside these, not for a landing page. All three are mine — there are no customer quotes here yet, and this page is not going to pretend otherwise.</p>
     <div class="cases">
       <div class="case">
         <div class="wordmark"><span class="serif">capture<span style="color:#2F5D3F">.</span></span></div>
-        <p class="quote">“The five-video launch set — drafted, fixed and re-cut in one afternoon. Re-doing a take stopped being a decision.”</p>
+        <p class="quote">A five-video launch set, drafted, corrected and re-cut in one afternoon. Re-doing a take stopped being a decision worth having.</p>
         <p class="meta">Thought-sorting app · <a href="https://capture-playground.vercel.app">capture-playground.vercel.app</a></p>
       </div>
       <div class="case">
-        <div class="wordmark"><img src="/landing/logos/avexjets.png" alt="AvexJets" class="caselogo wide"></div>
-        <p class="quote">“Our client walkthrough crosses three portals. What took twenty minutes live is a file now — issues get caught on camera, and the fix is a re-record, not another meeting.”</p>
+        <div class="wordmark"><img src="logos/avexjets.png" alt="AvexJets" class="caselogo wide"></div>
+        <p class="quote">One repeatable flow across three portals, replacing a twenty-minute live walkthrough. The proof log catches a broken step before a client ever sees it.</p>
         <p class="meta">Private aviation charter · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
       </div>
       <div class="case">
         <div class="wordmark tbmark"><span style="color:#193b92">Tech</span><span style="color:#2C7A7B">Bash</span></div>
-        <p class="quote">“Lesson walkthroughs for kids learning Scratch — an agent drags the actual blocks. When a lesson changes, the video reruns itself.”</p>
+        <p class="quote">An agent operates the real Scratch editor, dragging the actual blocks. When a lesson changes, the same file produces the next walkthrough.</p>
         <p class="meta">Coding school for young learners · <a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
       </div>
     </div>
@@ -188,16 +197,14 @@ mkdir demos && cd demos && retake install</pre>
     <p class="sub" style="max-width:640px">A screen recording is pixels you can never edit; a browser test is a pass/fail nobody can watch. A Retake demo is both halves: a readable file that proves itself like a test and renders like a film — and reruns when the app changes.</p>
     <ul class="refuse">
       <li><b>A video editor.</b> <span>If a take needs editing, the demo file was wrong. Fix the file, run it again.</span></li>
-      <li><b>A screen recorder.</b> <span>Nothing is captured over your shoulder. Every frame comes from a step you can read.</span></li>
       <li><b>A cloud.</b> <span>Your app, your machine, your files. There is nothing to sign into and nowhere your footage goes.</span></li>
-      <li><b>A chat.</b> <span>The agent you already use is the chat. Retake is the hands and the camera.</span></li>
       <li><b>A subscription.</b> <span>MIT licensed. A demo you recorded is yours to rerun forever.</span></li>
     </ul>
   </section>
 
   <section>
     <h2>Record your first rerunnable demo</h2>
-    <p class="sub" style="max-width:620px">The demo outlives the video. When the next release moves a button, the fix is a line in a file — and every format you published re-renders from the same take.</p>
+    <p class="sub" style="max-width:620px">The demo outlives the video. When the next release moves a button, the fix is a line in a file — and landscape, square, vertical and the GIF all re-render from the same take.</p>
     <div class="copyline">
       <div class="say"><span class="who">Start with the sentence</span><i id="pasteline2">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
       <button class="copybtn" data-copy="pasteline2">Copy</button>
