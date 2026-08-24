@@ -467,7 +467,8 @@ export function serve(port: number) {
         const dir = path.join(outRoot(), name);
         const target = path.join(dir, "thumbnail.png");
         if (!fs.existsSync(dir)) return json(res, 404, { error: `no take for ${name}` });
-        const b = JSON.parse(await readBody(req)) as { still?: string; at?: number; file?: string; dataUrl?: string };
+        const b = JSON.parse(await readBody(req)) as { still?: string; at?: number; file?: string; dataUrl?: string; auto?: boolean };
+        if (b.auto) { fs.rmSync(path.join(dir, ".poster"), { force: true }); return json(res, 200, { ok: true, poster: "auto — the next render takes it from the thumbnail scene" }); }
         try {
           if (b.still) {
             // A scene still, by its file name under stills/.
@@ -494,6 +495,8 @@ export function serve(port: number) {
         } catch (e) {
           return json(res, 500, { error: (e as Error).message });
         }
+        // The choice survives re-renders; "auto" hands it back to the scene default.
+        fs.writeFileSync(path.join(dir, ".poster"), JSON.stringify({ ...b, dataUrl: b.dataUrl ? "(uploaded)" : undefined, at: b.at }));
         return json(res, 200, { ok: true, poster: "thumbnail.png" });
       }
 

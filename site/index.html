@@ -61,12 +61,6 @@
   .diff .del { color:#9a4238; } .diff .del::before { content:"−  "; opacity:.55; }
   .diff .add { color:#33613f; } .diff .add::before { content:"+  "; opacity:.55; }
   .diff .ctx { color:var(--muted); font-size:12px; margin-bottom:4px; }
-  .refuse { list-style:none; margin:0; padding:0; }
-  .refuse li { padding:12px 0 12px 30px; border-bottom:1px solid var(--rule); font-size:15.5px; position:relative; }
-  .refuse li::before { content:"×"; position:absolute; left:4px; top:10px; color:var(--rule2); font-size:18px; }
-  .refuse li:last-child { border-bottom:0; }
-  .refuse li b { font-weight:600; }
-  .refuse li span { color:var(--muted); }
   .copyline { display:flex; gap:10px; align-items:stretch; margin-top:0; }
   .copyline .say { flex:1; margin:0; }
   .copybtn { flex:none; border:1px solid var(--rule2); background:#fff; border-radius:14px; padding:0 20px; font:14px/1 inherit; cursor:pointer; transition:border-color .15s; }
@@ -110,7 +104,7 @@
   <div class="hero">
     <p class="kicker">your product changed. your demo is outdated.</p>
     <h1>Demos that<br><em>re-record themselves.</em></h1>
-    <p class="lede">A demo is a small file your coding agent writes. When the UI changes, change one line and run it again — every format comes back out of the same current take. For teams that ship UI faster than they can re-record it — the client walkthrough on Tuesday and the launch video on Friday, out of the same file.</p>
+    <p class="lede">A demo is a small file your coding agent writes. When the UI changes, change one line and run it again — the client walkthrough on Tuesday and the launch video on Friday, from the same current take.</p>
     <div class="actions">
       <a class="btn dark" href="#start">Copy the setup prompt</a>
       <a class="btn light" href="#proof">Watch the 14-second demo</a>
@@ -182,24 +176,13 @@ mkdir demos && cd demos && retake install</pre>
       <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
       <div class="cell"><b>Presets that post well</b><p>Landscape, a true square, a true 9:16, docs GIF — the same take, re-rendered. Stubs and seeds keep it repeatable.</p></div>
       <div class="cell"><b>Behind the login, off camera</b><p>The agent asks for a demo account by name; you type it into the window and it stays in one local file. The sign-in runs before recording and is trimmed off. 2FA included.</p></div>
+      <div class="cell"><b>Plain, or produced</b><p><code>mode: demo</code> keeps everything but your product out of the frame. <code>mode: launch</code> adds a title card, cuts the waiting, and lets you pick the poster. Demo is the default; your agent never upgrades one on its own.</p></div>
     </div>
-  </section>
-
-
-
-  <section>
-    <h2>Plain, or produced</h2>
-    <p class="sub" style="max-width:640px">One line in the file decides. <code>mode: demo</code> proves how something works — a client walkthrough, a clip for a pull request, a lesson — and keeps everything but your product out of the frame. <code>mode: launch</code> presents it in public: a title card, the waiting cut out, a callout on the moment that matters, and a poster you pick from the take instead of accept. Demo is the default, and your agent never upgrades one on its own. Change your mind after watching; it's a re-render, not a re-record.</p>
   </section>
 
   <section>
     <h2>Not a recorder, not a test runner</h2>
-    <p class="sub" style="max-width:640px">A screen recording is pixels you can never edit; a browser test is a pass/fail nobody can watch. A Retake demo is both halves: a readable file that proves itself like a test and renders like a film — and reruns when the app changes.</p>
-    <ul class="refuse">
-      <li><b>A video editor.</b> <span>If a take needs editing, the demo file was wrong. Fix the file, run it again.</span></li>
-      <li><b>A cloud.</b> <span>Your app, your machine, your files. There is nothing to sign into and nowhere your footage goes.</span></li>
-      <li><b>A subscription.</b> <span>MIT licensed. A demo you recorded is yours to rerun forever.</span></li>
-    </ul>
+    <p class="sub" style="max-width:640px">A screen recording is pixels you can never edit; a browser test is a pass/fail nobody can watch. A Retake demo is both halves: a readable file that proves itself like a test and renders like a film — and reruns when the app changes. And it refuses to become a video editor: if a take needs editing, the file was wrong. Fix the file, run it again.</p>
   </section>
 
   <section>

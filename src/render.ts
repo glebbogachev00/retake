@@ -558,8 +558,14 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   const cardShift = !o.scene && m.intro ? m.intro.ms / 1000 : 0;
 
   // --- 4. thumbnail ----------------------------------------------------------
+  // A person's chosen poster (the window's "Use this frame" / a still / an
+  // upload) outlives re-renders: the choice writes a .poster marker, and the
+  // scene-based default never overwrites a deliberate choice.
   let thumbnail: string | undefined;
-  if (m.outputs.thumbnail) {
+  if (m.outputs.thumbnail && fs.existsSync(path.join(outDir, ".poster")) && fs.existsSync(path.join(outDir, "thumbnail.png"))) {
+    thumbnail = path.join(outDir, "thumbnail.png");
+    log?.("thumbnail: keeping the poster you chose (delete .poster to go back to the scene default)");
+  } else if (m.outputs.thumbnail) {
     const sc = scenes(take);
     let at: number;
     if (typeof m.outputs.thumbnail === "object") {
