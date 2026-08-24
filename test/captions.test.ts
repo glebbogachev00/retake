@@ -44,3 +44,11 @@ test("callout and cards are schema-valid and render-relevant", async () => {
   assert.equal(c.ms, 2000);
   assert.throws(() => Manifest.parse({ name: "x", url: "http://x", steps: [{ action: "callout" }] }), /selector or/);
 });
+
+test("music accepts a path or a config, with sane defaults", async () => {
+  const { Manifest } = await import("../src/manifest.js");
+  const a = Manifest.parse({ name: "x", url: "http://x", music: "track.mp3", steps: [{ action: "wait", ms: 10 }] });
+  assert.equal(a.music, "track.mp3");
+  const b = Manifest.parse({ name: "x", url: "http://x", music: { file: "t.mp3" }, steps: [{ action: "wait", ms: 10 }] });
+  assert.deepEqual(b.music, { file: "t.mp3", gainDb: -14, fadeOutMs: 1800 });
+});

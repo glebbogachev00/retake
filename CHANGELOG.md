@@ -9,6 +9,11 @@ title cards and callouts, rendered from HTML.
   them frame-by-frame from an HTML template (deterministic to the pixel),
   spliced onto the take at render time. The intro's settled frame is written
   as `cover.png` — the poster. Change a word, re-render in seconds.
+- **`music:`** — a bed under the whole video, mixed at render: the person's
+  own file (Retake bundles no tracks — licensing), looped or trimmed to
+  fit, faded out at the end. The skill teaches the flow: plain cut by
+  default; the launch treatment offered in one sentence when the
+  destination is a launch or a post.
 - **`callout` steps**: an animated amber ring and label around an element,
   box recorded during the take, drawn at render in source coordinates so a
   moving camera carries it. The take holds while it plays.

@@ -83,6 +83,24 @@ zooms or caption tone until they have seen one. Two moves instead:
    so it never comes up again in this project. Never ask about zoom or
    cursor before they have seen a take.
 
+**Two kinds of take, one file — and the destination decides.** The default
+is the plain cut: still camera, cursor, captions, nothing else. That is
+correct for PRs, clients, docs, lessons — most takes. When the person's
+answer to "where is this going?" is a launch, a post, or anything public
+and promotional, offer the produced cut in ONE sentence: "Want the launch
+treatment — title card, a callout on the payoff, square or vertical for
+the feed, and music if you give me a track?" Never apply it unasked, and
+never ask about its parts one by one.
+
+The produced cut, when they say yes:
+- `intro: { title, subtitle }` and usually `outro:` (the product name or URL)
+- one `callout` on the payoff moment, not more
+- the destination's shape: `post-square` or `post-vertical`
+- `music: <file>` only if they hand you a file or point at one on disk.
+  Retake bundles no tracks (licensing) — say: "give me an mp3 you have the
+  rights to; CC0 tracks live at freepd.com or pixabay.com/music". Skip
+  music without complaint if they shrug.
+
 Anything they would tell a videographer maps to a knob, in plain English:
 
 - "add a title card" / "give it a cover" → `intro: { title, subtitle }`

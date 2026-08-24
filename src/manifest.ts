@@ -199,6 +199,10 @@ const ManifestShape = z.object({
   /** band (default): the site fills the frame, caption strip below · card: the recording framed on a soft canvas · overlay-*: caption over the video · none */
   layout: z.enum(["band", "card", "overlay-bottom", "overlay-top", "none"]).optional(),
   /** auto: each scene zooms toward the last element the demo touched · static: no camera moves. */
+  /** A music bed under the whole video, mixed at render time: looped or
+      trimmed to fit, faded out over the last moments. The person supplies the
+      file (CC0/licensed — it ships inside their video); Retake bundles none. */
+  music: z.union([z.string(), z.object({ file: z.string(), gainDb: z.number().min(-40).max(6).default(-14), fadeOutMs: z.number().positive().max(8000).default(1800) })]).optional(),
   /** Title cards, rendered at render time (change them, re-render in seconds).
       The intro's settled frame is also written as cover.png — the poster. */
   intro: z.object({ title: z.string().max(60), subtitle: z.string().max(90).optional(), ms: z.number().positive().max(6000).default(2400) }).optional(),

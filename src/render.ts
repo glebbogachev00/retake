@@ -22,7 +22,7 @@ import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { renderCard, renderCalloutOverlay } from "./cards.js";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
-import { resolve, type Manifest, type Resolved, type Step } from "./manifest.js";
+import { expandEnv, resolve, type Manifest, type Resolved, type Step } from "./manifest.js";
 import type { Take, TimelineEntry } from "./record.js";
 
 export type Artifacts = {
@@ -66,7 +66,7 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro], gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro], music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -451,6 +451,23 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
       for (const f of segs) if (f !== mp4) fs.rmSync(f, { force: true });
     }
     mark("cards");
+  }
+
+  // Music bed: looped or trimmed to the video, faded out at the end. The
+  // deliverable gets it; the master stays a clean video-only source.
+  if (m.music && !o.scene) {
+    const spec = typeof m.music === "string" ? { file: m.music, gainDb: -14, fadeOutMs: 1800 } : m.music;
+    // Absolute, or relative to the working directory (the workspace).
+    const musicFile = path.resolve(expandEnv(spec.file));
+    if (!fs.existsSync(musicFile)) throw new Error(`music: no such file ${musicFile} — the track ships inside the video, so it must be one the person may use (CC0 or licensed)`);
+    const dur = probe(mp4).duration;
+    const mixed = path.join(outDir, ".with-music.mp4");
+    const fadeStart = Math.max(0, dur - spec.fadeOutMs / 1000);
+    ff(["-i", mp4, "-stream_loop", "-1", "-i", musicFile, "-shortest",
+      "-filter_complex", `[1:a]volume=${spec.gainDb}dB,afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeStart.toFixed(2)}:d=${(spec.fadeOutMs / 1000).toFixed(2)}[a]`,
+      "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", mixed], log);
+    fs.renameSync(mixed, mp4);
+    mark("music");
   }
   if (o.scene) return { mp4, proofLog };
 
