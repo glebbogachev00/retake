@@ -307,9 +307,10 @@ export async function proposeEdits(input: { instruction: string; yaml: string; r
 
 const SCHEMA_DOC = `
 Manifest YAML fields:
-  name (kebab-case), title, url, preset: post-landscape, waitForSelector (selector present when page is ready),
+  name (kebab-case), title, url, mode: demo, preset: post-landscape, waitForSelector (selector present when page is ready),
   camera: static, setup: [steps run before recording], steps: [...], outputs: {mp4: true, gif: true, thumbnail: {scene: <label>}}
   Do NOT set viewport, cursor, chrome, background, fps, crf or captions — the preset handles quality.
+  Always set mode: demo — this is a demo, so nothing goes in the frame but the product. Never emit intro or outro cards, music, callouts or voiceover: those belong to mode: launch, which only a person can ask for.
 Steps (each may have pauseAfter ms, waitFor selector, timeout ms):
   {action: scene, label, caption, camera?: static | {focus: selector, zoom: 1.25}}   a named beat; caption is burned in until the next scene (under 60 chars). Set camera: static on every scene unless the thing being shown is genuinely too small to read at full frame — a calm, still demo reads as more real than a zooming one. If the person asked for zooms (or stillness), that wins.
   {action: wait, ms}
@@ -321,7 +322,7 @@ Steps (each may have pauseAfter ms, waitFor selector, timeout ms):
   {action: keyboard, key}
   {action: waitFor, selector, timeout: 30000}      wait for something to appear (use after actions that trigger async work)
   {action: evaluate, script}
-Rules: never invent field names or add "?" to keys; 15–35 seconds total; 3–6 scenes; open with a scene; every click uses a selector from the scouted list verbatim (selectors ending in \">> nth=N\" are already disambiguated — keep them exactly); after any action that loads or computes something, waitFor an element that only appears as a result (never one that is already on the page) — if you cannot know it from the scout, use {action: wait, ms: 3000} instead; end with a wait of ~2000ms on the payoff; do not use zoom steps — scenes carry the camera.
+Rules: never invent field names or add "?" to keys; write mode: demo; no cards, music, callouts or voiceover; 15–35 seconds total; 3–6 scenes; open with a scene; every click uses a selector from the scouted list verbatim (selectors ending in \">> nth=N\" are already disambiguated — keep them exactly); after any action that loads or computes something, waitFor an element that only appears as a result (never one that is already on the page) — if you cannot know it from the scout, use {action: wait, ms: 3000} instead; end with a wait of ~2000ms on the payoff; do not use zoom steps — scenes carry the camera; write a caption ONLY where it says something the screen cannot (never narrate a visible click), and hold the payoff in ONE frame rather than moving between tabs or views to show its parts separately.
 `;
 
 /** The person's standing taste — demos/style.md, written once, read by every

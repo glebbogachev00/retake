@@ -283,7 +283,7 @@ server.registerTool("read_manifest", { description: "The YAML of a demo.", input
   return text(fs.readFileSync(manifestPath(name), "utf8"));
 });
 
-server.registerTool("write_manifest", { description: "Create or replace a demo's YAML. It is validated; errors come back instead of being written. Prefer `edit` for small changes to an existing demo.", inputSchema: { name: z.string(), yaml: z.string() }, annotations: RETAKE_WRITE }, async ({ name, yaml }) => { LAST_DEMO = name;
+server.registerTool("write_manifest", { description: "Create or replace a demo's YAML. It is validated; errors come back instead of being written. Prefer `edit` for small changes to an existing demo. ALWAYS set `mode:`. `mode: demo` (the default) proves how something works and keeps everything but the product out of the frame — a client walkthrough, a PR clip, a bug repro, a lesson, anything for someone who already wants to know how it works. `mode: launch` presents the product in public (a launch, a post, an ad, a landing page) and is the ONLY mode where intro/outro cards, music, callouts and a branded ending belong — and a launch cut ends with THEIR product, never with Retake. Decide from the AUDIENCE, not the subject, and never upgrade a demo to a launch yourself: if you are unsure, use demo and ask.", inputSchema: { name: z.string(), yaml: z.string() }, annotations: RETAKE_WRITE }, async ({ name, yaml }) => { LAST_DEMO = name;
   if (!safe(name)) return text("name must be kebab-case");
   let parsed;
   try { parsed = YAML.parse(yaml); } catch (e) { return text(`not valid YAML: ${(e as Error).message}`); }
@@ -296,7 +296,7 @@ server.registerTool("write_manifest", { description: "Create or replace a demo's
   return text(`written: demos/${name}.yaml (${r.data.steps.length} steps)`);
 });
 
-server.registerTool("draft", { description: "Let Retake draft a manifest from a sentence: scouts the URL (and reads the project if given) and writes demos/<name>.yaml. Then dry-run it.", inputSchema: { name: z.string(), url: z.string().url(), describe: z.string(), project: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ name, url, describe, project }) => { LAST_DEMO = name;
+server.registerTool("draft", { description: "Let Retake draft a manifest from a sentence: scouts the URL (and reads the project if given) and writes demos/<name>.yaml. Then dry-run it. Drafts are always `mode: demo` — nothing in the frame but the product. If this is a launch or a post, say so afterwards with edit (see write_manifest for what launch mode allows).", inputSchema: { name: z.string(), url: z.string().url(), describe: z.string(), project: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ name, url, describe, project }) => { LAST_DEMO = name;
   if (!safe(name)) return text("name must be kebab-case");
   const provider = pickProvider();
   if (!provider) return text("no drafting model configured; write the manifest yourself with write_manifest");
@@ -309,7 +309,7 @@ server.registerTool("draft", { description: "Let Retake draft a manifest from a 
   return text(`drafted demos/${name}.yaml (${m.steps.length} steps). Next: dry.\n\n${d.yaml}`);
 });
 
-server.registerTool("edit", { description: "Make small structured changes to a demo without rewriting it: captions, camera, holds, trim, waits, selectors, text; delete_step; insert_step {after, step:{action,…}} to add one step; set_step {step, value:{action,…}} to replace one. Steps are validated. Keeps comments. Returns what changed and whether it needs re-recording. Prefer this over write_manifest — one verb costs a line, a rewrite costs the file.", inputSchema: { name: z.string(), edits: z.array(z.object({ op: z.string() }).passthrough()) }, annotations: RETAKE_WRITE }, async ({ name, edits }) => { LAST_DEMO = name;
+server.registerTool("edit", { description: "Make small structured changes to a demo without rewriting it: captions, camera, holds, trim, waits, selectors, text; delete_step; insert_step {after, step:{action,…}} to add one step; set_step {step, value:{action,…}} to replace one. Steps are validated. Keeps comments. Returns what changed and whether it needs re-recording. Prefer this over write_manifest — one verb costs a line, a rewrite costs the file. Turning a demo into a launch cut is edits too: set mode: launch, then intro/outro cards, one callout at most, music (their file), compressIdle. Never do that unasked — a demo is the default and a client walkthrough is a demo.", inputSchema: { name: z.string(), edits: z.array(z.object({ op: z.string() }).passthrough()) }, annotations: RETAKE_WRITE }, async ({ name, edits }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const a = applyEdits(manifestPath(name), edits as Edit[]);
   for (const d of a.done) await tell(d);
@@ -325,7 +325,7 @@ server.registerTool("dry", { description: "Run a demo with no camera: every sele
   return text(r.ok ? `ok: all ${manifest.steps.length} steps resolve` : r.lines.join("\n"));
 });
 
-server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story. Returns the receipts.", inputSchema: { name: z.string(), preview: z.boolean().default(true), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo") }, annotations: RETAKE_WRITE }, async ({ name, preview, until }) => { LAST_DEMO = name;
+server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story. Returns the receipts. `check: pass` and healthy audio prove the FILE is sound, not that the demo is good — call `look` at the payoff scene and judge it: can a stranger state the promise from that frame, is the result legible at playback size, is any beat longer than what it tells you? If you cannot answer yes, fix the cut before calling done.", inputSchema: { name: z.string(), preview: z.boolean().default(true), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo") }, annotations: RETAKE_WRITE }, async ({ name, preview, until }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const loaded = loadManifest(manifestPath(name));
   const manifest = preview ? { ...loaded.manifest, preset: "preview-fast" } : loaded.manifest;
