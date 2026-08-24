@@ -78,6 +78,9 @@
   .wordmark .avex { color:var(--amber); margin-right:2px; }
   .case .quote { margin:0 0 14px; font-size:14.5px; line-height:1.65; flex:1; }
   .case .meta { margin:0; font-size:12.5px; color:var(--muted); }
+  .case .watch { margin:12px 0 0; padding-top:10px; border-top:1px solid var(--rule); font-size:13px; display:flex; gap:8px; align-items:baseline; }
+  .case .watch .k { font:10.5px ui-monospace, Menlo, monospace; letter-spacing:.08em; color:var(--muted); flex:none; }
+  .case .watch a { color:var(--ink); }
   .case .meta a { color:inherit; }
   @media (max-width: 560px) {
     /* The diff is the page's best proof, so on a phone it wraps rather than
@@ -132,16 +135,19 @@
         <div class="wordmark"><span class="serif">capture<span style="color:#2F5D3F">.</span></span></div>
         <p class="quote">A five-video launch set, drafted, corrected and re-cut in one afternoon. Re-doing a take stopped being a decision worth having.</p>
         <p class="meta">Thought-sorting app · <a href="https://capture-playground.vercel.app">capture-playground.vercel.app</a></p>
+        <p class="watch"><span class="k">WATCH</span><span>Three of those videos are live on <a href="https://capture-playground.vercel.app">Capture's own page</a>, which credits Retake by name.</span></p>
       </div>
       <div class="case">
         <div class="wordmark"><img src="logos/avexjets.png" alt="AvexJets" class="caselogo wide"></div>
         <p class="quote">One repeatable flow across three portals, replacing a twenty-minute live walkthrough. The proof log catches a broken step before a client ever sees it.</p>
         <p class="meta">Private aviation charter · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
+        <p class="watch"><span class="k">SITE</span><span>The walkthrough itself is client-facing; <a href="https://www.avex-jets.com">the product it records is public</a>.</span></p>
       </div>
       <div class="case">
         <div class="wordmark tbmark"><span style="color:#193b92">Tech</span><span style="color:#2C7A7B">Bash</span></div>
         <p class="quote">An agent operates the real Scratch editor, dragging the actual blocks. When a lesson changes, the same file produces the next walkthrough.</p>
         <p class="meta">Coding school for young learners · <a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
+        <p class="watch"><span class="k">WATCH</span><span><a href="media/scratch-mini-project.mp4">The take, 19 seconds</a> — four blocks dragged into one script, and the cat runs it.</span></p>
       </div>
     </div>
   </section>
