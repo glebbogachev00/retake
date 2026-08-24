@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "//": "The landing page is the static folder site/. This repo is an npm package too, so without this Vercel installs the package, runs tsc, and then looks for a public/ directory that does not exist. There is nothing to install and nothing to build.",
+  "framework": null,
+  "installCommand": "echo 'no install: the landing page is static'",
+  "buildCommand": "echo 'no build: the landing page is static'",
+  "outputDirectory": "site",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=()" }
+      ]
+    },
+    { "source": "/media/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+    { "source": "/logos/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] },
+    { "source": "/og.png", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
+  ]
+}

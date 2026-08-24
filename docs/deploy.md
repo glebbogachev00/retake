@@ -18,31 +18,29 @@ run it again if the domain ever changes. Commit the result.
 
 ## 2. Deploy
 
-Either route works; the CLI is faster the first time.
+`vercel.json` at the repo root already says what this is: no install, no
+build, serve `site/`. A default import needs no settings.
+
+**From the dashboard** — import `glebbogachev00/retake` on vercel.com and
+press Deploy. Leave every setting alone: root directory `./`, framework
+"Other", build and install commands untouched. The config overrides them.
 
 **From the terminal**
 
 ```bash
-npx vercel --cwd site            # preview build, prints a URL
-npx vercel --cwd site --prod     # production
+npx vercel            # preview build, prints a URL
+npx vercel --prod     # production
 ```
 
-**From the dashboard** — import `glebbogachev00/retake` on vercel.com and set:
+Run it from the repo root, not from `site/`.
 
-| Setting | Value |
-|---|---|
-| Framework preset | Other |
-| Root directory | `site` |
-| Build command | *(leave empty)* |
-| Output directory | *(leave empty)* |
-| Install command | *(leave empty)* |
+If a build ever fails with *No Output Directory named "public"*, Vercel is
+ignoring `vercel.json` — usually because the project's Root Directory was
+set to something other than `./` in the dashboard. Set it back to `./`.
 
-There is no build. If Vercel tries to run one, the settings above are wrong.
-
-`site/vercel.json` sets the headers: a year of immutable caching on
-`/media/*` (the videos never change under the same name), a week on the
-logos and the share image, plus `nosniff`, `SAMEORIGIN` and a referrer
-policy.
+The config also sets the headers: a year of immutable caching on `/media/*`
+(the videos never change under the same name), a week on the logos and the
+share image, plus `nosniff`, `SAMEORIGIN` and a referrer policy.
 
 ## 3. Point the Namecheap domain at it
 
