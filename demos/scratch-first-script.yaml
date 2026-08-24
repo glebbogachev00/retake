@@ -1,8 +1,10 @@
 # The pilot lesson: a child's first script, built by dragging.
 # Blockly intercepts pointer events on its toolbox and blocks, so every target
 # here is a POINT (resolved from the page's own rect), not a locator.
-intro: { title: "A child's first script", subtitle: "Recorded by an agent dragging real blocks", ms: 2300 }
-outro: { title: "retake-demos", subtitle: "Demos that re-record themselves", ms: 1900 }
+mode: launch
+compressIdle: true
+intro: { title: "TechBash", subtitle: "A child's first script — built by an agent, dragging the real blocks", ms: 1900 }
+outro: { title: "TechBash", subtitle: "bash.techtutor.academy", ms: 1700 }
 name: scratch-first-script
 title: Scratch — make the cat move when you click the flag
 url: https://scratch.mit.edu/projects/editor/
@@ -26,7 +28,6 @@ steps:
     pauseAfter: 1600
   - action: scene
     label: hat
-    caption: Drag the hat block into the empty space
     camera: static
   - action: drag
     from: { selector: ".blocklyFlyout text:has-text('when') >> nth=0" }
@@ -35,7 +36,6 @@ steps:
     pauseAfter: 1000
   - action: scene
     label: motion
-    caption: Now something for it to do
     camera: static
   - action: click
     at: { selector: "#motion" }
@@ -47,7 +47,6 @@ steps:
     pauseAfter: 1200
   - action: scene
     label: snapped
-    caption: It snaps underneath — that is the script
     camera: static
   - action: wait
     ms: 1600

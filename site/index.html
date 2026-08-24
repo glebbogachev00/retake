@@ -215,7 +215,7 @@ mkdir demos && cd demos && retake install</pre>
 // The proof section fills itself from whatever clean renders exist in
 // site/media/. Committed pages carry no product footage; media is local.
 const CANDIDATES = [
-  { file: 'capture-two-places', cap: '<b>Capture — the launch pitch.</b> One messy sentence lands as an action and a thread. Drafted, dry-run and recorded by an agent — title card and all, from one YAML file.' },
+  { file: 'capture-two-places', cap: '<b>Capture — the launch pitch.</b> One messy sentence lands as an action and a thread. Drafted, dry-run, recorded, titled and posterised from one YAML file. 14 seconds.' },
 ];
 (async () => {
   const host = document.getElementById('proof');
@@ -234,7 +234,7 @@ const CANDIDATES = [
     const more = document.createElement('p');
     more.className = 'sub'; more.style.cssText = 'margin:14px 0 0;font-size:13.5px';
     const base = location.pathname.startsWith('/landing') ? '/landing/media/' : 'media/';
-    more.innerHTML = 'Two more takes: <a style="color:inherit" href="' + base + 'store-checkout.mp4">behind a login</a> · <a style="color:inherit" href="' + base + 'scratch-first-script.mp4">a Scratch lesson, blocks dragged by an agent</a>.';
+    more.innerHTML = 'Two more launch cuts: <a style="color:inherit" href="' + base + 'scratch-mini-project.mp4">a first Scratch project for TechBash</a> · <a style="color:inherit" href="' + base + 'mark-done.mp4">Capture closing a loop</a>.';
     host.after(more);
   }
   if (!host.children.length) host.innerHTML = '<div class="say" style="margin-top:0"><span class="who">Proof pending</span>Record a demo and drop its render into <code>site/media/</code> — this section fills itself.</div>';

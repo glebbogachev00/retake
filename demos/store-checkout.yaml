@@ -1,8 +1,6 @@
 # Public-safe: SauceDemo, a store built for test automation, with published
 # demo credentials. The point of this one is the login: real credentials
 # come from .env, marked secret, and the sign-in happens before the camera.
-intro: { title: "Behind a login", subtitle: "Signed in before the camera rolls", ms: 2300 }
-outro: { title: "retake-demos", subtitle: "Demos that re-record themselves", ms: 1900 }
 name: store-checkout
 title: Sign in, pick a thing, check out
 url: https://www.saucedemo.com
