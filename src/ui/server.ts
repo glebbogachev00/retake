@@ -33,7 +33,7 @@ import { draftManifest, loadDotenv, pickProvider, proposeEdits, providerStatus, 
 import { applyEdits, receiptsFor } from "../edits.js";
 import { dryRun } from "../dryrun.js";
 import { startOperator, getSession, addPending, answerPending, markDone, stopSession } from "../operator/run.js";
-import { gifskiBin, makeGif } from "../render.js";
+import { ffmpegBin, gifskiBin, makeGif } from "../render.js";
 import { captureHash } from "../record.js";
 import { digest } from "../digest.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
@@ -456,6 +456,45 @@ export function serve(port: number) {
         const seen = new Set<string>();
         return json(res, 200, items.filter((x) => !seen.has(x.name) && seen.add(x.name)));
       }
+      // ---------- the poster: any frame, a card, or their own file ----------
+      // thumbnail.png IS the poster. Every source here just writes it, so the
+      // choice costs no re-render and never touches the video.
+      const mcov = /^\/api\/cover\/([a-z0-9-]+)$/.exec(p);
+      if (mcov && req.method === "POST") {
+        const name = mcov[1];
+        const dir = path.join(outRoot(), name);
+        const target = path.join(dir, "thumbnail.png");
+        if (!fs.existsSync(dir)) return json(res, 404, { error: `no take for ${name}` });
+        const b = JSON.parse(await readBody(req)) as { still?: string; at?: number; file?: string; dataUrl?: string };
+        try {
+          if (b.still) {
+            // A scene still, by its file name under stills/.
+            const src = path.join(dir, "stills", path.basename(b.still));
+            if (!fs.existsSync(src)) return json(res, 404, { error: `no still ${b.still}` });
+            fs.copyFileSync(src, target);
+          } else if (b.file) {
+            // A candidate already in the take (cover.png, cover-titled.png).
+            const src = path.join(dir, path.basename(b.file));
+            if (!fs.existsSync(src)) return json(res, 404, { error: `no file ${b.file}` });
+            fs.copyFileSync(src, target);
+          } else if (typeof b.at === "number") {
+            // Any moment of the finished video — usually the best frame is
+            // nowhere near a scene marker.
+            const mp4 = path.join(dir, "demo.mp4");
+            if (!fs.existsSync(mp4)) return json(res, 404, { error: "no demo.mp4" });
+            execFileSync(ffmpegBin(), ["-y", "-loglevel", "error", "-ss", Math.max(0, b.at).toFixed(2), "-i", mp4, "-frames:v", "1", target]);
+          } else if (b.dataUrl) {
+            // Their own image.
+            const m2 = /^data:image\/(png|jpe?g|webp);base64,(.+)$/.exec(b.dataUrl);
+            if (!m2) return json(res, 400, { error: "expected a png, jpeg or webp data URL" });
+            fs.writeFileSync(target, Buffer.from(m2[2], "base64"));
+          } else return json(res, 400, { error: "give a still, a file, an `at` time, or a dataUrl" });
+        } catch (e) {
+          return json(res, 500, { error: (e as Error).message });
+        }
+        return json(res, 200, { ok: true, poster: "thumbnail.png" });
+      }
+
       if (p === "/api/trash/clear" && req.method === "POST") {
         const trash = path.join(ROOT, ".trash");
         let n = 0;

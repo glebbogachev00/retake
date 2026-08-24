@@ -95,6 +95,7 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 - **Selectors must be unique.** Playwright runs strict: a selector matching two
   elements fails. Prefer ids, `data-testid`, `aria-label`, then
   `button:has-text("…")`; append `>> nth=0` only when duplicates are intended.
+- **The poster** is `thumbnail.png`. `outputs.thumbnail: { scene: <label> }` picks the scene; the person can override it in the window from any frame, a generated cover, or their own image (`POST /api/cover/<name>`). Launch mode also writes `cover.png` (the title card) and `cover-titled.png` (a real frame with the title on it) as candidates. Do not re-render to change a poster.
 - **`mode:`** — `demo` (default) proves the interaction: nothing in the frame
   but the product. A CLIENT WALKTHROUGH IS A DEMO. `launch` presents the
   product in public (a launch, a post, an ad) and may carry a title card,

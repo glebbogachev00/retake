@@ -137,7 +137,13 @@ The produced cut, when they say yes (all render-time except typing):
 Anything they would tell a videographer maps to a knob, in plain English:
 
 - "add a title card" / "give it a cover" → `intro: { title, subtitle }`
-  (and `outro:`) — render-time, and the intro frame becomes cover.png
+  (and `outro:`) — render-time, and it also writes two poster candidates:
+  cover.png (the card) and cover-titled.png (a real frame with the title on
+  it, which is what stops a scroll)
+- "the thumbnail is wrong" → they pick the poster themselves in the window
+  (any frame, any still, a cover, or their own image). Point them at it
+  rather than re-rendering; `outputs.thumbnail: { scene }` only sets the
+  starting guess.
 - "point at it" / "highlight the button" → a `callout` step with a label —
   at most one per scene, and only where the caption alone is not enough
 

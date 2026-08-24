@@ -70,6 +70,13 @@
   .stills { display:flex; gap:8px; margin-top:10px; overflow-x:auto; padding-bottom:4px; }
   .stills img { height:64px; border-radius:7px; border:1px solid var(--rule2); box-shadow:0 2px 6px rgba(24,28,24,.06); cursor:pointer; flex:none; }
   .stills img:hover { border-color:var(--ink); }
+  .stills img.poster, .coverrow img.poster { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .coverrow { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .coverrow img { height:64px; border-radius:7px; border:1px solid var(--rule2); cursor:pointer; }
+  .coverrow img:hover { border-color:var(--ink); }
+  .coverrow .lab { font:11px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .coverrow label.up { font-size:12.5px; color:var(--muted); border:1px dashed var(--rule2); border-radius:8px; padding:8px 12px; cursor:pointer; }
+  .coverrow label.up:hover { border-color:var(--ink); color:var(--ink); }
   /* the library: one quiet card at the video's side */
   .lib { border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 10px; position:sticky; top:14px; line-height:1.4; }
   .lib h2 { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:2px 0 10px 12px; }
@@ -143,8 +150,10 @@
         </select>
         <a id="vidDl" download>Download</a>
         <button id="vidFolder">Show in folder</button>
+        <button id="vidCover" title="Make the frame showing right now the poster">Use this frame</button>
         <!-- The workshop (/classic) still exists but is not advertised until it has been tested as carefully as this page. -->
       </div>
+      <div class="coverrow" id="coverrow"></div>
       <div class="stills" id="stills"></div>
     </div>
     <div class="empty" id="empty" style="display:none">
@@ -166,6 +175,19 @@ let current = null, demos = [], settings = null;
 async function api(u, o) { const r = await fetch(u, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j; }
 
 const REPO = 'https://github.com/glebbogachev00/retake';
+async function setCover(body, marked) {
+  try {
+    await api('/api/cover/' + current, { method: 'POST', body: JSON.stringify(body) });
+    // Cache-bust: the poster keeps its filename, so the browser needs telling.
+    const v = '?v=' + Date.now();
+    $('vid').poster = `/out/${current}/thumbnail.png` + v;
+    for (const i of document.querySelectorAll('.stills img, .coverrow img')) i.classList.remove('poster');
+    if (marked) marked.classList.add('poster');
+    const meta = $('vidMeta').textContent;
+    $('vidMeta').textContent = meta.replace(/ · poster set$/, '') + ' · poster set';
+  } catch (e) { $('vidMeta').textContent = 'could not set the poster: ' + e.message; }
+}
+
 document.getElementById('gremlinBtn').onclick = async () => {
   const veil = document.createElement('div');
   veil.className = 'veil';
@@ -248,12 +270,30 @@ async function pin(name) {
   $('vidMeta').title = failed?.screen ? 'On screen at that moment: ' + failed.screen : '';
   $('vidDl').href = `/out/${name}/demo.mp4${q}`; $('vidDl').setAttribute('download', name + '.mp4');
   $('vidFolder').onclick = () => api('/api/open/' + name, { method: 'POST' }).catch(() => {});
+$('vidCover').onclick = () => setCover({ at: $('vid').currentTime });
   const tempo = (demos.find((x) => x.name === name)?.settings?.tempo) || 1;
   $('vidSpeed').value = String(tempo);
   $('vid').playbackRate = 1; // the file already carries its tempo
+  // The poster is the first thing anyone sees of a video, so it is chosen
+  // here, not guessed: any scene still, any frame of the take, a generated
+  // cover, or the person's own image. All of it just rewrites thumbnail.png,
+  // so it costs no re-render.
   const st = (d.files || []).filter((f) => f.startsWith('stills/')).sort();
-  $('stills').innerHTML = st.map((f) => `<img src="/out/${name}/${f}${q}" title="${esc(f.slice(7, -4))}" loading="lazy">`).join('');
-  for (const img of $('stills').querySelectorAll('img')) img.onclick = () => window.open(img.src, '_blank');
+  $('stills').innerHTML = st.map((f) => `<img src="/out/${name}/${f}${q}" title="Make this the poster — ${esc(f.slice(7, -4))}" loading="lazy" data-still="${esc(f.slice(7))}">`).join('');
+  for (const img of $('stills').querySelectorAll('img')) img.onclick = () => setCover({ still: img.dataset.still }, img);
+
+  const covers = (d.files || []).filter((f) => f === 'cover.png' || f === 'cover-titled.png');
+  $('coverrow').innerHTML =
+    (covers.length ? `<span class="lab">poster</span>` + covers.map((f) => `<img src="/out/${name}/${f}${q}" title="${f === 'cover.png' ? 'The title card' : 'This frame, with the title on it'}" data-file="${f}">`).join('') : `<span class="lab">poster</span>`) +
+    `<label class="up">Upload an image<input type="file" accept="image/png,image/jpeg,image/webp" hidden id="coverUp"></label>`;
+  for (const img of $('coverrow').querySelectorAll('img[data-file]')) img.onclick = () => setCover({ file: img.dataset.file }, img);
+  $('coverUp').onchange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => setCover({ dataUrl: r.result });
+    r.readAsDataURL(f);
+  };
   $('pin').classList.add('show');
   drawDemos();
   return true;

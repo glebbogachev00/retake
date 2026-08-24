@@ -122,3 +122,35 @@ export async function renderCalloutOverlay(
   fs.rmSync(dir, { recursive: true, force: true });
   return webm;
 }
+
+/** A cover built from a real frame of the video with the title laid over it —
+    a screenshot plus a few words, which is what actually stops a scroll. Not
+    a skin of the centred card: the product is the picture. */
+export async function renderTitledCover(
+  ffmpeg: string, frame: string, out: string,
+  spec: { title: string; subtitle?: string },
+  w: number, h: number, theme: Theme,
+): Promise<string> {
+  const b64 = fs.readFileSync(frame).toString("base64");
+  const titleSize = Math.round(Math.min(w * 0.045, h * 0.1));
+  const subSize = Math.round(titleSize * 0.42);
+  const html = `<!doctype html><meta charset="utf-8"><style>
+  html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden;background:${theme.background};font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif}
+  .shot{position:absolute;inset:0;background:url(data:image/png;base64,${b64}) center/cover no-repeat}
+  .veil{position:absolute;inset:0;background:linear-gradient(to bottom, rgba(0,0,0,0) 38%, rgba(0,0,0,.14) 58%, ${theme.background} 78%)}
+  .txt{position:absolute;left:0;right:0;bottom:${Math.round(h * 0.055)}px;text-align:center;padding:0 ${Math.round(w * 0.08)}px}
+  .t{font-size:${titleSize}px;font-weight:700;letter-spacing:-.02em;color:${theme.ink};margin:0}
+  .r{height:${Math.max(3, Math.round(titleSize * 0.08))}px;width:${Math.round(titleSize * 2.6)}px;background:${AMBER};border-radius:99px;margin:${Math.round(titleSize * 0.3)}px auto}
+  .s{font-size:${subSize}px;color:${theme.ink};margin:0;opacity:.75}
+  </style>
+  <div class="shot"></div><div class="veil"></div>
+  <div class="txt"><p class="t">${escapeHtml(spec.title)}</p><div class="r"></div>${spec.subtitle ? `<p class="s">${escapeHtml(spec.subtitle)}</p>` : ""}</div>`;
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: w, height: h } });
+  await page.setContent(html, { waitUntil: "load" });
+  await page.screenshot({ path: out });
+  await browser.close();
+  return out;
+}
+
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

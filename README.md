@@ -61,12 +61,14 @@ outputs/<name>/
   demo.mp4        the shareable — captions burned in
   master.mp4      the CRF-14 keeper (post presets only)
   stills/         one PNG per scene, mid-scene and at its last moment
-  thumbnail.png   the frame at a chosen scene
+  thumbnail.png   the poster — pick any frame, a cover, or your own image in the window
+  cover.png       launch mode: the title card, settled
+  cover-titled.png launch mode: a real frame with the title over it
   proof-log.md    result, shot list, every step's timing, pass/fail, what was on screen when it failed
   take.json       the raw timeline the renderer reads
 ```
 
-In the window: play it, switch speed (0.75× to 1.3×, re-rendered in seconds), download, or open its folder — stills, proof log, manifest. Demos group by the app they point at; archive what you're done with.
+In the window: play it, switch speed (0.75× to 1.3×, re-rendered in seconds), download, or open its folder — stills, proof log, manifest. **The poster is chosen, not guessed**: scrub to a frame and press *Use this frame*, click any scene still, take one of the generated covers, or upload your own. It rewrites `thumbnail.png`, so it costs no re-render — and on a feed the poster decides whether anyone presses play. Demos group by the app they point at; archive what you're done with.
 
 ## The loop
 

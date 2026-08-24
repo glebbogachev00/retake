@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { capSecondsFor } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
-import { renderCard, renderCalloutOverlay } from "./cards.js";
+import { renderCard, renderCalloutOverlay, renderTitledCover } from "./cards.js";
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
 import { DEFAULT_VOICE, audioSeconds, synthesize } from "./voice.js";
 import { createRequire } from "node:module";
@@ -553,6 +553,10 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     mark("gif");
   }
 
+  // Cards are spliced onto the front of the deliverable, so every timestamp
+  // in the take is that much later in the file frames are pulled from.
+  const cardShift = !o.scene && m.intro ? m.intro.ms / 1000 : 0;
+
   // --- 4. thumbnail ----------------------------------------------------------
   let thumbnail: string | undefined;
   if (m.outputs.thumbnail) {
@@ -571,7 +575,14 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
       at = last ? last.start - take.trimBefore + 1.0 : Math.max(0, take.duration - take.trimBefore - 0.5);
     }
     thumbnail = path.join(outDir, "thumbnail.png");
-    ff(["-ss", Math.max(0, at).toFixed(2), "-i", mp4, "-frames:v", "1", thumbnail], log);
+    ff(["-ss", Math.max(0, at + cardShift).toFixed(2), "-i", mp4, "-frames:v", "1", thumbnail], log);
+    // A launch cut gets a second candidate: this frame with the title on it.
+    // The person picks between them (or any still, or their own file) in the
+    // window; both are just PNGs, and the poster is whichever is thumbnail.png.
+    if (m.mode === "launch" && m.intro) {
+      const d = probe(mp4);
+      await renderTitledCover(ffmpegBin(), thumbnail, path.join(outDir, "cover-titled.png"), m.intro, d.width, d.height, q.theme);
+    }
     mark("thumbnail");
   }
   // --- 5. scene stills -------------------------------------------------------
@@ -592,12 +603,12 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
       const at = Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
       const base = `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}`;
       const file = path.join(dir, `${base}.png`);
-      ff(["-ss", at.toFixed(2), "-i", mp4, "-frames:v", "1", file], log);
+      ff(["-ss", (at + cardShift).toFixed(2), "-i", mp4, "-frames:v", "1", file], log);
       stills.push(file);
       // And the scene's last moment: the caption names what the scene
       // achieves, and that is usually on screen at the end, not the middle.
       const atEnd = Math.min(Math.max(from + 0.4, next - 0.6), Math.max(0, end - 0.2));
-      if (atEnd - at > 0.5) { const fe = path.join(dir, `${base}-end.png`); ff(["-ss", atEnd.toFixed(2), "-i", mp4, "-frames:v", "1", fe], log); stills.push(fe); }
+      if (atEnd - at > 0.5) { const fe = path.join(dir, `${base}-end.png`); ff(["-ss", (atEnd + cardShift).toFixed(2), "-i", mp4, "-frames:v", "1", fe], log); stills.push(fe); }
     }
     if (sc.length) mark(`stills ×${sc.length}`);
   }
