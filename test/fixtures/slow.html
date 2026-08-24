@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>slow</title>
+<style>body{margin:0;font:18px system-ui;background:#f6f6f3;padding:48px}button{font:inherit;padding:12px 22px;border-radius:10px;border:1px solid #bbb;background:#fff;cursor:pointer}
+#spin{display:none;margin:24px 0;color:#888}#result{display:none;margin:24px 0;padding:18px;border:1px solid #9c9;background:#eaf5ea;border-radius:10px}</style>
+<h1>A slow backend</h1>
+<button id="go">Ask the model</button>
+<div id="spin">thinking…</div>
+<div id="result">The answer, six real seconds later.</div>
+<script>document.getElementById('go').onclick=()=>{spin.style.display='block';setTimeout(()=>{spin.style.display='none';result.style.display='block'},6000)}</script>

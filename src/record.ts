@@ -646,7 +646,7 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       await rec.click(step.selector!, { timeout, zoom: step.zoom });
       break;
     case "type":
-      await rec.type(step.selector, expandEnv(step.text), { delay: step.delay ?? 70, clear: step.clear, timeout });
+      await rec.type(step.selector, expandEnv(step.text), { delay: step.delay ?? (m.typing === "brisk" ? 22 : 70), clear: step.clear, timeout });
       break;
     case "fill":
       await rec.fill(step.selector, expandEnv(step.text), { timeout });

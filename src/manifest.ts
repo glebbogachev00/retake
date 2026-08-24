@@ -199,6 +199,19 @@ const ManifestShape = z.object({
   /** band (default): the site fills the frame, caption strip below · card: the recording framed on a soft canvas · overlay-*: caption over the video · none */
   layout: z.enum(["band", "card", "overlay-bottom", "overlay-top", "none"]).optional(),
   /** auto: each scene zooms toward the last element the demo touched · static: no camera moves. */
+  /** Compress the app's dead time at render: a waitFor/navigate step that
+      made the viewer sit through N seconds is shown as ~keepSeconds (real
+      start, then a fast-forward). The author's own `wait` steps are pacing
+      and are never touched. Off by default. */
+  compressIdle: z.union([z.boolean(), z.object({ keepSeconds: z.number().min(0.8).max(5).default(1.5) })]).default(false),
+  /** How typed text lands. `natural` is the per-step default (~80ms a key);
+      `brisk` is the launch rhythm — fast keys (~22ms), the pauses carrying
+      the meaning instead. A step's own `delay` always wins. */
+  typing: z.enum(["natural", "brisk"]).default("natural"),
+  /** The captions, read aloud (edge-tts). Each scene's caption is synthesized
+      and placed at the scene's start; music ducks under it. The captions are
+      the script — there is nothing separate to write. */
+  voiceover: z.union([z.boolean(), z.object({ voice: z.string().default("en-US-JennyNeural"), gainDb: z.number().min(-20).max(10).default(0) })]).default(false),
   /** A music bed under the whole video, mixed at render time: looped or
       trimmed to fit, faded out over the last moments. The person supplies the
       file (CC0/licensed — it ships inside their video); Retake bundles none. */

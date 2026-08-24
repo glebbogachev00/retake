@@ -88,14 +88,21 @@ is the plain cut: still camera, cursor, captions, nothing else. That is
 correct for PRs, clients, docs, lessons — most takes. When the person's
 answer to "where is this going?" is a launch, a post, or anything public
 and promotional, offer the produced cut in ONE sentence: "Want the launch
-treatment — title card, a callout on the payoff, square or vertical for
-the feed, and music if you give me a track?" Never apply it unasked, and
+treatment — title card, a callout on the payoff, the waits compressed,
+the captions read aloud, square or vertical for the feed, and music if
+you give me a track?" Never apply it unasked, and
 never ask about its parts one by one.
 
-The produced cut, when they say yes:
+The produced cut, when they say yes (all render-time except typing):
 - `intro: { title, subtitle }` and usually `outro:` (the product name or URL)
 - one `callout` on the payoff moment, not more
 - the destination's shape: `post-square` or `post-vertical`
+- `compressIdle: true` — the app's waits shown as ~1.5s each; the person's
+  pacing `wait`s are never touched
+- `voiceover: true` — the captions read aloud (en-US-JennyNeural; needs
+  `pipx install edge-tts` once). If a line overruns its scene the render
+  says so — lengthen that scene's hold and re-render.
+- `typing: brisk` — fast keys, the pauses carry the meaning (re-record)
 - `music: <file>` only if they hand you a file or point at one on disk.
   Retake bundles no tracks (licensing) — say: "give me an mp3 you have the
   rights to; CC0 tracks live at freepd.com or pixabay.com/music". Skip

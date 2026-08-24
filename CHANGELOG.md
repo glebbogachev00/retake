@@ -14,6 +14,15 @@ title cards and callouts, rendered from HTML.
   fit, faded out at the end. The skill teaches the flow: plain cut by
   default; the launch treatment offered in one sentence when the
   destination is a launch or a post.
+- **`compressIdle:`** — the app's dead waits (waitFor/navigate) shown as
+  ~1.5s each: real start, then a fast-forward, every caption/camera/still
+  clock remapped through the same warp. The author's pacing waits are never
+  touched. Render-time.
+- **`voiceover:`** — the captions read aloud (edge-tts, JennyNeural by
+  default; `pipx install edge-tts` once). Each scene's line lands at the
+  scene's start; music ducks 7dB under it; a line that overruns its scene
+  is called out in the log with the fix.
+- **`typing: brisk`** — fast keys, pauses carry the meaning.
 - **`callout` steps**: an animated amber ring and label around an element,
   box recorded during the take, drawn at render in source coordinates so a
   moving camera carries it. The take holds while it plays.

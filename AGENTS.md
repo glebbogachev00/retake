@@ -95,6 +95,9 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 - **Selectors must be unique.** Playwright runs strict: a selector matching two
   elements fails. Prefer ids, `data-testid`, `aria-label`, then
   `button:has-text("…")`; append `>> nth=0` only when duplicates are intended.
+- **The launch cut**: `compressIdle: true` (waits shown short — render-time),
+  `voiceover: true` (captions read aloud), `typing: brisk` (re-record). Offer
+  as one package when the destination is a launch or post; default is plain.
 - **`music: <file>`** mixes a bed under the video at render (looped, faded
   out). The person supplies the file — never invent a path, never bundle.
 - **Cards and callouts:** `intro: { title, subtitle }` / `outro:` splice a

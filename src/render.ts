@@ -20,6 +20,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { capSecondsFor } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { renderCard, renderCalloutOverlay } from "./cards.js";
+import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
+import { DEFAULT_VOICE, audioSeconds, synthesize } from "./voice.js";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { expandEnv, resolve, type Manifest, type Resolved, type Step } from "./manifest.js";
@@ -66,7 +68,7 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro], music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro], idle: m.compressIdle, vo: m.voiceover, music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -300,6 +302,20 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   }
   // Captions, holds, camera zooms and trim come from the manifest as it is now.
   take = applyManifest(m, take);
+  // Idle compression: re-cut the source so the app's dead waits are shown
+  // short, and remap every clock in the take through the same warp.
+  let idleLines: string[] = [];
+  if (m.compressIdle && take.video) {
+    const keep = m.compressIdle === true ? 1.5 : m.compressIdle.keepSeconds;
+    const segs = planIdle(take, keep);
+    if (segs.length) {
+      const paced = path.join(outDir, ".paced.mp4");
+      ff([...warpFilterArgs(take.video, segs, take.duration, paced).slice(0, -1), "-r", String(resolve(m).fps), "-c:v", "libx264", "-crf", "14", "-preset", "veryfast", "-pix_fmt", "yuv420p", paced], log);
+      idleLines = describeIdle(take, segs);
+      for (const l of idleLines) log?.(`idle: ${l}`);
+      take = { ...warpTake(take, segs), video: paced };
+    }
+  }
   // Tempo: the source is cut in its own time (-ss/-t below), then every
   // clock downstream — captions, camera keys, stills — runs in output time.
   const srcTake = take;
@@ -321,7 +337,7 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     take = { ...take, trimBefore: from, duration: to };
   }
 
-  const src = path.resolve(srcVideo);
+  const src = path.resolve(take.video ?? srcVideo); // take.video may be the idle-warped re-cut
   // Source (recorded viewport) vs canvas (preset output). They differ when a
   // narrow app was recorded at its own aspect and gets centred on the canvas.
   const SW = take.quality?.width ?? q.viewport.width;
@@ -453,21 +469,48 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     mark("cards");
   }
 
-  // Music bed: looped or trimmed to the video, faded out at the end. The
-  // deliverable gets it; the master stays a clean video-only source.
-  if (m.music && !o.scene) {
-    const spec = typeof m.music === "string" ? { file: m.music, gainDb: -14, fadeOutMs: 1800 } : m.music;
-    // Absolute, or relative to the working directory (the workspace).
-    const musicFile = path.resolve(expandEnv(spec.file));
-    if (!fs.existsSync(musicFile)) throw new Error(`music: no such file ${musicFile} — the track ships inside the video, so it must be one the person may use (CC0 or licensed)`);
+  // Audio: the music bed and/or the captions read aloud, mixed in one pass.
+  // The deliverable gets it; the master stays a clean video-only source.
+  if ((m.music || m.voiceover) && !o.scene) {
     const dur = probe(mp4).duration;
-    const mixed = path.join(outDir, ".with-music.mp4");
-    const fadeStart = Math.max(0, dur - spec.fadeOutMs / 1000);
-    ff(["-i", mp4, "-stream_loop", "-1", "-i", musicFile, "-shortest",
-      "-filter_complex", `[1:a]volume=${spec.gainDb}dB,afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeStart.toFixed(2)}:d=${(spec.fadeOutMs / 1000).toFixed(2)}[a]`,
-      "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", mixed], log);
+    // Cards shift every scene: narration is placed in FINAL time.
+    const introShift = m.intro ? m.intro.ms / 1000 : 0;
+    const audioIn: string[] = [];
+    const chains: string[] = [];
+    const mixIns: string[] = [];
+    let idx = 1; // 0 is the video
+    if (m.music) {
+      const spec = typeof m.music === "string" ? { file: m.music, gainDb: -14, fadeOutMs: 1800 } : m.music;
+      const musicFile = path.resolve(expandEnv(spec.file));
+      if (!fs.existsSync(musicFile)) throw new Error(`music: no such file ${musicFile} — the track ships inside the video, so it must be one the person may use (CC0 or licensed)`);
+      const fadeStart = Math.max(0, dur - spec.fadeOutMs / 1000);
+      // Ducked a step further when a voice speaks over it.
+      const gain = spec.gainDb - (m.voiceover ? 7 : 0);
+      audioIn.push("-stream_loop", "-1", "-i", musicFile);
+      chains.push(`[${idx}:a]volume=${gain}dB,afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeStart.toFixed(2)}:d=${(spec.fadeOutMs / 1000).toFixed(2)}[mus]`);
+      mixIns.push("[mus]"); idx++;
+    }
+    if (m.voiceover) {
+      const spec = m.voiceover === true ? { voice: DEFAULT_VOICE, gainDb: 0 } : m.voiceover;
+      const wins = captionWindows(take);
+      for (let i = 0; i < wins.length; i++) {
+        const w = wins[i];
+        const clip = path.join(outDir, `.vo-${i}.mp3`);
+        synthesize(w.text, spec.voice, clip);
+        const spoken = audioSeconds(ffmpegBin(), clip);
+        const at = w.from + introShift;
+        if (spoken > w.to - w.from + 0.4) log?.(`voiceover: “${w.text.slice(0, 40)}…” runs ${spoken.toFixed(1)}s but its scene holds ${(w.to - w.from).toFixed(1)}s — lengthen the scene's holdMs or trailing wait and re-render`);
+        audioIn.push("-i", clip);
+        chains.push(`[${idx}:a]volume=${spec.gainDb}dB,adelay=${Math.round(at * 1000)}:all=1[vo${i}]`);
+        mixIns.push(`[vo${i}]`); idx++;
+      }
+    }
+    const mixed = path.join(outDir, ".with-audio.mp4");
+    const graph = `${chains.join(";")};${mixIns.join("")}amix=inputs=${mixIns.length}:duration=longest:normalize=0,atrim=0:${dur.toFixed(2)}[a]`;
+    ff(["-i", mp4, ...audioIn, "-filter_complex", graph, "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-shortest", mixed], log);
     fs.renameSync(mixed, mp4);
-    mark("music");
+    for (const f of fs.readdirSync(outDir)) if (/^\.vo-\d+\.mp3$/.test(f)) fs.rmSync(path.join(outDir, f), { force: true });
+    mark("audio");
   }
   if (o.scene) return { mp4, proofLog };
 
