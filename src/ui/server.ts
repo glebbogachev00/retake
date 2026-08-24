@@ -147,13 +147,30 @@ function unassignDemoProject(name: string) {
   fs.writeFileSync(DEMO_PROJECTS, JSON.stringify(map, null, 2) + "\n");
 }
 
+/** Parsed manifests, keyed by path and invalidated by mtime+size.
+    Listing 32 demos meant 64 YAML parses and zod validations per request —
+    two seconds, on a call the window makes on load, on every agent event and
+    every 30s. Nothing about a file that has not changed can have changed. */
+const manifestCache = new Map<string, { key: string; manifest: ReturnType<typeof loadManifest>["manifest"] | null }>();
+function cachedManifest(file: string) {
+  let key: string;
+  try { const st = fs.statSync(file); key = `${st.mtimeMs}:${st.size}`; } catch { manifestCache.delete(file); return null; }
+  const hit = manifestCache.get(file);
+  if (hit && hit.key === key) return hit.manifest;
+  let manifest: ReturnType<typeof loadManifest>["manifest"] | null = null;
+  try { manifest = loadManifest(file).manifest; } catch { manifest = null; }
+  manifestCache.set(file, { key, manifest });
+  return manifest;
+}
+
 function listDemos(project?: string) {
   if (!fs.existsSync(DEMOS)) return [];
   const wanted = project?.trim() ? projectKey(project) : null;
   const assignments = demoProjects();
   const byUrl = new Map<string, string>();
   for (const f of fs.readdirSync(DEMOS).filter((x) => /\.ya?ml$/.test(x))) {
-    try { const mm = loadManifest(path.join(DEMOS, f)).manifest; const asg = assignments[mm.name]; if (asg && mm.url && !byUrl.has(mm.url)) byUrl.set(mm.url, asg); } catch { /* invalid manifest: no vote */ }
+    const mm = cachedManifest(path.join(DEMOS, f));
+    if (mm) { const asg = assignments[mm.name]; if (asg && mm.url && !byUrl.has(mm.url)) byUrl.set(mm.url, asg); }
   }
   return fs
     .readdirSync(DEMOS)
@@ -162,7 +179,8 @@ function listDemos(project?: string) {
       const file = path.join(DEMOS, f);
       let title = "", name = f.replace(/\.ya?ml$/, ""), valid = true, url = "", settings: Record<string, unknown> = {};
       try {
-        const m = loadManifest(file).manifest;
+        const m = cachedManifest(file);
+        if (!m) throw new Error("invalid");
         title = m.title ?? "";
         name = m.name;
         url = m.url;

@@ -24,11 +24,10 @@ export type Preset = {
   cameraZoom: number;
   cursorSize: number;
   captionFontSize: number;
-  /** Band layout only. `text`: the band fits the captions at render time (one line
-      ≈ 2.4× the font size; bandHeight is then nominal). `fill`: the canvas is the
-      constraint (square, vertical): the band is exactly bandHeight and the page
-      area is the canvas minus it. */
-  bandFit: "text" | "fill";
+  /** The caption strip, always INSIDE the canvas: a preset has exactly one
+      output size and the page area is `height - bandHeight`. Fitting the band
+      to the text was tidier per video and made two takes of the same app
+      different shapes, which is worse. */
   bandHeight: number;
   /** x264: CRF-driven software encode (best quality). videotoolbox: Apple hardware encode (fast previews). */
   encoder: "x264" | "videotoolbox";
@@ -47,7 +46,7 @@ export const PRESETS: Record<string, Preset> = {
     name: "draft",
     width: 960, height: 540, scale: 1, fps: 15, crf: 0,
     gif: false, layout: "band", cameraZoom: 1.2,
-    cursorSize: 36, captionFontSize: 24, bandHeight: 76, bandFit: "text",
+    cursorSize: 36, captionFontSize: 24, bandHeight: 76,
     encoder: "videotoolbox", master: false,
     description: "Fastest. Same layout as the final at a quarter of the pixels — for iterating, never for shipping.",
   },
@@ -55,7 +54,7 @@ export const PRESETS: Record<string, Preset> = {
     name: "preview-fast",
     width: 1920, height: 1080, scale: 2, fps: 24, crf: 0,
     gif: false, layout: "band", cameraZoom: 1.25,
-    cursorSize: 72, captionFontSize: 46, bandHeight: 150, bandFit: "text",
+    cursorSize: 72, captionFontSize: 46, bandHeight: 150,
     encoder: "videotoolbox", master: false,
     description: "Same framing as post, hardware-encoded MP4 only. For checking timing and framing fast.",
   },
@@ -63,7 +62,7 @@ export const PRESETS: Record<string, Preset> = {
     name: "proof-fast",
     width: 960, height: 720, scale: 1, fps: 24, crf: 24,
     gif: false, layout: "band", cameraZoom: 1.2,
-    cursorSize: 40, captionFontSize: 26, bandHeight: 84, bandFit: "text",
+    cursorSize: 40, captionFontSize: 26, bandHeight: 84,
     encoder: "videotoolbox", master: false,
     description: "Small, quick internal check.",
   },
@@ -71,34 +70,34 @@ export const PRESETS: Record<string, Preset> = {
     name: "post-landscape",
     width: 1920, height: 1080, scale: 2, fps: 30, crf: 17,
     gif: false, layout: "band", cameraZoom: 1.25,
-    cursorSize: 72, captionFontSize: 46, bandHeight: 150, bandFit: "text",
+    cursorSize: 72, captionFontSize: 46, bandHeight: 150,
     encoder: "x264", master: true,
-    description: "1080p, 30fps, CRF 17. The general-purpose demo. GIF on request.",
+    description: "A true 1920×1080, 30fps, CRF 17. The general-purpose demo. GIF on request.",
   },
   "post-square": {
     name: "post-square",
     /* The page area is the canvas minus the caption band, so the file really
        is 1080×1080 — a square preset that produced 1080×1210 got letterboxed
        by every feed. Landscape keeps its full-height page on purpose. */
-    width: 1080, height: 960, scale: 1.6, fps: 30, crf: 17,
+    width: 1080, height: 1080, scale: 1.6, fps: 30, crf: 17,
     gif: false, layout: "band", cameraZoom: 1.25,
-    cursorSize: 60, captionFontSize: 36, bandHeight: 120, bandFit: "fill",
+    cursorSize: 60, captionFontSize: 36, bandHeight: 120,
     encoder: "x264", master: true,
-    description: "A true 1080×1080 (page 1080×960 + a fixed 120px caption band), feed-friendly.",
+    description: "1080×1080 for feeds. Page 1080×960 with a 120px caption band.",
   },
   "post-vertical": {
     name: "post-vertical",
-    width: 1080, height: 1800, scale: 2, fps: 30, crf: 17,
+    width: 1080, height: 1920, scale: 2, fps: 30, crf: 17,
     gif: false, layout: "band", cameraZoom: 1.3,
-    cursorSize: 60, captionFontSize: 40, bandHeight: 120, bandFit: "fill",
+    cursorSize: 60, captionFontSize: 40, bandHeight: 120,
     encoder: "x264", master: true,
-    description: "A true 1080×1920 (page 1080×1800 + a fixed 120px caption band) for shorts/reels. Narrow-column apps suit it best.",
+    description: "1080×1920 for shorts and reels. Narrow-column apps suit it best.",
   },
   "docs-gif": {
     name: "docs-gif",
     width: 1440, height: 900, scale: 1.5, fps: 24, crf: 20,
     gif: { width: 900, fps: 15 }, layout: "band", cameraZoom: 1.2,
-    cursorSize: 48, captionFontSize: 32, bandHeight: 100, bandFit: "text",
+    cursorSize: 48, captionFontSize: 32, bandHeight: 100,
     encoder: "x264", master: false,
     description: "README/docs GIF, 900px wide.",
   },
@@ -106,7 +105,7 @@ export const PRESETS: Record<string, Preset> = {
     name: "master",
     width: 1920, height: 1080, scale: 2, fps: 30, crf: 12,
     gif: false, layout: "band", cameraZoom: 1.25,
-    cursorSize: 72, captionFontSize: 46, bandHeight: 150, bandFit: "text",
+    cursorSize: 72, captionFontSize: 46, bandHeight: 150,
     encoder: "x264", master: true,
     description: "Highest quality, slowest. Archive/source render.",
   },

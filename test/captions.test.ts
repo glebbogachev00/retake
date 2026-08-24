@@ -3,22 +3,26 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { bandHeightFor, captionLines, wrap } from "../src/captions.js";
 
-const q = (over: Partial<Parameters<typeof bandHeightFor>[0]> = {}) => ({ captions: { fontSize: 46 }, layout: "band" as const, bandHeight: 150, bandFit: "text" as const, height: 1080, ...over });
+const q = (over: Record<string, unknown> = {}) => ({ captions: { fontSize: 46 }, layout: "band" as const, bandHeight: 150, height: 1080, ...over }) as Parameters<typeof bandHeightFor>[0];
 
-test("one line of caption gets a one-line band; two lines a taller one; none gets none", () => {
-  const one = bandHeightFor(q(), 1920, ["Short."]);
-  const two = bandHeightFor(q(), 1920, ["a caption long enough to wrap ".repeat(6)]);
-  assert.ok(one >= 90 && one <= 110, `one line ≈ 100px, got ${one}`);
-  assert.ok(two > one + 40, `two lines noticeably taller: ${two} vs ${one}`);
-  assert.equal(one % 2, 0, "even, for yuv420p");
-  assert.equal(bandHeightFor(q({ captions: false }), 1920, ["x"]), 0);
-  assert.equal(bandHeightFor(q({ layout: "overlay-bottom" }), 1920, ["x"]), 0);
+test("the band is fixed per preset, so one preset means one output size", () => {
+  // It used to grow with the caption: tidier per video, and it made two
+  // takes of the same app different shapes, which players letterbox.
+  const short = bandHeightFor(q());
+  const long = bandHeightFor(q());
+  assert.equal(short, 150);
+  assert.equal(short, long, "caption length must not change the frame");
+  assert.equal(bandHeightFor(q({ captions: false })), 0, "no captions, no band");
+  assert.equal(bandHeightFor(q({ layout: "overlay-bottom" })), 0, "overlay draws over the app");
 });
 
-test("fixed-canvas presets fill to the canvas whatever the page height was", () => {
-  const sq = q({ bandFit: "fill", bandHeight: 120, height: 960, captions: { fontSize: 36 } });
-  assert.equal(bandHeightFor(sq, 1080, ["x"]), 120);          // new take: page 960
-  assert.equal(bandHeightFor(sq, 1080, ["x"], 950), 130);     // older take: page 950 → still 1080
+test("the default page is the canvas minus the band, so the video is the preset's size", async () => {
+  const { resolve, Manifest } = await import("../src/manifest.js");
+  for (const [preset, w, h] of [["post-landscape", 1920, 1080], ["post-square", 1080, 1080], ["post-vertical", 1080, 1920]] as const) {
+    const r = resolve(Manifest.parse({ name: "x", url: "http://x", preset, steps: [{ action: "wait", ms: 10 }] }));
+    assert.equal(r.viewport.width, w, `${preset} page width`);
+    assert.equal(r.viewport.height + bandHeightFor(r), h, `${preset}: page + band must equal the canvas`);
+  }
 });
 
 test("wrap breaks two-line captions near the middle and never orphans a word", () => {

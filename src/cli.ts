@@ -445,12 +445,11 @@ program
     const { bandHeightFor } = await import("./captions.js");
     say(`${"preset".padEnd(16)} ${"video".padEnd(12)} ${"page".padEnd(11)} fps  layout`);
     for (const p of Object.values(PRESETS)) {
-      const q = { captions: { fontSize: p.captionFontSize }, layout: p.layout, bandHeight: p.bandHeight, bandFit: p.bandFit, height: p.height };
-      const one = bandHeightFor(q, p.width, ["one line"]), two = bandHeightFor(q, p.width, ["a caption long enough to wrap ".repeat(6)]);
-      const video = p.layout === "card" ? `${p.width}×${p.height}` : p.layout !== "band" ? `${p.width}×${p.height}` : one === two ? `${p.width}×${p.height + one}` : `${p.width}×${p.height + one}–${p.height + two}`;
-      say(`${p.name.padEnd(16)} ${video.padEnd(12)} ${String(p.width + "×" + p.height).padEnd(11)} ${String(p.fps).padEnd(4)} ${p.layout.padEnd(5)} — ${p.description}`);
+      const band = p.layout === "band" || p.layout === "card" ? p.bandHeight : 0;
+      const page = `${p.width}×${p.height - band}`;
+      say(`${p.name.padEnd(16)} ${String(p.width + "×" + p.height).padEnd(12)} ${page.padEnd(11)} ${String(p.fps).padEnd(4)} ${p.layout.padEnd(5)} — ${p.description}`);
     }
-    say(`\nvideo = page + caption band. On landscape presets the band fits the captions (one line, or two); square and vertical keep a fixed band so the canvas stays exact. A manifest's \`viewport\` replaces the page size (the video follows it). \`captions: false\` → no band.`);
+    say(`\nOne preset, one size: the caption band sits inside the canvas, so every take at a preset comes out identical and no player letterboxes it. A manifest's \`viewport\` overrides the page (validate warns). \`captions: false\` → the page fills the frame.`);
   });
 
 program
@@ -464,10 +463,10 @@ program
     // here rather than letting it surprise someone after a two-minute take.
     const { bandHeightFor } = await import("./captions.js");
     const outW = q.layout === "card" ? q.width : q.viewport.width;
-    const band = bandHeightFor(q, outW, manifest.steps.flatMap((s) => (s.action === "scene" && s.caption ? [s.caption] : [])), q.viewport.height);
+    const band = bandHeightFor(q);
     const outH = (q.layout === "card" ? q.height : q.viewport.height) + (q.layout === "band" ? band : 0);
     say(`ok: ${manifest.name} · ${manifest.steps.length} steps · ${manifest.steps.filter((s) => s.action === "scene").length} scenes`);
-    say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? (band ? ` (page ${q.viewport.width}×${q.viewport.height} + ${band}px caption band${q.bandFit === "text" ? ", sized to the captions" : ""})` : " (captions off, no band)") : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
+    say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? (band ? ` (page ${q.viewport.width}×${q.viewport.height} + a ${band}px caption band)` : " (captions off — the page fills the frame)") : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
   });
 

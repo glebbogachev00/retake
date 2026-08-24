@@ -43,15 +43,11 @@ export function captionLines(texts: string[], width: number, fontSize: number): 
 
 /** The band's height for this take: fitted to the text, or the preset's
     fixed band when the canvas is the constraint. 0 when captions are off. */
-export function bandHeightFor(q: Pick<Resolved, "captions" | "layout" | "bandHeight" | "bandFit" | "height">, width: number, texts: string[], pageHeight = q.height): number {
+export function bandHeightFor(q: Pick<Resolved, "captions" | "layout" | "bandHeight">): number {
   if (q.layout !== "band" && q.layout !== "card") return 0;
   if (!q.captions) return 0;
-  // Fixed canvas: whatever the page turned out to be (an older take may have
-  // a different page height), the band fills the rest so the canvas is exact.
-  if (q.bandFit === "fill") return Math.max(0, q.height + q.bandHeight - pageHeight);
-  const size = q.captions.fontSize;
-  const lines = captionLines(texts, width, size);
-  // glyph height ≈ 1.05 × size; line spacing 0.25 × size; breathing room above and below.
-  const h = size * 1.05 * lines + size * 0.25 * (lines - 1) + size * 1.1;
-  return Math.ceil(h / 2) * 2;
+  // Fixed per preset. The default page is the canvas minus this, so the
+  // finished video is exactly the preset's size — every take the same shape,
+  // and no player letterboxing it.
+  return q.bandHeight;
 }

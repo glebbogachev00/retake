@@ -151,7 +151,13 @@ Anything they would tell a videographer maps to a knob, in plain English:
 - "hide the cursor" → `cursor: false`
 - "no captions" / "shorter captions" → captions off, or rewrite them
 - "slower" / "hold the ending" → `pauseAfter`, scene `holdMs`, end waits
-- "square" / "vertical" / "for X" → preset `post-square` / `post-vertical`
+- "square" / "vertical" / "for X" → preset `post-square` / `post-vertical`,
+  and this is a RE-RENDER of the take you already have, never a re-record:
+  `retake render outputs/<name> --preset post-square`. Size is not recorded.
+- **Never set `viewport`.** The preset owns the size — one preset, one
+  output shape, every time. A manifest that sets its own viewport comes out
+  a different shape from every other demo of the same app, and players
+  letterbox it. `validate` warns.
 
 The default is calm and real: still camera (`camera: static` is the
 manifest default — write `auto` only when asked), cursor shown, plain

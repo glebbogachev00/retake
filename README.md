@@ -132,15 +132,15 @@ Think in the publishing format, not the browser window.
 
 | Preset | Video | Page area | For |
 |---|---:|---:|---|
-| `draft` | 960×592 | 960×540 | iterating — the finals' layout at a quarter of the pixels, fastest |
-| `preview-fast` | 1920×1180 | 1920×1080 | checking timing and framing, hardware-encoded |
-| `post-landscape` *(default)* | 1920×1180 | 1920×1080 | the general-purpose demo, plus a CRF-14 master |
-| `post-square` | 1080×1080 | 1080×960 | feeds — a true square |
-| `post-vertical` | 1080×1920 | 1080×1800 | shorts and reels — a true 9:16 |
-| `docs-gif` | 1440×970 | 1440×900 | README and docs GIFs |
-| `master` | 1920×1180 | 1920×1080 | archive, CRF 12 |
+| `draft` | 960×540 | 960×464 | iterating — the finals' layout at a quarter of the pixels, fastest |
+| `preview-fast` | 1920×1080 | 1920×930 | checking timing and framing, hardware-encoded |
+| `post-landscape` *(default)* | 1920×1080 | 1920×930 | the general-purpose demo, plus a CRF-14 master |
+| `post-square` | 1080×1080 | 1080×960 | feeds |
+| `post-vertical` | 1080×1920 | 1080×1800 | shorts and reels |
+| `docs-gif` | 1440×900 | 1440×800 | README and docs GIFs |
+| `master` | 1920×1080 | 1920×930 | archive, CRF 12 |
 
-**The video is the page area plus the caption band, and the band fits the captions.** On landscape presets the page keeps its full 1920×1080 and the band under it is sized to the longest caption — about 100 px for one line, 160 for two, one height for the whole take (video sizes above are for one-line captions). The captions never cover the app. Square and vertical keep a fixed 120 px band inside the canvas, because a feed that wants 1:1 or 9:16 will letterbox anything else. `captions: false` → no band at all. A manifest's `viewport` replaces the page area and the video follows it, so a 1240×1080 viewport gives a 1240×1230 video. `retake presets` prints this table, and `retake validate` tells you the exact size of the video a manifest will produce before you record it.
+**One preset, one size — and size is not recorded.** The caption band sits inside the canvas, so `post-landscape` is always exactly 1920×1080 and two demos of the same app are never different shapes. Better still, the shape is decided at render: the take is fitted into whichever canvas you ask for, so `retake render outputs/x --preset post-vertical` gives you a 9:16 cut of a demo you recorded landscape — seconds, no browser, no re-record. Setting `viewport` in a manifest overrides the page and `validate` warns, because that is how one demo ends up a different shape from the rest.
 
 **Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text reads on a phone. **Camera** is still by default — a calm demo reads as real. `camera: auto` eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at; per scene: `camera: { focus: ".result", zoom: 1.3 }`. Zoom is something you ask for after seeing a take, not something that happens to you. Captions, camera, speed, trim, format and layout are all render-time: change them and `retake render` takes seconds, never touches the browser.
 

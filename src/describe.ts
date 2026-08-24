@@ -309,7 +309,7 @@ const SCHEMA_DOC = `
 Manifest YAML fields:
   name (kebab-case), title, url, mode: demo, preset: post-landscape, waitForSelector (selector present when page is ready),
   camera: static, setup: [steps run before recording], steps: [...], outputs: {mp4: true, gif: true, thumbnail: {scene: <label>}}
-  Do NOT set viewport, cursor, chrome, background, fps, crf or captions — the preset handles quality.
+  NEVER set viewport. The preset decides the size and every take at a preset comes out identical; setting viewport makes this demo a different shape from every other one and players letterbox it. Same for cursor, chrome, background, fps, crf and captions — the preset handles all of it.
   Always set mode: demo — this is a demo, so nothing goes in the frame but the product. Never emit intro or outro cards, music, callouts or voiceover: those belong to mode: launch, which only a person can ask for.
 Steps (each may have pauseAfter ms, waitFor selector, timeout ms):
   {action: scene, label, caption, camera?: static | {focus: selector, zoom: 1.25}}   a named beat; caption is burned in until the next scene (under 60 chars). Set camera: static on every scene unless the thing being shown is genuinely too small to read at full frame — a calm, still demo reads as more real than a zooming one. If the person asked for zooms (or stillness), that wins.

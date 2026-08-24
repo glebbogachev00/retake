@@ -397,6 +397,13 @@ export function warnings(m: Manifest): string[] {
   const w: string[] = [];
   // A demo proves an interaction; a launch presents the product. Launch
   // furniture in a demo is noise the viewer has to look past.
+  if (m.viewport) {
+    const p = PRESETS[m.preset] ?? PRESETS[DEFAULT_PRESET];
+    const band = m.captions === false ? 0 : p.bandHeight;
+    if (m.viewport.width !== p.width || m.viewport.height !== p.height - band) {
+      w.push(`\`viewport\` overrides the preset, so this video will be ${m.viewport.width}×${m.viewport.height + band} instead of ${p.name}'s ${p.width}×${p.height}. Two demos of the same app then come out different shapes and players letterbox them. Drop \`viewport\` unless the app genuinely needs it.`);
+    }
+  }
   if (m.mode === "demo") {
     const launchy = [m.intro && "intro card", m.outro && "outro card", m.music && "music", m.steps.some((s) => s.action === "callout") && "callouts"].filter(Boolean) as string[];
     if (launchy.length) w.push(`this is \`mode: demo\` but carries ${launchy.join(", ")} — a demo proves the interaction and wants nothing else in the frame. Set \`mode: launch\` if it is a launch video, or drop them.`);
@@ -466,7 +473,11 @@ export type Resolved = Preset & {
 
 export function resolve(m: Manifest): Resolved {
   const p = PRESETS[m.preset] ?? PRESETS[DEFAULT_PRESET];
-  const viewport = { width: m.viewport?.width ?? p.width, height: m.viewport?.height ?? p.height };
+  // The page is the canvas minus the caption strip, so the finished video is
+  // exactly the preset's size. A manifest may override it, and `warnings()`
+  // says out loud that doing so changes the output size.
+  const band = m.captions === false ? 0 : p.layout === "band" || p.layout === "card" ? p.bandHeight : 0;
+  const viewport = { width: m.viewport?.width ?? p.width, height: m.viewport?.height ?? p.height - band };
   const gifOverride = m.outputs.gif;
   /* `gif: true` means "yes, a GIF" on any preset. Only docs-gif carries GIF
      settings, so asking for one anywhere else used to resolve to the preset's

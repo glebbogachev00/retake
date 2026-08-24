@@ -344,8 +344,11 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   const SH = take.quality?.height ?? q.viewport.height;
   // band/overlay/none: the canvas IS the recording (site fills the frame).
   // card: the preset canvas, with the recording framed inside it.
-  const W = q.layout === "card" ? q.width : SW;
-  const H = q.layout === "card" ? q.height : SH;
+  // The finished frame is ALWAYS the preset's canvas. Whatever page size the
+  // take was recorded at gets fitted into it below — so a size change is a
+  // re-render, never a re-record, and one preset always means one shape.
+  const W = q.width;
+  const H = q.height;
   const fps = q.fps;
   const bg = q.theme.background;
   const ink = q.theme.ink;
@@ -367,11 +370,16 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   let geom: CardGeom | null = null;
   const capSize = q.captions ? q.captions.fontSize : 0;
   // One band height for the whole take, from its captions (see captions.ts).
-  const bandH = bandHeightFor(q, W, captionWindows(take).map((w) => w.text), H);
+  const bandH = bandHeightFor(q);
 
   if (layout === "band") {
     // Site fills the frame; caption strip below it — none at all if captions are off.
-    if (bandH) { filters.push(`pad=${W}:${H + bandH}:0:0:color=${bg}`); capY = `${H}+${bandH / 2}-th/2`; }
+    // Fit the recording into the page area, letterboxing on the theme colour
+    // rather than black, then the caption strip underneath. A take recorded
+    // at 1440×1080 becomes a true 1920×1080, a 1080×1920, whatever is asked.
+    const pageH = H - bandH;
+    filters.push(`scale=${W}:${pageH}:force_original_aspect_ratio=decrease:flags=lanczos`, `pad=${W}:${pageH}:(ow-iw)/2:(oh-ih)/2:color=${bg}`);
+    if (bandH) { filters.push(`pad=${W}:${H}:0:0:color=${bg}`); capY = `${pageH}+${bandH / 2}-th/2`; }
   } else if (layout === "card") {
     geom = cardGeometry(W, H, SW, SH, bandH);
     frameInput = path.join(outDir, ".frame.png");
@@ -383,7 +391,10 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     capColor = q.captions ? q.captions.color ?? "white" : "white";
     capBox = ":box=1:boxcolor=black@0.55:boxborderw=18";
   }
-  filters.push("format=yuv420p");
+  // Square pixels, explicitly. Playwright's webm arrives with a SAR of
+  // 1216:1215 — a half-percent stretch nobody notices until concat refuses
+  // to join it to a title card that is honestly 1:1.
+  filters.push("setsar=1", "format=yuv420p");
 
   const captionFilters: string[] = [];
   if (q.captions && layout !== "none") {
@@ -680,9 +691,9 @@ export function check(outDir: string, m?: Manifest): Check {
   const mp4 = path.join(outDir, "demo.mp4");
   if (!fs.existsSync(mp4)) return { ok: false, lines: ["FAIL  demo.mp4 missing"] };
   const p = probe(mp4);
-  const wantW = q ? (q.layout === "card" ? q.width : (take.quality?.width ?? q.viewport.width)) : undefined;
+  const wantW = q?.width;
   say(true, `resolution: ${p.width}×${p.height}`);
-  if (wantW) say(p.width === wantW, `matches expected width ${wantW}`);
+  if (wantW) say(p.width === wantW, `matches ${q?.name}: ${wantW}px wide`);
   say(p.width >= 960, `at least 960px wide`);
   say(true, `fps: ${p.fps}`);
   /* A take may legitimately run long — a full product walkthrough does.
