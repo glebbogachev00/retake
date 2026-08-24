@@ -95,6 +95,13 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 - **Selectors must be unique.** Playwright runs strict: a selector matching two
   elements fails. Prefer ids, `data-testid`, `aria-label`, then
   `button:has-text("…")`; append `>> nth=0` only when duplicates are intended.
+- **`run --name <x>`** records into outputs/<x> without touching the
+  original; **`render <dir> --out <newdir>`** re-renders a copy and leaves
+  the published cut alone. Revising is never overwriting.
+- **A failed step writes `failed-step.png`** (full page, the exact moment)
+  and the failing URL into the log and take.json. Read the picture first.
+- **`manifest.used.yaml`** sits in every output — the exact manifest this
+  video came from, not whatever the file on disk says today.
 - **Size is a render-time choice.** One preset = one output size, always
   (the caption band sits inside the canvas). Any take renders at any preset:
   `retake render outputs/<name> --preset post-vertical`. Never re-record to

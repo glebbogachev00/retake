@@ -218,6 +218,31 @@ Never ask for a credential in chat. Never write a literal one into a
 manifest. Never invent one. Tell the person to use a demo account — the
 output is a video they may publish.
 
+## Hard-won rules from real sessions
+
+- **Scout again after ANY server restart** — not just the first time. A dev
+  server that restarts can come back serving a different build or mode on
+  the same port, and the take fails 20 seconds in with a selector timeout
+  that looks like your manifest's fault. Five takes were lost to this once.
+  If the run aborts saying "the app at <url> is not what this manifest
+  expects", believe it: look at not-the-app.png, fix the server, re-run.
+- **A failed step leaves failed-step.png next to the take** — a full-page
+  picture of the exact moment. Read it BEFORE re-running or editing
+  anything; it turns a five-round guess loop into one round.
+- **`waitFor` can match a STALE element.** After an action, the previous
+  capture's Undo button (or any leftover) may still satisfy your selector,
+  and the click lands on the wrong thing. Wait for something unique to the
+  NEW state (a count, a heading, a row with the new text), never for a
+  control that also existed before the action.
+- **What `compressIdle` compresses:** the app's own delays (`waitFor`,
+  `navigate`) and long typing. It NEVER touches your `wait` steps — those
+  are your pacing. Do not re-render hoping a `wait` gets shorter; shorten
+  the wait.
+- **Streaming content:** `waitFor` on a container resolves when the shell
+  exists, not when the text has streamed in. Wait on the signal the app
+  itself uses — a button flipping from busy to ready
+  (`button:has-text("Send")`), a count, a class change.
+
 ## When a take fails
 
 The camera stops at the first failed step, so a failed take is short and

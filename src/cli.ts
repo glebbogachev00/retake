@@ -57,13 +57,15 @@ program
   .option("--reuse", "reuse the last raw recording if nothing that shapes it changed (re-render only)", false)
   .option("--gif", "also produce a GIF (overrides the manifest)", false)
   .option("--until <scene>", "record up to the end of this scene, then stop (iterate on one beat without paying for the whole take)")
-  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; until?: string }) => {
+  .option("--name <name>", "write to outputs/<name> instead of the manifest's name — revise a cut without overwriting the published one")
+  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; until?: string; name?: string }) => {
     const loaded = loadManifest(file);
     let manifest = opts.preset ? { ...loaded.manifest, preset: opts.preset } : loaded.manifest;
     if (opts.gif) manifest = { ...manifest, outputs: { ...manifest.outputs, gif: true } };
     if (opts.preset && !presetNames().includes(opts.preset)) throw new Error(`unknown preset ${opts.preset} — one of ${presetNames().join(", ")}`);
     const dir = loaded.dir;
-    const outDir = path.resolve(opts.out, manifest.name);
+    if (opts.name && !/^[a-z0-9-]+$/.test(opts.name)) throw new Error("--name must be kebab-case");
+    const outDir = path.resolve(opts.out, opts.name ?? manifest.name);
     acquireLock(outDir); // throws if another run owns this folder
 
     // Reuse: same capture hash + raw video present → skip the browser.
@@ -119,9 +121,33 @@ program
   .option("--scene <label>", "render just one scene to scene-<label>.mp4 (fast, hardware encode)")
   .option("--gif", "also produce a GIF", false)
   .option("--force", "ignore the render cache", false)
-  .action(async (dir: string, manifestFile: string | undefined, opts: { preset?: string; scene?: string; gif: boolean; force: boolean }) => {
+  .option("--out <dir>", "write the render into a NEW directory, leaving the original untouched")
+  .action(async (dir: string, manifestFile: string | undefined, opts: { preset?: string; scene?: string; gif: boolean; force: boolean; out?: string }) => {
     const takePath = path.join(dir, "take.json");
     const take = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take;
+    // Revising a published cut should not destroy it. Copy the take (and the
+    // raw video it points at) into the new directory and render there.
+    if (opts.out) {
+      const dest = path.resolve(opts.out);
+      fs.mkdirSync(dest, { recursive: true });
+      for (const f of fs.readdirSync(path.resolve(dir))) {
+        if (/^(demo|master)\.mp4$|^demo\.gif$|\.png$|^proof-log\.md$|^facts\.json$|^stills$/.test(f)) continue;
+        const from = path.join(path.resolve(dir), f);
+        if (fs.statSync(from).isDirectory()) continue;
+        fs.copyFileSync(from, path.join(dest, f));
+      }
+      if (take.video) {
+        // The take points at its raw video by absolute path; a copied
+        // directory has to point at its own copy or it renders the original.
+        const base = path.basename(take.video);
+        const copied = path.join(dest, base);
+        if (fs.existsSync(copied)) take.video = copied;
+        else { fs.copyFileSync(take.video, copied); take.video = copied; }
+        fs.writeFileSync(path.join(dest, "take.json"), JSON.stringify(take, null, 2));
+      }
+      say(`▶ rendering into ${path.relative(process.cwd(), dest)} — ${path.relative(process.cwd(), path.resolve(dir))} is untouched`);
+      dir = dest;
+    }
     const name = path.basename(path.resolve(dir));
     const mf = manifestFile ?? guessManifest(name);
     const loaded = loadManifest(mf);

@@ -32,6 +32,10 @@ export type TimelineEntry = {
   holdMs?: number;
   /** What the page said at the moment a step failed (first 240 chars). */
   screen?: string;
+  /** A full-page PNG of the failure, written next to the take. */
+  screenshot?: string;
+  /** Where the browser actually was when it failed. */
+  url?: string;
   /** Where the camera looks (video-pixel box) and how far in. */
   camera?: { zoom: number; box: { x: number; y: number; width: number; height: number }; focus: string };
   /** Callout-only: the box the ring is drawn around (video px) and its label. */
@@ -327,7 +331,25 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         if (s.kind === "evaluate") await runEvaluateSeed(page, s, opts.manifestDir, log);
       }
     }
-    if (m.waitForSelector) await page.waitForSelector(m.waitForSelector, { timeout: 20_000 });
+    if (m.waitForSelector) {
+      try {
+        await page.waitForSelector(m.waitForSelector, { timeout: 20_000 });
+      } catch {
+        // Almost never a bad selector — almost always the wrong app on the
+        // port: a stale dev server, a different build, a login wall, a
+        // marketing page. Say THAT, with what is actually there.
+        let saw = "", title = "";
+        try { title = await page.title(); saw = (await page.evaluate(() => document.body?.innerText ?? "")).replace(/\s+/g, " ").trim().slice(0, 200); } catch { /* page gone */ }
+        try { await page.screenshot({ path: path.join(opts.outDir, "not-the-app.png"), fullPage: true }); } catch { /* ignore */ }
+        throw new Error(
+          `the app at ${m.url} is not what this manifest expects: waited 20s for \`${m.waitForSelector}\` and it never appeared.\n` +
+          `  page title: ${title || "(none)"}\n` +
+          `  on screen: ${saw ? `“${saw}”` : "(nothing)"}\n` +
+          `  picture: ${path.relative(process.cwd(), path.join(opts.outDir, "not-the-app.png"))}\n` +
+          `  Usually the port is serving a different build or mode — restart the app and check the URL in a browser before re-running.`,
+        );
+      }
+    }
 
     // Playwright's video begins at the first *painted* frame, not at newPage().
     // On a dev server that can be seconds later; if testreel's cursor overlay is
@@ -430,7 +452,19 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         // more than the error: it is how a reader (or agent) sees that the
         // login never happened, or the modal never closed.
         try { entry.screen = (await page.evaluate(() => document.body?.innerText ?? "")).replace(/\s+/g, " ").trim().slice(0, 240); } catch { /* page gone */ }
+        // A picture of the moment it broke. Every diagnosis anyone has made
+        // of a failed take came from pulling frames out of the video by hand;
+        // this is that, for free, at the exact instant.
+        let shot = "";
+        try {
+          shot = path.join(opts.outDir, "failed-step.png");
+          await page.screenshot({ path: shot, fullPage: true });
+          entry.screenshot = "failed-step.png";
+        } catch { shot = ""; }
+        try { entry.url = page.url(); } catch { /* page gone */ }
         log(`     ✗ ${entry.error}${entry.screen ? ` — on screen: “${entry.screen.slice(0, 120)}”` : ""}`);
+        if (entry.url) log(`       url: ${entry.url}`);
+        if (shot) log(`       picture of the failure: ${path.relative(process.cwd(), shot)}`);
         entry.end = sec(Date.now() - t0);
         timeline.push(entry);
         if (m.onFail === "stop") {

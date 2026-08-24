@@ -16,6 +16,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import YAML from "yaml";
 import { execFileSync, spawnSync } from "node:child_process";
 import { capSecondsFor } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
@@ -49,6 +50,8 @@ export type Facts = {
   /** Seconds per stage. */
   timings: Record<string, number>;
   renderHash: string;
+  /** demo or launch — so an output says what it was made to be. */
+  mode?: "demo" | "launch";
   preset: string;
   cached?: boolean;
 };
@@ -281,6 +284,12 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   const q = resolve(m);
   const proofLog = path.join(outDir, "proof-log.md");
   const writeProof = (a: Partial<Artifacts>) => fs.writeFileSync(proofLog, renderProof(m, take, q, a));
+  // An output directory that cannot say what produced it makes an audit
+  // guesswork: the manifest on disk today is not necessarily the one this
+  // was rendered from. Keep a copy beside the take.
+  if (!o.scene) {
+    try { fs.writeFileSync(path.join(outDir, "manifest.used.yaml"), YAML.stringify(m)); } catch { /* not fatal */ }
+  }
   if (!o.scene) writeProof({});
   if (!take.video) return { proofLog };
   const srcVideo: string = take.video;
@@ -636,6 +645,7 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     width: p.width, height: p.height, fps: p.fps || fps, duration: p.duration,
     sizes: Object.fromEntries([master, mp4, gif, thumbnail].filter((f): f is string => !!f).map((f) => [path.basename(f), fs.statSync(f).size])),
     gifTool, layout, cameraScenes: cam.count, encoder: q.encoder, timings: t.marks, renderHash: hash, preset: q.name,
+    mode: m.mode,
   };
   const a: Artifacts = { master, mp4, gif, thumbnail, proofLog, facts };
   writeProof(a);
@@ -708,7 +718,15 @@ export function check(outDir: string, m?: Manifest): Check {
      other seven navigations took under four seconds; every check passed.
      `wait` and `scene` are excluded because their whole job is to take time. */
   const PATIENCE = 8;
-  const stalled = (take.timeline || [])
+  // Judge what shipped. compressIdle rewrites the timeline at render, so
+  // reading raw step durations here failed good videos for a stall the
+  // viewer never sees — and a check that cries wolf teaches you to skim
+  // past the one that matters.
+  const idleSegs = m?.compressIdle && take.video
+    ? planIdle(take, m.compressIdle === true ? 1.5 : m.compressIdle.keepSeconds)
+    : [];
+  const shownTake = idleSegs.length ? warpTake(take, idleSegs) : take;
+  const stalled = (shownTake.timeline || [])
     .filter((t) => t.action !== "wait" && t.action !== "scene" && t.action !== "stub")
     .map((t) => ({ ...t, took: t.end - t.start }))
     .filter((t) => t.took > PATIENCE)

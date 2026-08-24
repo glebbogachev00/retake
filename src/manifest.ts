@@ -397,6 +397,8 @@ export function warnings(m: Manifest): string[] {
   const w: string[] = [];
   // A demo proves an interaction; a launch presents the product. Launch
   // furniture in a demo is noise the viewer has to look past.
+  // A held opening frame is the point of a launch cut, not a mistake.
+  const launch = m.mode === "launch";
   if (m.viewport) {
     const p = PRESETS[m.preset] ?? PRESETS[DEFAULT_PRESET];
     const band = m.captions === false ? 0 : p.bandHeight;
@@ -426,7 +428,9 @@ export function warnings(m: Manifest): string[] {
     const nextScene = rest.findIndex((x) => x.action === "scene");
     const between = nextScene === -1 ? rest : rest.slice(0, nextScene);
     // A closing hold on the payoff is normal; only a waits-only scene *followed by another* is empty.
-    if (nextScene !== -1 && between.length && between.every((x) => x.action === "wait")) w.push(`scene "${st.label}" has only waits before the next scene — nothing happens on camera in it.`);
+    // In a launch cut the opening scene IS a held frame — that is the shot.
+    const isFirstScene = m.steps.findIndex((x) => x.action === "scene") === i;
+    if (nextScene !== -1 && between.length && between.every((x) => x.action === "wait") && !(launch && isFirstScene)) w.push(`scene "${st.label}" has only waits before the next scene — nothing happens on camera in it.`);
   });
   return w;
 }
