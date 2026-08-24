@@ -95,6 +95,14 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 - **Selectors must be unique.** Playwright runs strict: a selector matching two
   elements fails. Prefer ids, `data-testid`, `aria-label`, then
   `button:has-text("…")`; append `>> nth=0` only when duplicates are intended.
+- **`mode:`** — `demo` (default) proves the interaction: nothing in the frame
+  but the product. A CLIENT WALKTHROUGH IS A DEMO. `launch` presents the
+  product in public (a launch, a post, an ad) and may carry a title card,
+  music, emphasis and a branded ending — ending with THEIR product, never
+  with Retake. Decide from the audience, not the subject; never upgrade a
+  demo yourself (`validate` warns).
+- **voiceover** needs a continuous `script:` and `approved: true` from a
+  person who heard it. Off otherwise.
 - **The launch cut**: `compressIdle: true` (waits shown short — render-time),
   `voiceover: true` (captions read aloud), `typing: brisk` (re-record). Offer
   as one package when the destination is a launch or post; default is plain.

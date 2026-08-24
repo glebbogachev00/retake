@@ -83,6 +83,29 @@ zooms or caption tone until they have seen one. Two moves instead:
    so it never comes up again in this project. Never ask about zoom or
    cursor before they have seen a take.
 
+**Which kind of take is this? Get it from the destination, never from the
+subject.** Write it into the manifest as `mode:`, and default to `demo`.
+
+- **`mode: demo`** — it proves how the thing works. A client walkthrough IS
+  a demo. So is a PR review, a bug repro, a docs clip, a lesson, "show the
+  team", "send it to the customer", "so they can see the flow". Nothing in
+  the frame but the product doing the thing. No title card, no music, no
+  callouts. Most takes are this.
+- **`mode: launch`** — it presents the product to strangers, in public: a
+  launch, a post, an ad, a landing page, Product Hunt, "for X", a trailer.
+  Only then are a title card, music, emphasis and a branded ending on the
+  table, and each still has to earn its second.
+
+The tell is the audience, not the polish: *someone who already wants to
+know how it works* → demo. *Someone who has to be given a reason to care*
+→ launch. If the person has not said, ask the one destination question and
+take `demo` if they shrug. **Never upgrade a demo to a launch on your own**
+— `validate` warns when a demo carries launch furniture, and that warning
+means you guessed.
+
+A launch cut ends with THEIR product, never with Retake. Retake branding
+belongs only in a video that presents Retake.
+
 **Two kinds of take, one file — and the destination decides.** The default
 is the plain cut: still camera, cursor, captions, nothing else. That is
 correct for PRs, clients, docs, lessons — most takes. When the person's
@@ -99,9 +122,12 @@ The produced cut, when they say yes (all render-time except typing):
 - the destination's shape: `post-square` or `post-vertical`
 - `compressIdle: true` — the app's waits shown as ~1.5s each; the person's
   pacing `wait`s are never touched
-- `voiceover: true` — the captions read aloud (en-US-JennyNeural; needs
-  `pipx install edge-tts` once). If a line overruns its scene the render
-  says so — lengthen that scene's hold and re-render.
+- **voiceover: leave it off.** It needs `script:` (one continuous script,
+  synthesized as one performance) AND `approved: true`, which only a person
+  who has HEARD it can set. Reading the captions line by line resets prosody
+  at every scene — that is a defect in the shape, not the voice. A silent cut
+  beats an unapproved synthetic voice. Offer narration only if they ask for
+  it, and let them listen before it ships.
 - `typing: brisk` — fast keys, the pauses carry the meaning (re-record)
 - `music: <file>` only if they hand you a file or point at one on disk.
   Retake bundles no tracks (licensing) — say: "give me an mp3 you have the

@@ -17,21 +17,37 @@ import type { Take } from "./record.js";
 
 export type WarpSegment = { from: number; to: number; rate: number };
 
-const COMPRESSIBLE = new Set(["waitFor", "navigate"]);
+/** The app made the viewer wait: show the start, fast-forward the rest. */
+const WAITING = new Set(["waitFor", "navigate"]);
 /** Only stretches meaningfully longer than what we would keep are worth a cut. */
 const SLACK = 0.6;
+/** Typing is not dead time — it is the person speaking — so it keeps its
+    start AND its finish at real speed and only accelerates the middle. Every
+    keystroke is a round-trip to the browser (~57ms whatever `delay` says), so
+    a real sentence costs five seconds nobody watches. */
+const TYPE_BUDGET = 2.4;
+const TYPE_HEAD = 0.8;
+const TYPE_TAIL = 0.7;
 
-/** Plan the warp: 1× everywhere except the tail of each long app-wait. */
+/** Plan the warp: 1× everywhere except the tail of each long app-wait and the
+    middle of each long typing run. */
 export function planIdle(take: Take, keepSeconds: number): WarpSegment[] {
   const segs: WarpSegment[] = [];
   for (const e of take.timeline) {
-    if (!COMPRESSIBLE.has(e.action) || !e.ok) continue;
+    if (!e.ok) continue;
     const dur = e.end - e.start;
-    if (dur < keepSeconds + SLACK) continue;
-    // Head at real speed, tail fast-forwarded into the remaining budget.
-    const head = keepSeconds * 0.6;
-    const shownTail = keepSeconds * 0.4;
-    segs.push({ from: e.start + head, to: e.end, rate: (dur - head) / shownTail });
+    if (WAITING.has(e.action)) {
+      if (dur < keepSeconds + SLACK) continue;
+      // Head at real speed, tail fast-forwarded into the remaining budget.
+      const head = keepSeconds * 0.6;
+      const shownTail = keepSeconds * 0.4;
+      segs.push({ from: e.start + head, to: e.end, rate: (dur - head) / shownTail });
+    } else if (e.action === "type" || e.action === "fill") {
+      if (dur < TYPE_BUDGET + SLACK) continue;
+      const middle = dur - TYPE_HEAD - TYPE_TAIL;
+      const shownMiddle = Math.max(0.3, TYPE_BUDGET - TYPE_HEAD - TYPE_TAIL);
+      segs.push({ from: e.start + TYPE_HEAD, to: e.end - TYPE_TAIL, rate: middle / shownMiddle });
+    }
   }
   return segs.sort((a, b) => a.from - b.from);
 }
@@ -78,8 +94,9 @@ export function warpFilterArgs(src: string, segs: WarpSegment[], duration: numbe
 /** Human line for the proof log. */
 export function describeIdle(take: Take, segs: WarpSegment[]): string[] {
   return segs.map((s) => {
-    const e = take.timeline.find((x) => s.to === x.end && s.from > x.start);
-    const shown = (s.from - (e?.start ?? s.from)) + (s.to - s.from) / s.rate;
-    return `${e ? e.summary : "wait"}: ${(s.to - (e?.start ?? s.from)).toFixed(1)}s of waiting shown as ${shown.toFixed(1)}s`;
+    const e = take.timeline.find((x) => x.start <= s.from && x.end >= s.to);
+    const real = e ? e.end - e.start : s.to - s.from;
+    const shown = real - (s.to - s.from) + (s.to - s.from) / s.rate;
+    return `${e ? e.summary.slice(0, 52) : "wait"}: ${real.toFixed(1)}s shown as ${shown.toFixed(1)}s`;
   });
 }

@@ -491,18 +491,32 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
       mixIns.push("[mus]"); idx++;
     }
     if (m.voiceover) {
-      const spec = m.voiceover === true ? { voice: DEFAULT_VOICE, gainDb: 0 } : m.voiceover;
-      const wins = captionWindows(take);
-      for (let i = 0; i < wins.length; i++) {
-        const w = wins[i];
-        const clip = path.join(outDir, `.vo-${i}.mp3`);
-        synthesize(w.text, spec.voice, clip);
+      const spec = m.voiceover === true ? { voice: DEFAULT_VOICE, gainDb: 0, script: undefined as string | undefined, fragments: true } : m.voiceover;
+      if (spec.script) {
+        // One script, one performance: prosody carries across the whole
+        // video the way a person reads. Starts after the title card.
+        const clip = path.join(outDir, ".vo-0.mp3");
+        synthesize(spec.script, spec.voice, clip);
         const spoken = audioSeconds(ffmpegBin(), clip);
-        const at = w.from + introShift;
-        if (spoken > w.to - w.from + 0.4) log?.(`voiceover: “${w.text.slice(0, 40)}…” runs ${spoken.toFixed(1)}s but its scene holds ${(w.to - w.from).toFixed(1)}s — lengthen the scene's holdMs or trailing wait and re-render`);
+        if (spoken > dur - introShift + 0.5) log?.(`voiceover: the script reads ${spoken.toFixed(1)}s but there are ${(dur - introShift).toFixed(1)}s of video after the title card — cut the script or lengthen the scenes, then re-render`);
         audioIn.push("-i", clip);
-        chains.push(`[${idx}:a]volume=${spec.gainDb}dB,adelay=${Math.round(at * 1000)}:all=1[vo${i}]`);
-        mixIns.push(`[vo${i}]`); idx++;
+        chains.push(`[${idx}:a]volume=${spec.gainDb}dB,adelay=${Math.round(introShift * 1000)}:all=1[vo0]`);
+        mixIns.push("[vo0]"); idx++;
+      } else {
+        // Explicitly-asked-for fragments: one clip per caption. Known to
+        // reset prosody at every line; the schema refuses it by default.
+        const wins = captionWindows(take);
+        for (let i = 0; i < wins.length; i++) {
+          const w = wins[i];
+          const clip = path.join(outDir, `.vo-${i}.mp3`);
+          synthesize(w.text, spec.voice, clip);
+          const spoken = audioSeconds(ffmpegBin(), clip);
+          const at = w.from + introShift;
+          if (spoken > w.to - w.from + 0.4) log?.(`voiceover: “${w.text.slice(0, 40)}…” runs ${spoken.toFixed(1)}s but its scene holds ${(w.to - w.from).toFixed(1)}s — lengthen the scene's holdMs or trailing wait and re-render`);
+          audioIn.push("-i", clip);
+          chains.push(`[${idx}:a]volume=${spec.gainDb}dB,adelay=${Math.round(at * 1000)}:all=1[vo${i}]`);
+          mixIns.push(`[vo${i}]`); idx++;
+        }
       }
     }
     const mixed = path.join(outDir, ".with-audio.mp4");

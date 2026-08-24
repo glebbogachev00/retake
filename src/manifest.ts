@@ -199,11 +199,20 @@ const ManifestShape = z.object({
   /** band (default): the site fills the frame, caption strip below · card: the recording framed on a soft canvas · overlay-*: caption over the video · none */
   layout: z.enum(["band", "card", "overlay-bottom", "overlay-top", "none"]).optional(),
   /** auto: each scene zooms toward the last element the demo touched · static: no camera moves. */
-  /** Compress the app's dead time at render: a waitFor/navigate step that
-      made the viewer sit through N seconds is shown as ~keepSeconds (real
-      start, then a fast-forward). The author's own `wait` steps are pacing
-      and are never touched. Off by default. */
+  /** Compress at render what nobody watches. A waitFor/navigate that made
+      the viewer sit through N seconds is shown as ~keepSeconds (real start,
+      then a fast-forward); a long typing run keeps its start and its finish
+      at real speed and accelerates the middle (every keystroke is a
+      round-trip, so a real sentence costs ~5s of video). The author's own
+      `wait` steps are pacing and are never touched. Off by default. */
   compressIdle: z.union([z.boolean(), z.object({ keepSeconds: z.number().min(0.8).max(5).default(1.5) })]).default(false),
+  /** What this take is FOR, and it changes what is allowed to be in it.
+      `demo` (the default) proves an interaction: direct, legible, minimally
+      framed — a title card or music in a demo is noise. `launch` presents
+      the product, so cards, music, emphasis and a branded ending are
+      legitimate, and each one still has to earn the second it costs.
+      Retake never upgrades a demo to a launch on its own. */
+  mode: z.enum(["demo", "launch"]).default("demo"),
   /** How typed text lands. `natural` is the per-step default (~80ms a key);
       `brisk` is the launch rhythm — fast keys (~22ms), the pauses carrying
       the meaning instead. A step's own `delay` always wins. */
@@ -211,7 +220,26 @@ const ManifestShape = z.object({
   /** The captions, read aloud (edge-tts). Each scene's caption is synthesized
       and placed at the scene's start; music ducks under it. The captions are
       the script — there is nothing separate to write. */
-  voiceover: z.union([z.boolean(), z.object({ voice: z.string().default("en-US-JennyNeural"), gainDb: z.number().min(-20).max(10).default(0) })]).default(false),
+  voiceover: z
+    .union([
+      z.boolean(),
+      z.object({
+        voice: z.string().default("en-US-JennyNeural"),
+        gainDb: z.number().min(-20).max(10).default(0),
+        /** One continuous script, synthesized as a single performance and
+            laid under the whole video — the only shape that keeps prosody.
+            Without it, narration is per-scene fragments: prosody resets at
+            every line and the read/wait rhythm follows scene boundaries
+            instead of speech. Fragments are refused unless `fragments: true`
+            says you know. */
+        script: z.string().optional(),
+        fragments: z.boolean().default(false),
+        /** A person has heard this voice and this script and approved them.
+            Synthesis succeeding is not approval. */
+        approved: z.boolean().default(false),
+      }),
+    ])
+    .default(false),
   /** A music bed under the whole video, mixed at render time: looped or
       trimmed to fit, faded out over the last moments. The person supplies the
       file (CC0/licensed — it ships inside their video); Retake bundles none. */
@@ -295,6 +323,21 @@ const ManifestShape = z.object({
     .prefault({}),
 });
 export const Manifest = ManifestShape.superRefine((m, ctx) => {
+  // A synthetic voice is a claim on the person's taste. Retake will not put
+  // one in a deliverable until they have heard it and said yes — and will
+  // not read the captions as fragments at all, because that is the defect,
+  // not the voice: prosody resets every line and the rhythm follows scene
+  // boundaries instead of speech.
+  if (m.voiceover) {
+    const vo = m.voiceover === true ? { approved: false, script: undefined, fragments: false } : m.voiceover;
+    if (!vo.approved) {
+      ctx.addIssue({ code: "custom", path: ["voiceover"], message: "voiceover is not approved. Synthesize it, LISTEN to it with the person, and only then set `approved: true`. Successful synthesis is not approval; a silent cut beats an unapproved synthetic voice." });
+    }
+    if (!vo.script && !vo.fragments) {
+      ctx.addIssue({ code: "custom", path: ["voiceover"], message: "voiceover needs `script:` — one continuous script, synthesized as a single performance. Reading the captions line by line resets prosody at every scene and paces the speech off scene boundaries. Set `fragments: true` only if you have heard the fragmented read and want it." });
+    }
+  }
+
   [...m.steps, ...m.setup].forEach((st, i) => {
     if ((st.action === "click" || st.action === "hover") && !st.selector && !st.at) {
       ctx.addIssue({ code: "custom", path: ["steps", i], message: `${st.action} needs either a selector or an \`at\` point` });
@@ -352,6 +395,12 @@ export function loadManifest(file: string): LoadedManifest {
 /** Things worth saying out loud before a run. Not errors — the run proceeds. */
 export function warnings(m: Manifest): string[] {
   const w: string[] = [];
+  // A demo proves an interaction; a launch presents the product. Launch
+  // furniture in a demo is noise the viewer has to look past.
+  if (m.mode === "demo") {
+    const launchy = [m.intro && "intro card", m.outro && "outro card", m.music && "music", m.steps.some((s) => s.action === "callout") && "callouts"].filter(Boolean) as string[];
+    if (launchy.length) w.push(`this is \`mode: demo\` but carries ${launchy.join(", ")} — a demo proves the interaction and wants nothing else in the frame. Set \`mode: launch\` if it is a launch video, or drop them.`);
+  }
   // Secrets typed during recorded steps end up in the video. In `setup` they do
   // not: setup runs before the camera and is trimmed off the front.
   const onCamera = m.steps.filter((s) => s.secret).length;

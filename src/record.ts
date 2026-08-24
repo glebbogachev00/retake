@@ -518,10 +518,17 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // calibrated to within ~0.2s of the first video frame on a warm route). The
   // real file length is authoritative for the end.
   const trimBefore = sec(setupEnd - t0);
-  const duration = video ? videoDuration(video) : sec(endMs - t0);
+  // The recording keeps rolling while the browser is torn down, so the raw
+  // video always has a tail of nothing after the last step. The take ends
+  // where the demo ends (plus a breath), never where the recorder stopped —
+  // otherwise every video ships with dead seconds at the end.
+  const GRACE = 0.4;
+  const videoSec = video ? videoDuration(video) : sec(endMs - t0);
   const last = timeline.at(-1);
-  if (last && Math.abs(duration - last.end) > 3) {
-    log(`note: video is ${duration.toFixed(1)}s but the last step ended at ${last.end.toFixed(1)}s — check anchoring`);
+  const duration = last && videoSec > last.end + GRACE + 0.1 ? last.end + GRACE : videoSec;
+  if (last && duration < videoSec - 0.05) log(`trim: ${(videoSec - duration).toFixed(1)}s of tail after the last step dropped`);
+  if (last && videoSec < last.end - 0.5) {
+    log(`note: video is ${videoSec.toFixed(1)}s but the last step ended at ${last.end.toFixed(1)}s — check anchoring`);
   }
 
   const finishedAt = new Date().toISOString();
