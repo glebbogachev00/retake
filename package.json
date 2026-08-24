@@ -30,7 +30,6 @@
   "files": [
     "dist",
     "skill",
-    "site/index.html",
     "assets/logo.svg",
     "assets/icon-192.png",
     "assets/icon-512.png",
@@ -40,7 +39,9 @@
     "LICENSE",
     "scripts/patch-testreel.mjs",
     "AGENTS.md",
-    "llms.txt"
+    "llms.txt",
+    "site/index.html",
+    "site/logos"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",

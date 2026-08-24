@@ -110,7 +110,7 @@ const readBody = (req: http.IncomingMessage) =>
     req.on("end", () => ok(b));
   });
 const safeName = (s: string) => /^[a-z0-9-]+$/.test(s);
-const MIME: Record<string, string> = { ".mp4": "video/mp4", ".gif": "image/gif", ".png": "image/png", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
+const MIME: Record<string, string> = { ".mp4": "video/mp4", ".gif": "image/gif", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
 
 /** A short name for "the app at this URL": the last path segment if there
     is one (demo.playwright.dev/todomvc → todomvc), else the host without
@@ -384,9 +384,9 @@ export function serve(port: number) {
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(fs.readFileSync(f));
       }
-      const msite = /^\/landing\/media\/([A-Za-z0-9._-]+)$/.exec(p);
+      const msite = /^\/landing\/(media|logos)\/([A-Za-z0-9._-]+)$/.exec(p);
       if (msite && (req.method === "GET" || req.method === "HEAD")) {
-        const f = path.join(PKG_ROOT, "site", "media", msite[1]);
+        const f = path.join(PKG_ROOT, "site", msite[1], msite[2]);
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
         res.writeHead(200, { "content-type": MIME[path.extname(f)] ?? "application/octet-stream", "content-length": fs.statSync(f).size });
         if (req.method === "HEAD") return res.end();

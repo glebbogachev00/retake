@@ -74,9 +74,11 @@
   .vocab b { color:var(--ink); }
   .cases { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:14px; }
   .case { background:var(--card); border:1px solid var(--rule); border-radius:16px; padding:22px 24px; display:flex; flex-direction:column; box-shadow:0 10px 26px rgba(24,28,24,.06); }
-  .wordmark { font-size:24px; font-weight:700; letter-spacing:-.02em; margin-bottom:12px; }
-  .wordmark.serif { font-family:Georgia, "Times New Roman", serif; font-weight:600; letter-spacing:0; }
-  .wordmark.mono { font-family:ui-monospace, Menlo, monospace; font-size:20px; letter-spacing:.14em; }
+  .wordmark { font-size:24px; font-weight:700; letter-spacing:-.02em; margin-bottom:12px; display:flex; align-items:center; gap:10px; }
+  .caselogo { height:28px; width:28px; border-radius:7px; object-fit:contain; }
+  .caselogo.wide { height:26px; width:auto; max-width:170px; border-radius:0; }
+  .wordmark .serif { font-family:Georgia, "Times New Roman", serif; font-weight:600; letter-spacing:0; }
+  .wordmark.tbmark { font-weight:900; letter-spacing:-.03em; gap:1px; }
   .wordmark .avex { color:var(--amber); margin-right:2px; }
   .case .quote { margin:0 0 14px; font-size:14.5px; line-height:1.65; flex:1; }
   .case .meta { margin:0; font-size:12.5px; color:var(--muted); }
@@ -123,19 +125,19 @@
     <p class="sub">Same maker, three real businesses — Retake was built inside them, not for a landing page.</p>
     <div class="cases">
       <div class="case">
-        <div class="wordmark serif">capture.</div>
+        <div class="wordmark"><span class="serif">capture<span style="color:#2F5D3F">.</span></span></div>
         <p class="quote">“The five-video launch set — drafted, fixed and re-cut in one afternoon. Re-doing a take stopped being a decision.”</p>
         <p class="meta">Thought-sorting app · <a href="https://capture-playground.vercel.app">capture-playground.vercel.app</a></p>
       </div>
       <div class="case">
-        <div class="wordmark"><span class="avex">✈</span> AvexJets</div>
+        <div class="wordmark"><img src="/landing/logos/avexjets.png" alt="AvexJets" class="caselogo wide"></div>
         <p class="quote">“Our client walkthrough crosses three portals. What took twenty minutes live is a file now — issues get caught on camera, and the fix is a re-record, not another meeting.”</p>
-        <p class="meta">Private aviation charter · <a href="https://avexjets.com">avexjets.com</a></p>
+        <p class="meta">Private aviation charter · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
       </div>
       <div class="case">
-        <div class="wordmark mono">TECHBASH</div>
+        <div class="wordmark tbmark"><span style="color:#193b92">Tech</span><span style="color:#2C7A7B">Bash</span></div>
         <p class="quote">“Lesson walkthroughs for kids learning Scratch — an agent drags the actual blocks. When a lesson changes, the video reruns itself.”</p>
-        <p class="meta">Coding school for young learners</p>
+        <p class="meta">Coding school for young learners · <a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
       </div>
     </div>
   </section>
