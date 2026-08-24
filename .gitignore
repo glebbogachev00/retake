@@ -30,7 +30,10 @@ SUMMARY.md
 .drafts/
 .trash/
 demos/*/
-site/media/
+# The landing page is deployed from this folder (Vercel), so its media
+# ships with it. Recording outputs stay ignored — these are the published
+# cuts only, ~4MB.
+!site/media/
 !site/logos/
 dist/
 *.tgz
