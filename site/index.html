@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Retake — rerun the demo, don't re-record it</title>
-<meta name="description" content="Retake turns a plain-English walkthrough into a repeatable video of your real app. Your agent writes the flow; Retake checks it, records it, and keeps it rerunnable." />
+<title>Retake — demos that re-record themselves</title>
+<meta name="description" content="A demo is a small file your coding agent writes. When the UI changes, run the file again — nobody re-records anything by hand." />
 <style>
   :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --rule2:#c9cec0; --accent:#1a1c1e; --amber:#e8b04b; }
   * { box-sizing:border-box; }
@@ -18,18 +18,18 @@
   .top a { color:var(--muted); text-decoration:none; font-size:14px; margin-left:18px; }
   .top a:hover { color:var(--ink); }
   main { max-width:880px; margin:0 auto; padding:30px 26px 90px; }
-  .hero { padding:40px 0 30px; }
+  .hero { padding:52px 0 34px; }
   .kicker { font:12px ui-monospace, Menlo, monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 14px; }
   h1 { font-size:clamp(34px, 6vw, 54px); line-height:1.08; letter-spacing:-.025em; margin:0 0 18px; }
   h1 em { font-style:normal; color:var(--muted); }
   .lede { font-size:19px; color:var(--muted); max-width:620px; margin:0 0 28px; }
   .actions { display:flex; gap:10px; flex-wrap:wrap; }
-  .btn { display:inline-block; text-decoration:none; border-radius:12px; padding:12px 22px; font-size:15px; }
+  .btn { display:inline-block; text-decoration:none; border-radius:14px; padding:13px 24px; font-size:15px; letter-spacing:-.01em; }
   .btn.dark { background:var(--accent); color:#eceee9; }
   .btn.dark:hover { opacity:.9; }
   .btn.light { border:1px solid var(--rule2); color:var(--ink); background:#fff; }
   .btn.light:hover { border-color:var(--ink); }
-  .say { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:16px 20px; margin:46px 0 10px; font-size:17px; }
+  .say { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:18px 22px; margin:46px 0 10px; font-size:16.5px; box-shadow:0 1px 0 rgba(24,28,24,.03); }
   .say .who { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:6px; }
   .say i { font-style:normal; }
   .arrow { text-align:center; color:var(--muted); margin:8px 0; }
@@ -38,7 +38,7 @@
   .shot video { width:100%; height:auto; display:block; }
   .shot figcaption { background:var(--card); padding:12px 18px 14px; font-size:14px; color:var(--muted); }
   .shot figcaption b { color:var(--ink); font-weight:600; }
-  section { margin-top:72px; }
+  section { margin-top:84px; }
   h2 { font-size:24px; letter-spacing:-.015em; margin:0 0 8px; }
   .sub { color:var(--muted); margin:0 0 26px; max-width:560px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; }
@@ -53,6 +53,27 @@
   .step p { margin:2px 0 0; color:var(--muted); font-size:14.5px; }
   pre { background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:16px 20px; overflow-x:auto; font:14px/1.8 ui-monospace, Menlo, monospace; }
   pre .c { color:var(--muted); }
+  .diff { font:13.5px/1.9 ui-monospace, Menlo, monospace; overflow-x:auto; }
+  .diff div { white-space:pre; }
+  .diff .del { color:#9a4238; } .diff .del::before { content:"−  "; opacity:.55; }
+  .diff .add { color:#33613f; } .diff .add::before { content:"+  "; opacity:.55; }
+  .diff .ctx { color:var(--muted); font-size:12px; margin-bottom:4px; }
+  .refuse { list-style:none; margin:0; padding:0; }
+  .refuse li { padding:12px 0 12px 30px; border-bottom:1px solid var(--rule); font-size:15.5px; position:relative; }
+  .refuse li::before { content:"×"; position:absolute; left:4px; top:10px; color:var(--rule2); font-size:18px; }
+  .refuse li:last-child { border-bottom:0; }
+  .refuse li b { font-weight:600; }
+  .refuse li span { color:var(--muted); }
+  .copyline { display:flex; gap:10px; align-items:stretch; margin-top:0; }
+  .copyline .say { flex:1; margin:0; }
+  .copybtn { flex:none; border:1px solid var(--rule2); background:#fff; border-radius:14px; padding:0 20px; font:14px/1 inherit; cursor:pointer; transition:border-color .15s; }
+  .copybtn:hover { border-color:var(--ink); }
+  .vocab { background:var(--card); border:1px solid var(--rule); border-left:3px solid var(--amber); border-radius:14px; padding:18px 22px; font-size:15px; color:var(--muted); line-height:1.8; }
+  .vocab b { color:var(--ink); }
+  @media (max-width: 560px) {
+    .copyline { flex-direction:column; }
+    .copybtn { padding:12px 20px; }
+  }
   .foot { margin-top:80px; padding-top:22px; border-top:1px solid var(--rule); color:var(--muted); font-size:13.5px; display:flex; gap:18px; flex-wrap:wrap; }
   .foot a { color:inherit; }
 </style>
@@ -66,25 +87,40 @@
 </div>
 <main>
   <div class="hero">
-    <p class="kicker">Product demos, as code</p>
-    <h1>Rerun the demo.<br><em>Don't re-record it.</em></h1>
-    <p class="lede">Retake turns a plain-English walkthrough into a repeatable video of your real app. Your coding agent writes the flow. Retake checks it, drives the browser, records in 1080p, and lets you rerun the same demo when the UI changes.</p>
+    <p class="kicker">your demo videos rot every release</p>
+    <h1>Demos that<br><em>re-record themselves.</em></h1>
+    <p class="lede">A demo is a small file your coding agent writes. When the UI changes, run the file again. Nobody re-records anything by hand.</p>
     <div class="actions">
-      <a class="btn dark" href="#start">Paste the prompt</a>
-      <a class="btn light" href="#proof">Watch a demo</a>
+      <a class="btn dark" href="#start">Give it to your agent</a>
+      <a class="btn light" href="#proof">Watch it work</a>
     </div>
   </div>
 
-  <div class="say"><span class="who">You, to the agent you already use</span><i>“Record a demo of my app at localhost:3000 showing the sign-up flow.”</i></div>
-  <div class="say"><span class="who">Or, for the part behind the login</span><i>“It needs a login — the credentials are APP_USER and APP_PASSWORD in .env. Show an admin approving a request.”</i></div>
-  <p class="arrow">↓</p>
+  <div class="say"><span class="who">The release renamed a button. This is the whole fix</span>
+    <div class="diff" style="border:0;padding:6px 0 0;background:transparent">
+      <div class="ctx">demos/checkout.yaml</div>
+      <div class="del">{ action: click, selector: "button:has-text('Buy now')" }</div>
+      <div class="add">{ action: click, selector: "button:has-text('Complete purchase')" }</div>
+    </div>
+  </div>
+  <p class="arrow" style="font-size:13.5px">one line changed · <code>retake run</code> · a new take of the same demo ↓</p>
   <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
 
   <section id="start">
-    <h2>Paste this to your agent</h2>
-    <p class="sub">Ask from the coding agent you already use. The README tells your agent what to do with the link: install, register its tools, open the window for you, record. You say what to show.</p>
-    <div class="say" style="margin-top:0"><span class="who">In Claude Code, Codex, Hermes, or another coding agent</span><i>“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
-    <p class="sub" style="margin:14px 0 0">After setup, each demo starts as a sentence and ends as files you can inspect, rerender, or rerun.</p>
+    <h2>Give it to your agent</h2>
+    <p class="sub">The link is the instruction. The README tells your agent how to install, wire itself up, and open the window for you. You say what to show.</p>
+    <div class="copyline">
+      <div class="say"><span class="who">In Claude Code, Codex, Cursor — the agent you already use</span><i id="pasteline">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
+      <button class="copybtn" data-copy="pasteline">Copy</button>
+    </div>
+    <p class="sub" style="margin:22px 0 10px">Doing it yourself is two commands:</p>
+    <pre>npm install -g retake-demos     <span class="c"># Node 20+; ffmpeg bundled, Chromium downloads once</span>
+mkdir demos && cd demos && retake install</pre>
+  </section>
+
+  <section>
+    <h2>Four words we use</h2>
+    <div class="vocab">A recording is a <b>take</b>. Its beats are <b>scenes</b> — each carries a caption, burned in under the app, never over it. Every take ships with its <b>proof log</b>: each step, its timing, pass or fail, and what was on screen when it failed. Those files together are the <b>receipts</b>.</div>
   </section>
 
   <section id="how">
@@ -117,25 +153,45 @@
       <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
       <div class="cell"><b>Presets that post well</b><p>1080p landscape, square, vertical, docs GIF. Pick the publishing format, not the browser window.</p></div>
       <div class="cell"><b>A still for every scene</b><p>Each scene yields a crisp PNG. A video usually ships with a picture next to it.</p></div>
-      <div class="cell"><b>Behind the login, off camera</b><p>The agent asks for a demo account by name; you type it into the Retake window and it stays in one local file, never sent to the agent. The sign-in runs before recording and is trimmed off. 2FA: authenticator codes are computed; for SMS or SSO you log in once by hand and Retake keeps the session.</p></div>
+      <div class="cell"><b>Behind the login, off camera</b><p>The agent asks for a demo account by name; you type it into the window and it stays in one local file. The sign-in runs before recording and is trimmed off. 2FA included.</p></div>
       <div class="cell"><b>Stubs and seeds</b><p>Stub the backend and reset state so demos stay repeatable.</p></div>
     </div>
   </section>
 
 
 
+  <section>
+    <h2>What it refuses to become</h2>
+    <ul class="refuse">
+      <li><b>A video editor.</b> <span>If a take needs editing, the demo file was wrong. Fix the file, run it again.</span></li>
+      <li><b>A screen recorder.</b> <span>Nothing is captured over your shoulder. Every frame comes from a step you can read.</span></li>
+      <li><b>A cloud.</b> <span>Your app, your machine, your files. There is nothing to sign into and nowhere your footage goes.</span></li>
+      <li><b>A chat.</b> <span>The agent you already use is the chat. Retake is the hands and the camera.</span></li>
+      <li><b>A subscription.</b> <span>MIT licensed. A demo you recorded is yours to rerun forever.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Yours, rerunnable</h2>
+    <p class="sub" style="max-width:620px">The demo outlives the video. When the next release moves a button, the fix is a line in a file — and every format you published re-renders from the same take.</p>
+    <div class="copyline">
+      <div class="say"><span class="who">Start with the sentence</span><i id="pasteline2">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
+      <button class="copybtn" data-copy="pasteline2">Copy</button>
+    </div>
+  </section>
+
   <div class="foot">
     <span>MIT licensed.</span>
     <a href="https://github.com/glebbogachev00/retake">Source</a>
     <span>Built on Playwright, testreel, and ffmpeg.</span>
-    <a href="https://github.com/glebbogachev00/retake/issues/new?template=gremlin.md">Report a bug</a>
+    <a href="https://github.com/glebbogachev00/retake/issues/new?template=bug.md">Report a bug</a>
   </div>
 </main>
 <script>
 // The proof section fills itself from whatever clean renders exist in
 // site/media/. Committed pages carry no product footage; media is local.
 const CANDIDATES = [
-  { file: 'todo-basics',    cap: '<b>Written by an agent, performed by a browser.</b> Real typing, real clicks, captions timed from the actual run — 22 seconds, every step passed.' },
+  { file: 'todo-basics',    cap: '<b>Written by an agent, performed by a browser.</b> Real typing, real clicks, captions timed from the actual run. Every step in the proof log, pass by pass.' },
   { file: 'store-checkout', cap: '<b>The login is handled properly.</b> Credentials from .env, marked secret, signed in before the camera rolls — then a checkout, end to end.' },
   { file: 'distill-messy',  cap: '<b>A conversation, recorded end to end.</b> Drafted, dry-run, and performed by an agent against a live model — 33 seconds.' },
 ];
@@ -154,6 +210,10 @@ const CANDIDATES = [
   }
   if (!host.children.length) host.innerHTML = '<div class="say" style="margin-top:0"><span class="who">Proof pending</span>Record a demo and drop its render into <code>site/media/</code> — this section fills itself.</div>';
 })();
+for (const b of document.querySelectorAll('.copybtn')) b.onclick = async () => {
+  const t = document.getElementById(b.dataset.copy).textContent.replace(/^“|”$/g, '');
+  try { await navigator.clipboard.writeText(t); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1600); } catch {}
+};
 </script>
 </body>
 </html>
