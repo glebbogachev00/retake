@@ -95,6 +95,10 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 - **Selectors must be unique.** Playwright runs strict: a selector matching two
   elements fails. Prefer ids, `data-testid`, `aria-label`, then
   `button:has-text("…")`; append `>> nth=0` only when duplicates are intended.
+- **Cards and callouts:** `intro: { title, subtitle }` / `outro:` splice a
+  title card (render-time; the intro frame becomes cover.png). A
+  `{ action: callout, selector, label }` step rings an element on camera.
+  At most one callout per scene; never callout what the caption already says.
 - **Scenes carry the story.** `{ action: scene, label, caption }` at each beat;
   captions burn into the video. The camera is still by default; `camera: auto`
   eases toward the last thing touched, or per scene `camera: { focus:

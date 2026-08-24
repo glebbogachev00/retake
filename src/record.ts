@@ -34,6 +34,8 @@ export type TimelineEntry = {
   screen?: string;
   /** Where the camera looks (video-pixel box) and how far in. */
   camera?: { zoom: number; box: { x: number; y: number; width: number; height: number }; focus: string };
+  /** Callout-only: the box the ring is drawn around (video px) and its label. */
+  callout?: { box: { x: number; y: number; width: number; height: number }; label?: string; ms: number };
 };
 
 export type Take = {
@@ -402,6 +404,15 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         end: 0,
         ok: true,
       };
+      if (step.action === "callout") {
+        // Resolve the box now; the ring itself is drawn at render time.
+        const target = step.selector ?? step.at!;
+        const c = await resolvePoint(page, target, step.timeout ?? 10_000);
+        const half = typeof target === "string" || !("x" in (target as object))
+          ? await page.locator((typeof target === "string" ? target : (target as { selector: string }).selector)).first().evaluate((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height }; }).catch(() => ({ w: 48, h: 48 }))
+          : { w: 48, h: 48 };
+        entry.callout = { box: { x: c.x - half.w / 2, y: c.y - half.h / 2, width: half.w, height: half.h }, label: step.label, ms: step.ms };
+      }
       if (step.action === "scene") {
         entry.label = step.label;
         entry.caption = step.caption;
@@ -710,6 +721,11 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
     case "stub":
       await ctx.stub({ url: step.url, method: step.method, status: step.status ?? 200, json: step.json, from: step.from, contentType: "application/json; charset=utf-8" });
       break;
+    case "callout":
+      // The box was resolved in the caller; on camera this is a hold while
+      // the (render-time) ring has the viewer's eye.
+      await page.waitForTimeout(step.ms / m.speed);
+      break;
     case "scene":
       // A marker only. Its timestamp is the point of the step.
       break;
@@ -759,6 +775,8 @@ export function describe(step: Step): string {
       return `evaluate (${step.script.length} chars)`;
     case "stub":
       return `stub ${step.method ? step.method + " " : ""}${step.url}`;
+    case "callout":
+      return `callout ${step.selector ?? pointName(step.at)}${step.label ? ` “${step.label}”` : ""}`;
     case "scene":
       return `scene: ${step.label}`;
   }

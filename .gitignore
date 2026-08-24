@@ -17,6 +17,7 @@ demos/*.yaml
 !demos/scratch-first-script.yaml
 !demos/gdevelop-scene-and-events.yaml
 !demos/cursor-hundred.yaml
+!demos/callout-probe.yaml
 !demos/zoom-probe.yaml
 # working files describe private apps — local only
 demos/*.md

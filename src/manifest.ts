@@ -116,6 +116,16 @@ export const Step = z.discriminatedUnion("action", [
     json: z.unknown().optional(),
     from: z.string().optional(),
   }),
+  /** Point at something while the take holds: an animated ring and an optional
+      label, drawn at render time from the box recorded here. Sparingly — one
+      per scene at most; the captions carry the story. */
+  Base.extend({
+    action: z.literal("callout"),
+    selector: Selector.optional(),
+    at: Point.optional(),
+    label: z.string().max(60).optional(),
+    ms: z.number().positive().max(8000).default(2200),
+  }),
   /** A named beat. Timestamps go into the proof log; `caption` gets burned into
       the video from this moment until the next scene (or `holdMs`). */
   Base.extend({
@@ -130,7 +140,7 @@ export const Step = z.discriminatedUnion("action", [
       .optional(),
   }),
 ]).superRefine((st, ctx) => {
-  if ((st.action === "click" || st.action === "hover") && !st.selector && !st.at) {
+  if ((st.action === "click" || st.action === "hover" || st.action === "callout") && !st.selector && !st.at) {
     ctx.addIssue({ code: "custom", message: `${st.action} needs either a selector or an \`at\` point` });
   }
 });
@@ -189,6 +199,10 @@ const ManifestShape = z.object({
   /** band (default): the site fills the frame, caption strip below · card: the recording framed on a soft canvas · overlay-*: caption over the video · none */
   layout: z.enum(["band", "card", "overlay-bottom", "overlay-top", "none"]).optional(),
   /** auto: each scene zooms toward the last element the demo touched · static: no camera moves. */
+  /** Title cards, rendered at render time (change them, re-render in seconds).
+      The intro's settled frame is also written as cover.png — the poster. */
+  intro: z.object({ title: z.string().max(60), subtitle: z.string().max(90).optional(), ms: z.number().positive().max(6000).default(2400) }).optional(),
+  outro: z.object({ title: z.string().max(60), subtitle: z.string().max(90).optional(), ms: z.number().positive().max(6000).default(2000) }).optional(),
   /** Still by default. A zoom is something a person asks for after seeing a
       take, never something that happens to them: a calm demo reads as real
       and can never crop the wrong thing. `auto` eases toward the last thing

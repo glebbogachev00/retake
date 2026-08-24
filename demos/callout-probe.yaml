@@ -1,0 +1,13 @@
+name: callout-probe
+title: "callout probe"
+url: file://../test/fixtures/grid.html
+preset: draft
+reducedMotion: true
+intro: { title: "A hundred buttons", subtitle: "and one that matters", ms: 2000 }
+steps:
+  - { action: scene, label: grid, caption: "A grid of buttons." }
+  - { action: wait, ms: 800 }
+  - { action: click, selector: "#b42", pauseAfter: 400 }
+  - { action: callout, selector: "#b42", label: "This one. Pressed by a real click.", ms: 2600 }
+  - { action: scene, label: done, caption: "Pointed at, on camera." }
+  - { action: wait, ms: 1200 }

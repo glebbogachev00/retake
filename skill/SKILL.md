@@ -85,6 +85,11 @@ zooms or caption tone until they have seen one. Two moves instead:
 
 Anything they would tell a videographer maps to a knob, in plain English:
 
+- "add a title card" / "give it a cover" → `intro: { title, subtitle }`
+  (and `outro:`) — render-time, and the intro frame becomes cover.png
+- "point at it" / "highlight the button" → a `callout` step with a label —
+  at most one per scene, and only where the caption alone is not enough
+
 - "no zooms" / "keep the camera still" → `camera: static` on scenes
 - "hide the cursor" → `cursor: false`
 - "no captions" / "shorter captions" → captions off, or rewrite them

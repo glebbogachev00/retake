@@ -118,6 +118,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         // Setup waits are not: they are usually giving a navigation or a login
         // time to finish, and cutting them changes the outcome.
         case "wait": await page.waitForTimeout(isSetup ? step.ms : Math.min(step.ms, 400)); break;
+        case "callout": await point(step.selector ?? step.at!); break;
         default: break; // scene, screenshot, zoom, download: nothing to verify
       }
       if (step.pauseAfter) await page.waitForTimeout(120);

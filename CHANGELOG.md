@@ -2,7 +2,16 @@
 
 ## 0.3.0 — 2026-08-23
 
-Logins, done so that no model ever sees a password.
+Logins, done so that no model ever sees a password. And the launch cut:
+title cards and callouts, rendered from HTML.
+
+- **`intro:` / `outro:` title cards** in Retake's own look — Chromium renders
+  them frame-by-frame from an HTML template (deterministic to the pixel),
+  spliced onto the take at render time. The intro's settled frame is written
+  as `cover.png` — the poster. Change a word, re-render in seconds.
+- **`callout` steps**: an animated amber ring and label around an element,
+  box recorded during the take, drawn at render in source coordinates so a
+  moving camera carries it. The take holds while it plays.
 
 - **The caption band fits the captions.** One line ≈ 100 px (was a fixed 150),
   two lines ≈ 160, one height per take; landscape videos are 1920×1180 for

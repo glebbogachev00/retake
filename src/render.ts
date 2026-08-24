@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { capSecondsFor } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
+import { renderCard, renderCalloutOverlay } from "./cards.js";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { resolve, type Manifest, type Resolved, type Step } from "./manifest.js";
@@ -65,7 +66,7 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro], gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -379,10 +380,34 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     }
   }
 
-  const graph = frameInput
+  // Callouts: recorded boxes become animated overlays, applied in SOURCE
+  // coordinates (before the camera filter) so a moving camera carries them.
+  const callouts = take.timeline.filter((e) => e.callout && e.ok);
+  const calloutInputs: string[] = [];
+  let preCam = "";
+  if (callouts.length && !o.scene && !frameInput) {
+    const camIdx = cam.filter ? filters.indexOf(cam.filter) : filters.length;
+    const before = filters.slice(0, camIdx), after = filters.slice(camIdx);
+    let label = "b0";
+    let g = `[0:v]${before.join(",")}[${label}]`;
+    for (let i = 0; i < callouts.length; i++) {
+      const e = callouts[i];
+      const from = Math.max(0, e.start - take.trimBefore);
+      const webm = await renderCalloutOverlay(ffmpegBin(), outDir, i, e.callout!, SW, SH, fps, Math.max(15, Math.round(q.captions ? q.captions.fontSize * 0.55 : 20)), ink);
+      calloutInputs.push(webm);
+      const inIdx = 1 + (frameInput ? 1 : 0) + i;
+      const next = `b${i + 1}`;
+      g += `;[${inIdx}:v]setpts=PTS+${from.toFixed(3)}/TB[c${i}];[${label}][c${i}]overlay=0:0:eof_action=pass[${next}]`;
+      label = next;
+    }
+    preCam = `${g};[${label}]${after.length ? after.join(",") : "null"}`;
+  }
+  const graph = preCam
+    ? `${preCam}${captionFilters.length ? "," + captionFilters.join(",") : ""}[out]`
+    : frameInput
     ? `[0:v]${filters.join(",")}[v];[v][1:v]overlay=0:0:format=auto${captionFilters.length ? "," + captionFilters.join(",") : ""}[out]`
     : `[0:v]${[...filters, ...captionFilters].join(",")}[out]`;
-  const inputs = ["-ss", srcTake.trimBefore.toFixed(3), "-t", (srcTake.duration - srcTake.trimBefore).toFixed(3), "-i", src, ...(frameInput ? ["-i", frameInput] : [])];
+  const inputs = ["-ss", srcTake.trimBefore.toFixed(3), "-t", (srcTake.duration - srcTake.trimBefore).toFixed(3), "-i", src, ...(frameInput ? ["-i", frameInput] : []), ...calloutInputs.flatMap((f) => ["-c:v", "libvpx-vp9", "-i", f])];
   const compose = ["-filter_complex", graph, "-map", "[out]", "-r", String(fps), "-an", "-pix_fmt", "yuv420p", "-movflags", "+faststart"];
   const x264 = (crf: number, preset: string) => ["-c:v", "libx264", "-crf", String(crf), "-preset", preset];
   // Hardware encode is a macOS thing; elsewhere the "fast" presets are a fast x264.
@@ -408,6 +433,25 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     mark("compose+encode");
   }
   if (frameInput) fs.rmSync(frameInput, { force: true });
+  for (const f of calloutInputs) fs.rmSync(f, { force: true });
+
+  // Title cards: rendered at the finished frame size, spliced on. The intro's
+  // settled frame becomes cover.png — the poster.
+  let cover: string | undefined;
+  if ((m.intro || m.outro) && !o.scene) {
+    const dims = probe(mp4);
+    const segs: string[] = [];
+    if (m.intro) { const c = await renderCard(ffmpegBin(), outDir, "intro", m.intro, dims.width, dims.height, fps, q.theme); segs.push(c.mp4); cover = c.cover; }
+    segs.push(mp4);
+    if (m.outro) segs.push((await renderCard(ffmpegBin(), outDir, "outro", m.outro, dims.width, dims.height, fps, q.theme)).mp4);
+    if (segs.length > 1) {
+      const joined = path.join(outDir, ".joined.mp4");
+      ff([...segs.flatMap((f) => ["-i", f]), "-filter_complex", `${segs.map((_, i) => `[${i}:v]`).join("")}concat=n=${segs.length}:v=1:a=0[out]`, "-map", "[out]", "-r", String(fps), "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", ...x264(q.crf, "medium"), joined], log);
+      fs.renameSync(joined, mp4);
+      for (const f of segs) if (f !== mp4) fs.rmSync(f, { force: true });
+    }
+    mark("cards");
+  }
   if (o.scene) return { mp4, proofLog };
 
   // --- 3. GIF (secondary, opt-in) --------------------------------------------

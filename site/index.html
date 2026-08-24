@@ -72,6 +72,15 @@
   .copybtn:hover { border-color:var(--ink); }
   .vocab { background:var(--card); border:1px solid var(--rule); border-left:3px solid var(--amber); border-radius:14px; padding:18px 22px; font-size:15px; color:var(--muted); line-height:1.8; }
   .vocab b { color:var(--ink); }
+  .cases { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:14px; }
+  .case { background:var(--card); border:1px solid var(--rule); border-radius:16px; padding:22px 24px; display:flex; flex-direction:column; box-shadow:0 10px 26px rgba(24,28,24,.06); }
+  .wordmark { font-size:24px; font-weight:700; letter-spacing:-.02em; margin-bottom:12px; }
+  .wordmark.serif { font-family:Georgia, "Times New Roman", serif; font-weight:600; letter-spacing:0; }
+  .wordmark.mono { font-family:ui-monospace, Menlo, monospace; font-size:20px; letter-spacing:.14em; }
+  .wordmark .avex { color:var(--amber); margin-right:2px; }
+  .case .quote { margin:0 0 14px; font-size:14.5px; line-height:1.65; flex:1; }
+  .case .meta { margin:0; font-size:12.5px; color:var(--muted); }
+  .case .meta a { color:inherit; }
   @media (max-width: 560px) {
     .copyline { flex-direction:column; }
     .copybtn { padding:12px 20px; }
@@ -108,12 +117,28 @@
   </div>
   <p class="arrow" style="font-size:13.5px">one line changed · <code>retake run</code> · a new take of the same demo ↓</p>
   <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
-  <div class="sub" style="margin:18px 0 0;font-size:13.5px;max-width:680px">
-    <p style="margin:0 0 6px">Every demo video for <a href="https://capture-playground.vercel.app" style="color:inherit">Capture</a>, <a href="https://avexjets.com" style="color:inherit">AvexJets</a> and TechBash is a Retake file — including the takes above.</p>
-    <p style="margin:0 0 4px"><b style="color:var(--ink)">AvexJets</b> — a client walkthrough across three portals. What took twenty minutes live with the client is a file now: issues get caught on camera and the fix is a re-record, not another meeting.</p>
-    <p style="margin:0 0 4px"><b style="color:var(--ink)">Capture</b> — the five-video launch set, drafted, fixed and re-cut in an afternoon.</p>
-    <p style="margin:0"><b style="color:var(--ink)">TechBash</b> — Scratch lesson walkthroughs, recorded by an agent dragging real blocks, rerun whenever a lesson changes.</p>
-  </div>
+
+  <section>
+    <h2>Three products already run on it</h2>
+    <p class="sub">Same maker, three real businesses — Retake was built inside them, not for a landing page.</p>
+    <div class="cases">
+      <div class="case">
+        <div class="wordmark serif">capture.</div>
+        <p class="quote">“The five-video launch set — drafted, fixed and re-cut in one afternoon. Re-doing a take stopped being a decision.”</p>
+        <p class="meta">Thought-sorting app · <a href="https://capture-playground.vercel.app">capture-playground.vercel.app</a></p>
+      </div>
+      <div class="case">
+        <div class="wordmark"><span class="avex">✈</span> AvexJets</div>
+        <p class="quote">“Our client walkthrough crosses three portals. What took twenty minutes live is a file now — issues get caught on camera, and the fix is a re-record, not another meeting.”</p>
+        <p class="meta">Private aviation charter · <a href="https://avexjets.com">avexjets.com</a></p>
+      </div>
+      <div class="case">
+        <div class="wordmark mono">TECHBASH</div>
+        <p class="quote">“Lesson walkthroughs for kids learning Scratch — an agent drags the actual blocks. When a lesson changes, the video reruns itself.”</p>
+        <p class="meta">Coding school for young learners</p>
+      </div>
+    </div>
+  </section>
 
   <section id="start">
     <h2>Give it to your agent</h2>
@@ -125,11 +150,6 @@
     <p class="sub" style="margin:22px 0 10px">Doing it yourself is two commands:</p>
     <pre>npm install -g retake-demos     <span class="c"># Node 20+; ffmpeg bundled, Chromium downloads once</span>
 mkdir demos && cd demos && retake install</pre>
-  </section>
-
-  <section>
-    <h2>Four words we use</h2>
-    <div class="vocab">A recording is a <b>take</b>. Its beats are <b>scenes</b> — each carries a caption, burned in under the app, never over it. Every take ships with its <b>proof log</b>: each step, its timing, pass or fail, and what was on screen when it failed. Those files together are the <b>receipts</b>.</div>
   </section>
 
   <section id="how">
@@ -155,6 +175,11 @@ mkdir demos && cd demos && retake install</pre>
   </section>
 
 
+
+  <section>
+    <h2>Plain, or produced</h2>
+    <p class="sub" style="max-width:640px">The same file renders both. A walkthrough for the pull request stays plain: still camera, captions, done. A launch cut gets a title card, a closing card and a callout ringing the moment that matters — <code>intro:</code>, <code>outro:</code>, one <code>callout</code> step. Change your mind after seeing it; it's a re-render, not a re-record.</p>
+  </section>
 
   <section>
     <h2>Not a recorder, not a test runner</h2>
@@ -188,9 +213,7 @@ mkdir demos && cd demos && retake install</pre>
 // The proof section fills itself from whatever clean renders exist in
 // site/media/. Committed pages carry no product footage; media is local.
 const CANDIDATES = [
-  { file: 'todo-basics',    cap: '<b>A first take, start to finish.</b> Written by an agent, performed by a browser: real typing, real clicks, captions timed from the run.' },
-  { file: 'store-checkout', cap: '<b>Behind a login.</b> Credentials from .env, signed in before the camera rolls — then a checkout, end to end.' },
-  { file: 'distill-messy',  cap: '<b>A live model on camera.</b> Drafted, dry-run, and performed by an agent against a real AI feature — 33 seconds.' },
+  { file: 'capture-two-places', cap: '<b>Capture — the launch pitch.</b> One messy sentence lands as an action and a thread. Drafted, dry-run and recorded by an agent — title card and all, from one YAML file.' },
 ];
 (async () => {
   const host = document.getElementById('proof');
@@ -204,6 +227,13 @@ const CANDIDATES = [
     f.className = 'shot'; f.style.margin = 0;
     f.innerHTML = '<video src="' + url + '" poster="' + url.replace('.mp4', '.jpg') + '" controls muted playsinline preload="metadata"></video><figcaption>' + c.cap + '</figcaption>';
     host.appendChild(f);
+  }
+  if (host.children.length) {
+    const more = document.createElement('p');
+    more.className = 'sub'; more.style.cssText = 'margin:14px 0 0;font-size:13.5px';
+    const base = location.pathname.startsWith('/landing') ? '/landing/media/' : 'media/';
+    more.innerHTML = 'Two more takes: <a style="color:inherit" href="' + base + 'store-checkout.mp4">behind a login</a> · <a style="color:inherit" href="' + base + 'scratch-first-script.mp4">a Scratch lesson, blocks dragged by an agent</a>.';
+    host.after(more);
   }
   if (!host.children.length) host.innerHTML = '<div class="say" style="margin-top:0"><span class="who">Proof pending</span>Record a demo and drop its render into <code>site/media/</code> — this section fills itself.</div>';
 })();

@@ -28,3 +28,19 @@ test("wrap breaks two-line captions near the middle and never orphans a word", (
   assert.ok(Math.abs(a.length - b.length) < 12);
   assert.equal(captionLines(["short"], 1920, 46), 1);
 });
+
+test("callout and cards are schema-valid and render-relevant", async () => {
+  const { Manifest } = await import("../src/manifest.js");
+  const m = Manifest.parse({
+    name: "x", url: "http://x",
+    intro: { title: "T", subtitle: "s" },
+    steps: [
+      { action: "scene", label: "a" },
+      { action: "callout", selector: "#b", label: "look", ms: 2000 },
+    ],
+  });
+  assert.equal(m.intro?.ms, 2400);
+  const c = m.steps[1] as { action: string; ms: number };
+  assert.equal(c.ms, 2000);
+  assert.throws(() => Manifest.parse({ name: "x", url: "http://x", steps: [{ action: "callout" }] }), /selector or/);
+});

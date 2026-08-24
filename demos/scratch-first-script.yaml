@@ -1,6 +1,8 @@
 # The pilot lesson: a child's first script, built by dragging.
 # Blockly intercepts pointer events on its toolbox and blocks, so every target
 # here is a POINT (resolved from the page's own rect), not a locator.
+intro: { title: "A child's first script", subtitle: "Recorded by an agent dragging real blocks", ms: 2300 }
+outro: { title: "retake-demos", subtitle: "Demos that re-record themselves", ms: 1900 }
 name: scratch-first-script
 title: Scratch — make the cat move when you click the flag
 url: https://scratch.mit.edu/projects/editor/
