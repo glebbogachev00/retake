@@ -155,6 +155,11 @@ export const Step = z.discriminatedUnion("action", [
   Base.extend({
     action: z.literal("scene"),
     label: z.string().min(1),
+    /** Move this scene's marker in the finished video, in milliseconds
+        (negative = earlier). RENDER-TIME: it shifts where the caption, the
+        still and the thumbnail land, and never costs a new recording. A
+        caption that arrives a beat late is a re-render, not a re-take. */
+    nudge: z.number().int().min(-60_000).max(60_000).optional(),
     caption: z.string().optional(),
     holdMs: z.number().positive().optional(),
     /** Where the camera looks during this scene. Omitted → the manifest's

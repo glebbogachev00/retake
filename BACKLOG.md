@@ -80,22 +80,18 @@ transitions, filters, stock intros — the video-editor line stays drawn.
   card + a callout on the payoff + square/vertical + music without asking
   knob by knob. ~half a day, mostly prose.
 
+## Shipped
+
+- **Render-time scene markers** (2026-08-25). `nudge: <ms>` on a scene moves
+  its marker in the finished video — caption, still and thumbnail follow it,
+  clamped so it can never cross a neighbouring scene. Measured on a two-scene
+  take: 1.6s to move a caption, against re-recording the whole thing. It is
+  excluded from the capture hash, so it can never trigger a re-record.
+- **`waitFor: {selector, stableMs, minChars, gone}`** (2026-08-25).
+- **`retake contact <dir>`** — the timestamped contact sheet (2026-08-25).
+
 ## Next
 
-- **Render-time scene markers.** A caption-placement mistake currently costs
-  a full take, because scene boundaries are written into the recording. If
-  scenes lived in take.json as editable {label, caption, atMs}, moving a
-  caption two seconds would be a 90-second re-render, not a 195-second
-  re-record with a live model in it. Highest-value item from the 2026-08-25
-  audit; interim: `scene: {nudge: -2000}` offsets at render.
-- **`waitFor: {selector, stableMs}` and `waitForText`.** "Wait until the
-  streamed reply has landed" is not expressible today without reading the
-  app's source for its busy flag. Resolves when the subtree stops mutating
-  / reaches N chars. Kills two recurring wasted-take patterns (empty
-  streaming bubbles, stale-element matches).
-- **`retake contact <dir>`** — one timestamped contact-sheet PNG per output
-  (and by default for mode: launch). Reviewing a video today means pulling
-  frames with ffmpeg by hand; this is the artifact a human signs off on.
 - **Two mechanical caption checks.** Dead scene (a scene's -end still
   near-identical to the previous one under a caption promising change) and
   caption-outlives-its-subject (a captioned scene spanning steps that

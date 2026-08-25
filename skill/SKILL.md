@@ -286,13 +286,16 @@ average is three to five takes per demo. Most of that is avoidable:
 2. **`--until <scene>`** when the fix is in one beat. Re-recording a 60s
    demo to change its last 8 seconds is paying for 50 seconds you already
    have.
-3. **Never re-record for a size or a format.** `render outputs/<name>
+3. **A caption in the wrong place is a nudge, not a take.** `nudge: -1500` on
+   a scene moves its marker 1.5s earlier in the finished video; the caption,
+   the still and the thumbnail all follow. Re-render and look — it is seconds.
+4. **Never re-record for a size or a format.** `render outputs/<name>
    --preset post-vertical` re-frames the take you have. Captions, camera,
    speed, cards and posters are all render-time too.
-4. **`dry` before every `run`** — including after the app restarts. It is
+5. **`dry` before every `run`** — including after the app restarts. It is
    ~10s and it catches the wrong-build-on-the-port failure that otherwise
    costs a take and a confusing video.
-5. **Fix everything `dry` and the proof log report in ONE pass.** Reading
+6. **Fix everything `dry` and the proof log report in ONE pass.** Reading
    the whole failure list before editing turns three rounds into one.
 
 ## Judging the cut

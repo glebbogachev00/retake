@@ -155,6 +155,46 @@ export function applyManifest(m: Manifest, take: Take): Take {
   return { ...take, timeline, trimBefore, duration };
 }
 
+
+/** Apply the manifest's render-time scene nudges to a take.
+ *
+ * Scene markers come out of the recording, so getting one in the wrong place
+ * used to mean recording the whole thing again — with a live model in the
+ * middle of it, at 2.3x the video's length. A nudge moves the marker instead,
+ * and everything downstream (captions, stills, the thumbnail) reads scene
+ * times through here, so all of it moves together for the price of a render.
+ *
+ * Order is preserved by clamping: a scene can never be pushed past its
+ * neighbours, because a timeline that crosses over itself would produce
+ * captions in the wrong sequence rather than an error anyone could see.
+ */
+export function nudgeScenes(take: Take, m?: Manifest): { take: Take; applied: { label: string; ms: number; clamped: boolean }[] } {
+  const wanted = new Map<string, number>();
+  for (const st of m?.steps ?? []) {
+    if (st.action === "scene" && st.nudge) wanted.set(st.label, st.nudge);
+  }
+  if (!wanted.size) return { take, applied: [] };
+
+  const applied: { label: string; ms: number; clamped: boolean }[] = [];
+  const GAP = 0.1; // scenes stay strictly ordered
+  const sceneIdx = take.timeline.map((t, i) => (t.action === "scene" ? i : -1)).filter((i) => i >= 0);
+  const timeline = take.timeline.map((t) => ({ ...t }));
+
+  for (const [n, i] of sceneIdx.entries()) {
+    const want = wanted.get(timeline[i].label ?? "");
+    if (!want) continue;
+    const prev = n > 0 ? timeline[sceneIdx[n - 1]].start + GAP : 0;
+    const next = n < sceneIdx.length - 1 ? timeline[sceneIdx[n + 1]].start - GAP : take.duration;
+    const target = timeline[i].start + want / 1000;
+    const to = Math.min(Math.max(target, prev), Math.max(prev, next));
+    const span = timeline[i].end - timeline[i].start;
+    applied.push({ label: timeline[i].label ?? "?", ms: want, clamped: Math.abs(to - target) > 0.01 });
+    timeline[i].start = to;
+    timeline[i].end = to + span;
+  }
+  return { take: { ...take, timeline }, applied };
+}
+
 export function scenes(take: Take): TimelineEntry[] {
   return take.timeline.filter((t) => t.action === "scene");
 }
@@ -278,10 +318,20 @@ async function renderCardFrame(file: string, W: number, H: number, g: CardGeom, 
 
 // --- render ------------------------------------------------------------------
 
-export async function render(m: Manifest, take: Take, outDir: string, opts: RenderOptions | ((l: string) => void) = {}): Promise<Artifacts> {
+export async function render(m: Manifest, takeIn: Take, outDir: string, opts: RenderOptions | ((l: string) => void) = {}): Promise<Artifacts> {
+  let take = takeIn;
   const o = typeof opts === "function" ? { log: opts } : opts;
   const log = o.log;
   const q = resolve(m);
+  // Before anything reads a scene time: markers move at render, so captions,
+  // stills and the thumbnail all shift together and none of it costs a take.
+  {
+    const n = nudgeScenes(take, m);
+    take = n.take;
+    for (const a of n.applied) {
+      log?.(`scene "${a.label}" moved ${a.ms > 0 ? "+" : ""}${(a.ms / 1000).toFixed(1)}s${a.clamped ? " (clamped — it would have crossed a neighbouring scene)" : ""}`);
+    }
+  }
   const proofLog = path.join(outDir, "proof-log.md");
   const writeProof = (a: Partial<Artifacts>) => fs.writeFileSync(proofLog, renderProof(m, take, q, a));
   // An output directory that cannot say what produced it makes an audit
@@ -757,7 +807,9 @@ export function check(outDir: string, m?: Manifest): Check {
   const say = (pass: boolean, text: string) => { lines.push(`${pass ? "pass" : "FAIL"}  ${text}`); if (!pass) ok = false; };
   const takePath = path.join(outDir, "take.json");
   if (!fs.existsSync(takePath)) return { ok: false, lines: ["FAIL  no take.json"] };
-  const take = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take;
+  // The same shift render applied, so a nudged scene is not reported as a
+  // stall or a caption in the wrong place by a check reading raw times.
+  const take = nudgeScenes(JSON.parse(fs.readFileSync(takePath, "utf8")) as Take, m).take;
   // The take knows which preset it was recorded with; a `--preset` on the run
   // must win over the manifest's default, or a draft fails for lacking a master.
   const q = m ? resolve(take.quality?.preset && take.quality.preset !== m.preset ? { ...m, preset: take.quality.preset } : m) : null;
@@ -899,6 +951,12 @@ function renderProof(m: Manifest, take: Take, q: Resolved, a: Partial<Artifacts>
     `- Finished: ${take.finishedAt}`,
     `- Result: **${take.ok ? "all steps passed" : "some steps failed"}**${take.partial ? ` · **partial** — ${take.partial}` : ""}`,
     `- Setup trimmed: ${take.trimBefore.toFixed(1)}s · final length ≈ ${(take.duration - take.trimBefore).toFixed(1)}s`,
+    // A nudged demo no longer matches raw step timing; say so, or the next
+    // person reads the timeline against the video and thinks one is wrong.
+    ...(() => {
+      const n = (m.steps ?? []).filter((st) => st.action === "scene" && st.nudge).map((st) => `${(st as { label: string }).label} ${(st as { nudge: number }).nudge > 0 ? "+" : ""}${((st as { nudge: number }).nudge / 1000).toFixed(1)}s`);
+      return n.length ? [`- **Scene markers moved at render**: ${n.join(", ")} — the captions and stills follow these, not the raw step times below.`] : [];
+    })(),
     ...(take.stubbed?.length ? [`- **Stubbed data**: ${take.stubbed.map((k) => `${k}${take.stubHits ? ` (${take.stubHits[k] ?? 0} request${(take.stubHits[k] ?? 0) === 1 ? "" : "s"})` : ""}`).join(", ")} — these screens were fed canned responses, not a live backend.`] : []),
     ...(take.stubHits && Object.entries(take.stubHits).some(([, n]) => !n)
       ? [`- **Stubs that never fired**: ${Object.entries(take.stubHits).filter(([, n]) => !n).map(([k]) => k).join(", ")} — armed, but no request matched, so those screens showed whatever the app really returned. Usually the pattern does not match the real URL, or the page never re-fetched (a navigation that only changes the #fragment does not reload an SPA).`]
