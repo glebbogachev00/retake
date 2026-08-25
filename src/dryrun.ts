@@ -14,10 +14,64 @@ import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manif
 
 export type DryResult = { ok: boolean; lines: string[]; failures: number };
 
+/** What the element actually is, as the page sees it. */
+type ElInfo = { tag: string; type: string; disabled: boolean; readOnly: boolean; editable: boolean };
+
+async function elInfo(page: Page, selector: string, timeout: number): Promise<ElInfo | null> {
+  try {
+    const h = await page.locator(selector).first().elementHandle({ timeout });
+    if (!h) return null;
+    const info = await h.evaluate((el) => {
+      const e = el as HTMLElement & { type?: string; disabled?: boolean; readOnly?: boolean };
+      return {
+        tag: e.tagName.toLowerCase(),
+        type: (e.type ?? "").toLowerCase(),
+        disabled: !!e.disabled || e.getAttribute("aria-disabled") === "true",
+        readOnly: !!e.readOnly,
+        editable: e.isContentEditable,
+      };
+    });
+    await h.dispose();
+    return info;
+  } catch { return null; }
+}
+
+/** Does this action make sense on this element? Returns the complaint, or null.
+ *
+ * This is the check that pays for itself: an action that cannot work on the
+ * element it names is knowable before a single frame is recorded, and finding
+ * it out during a take costs the whole take. So the message names the fix, not
+ * just the symptom — a report that says "use `action: select`" ends the
+ * problem, one that says "element is not an <input>" starts an investigation. */
+export function actionFits(action: string, el: ElInfo): string | null {
+  const NOT_TEXT = new Set(["button", "submit", "reset", "checkbox", "radio", "file", "image", "range", "color"]);
+  const is = (t: string) => el.tag === t;
+  if (action === "type" || action === "fill") {
+    if (is("select")) return `\`${action}\` cannot be used on a <select> — use \`action: select\` with \`value: "<the option>"\``;
+    if (is("input") && el.type === "file") return `\`${action}\` cannot be used on a file input — use \`action: upload\` with \`file:\``;
+    if (is("input") && NOT_TEXT.has(el.type)) return `\`${action}\` cannot be used on <input type="${el.type}"> — it holds no text; \`action: click\` is probably what you mean`;
+    if (!is("input") && !is("textarea") && !el.editable) return `\`${action}\` needs a text field, but this is a <${el.tag}> that is not editable — if it is a custom editor, target the inner element that accepts typing`;
+    if (el.disabled) return `\`${action}\` cannot type into a disabled <${el.tag}> — something earlier has to enable it first`;
+    if (el.readOnly) return `\`${action}\` cannot type into a read-only <${el.tag}>`;
+  }
+  if (action === "select" && !is("select")) {
+    return `\`select\` only works on a real <select>, and this is a <${el.tag}> — for a custom dropdown, \`click\` it and then \`click\` the option`;
+  }
+  if (action === "upload" && !(is("input") && el.type === "file")) {
+    return `\`upload\` needs <input type="file">, and this is a <${el.tag}>${el.type && el.type !== el.tag ? ` type="${el.type}"` : ""}`;
+  }
+  if (action === "click" && el.disabled) {
+    return `this <${el.tag}> is disabled right now — the click would do nothing; wait for whatever enables it (\`action: waitFor\`) before clicking`;
+  }
+  return null;
+}
+
 export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean; outRoot?: string } = {}): Promise<DryResult> {
   const q = resolve(m);
   const lines: string[] = [];
   let failures = 0;
+  /** What the page actually laid out at — the width its breakpoints saw. */
+  let layoutWidth: number | null = null;
   // Failure pictures land beside the demo's other output, not in the cwd.
   const shotDir = path.join(opts.outRoot ?? "outputs", m.name);
   // Seeds run here too (file and command kinds — the cheap, out-of-page
@@ -36,6 +90,19 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     colorScheme: m.colorScheme,
     ...(m.reducedMotion ? { reducedMotion: "reduce" as const } : {}),
   });
+
+  // Whatever the recorder does to the page, dry does too — otherwise dry
+  // proves a layout that will never be filmed, which is the whole "a green dry
+  // is not a green run" problem. This is the page-scale zoom.
+  //
+  // Measured, for the record: `html{zoom}` does NOT move an app's media
+  // queries (innerWidth and clientWidth stay at the viewport width either
+  // way), so it is not by itself the cause of a mobile layout being filmed.
+  // That is why the width reported below is measured from the page rather than
+  // computed as width÷scale — the arithmetic would be a plausible lie.
+  if (q.scale !== 1) {
+    await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="html{zoom:${q.scale}}";document.head.appendChild(st)})`);
+  }
 
   const stubs = new Map<string, Stub>();
   const arm = async (d: Stub) => {
@@ -58,6 +125,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     // go network-idle, and the manifest's waitForSelector is the real gate.
     await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
+    layoutWidth = await page.evaluate(() => document.documentElement.clientWidth).catch(() => null);
     for (const s of [...(m.auth?.setup ?? []), ...m.setup]) await run(s, true);
     for (const [i, s] of m.steps.entries()) await run(s, false, i);
   } finally {
@@ -69,6 +137,15 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     const tag = isSetup ? "setup" : String(index).padStart(3, "0");
     const short = 8000; // long enough for a click that navigates, short enough to stay fast
     try {
+      // Before doing anything: does this action fit the element it names? A
+      // mismatch is the expensive kind of failure — the selector resolves, dry
+      // passes, and the take dies on it minutes into a recording.
+      const sel = (step as { selector?: string }).selector;
+      if (sel && ["type", "fill", "select", "upload", "click"].includes(step.action)) {
+        const el = await elInfo(page, sel, short);
+        const complaint = el && actionFits(step.action, el);
+        if (complaint) throw new Error(complaint);
+      }
       // A point step (click/hover `at`, or a drag) is verified by resolving
       // its target's rect in the page — the same way the recorder will.
       const point = async (t: unknown): Promise<{ x: number; y: number }> => {
@@ -160,7 +237,57 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
 
   const ok = failures === 0;
   log(ok ? `dry run: all ${m.steps.length} steps resolved` : `dry run: ${failures} step(s) would fail`);
+  // A preset's width is VIDEO pixels: at scale 2 a 1920 preset lays the page
+  // out at 960 CSS px, under most desktop breakpoints, so a responsive app
+  // quietly serves its MOBILE layout and the steps are looking for fields that
+  // are not there. It reads as a pile of broken selectors, and costs a whole
+  // take to work out. Only asked when something actually failed, and only
+  // reported when the wider page proves it.
+  if (!ok) {
+    // Measured, not computed: `zoom` does not move an app's media queries, so
+    // width÷scale is not the number the page's breakpoints saw. Ask the page.
+    const cssWidth = layoutWidth ?? q.viewport.width;
+    if (cssWidth < 1100) {
+      const missing = lines.map((l) => /✗ \[[^\]]+\] \w+ (.+?) —/.exec(l)?.[1]).filter((x): x is string => !!x);
+      const found = await resolvesWiderThan(m, missing, cssWidth, manifestDir);
+      if (found.length) {
+        const note = `⚠ ${found.length} of these selector(s) DO exist when the page is 1280 CSS px wide, but not at ${cssWidth}px.\n` +
+          `   This take lays the page out at ${cssWidth} CSS px, which is below this app's desktop breakpoint — you are filming its mobile layout.\n` +
+          `   Fix: give the manifest a wider \`viewport\`, or write the steps against the layout you are actually filming.\n` +
+          `   Resolved wider: ${found.slice(0, 4).join(", ")}${found.length > 4 ? ` … +${found.length - 4}` : ""}`;
+        lines.push(note);
+        log(note);
+      }
+    }
+  }
   return { ok, lines, failures };
+}
+
+/** Load the same page at a desktop width and report which of these selectors
+    resolve there. Proof, not a guess: it is only worth telling someone their
+    preset is filming the mobile layout if the wider page really does have the
+    thing they were looking for. */
+async function resolvesWiderThan(m: Manifest, selectors: string[], narrowPx: number, manifestDir: string): Promise<string[]> {
+  const unique = [...new Set(selectors)].filter((s) => s && !s.startsWith("http"));
+  if (!unique.length || narrowPx >= 1280) return [];
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: m.colorScheme });
+    const page = await ctx.newPage();
+    for (const d of m.stub) {
+      await ctx.route(d.url, async (route) => {
+        const body = d.json !== undefined ? JSON.stringify(d.json) : d.from ? fs.readFileSync(path.resolve(manifestDir, expandEnv(d.from)), "utf8") : "{}";
+        await route.fulfill({ status: d.status ?? 200, contentType: d.contentType, body });
+      });
+    }
+    await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForLoadState("networkidle", { timeout: 6000 }).catch(() => {});
+    const found: string[] = [];
+    for (const sel of unique) {
+      try { if (await page.locator(sel).first().isVisible({ timeout: 1500 })) found.push(sel); } catch { /* still missing */ }
+    }
+    return found;
+  } catch { return []; } finally { await browser.close().catch(() => {}); }
 }
 
 function describe(s: Step): string {

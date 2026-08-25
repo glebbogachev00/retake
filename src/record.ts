@@ -64,6 +64,10 @@ export type Take = {
   captureHash?: string;
   /** Wall-clock seconds the recording took (browser open → closed). */
   captureSec?: number;
+  /** The CSS width the page actually laid out at — measured, because `zoom`
+      does not move an app's media queries and width÷scale would be a guess.
+      This is the number that says which layout got filmed. */
+  layoutWidth?: number;
   /** Files the run downloaded, saved under outputs/<name>/downloads/. */
   downloads?: string[];
   /** Endpoints answered with canned data during this take. Named in the proof
@@ -310,6 +314,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const pageErrors: { at: number; text: string }[] = [];
   let video: string | undefined;
   let screenshots: string[] = [];
+  let layoutWidth: number | undefined;
   let t0 = Date.now();
   let setupEnd = t0;
   let endMs = t0;
@@ -337,6 +342,11 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // go network-idle, and the manifest's waitForSelector is the real gate.
     await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
+    // The width this app's own breakpoints saw. Measured rather than computed
+    // from the preset: `zoom` does not move media queries, so width÷scale
+    // would be a confident wrong answer. The proof log reports this one, so a
+    // take filmed against a mobile layout says so instead of being a mystery.
+    layoutWidth = await page.evaluate(() => document.documentElement.clientWidth).catch(() => undefined);
     if (!opts.skipSeed) {
       for (const s of m.seed) {
         if (s.kind === "evaluate") await runEvaluateSeed(page, s, opts.manifestDir, log);
@@ -580,6 +590,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const take: Take = {
     video, screenshots, timeline, duration, startedAt, finishedAt, ok, trimBefore, partial,
     quality: { preset: q.name, width: q.viewport.width, height: q.viewport.height, scale: q.scale, fps: q.fps },
+    layoutWidth,
     pageErrors,
     downloads: ctx.downloads,
     stubbed,

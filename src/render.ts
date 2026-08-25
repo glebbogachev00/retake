@@ -864,6 +864,11 @@ function renderProof(m: Manifest, take: Take, q: Resolved, a: Partial<Artifacts>
     "",
     `- URL: ${m.url}`,
     `- Preset: ${q.name} · canvas ${q.width}×${q.height} · viewport ${take.quality?.width ?? q.viewport.width}×${take.quality?.height ?? q.viewport.height} @ ${q.fps}fps · page scale ${q.scale}× · layout ${q.layout}`,
+    // Measured during the take, not computed from the preset: `zoom` does not
+    // move an app's media queries, so width÷scale would be a plausible lie.
+    // Named outright because a responsive app serves a different layout below
+    // a breakpoint, and this is the number that explains which one you filmed.
+    ...(take.layoutWidth ? [`- Page laid out at: **${take.layoutWidth} CSS px** wide — the width this app's own breakpoints saw.`] : []),
     `- Started: ${take.startedAt}`,
     `- Finished: ${take.finishedAt}`,
     `- Result: **${take.ok ? "all steps passed" : "some steps failed"}**${take.partial ? ` · **partial** — ${take.partial}` : ""}`,
