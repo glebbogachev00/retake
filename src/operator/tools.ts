@@ -418,4 +418,19 @@ server.registerTool("done", { description: "Call when the demo is recorded and a
 });
 
 const transport = new StdioServerTransport();
+
+// Leave when the client does. Without this the server sat on a closed stdin
+// forever — a day of agent sessions left a row of them running, each holding a
+// Node runtime for a client that had long since exited.
+let leaving = false;
+const leave = () => {
+  if (leaving) return;
+  leaving = true;
+  void server.close().catch(() => {}).finally(() => process.exit(0));
+};
+transport.onclose = leave;
+process.stdin.once("end", leave);
+process.stdin.once("close", leave);
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.once(sig, leave);
+
 await server.connect(transport);

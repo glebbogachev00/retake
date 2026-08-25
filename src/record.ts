@@ -11,7 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { execFileSync, execSync } from "node:child_process";
+import { execFileSync, execSync, spawn } from "node:child_process";
 import { chromium, type Page } from "playwright";
 import { recordPage, moveCursorToPoint, type PageRecorder } from "testreel";
 import { expandEnv, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
@@ -937,8 +937,61 @@ export async function runFileOrCommandSeed(s: Seed, dir: string, log: (l: string
     log(`seed: wrote ${path.relative(process.cwd(), dest)}${s.relativeDates ? " (relative dates resolved)" : ""}`);
   } else if (s.kind === "command") {
     log(`seed: $ ${s.run}`);
-    execSync(expandEnv(s.run), { stdio: "inherit", cwd: dir });
+    await runSeedCommand(expandEnv(s.run), s.run, dir);
   }
+}
+
+/** Anything that asks to outlive the command that started it. A seed's job is
+    to put data in place and exit; starting a server is `start_app`'s job, and
+    that one is gated on the person's say-so. Backgrounding here would walk
+    straight around that gate, so it is refused by name. */
+const BACKGROUNDING: [RegExp, string][] = [
+  // A lone `&` is backgrounding; `&&` is just "and then". Quoted spans are
+  // stripped before this runs, so a URL's query string is not mistaken for it.
+  [/(?<!&)&(?!&)/, "a bare `&`"],
+  [/\bnohup\b/, "nohup"],
+  [/\bdisown\b/, "disown"],
+  [/\b(?:screen|tmux)\s+(?:-\w+\s+)*(?:new|new-session|start)/, "screen/tmux"],
+  [/\bpm2\s+(?:start|restart)\b/, "pm2"],
+  [/\bforever\s+start\b/, "forever"],
+];
+
+/** A seed command runs to completion or it does not run. */
+export const SEED_TIMEOUT_MS = 120_000;
+
+export async function runSeedCommand(cmd: string, shown: string, dir: string, timeoutMs = SEED_TIMEOUT_MS): Promise<void> {
+  // Quoted arguments are data, not shell syntax: a URL's `?a=1&b=2` is not an
+  // attempt to background anything.
+  const bare = cmd.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
+  for (const [re, what] of BACKGROUNDING) {
+    if (re.test(bare)) {
+      throw new Error(
+        `Refusing to run this seed command because it uses ${what}, which leaves a process running after the seed finishes:\n  ${shown}\n\n` +
+        `A seed puts data in place and exits. To start the app itself, use Retake's start_app — starting processes is something the person allows explicitly, and a seed must not become the way around that.`,
+      );
+    }
+  }
+  // `detached` puts the shell in its own process group so a timeout can kill
+  // what it spawned as well. spawnSync cannot do this, which is why the seed
+  // path is async: killing only the shell would orphan the very process this
+  // timeout exists to stop.
+  const child = spawn(cmd, [], { shell: true, stdio: "inherit", cwd: dir, detached: true });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    try { if (child.pid) process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+  }, timeoutMs);
+  const status = await new Promise<number | null>((done, fail) => {
+    child.once("error", (e) => { clearTimeout(timer); fail(e); });
+    child.once("close", (code) => { clearTimeout(timer); done(code); });
+  });
+  if (timedOut) {
+    throw new Error(
+      `Seed command did not finish within ${Math.round(timeoutMs / 1000)}s and was stopped:\n  ${shown}\n\n` +
+      `If it is meant to start the app rather than seed it, use start_app instead — a seed has to exit before the take can begin.`,
+    );
+  }
+  if (status !== 0) throw new Error(`Seed command failed (exit ${status}):\n  ${shown}`);
 }
 
 async function runEvaluateSeed(page: Page, s: Extract<Seed, { kind: "evaluate" }>, dir: string, log: (l: string) => void) {

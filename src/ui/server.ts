@@ -385,7 +385,6 @@ function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: s
 
 export function serve(port: number) {
   loadDotenv(ROOT);
-  const page = fs.readFileSync(path.join(HERE, "index.html"), "utf8");
   const chatPage = fs.readFileSync(path.join(HERE, "chat.html"), "utf8");
   const guidePage = fs.readFileSync(path.join(HERE, "guide.html"), "utf8");
   const server = http.createServer(async (req, res) => {
@@ -415,10 +414,6 @@ export function serve(port: number) {
       if (p === "/guide" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(guidePage);
-      }
-      if (p === "/classic" && req.method === "GET") {
-        res.writeHead(200, { "content-type": "text/html" });
-        return res.end(page);
       }
       if (p === "/manifest.webmanifest") {
         res.writeHead(200, { "content-type": "application/manifest+json" });
