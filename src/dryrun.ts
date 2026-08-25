@@ -8,7 +8,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { runFileOrCommandSeed, resolvePoint, dragPoints } from "./record.js";
+import { applyPageSetup, authState, dragPoints, gateOnApp, resolvePoint, runEvaluateSeed, runFileOrCommandSeed } from "./record.js";
 import { chromium, type Page, type BrowserContext } from "playwright";
 import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
 
@@ -85,24 +85,23 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     log("dry: seeds skipped (--no-seed) — app state may not match what run will see");
   }
   const browser = await chromium.launch({ headless: true });
+  // Start from the same session run would. Without this, a demo behind a
+  // login was dry-run logged OUT — every selector "missing", or worse, a
+  // green dry against a marketing page and a failed take against the app.
+  const auth = authState(m, manifestDir);
+  if (auth.path) log(auth.fresh ? `dry: reusing session ${path.relative(process.cwd(), auth.path)}` : `dry: no fresh session — auth.setup will have to sign in`);
   const context = await browser.newContext({
     viewport: q.viewport,
     colorScheme: m.colorScheme,
     ...(m.reducedMotion ? { reducedMotion: "reduce" as const } : {}),
+    ...(auth.fresh && auth.path ? { storageState: auth.path } : {}),
   });
 
-  // Whatever the recorder does to the page, dry does too — otherwise dry
-  // proves a layout that will never be filmed, which is the whole "a green dry
-  // is not a green run" problem. This is the page-scale zoom.
-  //
-  // Measured, for the record: `html{zoom}` does NOT move an app's media
-  // queries (innerWidth and clientWidth stay at the viewport width either
-  // way), so it is not by itself the cause of a mobile layout being filmed.
-  // That is why the width reported below is measured from the page rather than
-  // computed as width÷scale — the arithmetic would be a plausible lie.
-  if (q.scale !== 1) {
-    await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="html{zoom:${q.scale}}";document.head.appendChild(st)})`);
-  }
+  // Whatever the recorder injects, dry injects — one function, so the two
+  // cannot drift apart again. (Measured, for the record: `html{zoom}` does
+  // NOT move an app's media queries, which is why the layout width reported
+  // below is asked of the page rather than computed as width÷scale.)
+  await applyPageSetup(context, m, q);
 
   const stubs = new Map<string, Stub>();
   const arm = async (d: Stub) => {
@@ -125,6 +124,17 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     // go network-idle, and the manifest's waitForSelector is the real gate.
     await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
+    // `evaluate` seeds write into the page itself — the panel that only
+    // exists once some state is seeded. Dry skipped them, so dry and run were
+    // literally looking at different apps; that was one of three lost takes
+    // in the field report.
+    if (opts.seed !== false) {
+      for (const sd of m.seed) if (sd.kind === "evaluate") await runEvaluateSeed(page, sd, manifestDir, log);
+    }
+    // The manifest's own readiness gate, with run's wrong-app diagnosis. A dry
+    // run that starts stepping before the app has booted reports selector
+    // failures that are really a race.
+    await gateOnApp(page, m, shotDir);
     layoutWidth = await page.evaluate(() => document.documentElement.clientWidth).catch(() => null);
     for (const s of [...(m.auth?.setup ?? []), ...m.setup]) await run(s, true);
     for (const [i, s] of m.steps.entries()) await run(s, false, i);

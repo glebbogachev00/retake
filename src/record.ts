@@ -12,7 +12,7 @@ import os from "node:os";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { execFileSync, execSync, spawn } from "node:child_process";
-import { chromium, type Page } from "playwright";
+import { chromium, type BrowserContext, type Page } from "playwright";
 import { recordPage, moveCursorToPoint, type PageRecorder } from "testreel";
 import { expandEnv, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
 import { ffmpegBin, videoDuration } from "./render.js";
@@ -94,6 +94,81 @@ export function captureHash(m: Manifest): string {
   const h = createHash("sha1");
   h.update(JSON.stringify({ url: m.url, viewport: q.viewport, scale: q.scale, cursor: q.cursor, wait: m.waitForSelector, reduced: m.reducedMotion, auth: m.auth, seed: m.seed, stub: m.stub, setup: m.setup, steps, speed: m.speed, camera: m.camera, colorScheme: m.colorScheme }));
   return h.digest("hex").slice(0, 12);
+}
+
+
+/** The session a take should start from, and whether it is still good.
+    Shared so `dry` starts signed in exactly when `run` would — a dry run
+    against a logged-out app "proving" a manifest is a wasted take waiting
+    to happen. */
+export function authState(m: Manifest, manifestDir: string): { path: string | null; fresh: boolean } {
+  const p = m.auth ? path.resolve(manifestDir, expandEnv(m.auth.storageState)) : null;
+  const fresh = !!p && fs.existsSync(p) && (Date.now() - fs.statSync(p).mtimeMs) / 3.6e6 < (m.auth?.maxAgeHours ?? 72);
+  return { path: p, fresh };
+}
+
+/** Everything injected into a page before it loads.
+ *
+ * ONE function, called by both the recorder and the dry run, because the
+ * expensive failure in this tool is a green `dry` followed by a failed `run`
+ * — and every knob only one of them applied was a way for dry to prove a
+ * different app than run would film. A knob added here reaches both by
+ * construction; a knob added to one call site is the bug this replaces. */
+export async function applyPageSetup(context: BrowserContext, m: Manifest, q: Resolved): Promise<void> {
+  // The page lays out at `scale`× (CSS zoom): the app sees a smaller viewport
+  // and renders crisp into the full canvas. Coordinates testreel/Playwright
+  // see are already video pixels, so cursor and clicks line up.
+  // Scale via a <style> tag, not an inline attribute: React hydration diffs
+  // element attributes against the server HTML, so style.zoom on <html> made
+  // every React app report a hydration mismatch — with a dev badge in shot.
+  if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="html{zoom:${q.scale}}";document.head.appendChild(st)})`);
+  // One page is what gets recorded, so keep the flow in it: window.open
+  // navigates in place, and target=_blank is stripped as it appears. A demo
+  // that spawned a second tab used to simply lose its subject.
+  if (m.keepInTab) {
+    await context.addInitScript(`
+      (() => {
+        const orig = window.open;
+        window.open = function (url) { if (url) { location.href = String(url); return window; } return orig.apply(window, arguments); };
+        const strip = (root) => { for (const a of root.querySelectorAll ? root.querySelectorAll('a[target="_blank"]') : []) a.removeAttribute('target'); };
+        addEventListener('DOMContentLoaded', () => {
+          strip(document);
+          new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) strip(n); }).observe(document.documentElement, { childList: true, subtree: true });
+        });
+      })();
+    `);
+  }
+    // Dev servers decorate themselves — Next's issues badge, Vite's error
+  // overlay, webpack's. None of that belongs in a product video, and no
+  // manifest should have to know about it.
+  await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="nextjs-portal,#__next-build-watcher,vite-error-overlay,#webpack-dev-server-client-overlay,#react-refresh-overlay{display:none!important}";document.head.appendChild(st)})`);
+}
+
+
+/** The manifest's own readiness gate, with the wrong-app diagnosis attached.
+    Both the recorder and `dry` wait on it: a dry run that starts stepping
+    before the app has booted reports selector failures that are really a
+    race, and it should refuse a wrong build for the same reason run does. */
+export async function gateOnApp(page: Page, m: Manifest, outDir: string): Promise<void> {
+  if (m.waitForSelector) {
+    try {
+      await page.waitForSelector(m.waitForSelector, { timeout: 20_000 });
+    } catch {
+      // Almost never a bad selector — almost always the wrong app on the
+      // port: a stale dev server, a different build, a login wall, a
+      // marketing page. Say THAT, with what is actually there.
+      let saw = "", title = "";
+      try { title = await page.title(); saw = (await page.evaluate(() => document.body?.innerText ?? "")).replace(/\s+/g, " ").trim().slice(0, 200); } catch { /* page gone */ }
+      try { await page.screenshot({ path: path.join(outDir, "not-the-app.png"), fullPage: true }); } catch { /* ignore */ }
+      throw new Error(
+        `the app at ${m.url} is not what this manifest expects: waited 20s for \`${m.waitForSelector}\` and it never appeared.\n` +
+        `  page title: ${title || "(none)"}\n` +
+        `  on screen: ${saw ? `“${saw}”` : "(nothing)"}\n` +
+        `  picture: ${path.relative(process.cwd(), path.join(outDir, "not-the-app.png"))}\n` +
+        `  Usually the port is serving a different build or mode — restart the app and check the URL in a browser before re-running.`,
+      );
+    }
+  }
 }
 
 export type RecordOptions = {
@@ -245,8 +320,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const size = { ...q.viewport };
   // A saved session (auth.storageState) means the login already happened on an
   // earlier run: load it and the setup login steps can be skipped.
-  const statePath = m.auth ? path.resolve(opts.manifestDir, expandEnv(m.auth.storageState)) : null;
-  const stateFresh = !!statePath && fs.existsSync(statePath) && (Date.now() - fs.statSync(statePath).mtimeMs) / 3.6e6 < (m.auth?.maxAgeHours ?? 72);
+  const { path: statePath, fresh: stateFresh } = authState(m, opts.manifestDir);
   if (statePath) log(stateFresh ? `auth: reusing session ${path.relative(process.cwd(), statePath)}` : `auth: no fresh session — running setup to sign in`);
   // No session and nothing that could create one: stop here rather than record
   // a logged-out take that passes every check.
@@ -258,33 +332,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     recordVideo: { dir: rawDir, size },
     ...(stateFresh && statePath ? { storageState: statePath } : {}),
   });
-  // The page lays out at `scale`× (CSS zoom): the app sees a smaller viewport
-  // and renders crisp into the full canvas. Coordinates testreel/Playwright
-  // see are already video pixels, so cursor and clicks line up.
-  // Scale via a <style> tag, not an inline attribute: React hydration diffs
-  // element attributes against the server HTML, so style.zoom on <html> made
-  // every React app report a hydration mismatch — with a dev badge in shot.
-  if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="html{zoom:${q.scale}}";document.head.appendChild(st)})`);
-  // One page is what gets recorded, so keep the flow in it: window.open
-  // navigates in place, and target=_blank is stripped as it appears. A demo
-  // that spawned a second tab used to simply lose its subject.
-  if (m.keepInTab) {
-    await context.addInitScript(`
-      (() => {
-        const orig = window.open;
-        window.open = function (url) { if (url) { location.href = String(url); return window; } return orig.apply(window, arguments); };
-        const strip = (root) => { for (const a of root.querySelectorAll ? root.querySelectorAll('a[target="_blank"]') : []) a.removeAttribute('target'); };
-        addEventListener('DOMContentLoaded', () => {
-          strip(document);
-          new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) strip(n); }).observe(document.documentElement, { childList: true, subtree: true });
-        });
-      })();
-    `);
-  }
-    // Dev servers decorate themselves — Next's issues badge, Vite's error
-  // overlay, webpack's. None of that belongs in a product video, and no
-  // manifest should have to know about it.
-  await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="nextjs-portal,#__next-build-watcher,vite-error-overlay,#webpack-dev-server-client-overlay,#react-refresh-overlay{display:none!important}";document.head.appendChild(st)})`);
+  await applyPageSetup(context, m, q);
 
   // Canned responses live in a map the route handler reads on every request, so
   // a `stub` step mid-demo swaps the answer without re-registering anything.
@@ -363,25 +411,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         if (s.kind === "evaluate") await runEvaluateSeed(page, s, opts.manifestDir, log);
       }
     }
-    if (m.waitForSelector) {
-      try {
-        await page.waitForSelector(m.waitForSelector, { timeout: 20_000 });
-      } catch {
-        // Almost never a bad selector — almost always the wrong app on the
-        // port: a stale dev server, a different build, a login wall, a
-        // marketing page. Say THAT, with what is actually there.
-        let saw = "", title = "";
-        try { title = await page.title(); saw = (await page.evaluate(() => document.body?.innerText ?? "")).replace(/\s+/g, " ").trim().slice(0, 200); } catch { /* page gone */ }
-        try { await page.screenshot({ path: path.join(opts.outDir, "not-the-app.png"), fullPage: true }); } catch { /* ignore */ }
-        throw new Error(
-          `the app at ${m.url} is not what this manifest expects: waited 20s for \`${m.waitForSelector}\` and it never appeared.\n` +
-          `  page title: ${title || "(none)"}\n` +
-          `  on screen: ${saw ? `“${saw}”` : "(nothing)"}\n` +
-          `  picture: ${path.relative(process.cwd(), path.join(opts.outDir, "not-the-app.png"))}\n` +
-          `  Usually the port is serving a different build or mode — restart the app and check the URL in a browser before re-running.`,
-        );
-      }
-    }
+    await gateOnApp(page, m, opts.outDir);
 
     // Playwright's video begins at the first *painted* frame, not at newPage().
     // On a dev server that can be seconds later; if testreel's cursor overlay is
@@ -1017,7 +1047,7 @@ export async function runSeedCommand(cmd: string, shown: string, dir: string, ti
   if (status !== 0) throw new Error(`Seed command failed (exit ${status}):\n  ${shown}`);
 }
 
-async function runEvaluateSeed(page: Page, s: Extract<Seed, { kind: "evaluate" }>, dir: string, log: (l: string) => void) {
+export async function runEvaluateSeed(page: Page, s: Extract<Seed, { kind: "evaluate" }>, dir: string, log: (l: string) => void) {
   const data = s.from ? JSON.parse(fs.readFileSync(path.resolve(dir, s.from), "utf8")) : undefined;
   log(`seed: evaluate${s.from ? ` (${s.from})` : ""}`);
   await page.evaluate(

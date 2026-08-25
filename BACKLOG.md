@@ -102,11 +102,12 @@ transitions, filters, stock intros — the video-editor line stays drawn.
   to Playwright's device descriptors (viewport, scale factor, user agent,
   touch), plus a `retake devices` table. Vertical output already exists; what's
   missing is the page rendering as a phone would. About a day.
-- **Linux.** Hardware presets now fall back to x264 off macOS; nothing else has
-  been run there beyond CI's typecheck and tests. A real recording on Linux
-  would tell us what else assumes a Mac (`open -R` for Show in Finder does).
-
 ## Later
+
+- **Linux.** Hardware presets fall back to x264 off macOS; nothing else has
+  been run there beyond CI's typecheck and tests. A real recording on Linux
+  would say what else assumes a Mac (`open -R` for Show in Finder does).
+  Parked deliberately: worth doing when someone asks for it, not before.
 
 - **Multi-tab recording.** Retake records one page; `keepInTab` folds most
   popups back into it. OAuth flows and apps that need a second window to keep
