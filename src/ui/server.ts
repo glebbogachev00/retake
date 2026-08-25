@@ -35,7 +35,7 @@ import { applyEdits, receiptsFor } from "../edits.js";
 import { dryRun } from "../dryrun.js";
 import { startOperator, getSession, addPending, answerPending, markDone, stopSession } from "../operator/run.js";
 import { ffmpegBin, gifskiBin, makeGif } from "../render.js";
-import { captureHash } from "../record.js";
+import { captureHash, restorePrevious } from "../record.js";
 import { digest } from "../digest.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
@@ -201,6 +201,10 @@ function listDemos(project?: string) {
       // Capture lands in a second "localhost:3100" fold next to "capture".
       const assigned = assignments[name] ?? (url ? byUrl.get(url) : undefined);
       const group = assigned ? path.basename(assigned) : shortGroup(url);
+      // Heal a folder whose run was killed mid-recording: the previous take is
+      // in its stash and nothing has put it back yet. The window must never
+      // show someone an empty demo when their recording is safe on disk.
+      if (!fs.existsSync(path.join(outRoot(), name, "take.json"))) restorePrevious(path.join(outRoot(), name));
       const take = path.join(outRoot(), name, "take.json");
       let lastTake: unknown = null;
       // Does the browser need to run again, or is a re-render enough? The

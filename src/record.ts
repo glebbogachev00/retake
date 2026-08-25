@@ -694,6 +694,144 @@ async function resolveCamera(page: Page, m: Manifest, q: Resolved, step: Extract
   }
 }
 
+
+/** A previous take is not rubbish until a new one exists to replace it — and
+ *  even then it might have been the better one.
+ *
+ * Two separate problems, one mechanism.
+ *
+ * 1. `run` used to delete the output folder and THEN start the browser, so any
+ *    failure in between — a crash, a Ctrl-C, a closed pipe, a dev server
+ *    serving the wrong app — left the person with neither the new take nor the
+ *    old one. Losing a good recording to a FAILED attempt is the most
+ *    expensive thing this tool can do to someone.
+ * 2. Even a successful re-record threw the previous take away, and you cannot
+ *    tell whether the new one is better until you have watched it.
+ *
+ * So old artifacts move aside before recording and, on success, become
+ * history rather than rubbish.
+ *
+ * History is deliberately cheap. Measured across 37 real demos: 506 MB total,
+ * of which 345 MB is DERIVED — master.mp4, demo.mp4, stills, thumbnails all
+ * re-render from take.json plus the raw recording in seconds. So a kept
+ * version stores only those two. The largest demo here costs 41 MB a version
+ * instead of 139 MB, and stays fully recoverable.
+ */
+const STASH = ".previous";
+const HISTORY = ".history";
+
+/** How many previous takes of a demo to keep, and the ceiling on their total
+    size. Small on purpose: this runs on machines whose disks fill up. */
+export const KEEP_TAKES = 2;
+export const HISTORY_BUDGET_MB = 400;
+
+/** Put back a stash left by a run that died. Call before anything else. */
+export function restorePrevious(outDir: string): boolean {
+  const stash = path.join(outDir, STASH);
+  if (!fs.existsSync(stash)) return false;
+  for (const f of fs.readdirSync(stash)) {
+    const to = path.join(outDir, f);
+    fs.rmSync(to, { recursive: true, force: true });
+    fs.renameSync(path.join(stash, f), to);
+  }
+  fs.rmSync(stash, { recursive: true, force: true });
+  return true;
+}
+
+/** Move the current artifacts aside, keeping the lock and the chosen poster. */
+export function stashPrevious(outDir: string): void {
+  fs.mkdirSync(outDir, { recursive: true });
+  restorePrevious(outDir); // a stash from an earlier crash comes back first
+  const keep = new Set([".retake-lock", STASH, HISTORY, ".poster"]);
+  const files = fs.readdirSync(outDir).filter((f) => !keep.has(f));
+  if (!files.length) return;
+  const stash = path.join(outDir, STASH);
+  fs.mkdirSync(stash, { recursive: true });
+  for (const f of files) fs.renameSync(path.join(outDir, f), path.join(stash, f));
+}
+
+export type KeptTake = { id: string; at: string; seconds: number; steps: number; ok: boolean; mb: number; video: string | null };
+
+/** The kept versions of this demo, newest first. */
+export function keptTakes(outDir: string): KeptTake[] {
+  const root = path.join(outDir, HISTORY);
+  if (!fs.existsSync(root)) return [];
+  const out: KeptTake[] = [];
+  for (const id of fs.readdirSync(root).sort().reverse()) {
+    const dir = path.join(root, id);
+    try {
+      const t = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8")) as Take;
+      const vid = fs.readdirSync(dir).find((f) => f.endsWith(".webm"));
+      let bytes = 0;
+      for (const f of fs.readdirSync(dir)) bytes += fs.statSync(path.join(dir, f)).size;
+      out.push({
+        id, at: t.finishedAt ?? id, seconds: Math.round(t.duration - t.trimBefore),
+        steps: t.timeline?.length ?? 0, ok: !!t.ok, mb: Math.round(bytes / 1e5) / 10,
+        video: vid ? path.join(dir, vid) : null,
+      });
+    } catch { /* an unreadable version is not worth keeping */ }
+  }
+  return out;
+}
+
+/** The new take is real. Keep the old one as a version — recording only, since
+    everything else re-renders — and prune to the budget. */
+export function keepPrevious(outDir: string, log?: (l: string) => void): void {
+  const stash = path.join(outDir, STASH);
+  if (!fs.existsSync(stash)) return;
+  try {
+    const takeFile = path.join(stash, "take.json");
+    const raw = fs.readdirSync(stash).find((f) => f.endsWith(".webm"));
+    const prev = fs.existsSync(takeFile) ? (JSON.parse(fs.readFileSync(takeFile, "utf8")) as Take) : null;
+    // A failed take is not worth a version: nobody wants to go back to it.
+    if (prev?.ok && raw) {
+      const id = (prev.finishedAt ?? new Date().toISOString()).replace(/[:.]/g, "-").slice(0, 19);
+      const dir = path.join(outDir, HISTORY, id);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.renameSync(takeFile, path.join(dir, "take.json"));
+      fs.renameSync(path.join(stash, raw), path.join(dir, raw));
+      // take.json points at the raw video by absolute path; keep it findable.
+      const moved = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8")) as Take;
+      moved.video = path.join(dir, raw);
+      fs.writeFileSync(path.join(dir, "take.json"), JSON.stringify(moved));
+      log?.(`kept the previous take as a version (${id})`);
+    }
+    pruneHistory(outDir, log);
+  } catch { /* history is a courtesy; never fail a good take over it */ }
+  fs.rmSync(stash, { recursive: true, force: true });
+}
+
+/** Keep it small: the newest KEEP_TAKES, and under the size budget. */
+export function pruneHistory(outDir: string, log?: (l: string) => void): void {
+  let kept = keptTakes(outDir);
+  const drop = (k: KeptTake, why: string) => {
+    fs.rmSync(path.join(outDir, HISTORY, k.id), { recursive: true, force: true });
+    log?.(`dropped version ${k.id} (${why})`);
+  };
+  for (const k of kept.slice(KEEP_TAKES)) drop(k, `only the last ${KEEP_TAKES} are kept`);
+  kept = kept.slice(0, KEEP_TAKES);
+  let total = kept.reduce((n, k) => n + k.mb, 0);
+  while (kept.length && total > HISTORY_BUDGET_MB) {
+    const oldest = kept.pop()!;
+    drop(oldest, `history over ${HISTORY_BUDGET_MB} MB`);
+    total -= oldest.mb;
+  }
+}
+
+/** Bring a kept version back as the current take. The caller re-renders. */
+export function restoreKept(outDir: string, id: string): boolean {
+  const dir = path.join(outDir, HISTORY, id);
+  if (!fs.existsSync(path.join(dir, "take.json"))) return false;
+  stashPrevious(outDir);
+  for (const f of fs.readdirSync(dir)) fs.copyFileSync(path.join(dir, f), path.join(outDir, f));
+  const tp = path.join(outDir, "take.json");
+  const t = JSON.parse(fs.readFileSync(tp, "utf8")) as Take;
+  const raw = fs.readdirSync(outDir).find((f) => f.endsWith(".webm"));
+  if (raw) { t.video = path.join(outDir, raw); fs.writeFileSync(tp, JSON.stringify(t)); }
+  fs.rmSync(path.join(outDir, STASH), { recursive: true, force: true });
+  return true;
+}
+
 /** One run per output dir at a time — record AND render. Two overlapping runs
     would wipe each other's files and die with ENOENT halfway. Throws if held. */
 export function acquireLock(outDir: string): true {

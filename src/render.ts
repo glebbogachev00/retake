@@ -18,7 +18,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import YAML from "yaml";
 import { execFile, execFileSync, spawnSync } from "node:child_process";
-import { capSecondsFor } from "./record.js";
+import { capSecondsFor, restorePrevious } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { renderCard, renderCalloutOverlay, renderTitledCover } from "./cards.js";
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
@@ -806,6 +806,11 @@ export function check(outDir: string, m?: Manifest): Check {
   let ok = true;
   const say = (pass: boolean, text: string) => { lines.push(`${pass ? "pass" : "FAIL"}  ${text}`); if (!pass) ok = false; };
   const takePath = path.join(outDir, "take.json");
+  // A run killed outright (a signal, a closed pipe) leaves its predecessor in
+  // the stash with no catch block ever running. Anything that READS the folder
+  // puts it back, so a person looking at it never sees an empty directory and
+  // concludes their take is gone.
+  if (!fs.existsSync(takePath)) restorePrevious(outDir);
   if (!fs.existsSync(takePath)) return { ok: false, lines: ["FAIL  no take.json"] };
   // The same shift render applied, so a nudged scene is not reported as a
   // stall or a caption in the wrong place by a check reading raw times.

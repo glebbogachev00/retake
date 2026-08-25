@@ -25,9 +25,10 @@ import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { Command } from "commander";
 import { loadManifest, resolve, warnings, type Manifest } from "./manifest.js";
-import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, lastCaptureSeconds, record, releaseLock, type Take } from "./record.js";
+import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
+import { applyTidy, mb, planTidy } from "./tidy.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
 
@@ -111,14 +112,17 @@ program
 
     const t0 = Date.now();
     if (!take) {
-      // Wipe everything except the lock.
-      for (const f of fs.readdirSync(outDir)) if (f !== ".retake-lock") fs.rmSync(path.join(outDir, f), { recursive: true, force: true });
+      // The previous take is moved aside, not deleted: if this recording dies
+      // the person still has the one that worked. See stashPrevious.
+      stashPrevious(outDir);
       try {
         take = await record(manifest, { until: opts.until, outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
       } catch (e) {
+        if (restorePrevious(outDir)) say("↩ recording failed — your previous take has been put back");
         releaseLock(outDir);
         throw e;
       }
+      keepPrevious(outDir, say);
     }
     say(`■ take done in ${((Date.now() - t0) / 1000).toFixed(1)}s · ${take.ok ? "all steps ok" : "SOME STEPS FAILED"} · ${take.video ?? "no video"}`);
 
@@ -139,6 +143,70 @@ program
     }
     if (take.partial) say(`⚠ partial take — ${take.partial}`);
     if (!take.ok || !take.video) process.exitCode = 2;
+  });
+
+
+program
+  .command("takes")
+  .description("the kept versions of a demo — previous recordings you can go back to")
+  .argument("<dir>", "an outputs/<name> dir")
+  .action((dir: string) => {
+    const kept = keptTakes(path.resolve(dir));
+    if (!kept.length) { say(`no kept versions of ${path.basename(dir)} — the current take is the only one.`); return; }
+    say(`kept versions of ${path.basename(dir)} (newest first). Only the recording is stored; everything else re-renders.`);
+    for (const k of kept) say(`  ${k.id}  ${k.seconds}s · ${k.steps} steps · ${k.mb} MB`);
+    say(`\nGo back to one:  retake restore ${path.relative(process.cwd(), dir)} <id>`);
+  });
+
+program
+  .command("restore")
+  .description("make a kept version the current take again, and re-render it")
+  .argument("<dir>", "an outputs/<name> dir")
+  .argument("<id>", "a version id from `retake takes`")
+  .argument("[manifest]", "manifest to render with (default demos/<name>.yaml)")
+  .action(async (dir: string, id: string, manifestFile?: string) => {
+    const outDir = path.resolve(dir);
+    const name = path.basename(outDir);
+    acquireLock(outDir);
+    try {
+      if (!restoreKept(outDir, id)) throw new Error(`no version "${id}" of ${name} — \`retake takes ${path.relative(process.cwd(), outDir)}\` lists them`);
+      say(`restored ${id} as the current take`);
+      const file = manifestFile ?? path.join("demos", `${name}.yaml`);
+      if (!fs.existsSync(file)) { say(`re-render it with:  retake render ${path.relative(process.cwd(), outDir)} <manifest>`); return; }
+      const { manifest } = loadManifest(file);
+      const take = JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take;
+      const a = await render(manifest, take, outDir, { log: (l) => { if (!l.startsWith("$")) say(l); } });
+      for (const f of [a.master, a.mp4, a.thumbnail, a.proofLog]) if (f) say(`✓ ${path.relative(process.cwd(), f)}`);
+    } finally {
+      releaseLock(outDir);
+    }
+  });
+
+
+program
+  .command("tidy")
+  .description("reclaim disk from outputs — shows what it would remove; nothing goes without --apply")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("--apply", "actually remove them", false)
+  .option("--deep", "also remove demo.mp4 (still re-renderable, but it is the deliverable)", false)
+  .option("--orphans", "also remove whole folders whose manifest is gone", false)
+  .action((opts: { out: string; apply: boolean; deep: boolean; orphans: boolean }) => {
+    const root = path.resolve(opts.out);
+    const plan = planTidy(root, { deep: opts.deep, orphans: opts.orphans, demosDir: path.resolve("demos") });
+    if (!plan.bytes) { say(`nothing to reclaim in ${path.relative(process.cwd(), root)} — ${mb(plan.keptBytes)} of recordings and deliverables, all of it worth keeping.`); return; }
+    for (const g of plan.groups) {
+      say(`${mb(g.bytes).padStart(8)}  ${g.what} — ${g.why}`);
+      for (const f of g.files.slice(0, 4)) say(`          ${path.relative(root, f)}`);
+      if (g.files.length > 4) say(`          … and ${g.files.length - 4} more`);
+    }
+    say(`${mb(plan.bytes).padStart(8)}  TOTAL reclaimable · ${mb(plan.keptBytes)} kept (raw recordings and take.json — the only things a re-render cannot rebuild)`);
+    if (!opts.apply) {
+      say(`\nNothing removed. Run again with --apply.`);
+      if (!opts.deep) say(`--deep also drops demo.mp4 · --orphans also drops folders whose manifest is gone`);
+      return;
+    }
+    const freed = applyTidy(plan);
+    say(`\nfreed ${mb(freed)}. Every demo can still be rebuilt with \`retake render outputs/<name>\`.`);
   });
 
 program

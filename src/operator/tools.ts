@@ -20,7 +20,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import YAML from "yaml";
 import { loadManifest, resolve } from "../manifest.js";
-import { record, captureHash, acquireLock, releaseLock, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
+import { record, captureHash, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
 import { render, check, ffmpegBin } from "../render.js";
 import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
@@ -332,9 +332,18 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   const outDir = path.join(OUT, name);
   acquireLock(outDir);
   try {
-    for (const f of fs.existsSync(outDir) ? fs.readdirSync(outDir) : []) if (f !== ".retake-lock") fs.rmSync(path.join(outDir, f), { recursive: true, force: true });
+    // Moved aside, not deleted: a failed recording must not cost the person
+    // the take they already had.
+    stashPrevious(outDir);
     await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);
-    const take = await record(manifest, { outDir, manifestDir: DEMOS, locked: true, until, log: () => {} });
+    let take: Take;
+    try {
+      take = await record(manifest, { outDir, manifestDir: DEMOS, locked: true, until, log: () => {} });
+    } catch (e) {
+      if (restorePrevious(outDir)) await tell("Recording failed — your previous take has been put back.");
+      throw e;
+    }
+    keepPrevious(outDir, (l) => void tell(l));
     await tell(`Rendering…`);
     const a = await render(manifest, take, outDir, {});
     const c = check(outDir, manifest);

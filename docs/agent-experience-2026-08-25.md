@@ -138,3 +138,71 @@ obvious on sight.
 
 That is the strongest argument for this tool, and it is not the argument the
 docs make.
+
+---
+
+# Update after 0.4.x — better, and one new top finding
+
+Re-recorded both demos against the updated build. **`actionFits` and the
+1280px breakpoint re-check both paid off immediately.** The second demo cost
+one failed dry run and *zero* failed takes; the equivalent last session was
+three captures. `dry-failed-*.png` is doing real work — I diagnosed a wrong
+page state from the screenshot without recording anything.
+
+Revised: **efficiency 5 → 7**, **error-resistance 6 → 8**. Equipped and
+structured stay at 9.
+
+## The new top recommendation: print the CSS width
+
+Ahead of everything else now, because **three separate incidents traced to it
+in one session**:
+
+1. A take died at step 57 because `post-landscape` (1920 at scale 2) gave the
+   app a 960px window — under the site's 1020px breakpoint — so it rendered its
+   *mobile* layout.
+2. Fixing that with a 1920 viewport silently reframed the demo. The client
+   noticed the UI had shrunk; I had reported the resolution and not the
+   framing, because I was not thinking in CSS px at all.
+3. Fixing *that*, I set `viewport: 1440` believing scale multiplied up. It
+   divides. The app got a 1080px window, below another breakpoint. The width
+   check caught it; I did not.
+
+The run header prints `page scale 1.3333×`. The number a person reasons about
+is **the width the app was given**, and it is the only one not shown.
+
+```
+preset post-landscape · canvas 1920×1080 · page 1440×810 CSS · 30fps
+```
+
+That one field turns all three of the above into a glance. It is derivable
+before a frame is captured, so it belongs in `dry` too.
+
+Related: **the viewport is the output canvas and `scale` divides it.** That is
+in a source comment in `presets.ts` and nowhere a manifest author will look.
+Worth a line in the skill, because getting it backwards silently changes which
+UI is filmed rather than failing.
+
+## Second new finding: fragment-only navigation does not reload
+
+`navigate` from `…/operations#/a` to `…/operations#/b` does not reload the
+document, so an SPA keeps whatever state the last action left in memory and a
+freshly-registered stub is never fetched. The page then looks plausible and is
+stale, which is the worst kind of wrong.
+
+Cost two dry runs. Statically knowable: compare consecutive `navigate` URLs and
+warn when only the fragment differs.
+
+The full-flow demo hid this for days because it bounces between `/operator` and
+`/operations` — real page loads. The moment a demo stays inside one SPA, it
+bites.
+
+## Still open from the original report
+
+- **Stub coverage in the proof log.** "My stub did not take effect" was the
+  symptom above. Listing stubs that matched zero requests would have named it
+  in seconds.
+- **A picture at a stall.** The stall check works — it caught 25.5s at 0:56 on
+  a scroll, which I would otherwise have shipped. But a timestamp alone leaves
+  "re-record and hope"; I still do not know whether that one was the machine or
+  the page. A frame grab would settle it, the way `dry` now does.
+- **Scene-label uniqueness.** Still unchecked.
