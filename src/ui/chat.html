@@ -148,6 +148,22 @@
   .rel li { margin:4px 0; font-size:13.5px; line-height:1.55; color:var(--muted); }
   .rel:not(.latest) li { opacity:.8; }
   .chip .ndot { display:inline-block; width:6px; height:6px; border-radius:99px; background:var(--accent,#e8b04b); margin-left:6px; vertical-align:middle; }
+  .lib h2 { display:flex; align-items:center; gap:8px; }
+  .lib h2 .selbtn { margin-left:auto; border:1px solid var(--rule2); background:#fff; color:var(--muted); border-radius:8px; font-size:11.5px; padding:3px 9px; cursor:pointer; line-height:1.4; }
+  .lib h2 .selbtn:hover { border-color:var(--ink); color:var(--ink); }
+  .lib h2 .selbtn.on { background:var(--ink); border-color:var(--ink); color:#fff; }
+  .demo .pick { display:none; width:15px; height:15px; margin-right:2px; accent-color:var(--ink); flex:none; cursor:pointer; }
+  body.selecting .demo .pick { display:inline-block; }
+  body.selecting .demo .zap { display:none; }
+  body.selecting .demo { cursor:pointer; }
+  .selbar { position:sticky; bottom:0; margin-top:10px; padding:10px 12px; background:var(--paper); border-top:1px solid var(--rule2); display:flex; align-items:center; gap:9px; }
+  .selbar small { color:var(--muted); font-size:12px; }
+  .selbar .sp { flex:1; }
+  .selbar button { border:1px solid var(--rule2); background:#fff; border-radius:8px; font-size:12px; padding:5px 11px; cursor:pointer; }
+  .selbar button:hover { border-color:var(--ink); }
+  .selbar button.go { background:var(--bad); border-color:var(--bad); color:#fff; }
+  .selbar button.go:disabled { opacity:.4; cursor:default; }
+  .selbar button.go:not(:disabled):hover { filter:brightness(.92); }
 </style>
 </head>
 <body>
@@ -196,7 +212,7 @@
     </div>
     </div>
     <aside class="lib" id="lib" style="display:none">
-      <h2 id="libTtl">Library</h2>
+      <h2><span id="libTtl">Library</span><button class="selbtn" id="selBtn" title="Pick several to archive at once">Select</button></h2>
       <div id="demos"></div>
     </aside>
   </div>
@@ -401,8 +417,15 @@ async function drawDemos() {
       el.className = 'demo' + (p.name === current ? ' on' : '');
       const dot = p.lastTake ? (p.lastTake.ok && !p.lastTake.partial ? 'ok' : 'bad') : '';
       const when = p.lastTake ? new Date(p.lastTake.finishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no take yet';
-      el.innerHTML = `<span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small><button class="zap" title="Archive this demo">✕</button>`;
-      el.onclick = () => { if (p.lastTake) pin(p.name); };
+      el.innerHTML = `<input type="checkbox" class="pick"${picked.has(p.name) ? ' checked' : ''}><span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small><button class="zap" title="Archive this demo">✕</button>`;
+      const box = el.querySelector('.pick');
+      box.onclick = (ev) => { ev.stopPropagation(); box.checked ? picked.add(p.name) : picked.delete(p.name); drawSelBar(); };
+      el.onclick = () => {
+        // In select mode the whole row is the checkbox — hunting for a 15px
+        // target is exactly the fiddliness this is meant to remove.
+        if (selecting) { box.checked = !box.checked; box.checked ? picked.add(p.name) : picked.delete(p.name); drawSelBar(); return; }
+        if (p.lastTake) pin(p.name);
+      };
       el.querySelector('.zap').onclick = async (ev) => {
         ev.stopPropagation();
         // Archive, not destroy — but moving someone's work still deserves a beat.
@@ -416,7 +439,58 @@ async function drawDemos() {
     $('demos').appendChild(det);
   }
   await drawArchive();
+  drawSelBar();
 }
+
+
+// Bulk archive. Off by default: a list you can accidentally multi-select from
+// is worse than one that needs a deliberate "Select" first.
+let selecting = false;
+const picked = new Set();
+
+function drawSelBar() {
+  const old = document.querySelector('.selbar'); if (old) old.remove();
+  if (!selecting) return;
+  const bar = document.createElement('div');
+  bar.className = 'selbar';
+  const n = picked.size;
+  bar.innerHTML = `<small>${n ? n + ' selected' : 'none selected'}</small><span class="sp"></span>` +
+    `<button id="selAll">${n === demos.length ? 'None' : 'All'}</button>` +
+    `<button class="go" id="selGo"${n ? '' : ' disabled'}>Archive${n ? ' ' + n : ''}</button>`;
+  $('lib').appendChild(bar);
+  bar.querySelector('#selAll').onclick = () => {
+    if (picked.size === demos.length) picked.clear(); else for (const d of demos) picked.add(d.name);
+    for (const b of document.querySelectorAll('.demo .pick')) b.checked = picked.has(b.parentElement.querySelector('.nm').textContent);
+    drawSelBar();
+  };
+  bar.querySelector('#selGo').onclick = async () => {
+    const names = [...picked];
+    if (!names.length) return;
+    if (!(await ask(`Archive ${names.length} demo${names.length === 1 ? '' : 's'}?`,
+      names.slice(0, 8).join(', ') + (names.length > 8 ? ` and ${names.length - 8} more` : '') +
+      '. Their videos are removed. The demos move to the archive below and can be restored any time.', 'Archive'))) return;
+    const failed = [];
+    for (const nm of names) {
+      try { await api('/api/demos/' + nm, { method: 'DELETE' }); } catch (e) { failed.push(nm + ' (' + e.message + ')'); }
+    }
+    if (current && picked.has(current)) { current = null; $('pin').classList.remove('show'); }
+    picked.clear();
+    selecting = false;
+    document.body.classList.remove('selecting');
+    $('selBtn').classList.remove('on');
+    await drawDemos();
+    if (failed.length) alert('Could not archive:\n' + failed.join('\n'));
+  };
+}
+
+$('selBtn').onclick = () => {
+  selecting = !selecting;
+  picked.clear();
+  document.body.classList.toggle('selecting', selecting);
+  $('selBtn').classList.toggle('on', selecting);
+  $('selBtn').textContent = selecting ? 'Done' : 'Select';
+  drawDemos();
+};
 
 async function drawArchive() {
   let items = [];

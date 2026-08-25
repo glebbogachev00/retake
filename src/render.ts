@@ -951,7 +951,9 @@ function renderProof(m: Manifest, take: Take, q: Resolved, a: Partial<Artifacts>
     // move an app's media queries, so width÷scale would be a plausible lie.
     // Named outright because a responsive app serves a different layout below
     // a breakpoint, and this is the number that explains which one you filmed.
-    ...(take.layoutWidth ? [`- Page laid out at: **${take.layoutWidth} CSS px** wide — the width this app's own breakpoints saw.`] : []),
+    ...(take.contentWidth && take.layoutWidth && take.contentWidth !== take.layoutWidth
+      ? [`- Page width: content had **${take.contentWidth} CSS px** of room (viewport ${take.layoutWidth} ÷ ${q.scale}× scale), while media queries read **${take.layoutWidth} px**. A responsive app therefore renders its DESKTOP layout squeezed into ${take.contentWidth}px rather than switching to mobile — if this take looks cramped, that is why, and \`scale: 1\` is the fix.`]
+      : take.layoutWidth ? [`- Page laid out at: **${take.layoutWidth} CSS px** wide.`] : []),
     `- Started: ${take.startedAt}`,
     `- Finished: ${take.finishedAt}`,
     `- Result: **${take.ok ? "all steps passed" : "some steps failed"}**${take.partial ? ` · **partial** — ${take.partial}` : ""}`,

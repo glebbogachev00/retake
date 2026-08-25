@@ -64,10 +64,13 @@ export type Take = {
   captureHash?: string;
   /** Wall-clock seconds the recording took (browser open → closed). */
   captureSec?: number;
-  /** The CSS width the page actually laid out at — measured, because `zoom`
-      does not move an app's media queries and width÷scale would be a guess.
-      This is the number that says which layout got filmed. */
+  /** What the app's media queries saw (documentElement.clientWidth). */
   layoutWidth?: number;
+  /** The CSS width of actual LAYOUT SPACE the content got — viewport ÷ scale.
+      Measured to be the real constraint: at scale 2 a width:100% element gets
+      half the room while the media queries still read full width, so a
+      desktop layout comes out cramped rather than switching to mobile. */
+  contentWidth?: number;
   /** Files the run downloaded, saved under outputs/<name>/downloads/. */
   downloads?: string[];
   /** Endpoints answered with canned data during this take. Named in the proof
@@ -392,6 +395,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   let video: string | undefined;
   let screenshots: string[] = [];
   let layoutWidth: number | undefined;
+  let contentWidth: number | undefined;
   let t0 = Date.now();
   let setupEnd = t0;
   let endMs = t0;
@@ -419,11 +423,17 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // go network-idle, and the manifest's waitForSelector is the real gate.
     await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
-    // The width this app's own breakpoints saw. Measured rather than computed
-    // from the preset: `zoom` does not move media queries, so width÷scale
-    // would be a confident wrong answer. The proof log reports this one, so a
-    // take filmed against a mobile layout says so instead of being a mystery.
+    // Two different widths, and the difference is the whole trap.
+    //
+    // Measured, on a real navigation: under `html{zoom:2}` a width:100%
+    // element gets 960 CSS px of LAYOUT SPACE while media queries still
+    // report 1920. So a responsive app does not switch to its mobile layout —
+    // it renders its DESKTOP layout squeezed into half the room, which is
+    // why the result looks wrong in a way no breakpoint explains.
+    //
+    // Both numbers go in the proof log, because either one alone misleads.
     layoutWidth = await page.evaluate(() => document.documentElement.clientWidth).catch(() => undefined);
+    contentWidth = Math.round((q.viewport.width) / q.scale);
     if (!opts.skipSeed) {
       for (const s of m.seed) {
         if (s.kind === "evaluate") await runEvaluateSeed(page, s, opts.manifestDir, log);
@@ -650,6 +660,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     video, screenshots, timeline, duration, startedAt, finishedAt, ok, trimBefore, partial,
     quality: { preset: q.name, width: q.viewport.width, height: q.viewport.height, scale: q.scale, fps: q.fps },
     layoutWidth,
+    contentWidth,
     pageErrors,
     downloads: ctx.downloads,
     stubbed,
