@@ -17,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import YAML from "yaml";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
 import { capSecondsFor } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { renderCard, renderCalloutOverlay, renderTitledCover } from "./cards.js";
@@ -632,6 +632,9 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   // Every scene already carries its real timestamp, so one crisp frame per
   // scene is free — and a video usually ships with a picture next to it.
   let stills: string[] = [];
+  // Every still in ONE ffmpeg pass: a process launch and a fresh decode per
+  // frame cost more than the frames do (7 stills was 3s of pure overhead).
+  const shots: { at: number; file: string }[] = [];
   if (m.outputs.stills) {
     const dir = path.join(outDir, "stills");
     fs.rmSync(dir, { recursive: true, force: true });
@@ -646,12 +649,24 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
       const at = Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
       const base = `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}`;
       const file = path.join(dir, `${base}.png`);
-      ff(["-ss", (at + cardShift).toFixed(2), "-i", mp4, "-frames:v", "1", file], log);
+      shots.push({ at: at + cardShift, file });
       stills.push(file);
       // And the scene's last moment: the caption names what the scene
       // achieves, and that is usually on screen at the end, not the middle.
       const atEnd = Math.min(Math.max(from + 0.4, next - 0.6), Math.max(0, end - 0.2));
-      if (atEnd - at > 0.5) { const fe = path.join(dir, `${base}-end.png`); ff(["-ss", (atEnd + cardShift).toFixed(2), "-i", mp4, "-frames:v", "1", fe], log); stills.push(fe); }
+      if (atEnd - at > 0.5) { const fe = path.join(dir, `${base}-end.png`); shots.push({ at: atEnd + cardShift, file: fe }); stills.push(fe); }
+    }
+    if (shots.length) {
+      // Each still is its own ffmpeg with an INPUT-side seek: `-ss` before
+      // `-i` jumps by keyframe, while one batched process with `-ss` after
+      // `-i` decodes sequentially to every timestamp and is far slower (it
+      // turned 3s of stills into 18s — measured, then reverted). The launches
+      // are independent, so they run at once instead of in a queue.
+      const bin = ffmpegBin();
+      await Promise.all(shots.map((s) => new Promise<void>((done) => {
+        execFile(bin, ["-hide_banner", "-loglevel", "error", "-y", "-ss", s.at.toFixed(2), "-i", mp4, "-frames:v", "1", s.file], () => done());
+      })));
+      stills = stills.filter((f) => fs.existsSync(f));
     }
     if (sc.length) mark(`stills ×${sc.length}`);
   }
