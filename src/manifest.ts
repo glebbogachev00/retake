@@ -84,6 +84,14 @@ export const Step = z.discriminatedUnion("action", [
         slow it down and the viewer can follow what went past. */
     speed: z.number().positive().max(4).optional(),
   }),
+  /** Choose an option in a <select>. A form-heavy app is mostly dropdowns, and
+      without this a demo of one has to fake them with evaluate. */
+  Base.extend({
+    action: z.literal("select"),
+    selector: Selector,
+    /** The option's value, or its visible label — whichever the page uses. */
+    value: z.string(),
+  }),
   Base.extend({
     action: z.literal("zoom"),
     selector: Selector.optional(),

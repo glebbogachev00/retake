@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>form</title>
+<style>body{margin:0;font:17px system-ui;padding:40px;background:#f6f6f3}
+select{font:inherit;padding:8px 12px;border-radius:8px;margin:12px 0;display:block}
+#out{margin-top:20px;padding:14px;border:1px solid #ddd;border-radius:9px;background:#fff}</style>
+<h1>A form-heavy screen</h1>
+<select id="plan"><option value="free">Free</option><option value="pro">Pro</option><option value="team">Team</option></select>
+<select id="seats"><option>1 seat</option><option>5 seats</option><option>20 seats</option></select>
+<div id="out">nothing chosen</div>
+<script>
+const upd=()=>out.textContent=`plan=${plan.value} seats=${seats.value}`;
+plan.onchange=upd; seats.onchange=upd;
+</script>

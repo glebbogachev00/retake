@@ -119,7 +119,7 @@ outputs:
 
 The full template is [`demos/example.yaml`](demos/example.yaml); `retake init` copies it into a new workspace.
 
-**Steps** — `click`, `type`, `fill`, `hover`, `drag`, `scroll`, `keyboard`, `navigate`, `wait`, `waitFor`, `evaluate`, `upload`, `download`, `screenshot`, `scene`. Every step takes `pauseAfter`, `waitFor`, `timeout`, `secret`. Targets are a selector, or a point — `{x, y}` or `{selector, dx, dy}` — for canvases and SVG editors. `${VAR}` expands from `.env` and fails loudly when unset.
+**Steps** — `click`, `type`, `fill`, `select`, `hover`, `drag`, `scroll`, `keyboard`, `navigate`, `wait`, `waitFor`, `evaluate`, `upload`, `download`, `screenshot`, `scene`. Every step takes `pauseAfter`, `waitFor`, `timeout`, `secret`. Targets are a selector, or a point — `{x, y}` or `{selector, dx, dy}` — for canvases and SVG editors. `${VAR}` expands from `.env` and fails loudly when unset.
 
 **Waits** take three modifiers, because a bare selector resolves the moment the element exists: `gone: true` waits for it to leave (the previous action's banner), `minChars: 40` waits for it to hold real text (a streamed reply), `stableMs: 500` waits for its subtree to stop changing.
 

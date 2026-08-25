@@ -111,6 +111,15 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         case "type": await page.locator(step.selector).waitFor({ timeout: short }); await page.locator(step.selector).fill(expandEnv(step.text), { timeout: short }); break;
         case "fill": await page.locator(step.selector).waitFor({ timeout: short }); await page.locator(step.selector).fill(expandEnv(step.text), { timeout: short }); break;
         case "hover": await page.locator(step.selector!).first().hover({ timeout: short }); break;
+        case "select": {
+          // Resolving is not enough: an option that does not exist is the
+          // whole failure mode, so dry proves the value is selectable.
+          const sel = page.locator(step.selector).first();
+          await sel.waitFor({ timeout: short });
+          try { await sel.selectOption(step.value, { timeout: short }); }
+          catch { await sel.selectOption({ label: step.value }, { timeout: short }); }
+          break;
+        }
         case "scroll": if (step.to) await page.locator(step.to).first().boundingBox({ timeout: short }); break;
         case "upload": await page.locator(step.selector).first().waitFor({ timeout: short }); break;
         case "evaluate": await page.evaluate(step.script); break;

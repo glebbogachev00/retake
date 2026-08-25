@@ -707,6 +707,20 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
     case "hover":
       await rec.hover(step.selector!, { timeout });
       break;
+    case "select": {
+      /* Hover first so the cursor actually travels to the control — a value
+         that changes with nothing moving reads as a glitch rather than a
+         choice. Playwright takes the option by value or by visible label, and
+         a page may use either, so try one and fall back to the other. */
+      await rec.hover(step.selector, { timeout });
+      const target = page.locator(step.selector).first();
+      try {
+        await target.selectOption({ value: step.value }, { timeout });
+      } catch {
+        await target.selectOption({ label: step.value }, { timeout });
+      }
+      break;
+    }
     case "scroll": {
       let dy = step.y;
       if (step.to === "top" || step.to === "bottom") {
@@ -763,6 +777,17 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       const dest = path.join(dir, name);
       await dl.saveAs(dest);
       ctx.downloads.push(dest);
+      break;
+    }
+    case "select": {
+      // The cursor travels to it on camera (testreel has no select of its
+      // own), then the option is chosen by value, falling back to its
+      // visible label — a manifest author should not have to know which
+      // one the page uses.
+      await rec.hover(step.selector, { timeout });
+      const sel = page.locator(step.selector).first();
+      try { await sel.selectOption(step.value, { timeout }); }
+      catch { await sel.selectOption({ label: step.value }, { timeout }); }
       break;
     }
     case "waitFor": {
@@ -836,6 +861,8 @@ export function describe(step: Step): string {
       return `fill ${step.selector}${step.secret ? " ••••••" : ""}`;
     case "hover":
       return `hover ${step.selector ?? pointName(step.at)}`;
+    case "select":
+      return `select "${step.value}" in ${step.selector}`;
     case "scroll":
       return step.to ? `scroll to ${step.to} (${step.align})` : `scroll x=${step.x ?? 0} y=${step.y ?? 0}`;
     case "zoom":

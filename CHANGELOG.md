@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.4.0 — 2026-08-25
+
+Sizes stop moving, failures explain themselves, and a cut can be reviewed.
+Two field audits and a second recording session drove all of it.
+
+**Sizes.** One preset now means one output size, always: the caption band
+sits inside the canvas, so `post-landscape` is exactly 1920×1080 rather
+than the four different shapes it was producing (a caption's line count
+was changing the frame height, and manifests set their own viewports).
+Better: the shape is now decided at RENDER — a take is fitted into
+whichever canvas you ask for, so `render outputs/x --preset post-vertical`
+turns a landscape recording into a true 9:16 in seconds. Nobody spends
+tokens re-recording to change a size. `viewport` still works and
+`validate` warns that it makes one demo a different shape from the rest.
+No captions anywhere → no band; the app fills the frame.
+
+Also: square pixels are forced. Playwright's webm carries SAR 1216:1215,
+a half-percent stretch nobody had noticed.
+
+**When something breaks, it says so.**
+- A failed step writes a full-page `failed-step.png` — in `run` AND in
+  `dry`, which is the cheap pass and was handing over less.
+- A manifest whose `waitForSelector` never resolves now says *the app at
+  this URL is not what this manifest expects*, with the page title, the
+  text on screen and a picture — instead of a bare Playwright timeout that
+  sends you hunting through steps that were fine.
+- The app's own errors are recorded with timestamps, and `check` fails a
+  video that ends on one. A take passed every check while ending on "This
+  page couldn't load".
+- `check` reads the timeline that shipped, so `compressIdle` no longer
+  gets videos failed for a stall it already removed.
+
+**Waits that do not lie.** `waitFor` gained `gone: true` (the element is
+the previous action's banner, still on screen), `minChars` (a shell that
+streams its text in) and `stableMs` (there, but still changing). Each cost
+a real take before it existed.
+
+**New step: `select`.** A form-heavy app is mostly dropdowns, and a demo of
+one had to fake them with `evaluate`. Takes the option's value or its
+visible label; `dry` proves the option exists rather than only the element.
+
+**Reviewing.** `retake contact <dir>` writes one timestamped grid of the
+whole video; launch cuts make it automatically. Per-scene stills cannot
+show a caption going false inside its own scene, and carry no clock.
+
+**Revising without destroying.** `render --out <dir>` and `run --name`,
+so a published cut survives its own revision. Outputs keep a copy of the
+manifest they were made from.
+
+**Fixed:** a take that ended soon after its last scene produced no poster
+and killed the render ("all steps ok, but no video"). The window's demo
+list took 2.1s and is now 0.06s — it parsed every manifest twice per
+request, on a call made on load, on every agent event and every 30s.
+
 ## 0.3.0 — 2026-08-23
 
 Logins, done so that no model ever sees a password. And the launch cut:
