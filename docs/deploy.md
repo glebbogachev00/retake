@@ -130,3 +130,20 @@ If the site stops updating, check that before checking the code: compare a
 file you changed (`curl -s https://<domain>/releases.json`) against the
 local one. If the deployment is old rather than the CDN being stale, it is
 a deploy that never ran.
+
+## Cutting a release
+
+npm and GitHub should move together, or the public surfaces disagree about
+what shipped. When `npm publish` goes out:
+
+```bash
+git tag -a v<version> <commit> -m "<one line>"
+git push origin --tags
+gh release create v<version> --title "<version> — <headline>" --notes-file <body> --latest
+```
+
+The body comes from `site/releases.json` — the same words the landing page
+and the Retake window show, so a person reads one description of a release
+wherever they meet it. Tags matter beyond the release page: without them
+nothing in git records what a published version actually was, and an issue
+filed against an old version cannot be reproduced.
