@@ -489,7 +489,7 @@ program
     // here rather than letting it surprise someone after a two-minute take.
     const { bandHeightFor } = await import("./captions.js");
     const outW = q.layout === "card" ? q.width : q.viewport.width;
-    const band = bandHeightFor(q);
+    const band = bandHeightFor(q, manifest.steps.flatMap((s) => (s.action === "scene" && s.caption ? [s.caption] : [])));
     const outH = (q.layout === "card" ? q.height : q.viewport.height) + (q.layout === "band" ? band : 0);
     say(`ok: ${manifest.name} · ${manifest.steps.length} steps · ${manifest.steps.filter((s) => s.action === "scene").length} scenes`);
     say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? (band ? ` (page ${q.viewport.width}×${q.viewport.height} + a ${band}px caption band)` : " (captions off — the page fills the frame)") : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);

@@ -43,9 +43,12 @@ export function captionLines(texts: string[], width: number, fontSize: number): 
 
 /** The band's height for this take: fitted to the text, or the preset's
     fixed band when the canvas is the constraint. 0 when captions are off. */
-export function bandHeightFor(q: Pick<Resolved, "captions" | "layout" | "bandHeight">): number {
+export function bandHeightFor(q: Pick<Resolved, "captions" | "layout" | "bandHeight">, captionTexts?: string[]): number {
   if (q.layout !== "band" && q.layout !== "card") return 0;
   if (!q.captions) return 0;
+  // A band with nothing to draw in it is an empty strip on the video: when
+  // the texts are known and none exist, the page gets the whole frame.
+  if (captionTexts && !captionTexts.some((t) => t && t.trim())) return 0;
   // Fixed per preset. The default page is the canvas minus this, so the
   // finished video is exactly the preset's size — every take the same shape,
   // and no player letterboxing it.

@@ -480,7 +480,11 @@ export function resolve(m: Manifest): Resolved {
   // The page is the canvas minus the caption strip, so the finished video is
   // exactly the preset's size. A manifest may override it, and `warnings()`
   // says out loud that doing so changes the output size.
-  const band = m.captions === false ? 0 : p.layout === "band" || p.layout === "card" ? p.bandHeight : 0;
+  // No captions anywhere (switched off, or no scene carries one) → no band
+  // to reserve: the page records at the full canvas and fills the frame.
+  const anyCaption = m.captions !== false && m.steps.some((st) => st.action === "scene" && Boolean(st.caption?.trim()));
+  const layout = m.layout ?? p.layout;
+  const band = anyCaption && (layout === "band" || layout === "card") ? p.bandHeight : 0;
   const viewport = { width: m.viewport?.width ?? p.width, height: m.viewport?.height ?? p.height - band };
   const gifOverride = m.outputs.gif;
   /* `gif: true` means "yes, a GIF" on any preset. Only docs-gif carries GIF
@@ -499,7 +503,8 @@ export function resolve(m: Manifest): Resolved {
     scale: m.scale ?? p.scale,
     fps: m.fps ?? p.fps,
     crf: m.crf ?? p.crf,
-    layout: m.layout ?? p.layout,
+    layout,
+    bandHeight: band,
     cameraZoom: typeof m.camera === "object" ? m.camera.zoom : p.cameraZoom,
     gif,
     cursor,

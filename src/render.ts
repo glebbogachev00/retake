@@ -379,7 +379,7 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   let geom: CardGeom | null = null;
   const capSize = q.captions ? q.captions.fontSize : 0;
   // One band height for the whole take, from its captions (see captions.ts).
-  const bandH = bandHeightFor(q);
+  const bandH = bandHeightFor(q, captionWindows(take).map((w) => w.text));
 
   if (layout === "band") {
     // Site fills the frame; caption strip below it — none at all if captions are off.

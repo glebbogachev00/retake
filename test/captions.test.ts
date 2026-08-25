@@ -25,6 +25,16 @@ test("the default page is the canvas minus the band, so the video is the preset'
   }
 });
 
+test("blank caption text does not reserve a caption band", async () => {
+  const { resolve, Manifest } = await import("../src/manifest.js");
+  const r = resolve(Manifest.parse({
+    name: "x", url: "http://x", preset: "post-landscape",
+    steps: [{ action: "scene", label: "blank", caption: "   " }],
+  }));
+  assert.equal(r.bandHeight, 0);
+  assert.equal(r.viewport.height, 1080);
+});
+
 test("wrap breaks two-line captions near the middle and never orphans a word", () => {
   const w = wrap("One sentence. Two different kinds of thing, said plainly.", 30);
   const [a, b] = w.split("\n");
