@@ -395,10 +395,18 @@ program
     say(`Sign in there — codes, SSO, captcha, whatever it asks. When you can see the signed-in app, come back here and press Enter.`);
     say(`(Nothing is recorded. Only the session is kept, in ${path.relative(process.cwd(), statePath)}, good for ${manifest.auth.maxAgeHours}h.)`);
     await new Promise<void>((ok) => { process.stdin.resume(); process.stdin.once("data", () => ok()); });
-    fs.mkdirSync(path.dirname(statePath), { recursive: true });
-    await context.storageState({ path: statePath });
-    fs.chmodSync(statePath, 0o600);
-    await browser.close();
+    try {
+      fs.mkdirSync(path.dirname(statePath), { recursive: true });
+      await context.storageState({ path: statePath });
+      fs.chmodSync(statePath, 0o600);
+    } catch (e) {
+      // Closing the window instead of pressing Enter is the usual way here:
+      // say so plainly rather than showing a stack, and leave no orphan.
+      const why = page.isClosed() ? "the browser window was closed before the session could be saved" : String((e as Error).message ?? e);
+      throw new Error(`Could not save the session — ${why}.\nRun \`retake signin ${file}\` again, and this time leave the window open and press Enter here.`);
+    } finally {
+      await browser.close().catch(() => {});
+    }
     say(`✓ session saved → ${path.relative(process.cwd(), statePath)}. Takes of ${manifest.name} now start signed in; run this again when it goes stale.`);
     process.exit(0);
   });
