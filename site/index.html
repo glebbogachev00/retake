@@ -149,17 +149,31 @@
 .ship a:hover{color:var(--ink)}
 
 /* a note from a person, not a brochure */
-/* A letter, and it should look like one: warmer paper than the page, a rule
-   the amber runs along, and room around the words. */
-.note{max-width:680px;font-size:17px;line-height:1.75;background:#f4f2ea;border-radius:20px;
-  padding:38px 40px 32px;position:relative;overflow:hidden}
+/* A person, not a wall of text. The shape is borrowed from Capture's own
+   maker note: the face goes first so a reader knows a person is talking
+   before reading a word, the heading names the convention it is breaking,
+   and the day is given as beats you can skim rather than prose you have to
+   work through. Full column width, so it sits on the page's grid. */
+.note{background:#f4f2ea;border-radius:20px;padding:32px 34px 28px;position:relative;overflow:hidden}
 .note::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--amber)}
-.note p{margin:0 0 16px}
-.note .hi{font-size:21px;letter-spacing:-.015em;color:var(--ink);font-weight:600;margin-bottom:20px}
-.note p:not(.hi):not(.sign){color:#3b423a}
-.note .sign{margin-top:26px;padding-top:18px;border-top:1px solid rgba(0,0,0,.08);font-size:15px;color:var(--muted)}
-.note .sign b{color:var(--ink);font-weight:600;margin-right:2px}
-@media (max-width:640px){.note{padding:28px 24px 24px;font-size:16px}}
+.note-who{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.note-who img{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none}
+.note-who>span{display:flex;flex-direction:column;gap:2px}
+.note-label{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.note-name{font-size:14.5px;font-weight:600;color:var(--ink)}
+.note .note-h{font-size:22px;letter-spacing:-.018em;margin:0 0 10px;font-weight:600}
+.note p{margin:0;font-size:16.5px;line-height:1.68;color:#3b423a;max-width:62ch}
+.note-beats{margin:22px 0 0;padding-top:18px;border-top:1px solid rgba(0,0,0,.08);
+  display:grid;grid-template-columns:1fr 1fr;gap:18px 28px}
+.note-beats div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.note-beats dt{font-size:14.5px;font-weight:600;color:var(--ink)}
+.note-beats dd{margin:0;font-size:13.5px;line-height:1.5;color:var(--muted)}
+.note .sign{margin-top:20px;font-size:14px;color:var(--muted)}
+.note .sign b{color:var(--ink);font-weight:600}
+.note .sign span{opacity:.45;margin:0 6px}
+.note .sign a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.22)}
+.note .sign a:hover{color:var(--ink)}
+@media (max-width:640px){.note{padding:26px 22px 22px}.note-beats{grid-template-columns:1fr;gap:14px}}
 .note .sign span{opacity:.45;margin:0 6px}
 .note .sign a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.22)}
 .note .sign a:hover{color:var(--ink)}
@@ -198,11 +212,19 @@
 
   <section id="note">
     <div class="note">
-      <p class="hi">Hey — a quick word about why this exists.</p>
-      <p>I kept re-recording the same demo. Every release moved a button, and every time it meant opening a screen recorder, performing the whole flow again without fumbling, and hoping the take was clean. An afternoon, for a video that was wrong again three weeks later.</p>
-      <p>So the demo became a file instead. When the button gets renamed you change the line that names it and run it again. The video is the output, not the thing you maintain.</p>
-      <p>I use it for two things. Demos — which is most of it, and where it has genuinely saved me a lot of time and energy. And launch videos, the kind that actually stay with someone. The first one I have working well. The second I am still figuring out, and the tool is honest about the difference: a demo proves an interaction, a launch presents a product, and they want almost opposite things in the frame.</p>
-      <p>It is early, and I am one person. The three examples on this page are my own projects — there are no customer quotes here yet, because I would rather show you my own work than borrow someone else's words. If you try it and something is stupid, tell me and I will fix it. That is roughly how everything on this page got built.</p>
+      <div class="note-who">
+        <img src="gleb.jpg" alt="" width="44" height="44">
+        <span>
+          <span class="note-label">From the person who made it</span>
+          <span class="note-name">Gleb, who records with it most days</span>
+        </span>
+      </div>
+      <h2 class="note-h">This is where the testimonials usually go.</h2>
+      <p>I do not have any yet, so here is the honest version. I kept re-recording the same demo — an afternoon each release, for a video that was wrong again three weeks later. So the demo became a file instead.</p>
+      <dl class="note-beats">
+        <div><dt>Demos</dt><dd>Most of what I use it for. It has saved me real time and real energy.</dd></div>
+        <div><dt>Launch videos</dt><dd>The kind that stay with someone. Still figuring that one out.</dd></div>
+      </dl>
       <p class="sign"><b>Gleb</b> <span>·</span> <a href="https://github.com/glebbogachev00/retake/issues/new">tell me what broke</a></p>
     </div>
   </section>

@@ -410,12 +410,17 @@ export function serve(port: number) {
       // root when deployed, so its asset paths are relative either way.
       // releases.json sits beside index.html when deployed, so the preview
       // has to serve it from the same two prefixes the page might be under.
-      const mrel = /^(?:\/landing)?\/releases\.json$/.exec(p);
-      if (mrel && (req.method === "GET" || req.method === "HEAD")) {
-        const f = path.join(PKG_ROOT, "site", "releases.json");
+      // Files that sit at the root of site/ when deployed — releases.json, the
+      // photo in the maker note. The preview has to serve them from the same
+      // two prefixes the page might be under, or it shows a broken page for a
+      // site that is actually fine.
+      const mroot = /^(?:\/landing)?\/([A-Za-z0-9._-]+\.(?:json|jpg|jpeg|png|svg|webp|ico|txt))$/.exec(p);
+      if (mroot && (req.method === "GET" || req.method === "HEAD")) {
+        const f = path.join(PKG_ROOT, "site", mroot[1]);
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
-        res.writeHead(200, { "content-type": "application/json" });
-        return res.end(req.method === "HEAD" ? undefined : fs.readFileSync(f));
+        res.writeHead(200, { "content-type": MIME[path.extname(f)] ?? "application/octet-stream", "content-length": fs.statSync(f).size });
+        if (req.method === "HEAD") return res.end();
+        return fs.createReadStream(f).pipe(res);
       }
       const msite = /^(?:\/landing)?\/(media|logos)\/([A-Za-z0-9._-]+)$/.exec(p);
       if (msite && (req.method === "GET" || req.method === "HEAD")) {
