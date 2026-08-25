@@ -830,7 +830,11 @@ export function check(outDir: string, m?: Manifest): Check {
      The manifest's own maxSeconds is the author's stated bound; a take
      inside it is not a runaway, so do not fail it for length. */
   const longest = m ? capSecondsFor(m) : 300;
-  say(p.duration >= 5 && p.duration <= longest, `duration: ${p.duration.toFixed(1)}s`);
+  // Whole-video judgements (is it long enough, does it have every scene) do
+  // not apply to a deliberate fragment.
+  const fragment = /\((?:from|until)\)/.test(take.partial ?? "");
+  if (fragment) lines.push(`—     duration: ${p.duration.toFixed(1)}s (not judged — this is a fragment)`);
+  else say(p.duration >= 5 && p.duration <= longest, `duration: ${p.duration.toFixed(1)}s`);
   if (p.duration > 60) lines.push(`—     ${p.duration.toFixed(0)}s is long for a social post (aim for 15–45s); fine for a walkthrough`);
   /* A step that stalls is not a failed step, so nothing above notices it — but
      the camera keeps rolling on the last painted frame and the viewer watches
@@ -913,7 +917,11 @@ export function check(outDir: string, m?: Manifest): Check {
   else lines.push("—     thumbnail: not requested");
   say(fs.existsSync(path.join(outDir, "proof-log.md")), "proof log exists");
   say(take.ok, take.ok ? "all steps passed" : "some steps failed");
-  say(!take.partial, take.partial ? `partial: ${take.partial}` : "polished render (not fallback)");
+  // A fragment recorded on purpose (--from / --until) is not a defect. Saying
+  // FAIL about work that did exactly what was asked is how people learn to
+  // skim past checks, including the ones that matter.
+  if (fragment) say(true, `fragment — ${take.partial}`);
+  else say(!take.partial, take.partial ? `partial: ${take.partial}` : "polished render (not fallback)");
   if (take.partial && /NO CURSOR/.test(take.partial)) say(false, "cursor overlay failed — the video has no cursor (split the demo or set cursor: false)");
   const sc = scenes(m ? applyManifest(m, take) : take);
   say(sc.length >= 2, `${sc.length} scenes`);

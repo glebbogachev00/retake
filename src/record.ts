@@ -177,6 +177,11 @@ export async function gateOnApp(page: Page, m: Manifest, outDir: string): Promis
 export type RecordOptions = {
   /** Record up to the end of this scene label, then stop. */
   until?: string;
+  /** Start the take at this scene. The steps before it still RUN — the app
+      has to reach that state — but at full speed and off the clock, and the
+      render trims them off the front. A demo whose ending changed stops
+      costing its beginning. */
+  from?: string;
   outDir: string;
   /** The caller already holds the folder lock. */
   locked?: boolean;
@@ -501,12 +506,28 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     const moves = cursorMoves(m);
     if (q.cursor !== false && moves > CURSOR_MOVE_LIMIT) log(`cursor: ~${moves} cursor moves — past ~${CURSOR_MOVE_LIMIT} the cursor filter no longer fits in one ffmpeg argument and the overlay may be MISSING. Split the demo (a viewer wants chapters anyway), or set cursor: false to be honest about it.`);
     let pastUntil = false;
+    // --from <scene>: everything before it still runs (the app must reach that
+    // state) but at full speed, and `trimBefore` moves to the moment it lands,
+    // so none of it is in the finished video. Re-recording only the tail.
+    let fastForward = !!opts.from && m.steps.some((st) => st.action === "scene" && st.label === opts.from);
+    if (opts.from && !fastForward) throw new Error(`--from "${opts.from}": no scene with that label. Scenes here: ${m.steps.filter((st) => st.action === "scene").map((st) => (st as { label: string }).label).join(", ") || "(none)"}`);
+    if (fastForward) log(`fast-forwarding to scene "${opts.from}" — the steps before it run but are not in the video`);
     for (const [i, step] of m.steps.entries()) {
+      if (fastForward && step.action === "scene" && step.label === opts.from) {
+        fastForward = false;
+        setupEnd = Date.now();          // the take starts HERE
+        // A fragment, like --until: say so, or every check that judges a
+        // whole video (length, scene count) fails a take that is working
+        // exactly as asked.
+        partial = `recorded from scene "${opts.from}" (from) — a fragment for iteration, not a finished cut`;
+        log(`▶ recording from "${opts.from}"`);
+      }
       // --until <scene>: record that scene in full, stop at the next one.
       if (opts.until && step.action === "scene") {
         if (pastUntil) { partial = `stopped after scene "${opts.until}" (until)`; log(`■ ${partial}`); break; }
         if (step.label === opts.until) pastUntil = true;
       }
+      ctx.fast = fastForward;
       const start = Date.now();
       const entry: TimelineEntry = {
         index: i,
@@ -868,7 +889,14 @@ function isAlive(pid: number): boolean {
   }
 }
 
-type StepCtx = { outDir: string; manifestDir: string; downloads: string[]; stub: (d: Stub) => Promise<void> };
+type StepCtx = {
+  outDir: string; manifestDir: string; downloads: string[]; stub: (d: Stub) => Promise<void>;
+  /** Replaying to reach a state, with nobody watching: the pacing that exists
+      for a viewer is dead weight, so typing runs at full speed and author
+      pauses are skipped. Selector waits are NOT touched — those are the ones
+      holding the app's actual state together. */
+  fast?: boolean;
+};
 
 /** testreel clicks and types at *screen* coordinates and never scrolls first,
     so anything below the fold gets a click on empty air. Bring it into view
@@ -902,24 +930,27 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
     const pt = await resolvePoint(page, step.at, timeout);
     if (q.cursor !== false) await moveCursorToPoint(page, pt.x, pt.y, { style: q.cursor.style, size: q.cursor.size });
     if (step.action === "click") await page.mouse.click(pt.x, pt.y);
-    if (step.pauseAfter) await page.waitForTimeout(step.pauseAfter);
+    if (step.pauseAfter && !ctx.fast) await page.waitForTimeout(step.pauseAfter);
     return;
   }
   if (step.action === "drag") {
     await performDrag(page, step, q, timeout);
-    if (step.pauseAfter) await page.waitForTimeout(step.pauseAfter);
+    if (step.pauseAfter && !ctx.fast) await page.waitForTimeout(step.pauseAfter);
     return;
   }
-  const pause = step.pauseAfter;
+  const pause = ctx.fast ? undefined : step.pauseAfter;
   switch (step.action) {
     case "wait":
-      await rec.wait(step.ms);
+      // An author `wait` is pacing for the viewer; while replaying there is
+      // none, so it shrinks. Capped rather than dropped: some apps genuinely
+      // need a beat, and the state has to arrive intact.
+      await rec.wait(ctx.fast ? Math.min(step.ms, 250) : step.ms);
       return; // wait's own duration is the pause
     case "click":
       await rec.click(step.selector!, { timeout, zoom: step.zoom });
       break;
     case "type":
-      await rec.type(step.selector, expandEnv(step.text), { delay: step.delay ?? (m.typing === "brisk" ? 22 : 70), clear: step.clear, timeout });
+      await rec.type(step.selector, expandEnv(step.text), { delay: ctx.fast ? 0 : (step.delay ?? (m.typing === "brisk" ? 22 : 70)), clear: step.clear, timeout });
       break;
     case "fill":
       await rec.fill(step.selector, expandEnv(step.text), { timeout });

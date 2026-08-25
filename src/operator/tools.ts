@@ -325,7 +325,7 @@ server.registerTool("dry", { description: "Run a demo with no camera: every sele
   return text(r.ok ? `ok: all ${manifest.steps.length} steps resolve` : r.lines.join("\n"));
 });
 
-server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story — ALWAYS start there, and on a long demo show that draft to the person before spending the full take. Returns the receipts. SIZE IS NOT RECORDED: any take renders at any preset later (`render` with a preset), so never re-record to change the shape and never set `viewport` in a manifest — the preset owns the size and every take at a preset is identical. `check: pass` and healthy audio prove the FILE is sound, not that the demo is good — call `look` at the payoff scene and judge it: can a stranger state the promise from that frame, is the result legible at playback size, is any beat longer than what it tells you? If you cannot answer yes, fix the cut before calling done.", inputSchema: { name: z.string(), preview: z.boolean().default(true), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo") }, annotations: RETAKE_WRITE }, async ({ name, preview, until }) => { LAST_DEMO = name;
+server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story — ALWAYS start there, and on a long demo show that draft to the person before spending the full take. Returns the receipts. SIZE IS NOT RECORDED: any take renders at any preset later (`render` with a preset), so never re-record to change the shape and never set `viewport` in a manifest — the preset owns the size and every take at a preset is identical. `check: pass` and healthy audio prove the FILE is sound, not that the demo is good — call `look` at the payoff scene and judge it: can a stranger state the promise from that frame, is the result legible at playback size, is any beat longer than what it tells you? If you cannot answer yes, fix the cut before calling done.", inputSchema: { name: z.string(), preview: z.boolean().default(true), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo"), from: z.string().optional().describe("start the take AT this scene: earlier steps still run, at full speed and off camera. When only the ending changed, this is the difference between re-recording 90 seconds and re-recording seven minutes") }, annotations: RETAKE_WRITE }, async ({ name, preview, until, from }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const loaded = loadManifest(manifestPath(name));
   const manifest = preview ? { ...loaded.manifest, preset: "preview-fast" } : loaded.manifest;
@@ -338,7 +338,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);
     let take: Take;
     try {
-      take = await record(manifest, { outDir, manifestDir: DEMOS, locked: true, until, log: () => {} });
+      take = await record(manifest, { outDir, manifestDir: DEMOS, locked: true, until, from, log: () => {} });
     } catch (e) {
       if (restorePrevious(outDir)) await tell("Recording failed — your previous take has been put back.");
       throw e;
@@ -369,7 +369,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   }
 });
 
-server.registerTool("render", { description: "Re-render the last recording of a demo with the current manifest (captions, camera, trim, format). No browser, seconds.", inputSchema: { name: z.string() }, annotations: RETAKE_WRITE }, async ({ name }) => { LAST_DEMO = name;
+server.registerTool("render", { description: "Re-render the last recording with the current manifest. No browser, seconds. THIS, NOT `run`, IS THE ANSWER TO ALMOST EVERY CHANGE: size and shape and format, a caption's words, speed, zoom, cards, music, the poster, and WHERE a caption sits (`nudge: <ms>` on the scene moves its marker, and the still and thumbnail follow). Only a change to what the demo DOES needs the camera again — and even then, `run` with `from`/`until` records one end of it rather than all of it.", inputSchema: { name: z.string() }, annotations: RETAKE_WRITE }, async ({ name }) => { LAST_DEMO = name;
   const outDir = path.join(OUT, name);
   const tp = path.join(outDir, "take.json");
   if (!fs.existsSync(tp)) return text("no recording yet — run first");

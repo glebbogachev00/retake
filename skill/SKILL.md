@@ -83,6 +83,32 @@ say so in one line and stop.
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
 
+## What a change costs — read this before re-recording anything
+
+The one mistake that wastes real time is reaching for a new recording when a
+re-render would do. Almost nothing needs the camera twice.
+
+| You want to change | Do this | Cost |
+|---|---|---|
+| size, shape, format (landscape → square → vertical) | `render` with another preset | seconds |
+| a caption's words, the speed, a zoom, cards, music | edit the manifest, `render` | seconds |
+| **where** a caption or still sits in time | `nudge: <ms>` on the scene, then `render` | seconds |
+| which frame is the poster | click a frame in the window, or `--scene` | seconds |
+| the ENDING of a demo | `run --from <scene>` | the tail only |
+| one beat, iterating | `run --until <scene>` | the head only |
+| the steps themselves — what the demo DOES | full `run` | the whole thing |
+
+Only the last row needs the camera for the whole demo. If you are about to
+re-record and your reason is not in that last row, you are paying for
+something you already have.
+
+`nudge` and `--from` are the two most recently added and the two most often
+missed. `nudge: -1500` moves a scene's marker 1.5s earlier in the finished
+video — caption, still and thumbnail follow it. `--from <scene>` runs the
+earlier steps at full speed off camera so the app reaches the right state,
+then starts recording there; a seven-minute demo whose last third changed
+costs ninety seconds instead of seven minutes.
+
 ## Style — how the person wants their videos to look
 
 Do not ask about knobs before the first take — nobody has opinions about
@@ -300,7 +326,10 @@ average is three to five takes per demo. Most of that is avoidable:
 1. **Draft everything.** `--preset draft` has the same layout and timing at
    a quarter of the pixels. Judge the story there; switch to a post preset
    once, at the end.
-2. **`--until <scene>`** when the fix is in one beat. Re-recording a 60s
+2. **`--until <scene>` for the head, `--from <scene>` for the tail.** These
+   are the two halves of the same idea and `--from` is the one people miss:
+   when the ending changed, everything before it still runs (the app has to
+   reach that state) but at full speed and off camera. Re-recording a 60s
    demo to change its last 8 seconds is paying for 50 seconds you already
    have.
 3. **Get a person's eyes on a cheap draft before buying an expensive take.**

@@ -85,8 +85,9 @@ program
   .option("--reuse", "reuse the last raw recording if nothing that shapes it changed (re-render only)", false)
   .option("--gif", "also produce a GIF (overrides the manifest)", false)
   .option("--until <scene>", "record up to the end of this scene, then stop (iterate on one beat without paying for the whole take)")
+  .option("--from <scene>", "start the take at this scene — earlier steps still run, at full speed and off camera, so a demo whose ENDING changed stops costing its beginning")
   .option("--name <name>", "write to outputs/<name> instead of the manifest's name — revise a cut without overwriting the published one")
-  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; until?: string; name?: string }) => {
+  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; until?: string; from?: string; name?: string }) => {
     const loaded = loadManifest(file);
     let manifest = opts.preset ? { ...loaded.manifest, preset: opts.preset } : loaded.manifest;
     if (opts.gif) manifest = { ...manifest, outputs: { ...manifest.outputs, gif: true } };
@@ -116,7 +117,7 @@ program
       // the person still has the one that worked. See stashPrevious.
       stashPrevious(outDir);
       try {
-        take = await record(manifest, { until: opts.until, outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
+        take = await record(manifest, { until: opts.until, from: opts.from, outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
       } catch (e) {
         if (restorePrevious(outDir)) say("↩ recording failed — your previous take has been put back");
         releaseLock(outDir);

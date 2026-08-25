@@ -14,6 +14,31 @@ clone of this repo the same commands run from source as `npm run retake -- …`.
 The MCP route is better than the CLI when it exists: `retake install` registers
 the tools and the skill with Claude Code, so the loop below becomes tool calls.
 
+## What a change costs
+
+Reaching for a new recording when a re-render would do is the one mistake
+that wastes real time. Almost nothing needs the camera twice.
+
+| You want to change | Do this | Cost |
+|---|---|---|
+| size, shape, format | `retake render <dir> --preset <other>` | seconds |
+| caption words, speed, zoom, cards, music | edit the manifest, `retake render` | seconds |
+| **where** a caption or still sits | `nudge: <ms>` on the scene, then render | seconds |
+| the ENDING of a demo | `retake run … --from <scene>` | the tail only |
+| one beat, while iterating | `retake run … --until <scene>` | the head only |
+| what the demo actually DOES | full `retake run` | the whole thing |
+
+`--from` runs the earlier steps at full speed and off camera so the app
+reaches the right state, then starts recording there. A seven-minute demo
+whose last third changed costs ninety seconds.
+
+Housekeeping, since outputs grow: `retake takes <dir>` lists the kept
+versions of a demo and `retake restore <dir> <id>` puts one back;
+`retake tidy` reports reclaimable disk and removes nothing without
+`--apply`. Neither ever touches a raw recording or a take.json — those are
+the only things a re-render cannot rebuild.
+
+
 ## Starting from nothing (the person pasted the repo link)
 
 ```
