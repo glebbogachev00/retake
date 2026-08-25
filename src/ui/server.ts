@@ -361,7 +361,7 @@ function pickFolder(): Promise<string | null> {
 const BOOT = Date.now();   // pages compare this and reload themselves after a restart
 
 /** A live view of agent-driven work, so the app is a window and not a folder. */
-type Progress = { phase: string; step: number; total: number; label: string; demo?: string };
+type Progress = { phase: string; step: number; total: number; label: string; demo?: string; etaSec?: number; since?: number };
 type Activity = { active: boolean; who: string; demo?: string; lines: string[]; startedAt: number; finishedAt?: number; progress?: Progress };
 const activity: Activity = { active: false, who: "", lines: [], startedAt: 0 };
 const activityWatchers = new Set<(ev: { type: string; data: unknown }) => void>();
@@ -385,7 +385,7 @@ function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: s
   if (b.who) activity.who = b.who;
   if (b.demo) activity.demo = b.demo;
   if (b.line) { activity.lines.push(b.line); if (activity.lines.length > 200) activity.lines.shift(); }
-  if (b.progress) { activity.progress = b.progress; if (b.progress.demo) activity.demo = b.progress.demo as string; }
+  if (b.progress) { activity.progress = { ...b.progress, since: Date.now() }; if (b.progress.demo) activity.demo = b.progress.demo as string; }
   if (b.done) { activity.active = false; activity.finishedAt = Date.now(); activity.progress = undefined; }
   for (const w of activityWatchers) w({ type: b.done ? "finished" : b.progress ? "progress" : "line", data: { ...activity, latest: b.line } });
 }

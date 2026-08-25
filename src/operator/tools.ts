@@ -72,7 +72,7 @@ async function waitForHuman(kind: "question" | "approve", text: string, detail?:
 
 /** Tell the window how far into a recording we are. Fire-and-forget: a demo
     must never fail because a progress ping did not land. */
-async function progress(p: { phase: string; step: number; total: number; label: string }) {
+async function progress(p: { phase: string; step: number; total: number; label: string; etaSec?: number }) {
   if (!UI) return;
   const body = JSON.stringify({ progress: { ...p, demo: LAST_DEMO || undefined } });
   const url = SESSION ? `${UI}/api/operator/${SESSION}/log` : `${UI}/api/activity`;
@@ -346,6 +346,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   if (preview && pinned) await tell(`preview overrides the pinned ${pinned.width}×${pinned.height} viewport`);
   const outDir = path.join(OUT, name);
   acquireLock(outDir);
+  return await holdOpen(async () => {
   try {
     // Moved aside, not deleted: a failed recording must not cost the person
     // the take they already had.
@@ -364,6 +365,15 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
       throw e;
     }
     keepPrevious(outDir, (l) => void tell(l));
+    // Render has no per-stage hook, but the last render of THIS demo measured
+    // itself into facts.json — so the bar can run on a real number rather
+    // than a spinner. It is an estimate and is labelled as one.
+    let etaSec = 0;
+    try {
+      const f = JSON.parse(fs.readFileSync(path.join(outDir, "facts.json"), "utf8")) as { timings?: Record<string, number> };
+      etaSec = Math.round(Object.values(f.timings ?? {}).reduce((a, b) => a + Number(b), 0));
+    } catch { /* first render of this demo: no estimate to give */ }
+    void progress({ phase: "rendering", step: 0, total: 0, label: "rendering", etaSec });
     await tell(`Rendering…`);
     const a = await render(manifest, take, outDir, {});
     const c = check(outDir, manifest);
@@ -387,6 +397,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   } finally {
     releaseLock(outDir);
   }
+  });
 });
 
 server.registerTool("render", { description: "Re-render the last recording with the current manifest. No browser, seconds. THIS, NOT `run`, IS THE ANSWER TO ALMOST EVERY CHANGE: size and shape and format, a caption's words, speed, zoom, cards, music, the poster, and WHERE a caption sits (`nudge: <ms>` on the scene moves its marker, and the still and thumbnail follow). Only a change to what the demo DOES needs the camera again — and even then, `run` with `from`/`until` records one end of it rather than all of it.", inputSchema: { name: z.string() }, annotations: RETAKE_WRITE }, async ({ name }) => { LAST_DEMO = name;
@@ -463,10 +474,31 @@ const transport = new StdioServerTransport();
 // forever — a day of agent sessions left a row of them running, each holding a
 // Node runtime for a client that had long since exited.
 let leaving = false;
+
+/** Work that must not be abandoned halfway. A recording is minutes of real
+    time against a real app; dropping it because the agent's socket closed
+    throws away the expensive half of the job and leaves nothing behind. */
+let inFlight = 0;
+export function holdOpen<T>(work: () => Promise<T>): Promise<T> {
+  inFlight++;
+  return work().finally(() => { inFlight--; if (leaving && inFlight === 0) process.exit(0); });
+}
+
 const leave = () => {
   if (leaving) return;
   leaving = true;
-  void server.close().catch(() => {}).finally(() => process.exit(0));
+  // Stop accepting new work immediately, but let a take in progress finish
+  // and write its files. Before this, the server exited the moment the
+  // client's socket closed and the recording died at whatever step it was
+  // on -- the person came back to nothing.
+  void server.close().catch(() => {});
+  if (inFlight > 0) {
+    process.stderr.write(`retake: client disconnected, finishing ${inFlight} job(s) in flight\n`);
+    // A take cannot outlive its own ceiling, so this is a backstop, not a policy.
+    setTimeout(() => process.exit(0), 65 * 60_000).unref();
+    return;
+  }
+  process.exit(0);
 };
 transport.onclose = leave;
 process.stdin.once("end", leave);

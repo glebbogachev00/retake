@@ -558,6 +558,16 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
       }
       log(`[${String(i).padStart(2, "0")}] ${entry.summary}${entry.camera ? ` · camera ${entry.camera.zoom}× on ${entry.camera.focus}` : ""}`);
       opts.onProgress?.({ phase: "recording", step: i + 1, total: m.steps.length, label: entry.summary });
+      // A resume point on disk, so a take that dies is not a take lost. It
+      // survives a kill because it is written as it goes, not at the end —
+      // and `--from <that scene>` re-records only what came after it.
+      if (step.action === "scene" && step.label) {
+        try {
+          fs.writeFileSync(path.join(opts.outDir, "reached.json"), JSON.stringify({
+            demo: m.name, scene: step.label, step: i + 1, of: m.steps.length, at: new Date().toISOString(),
+          }));
+        } catch { /* a resume hint is a courtesy, never a reason to fail */ }
+      }
       try {
         await runStep(rec, page, step, m, ctx);
       } catch (e) {
@@ -667,6 +677,9 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // Timeline offsets are already relative to videoStartedAt (= document commit,
   // calibrated to within ~0.2s of the first video frame on a warm route). The
   // real file length is authoritative for the end.
+  // The take finished, so there is nothing to resume: leaving the hint would
+  // send someone back into the middle of a demo they already have.
+  try { fs.rmSync(path.join(opts.outDir, "reached.json"), { force: true }); } catch { /* fine */ }
   const trimBefore = sec(setupEnd - t0);
   // The recording keeps rolling while the browser is torn down, so the raw
   // video always has a tail of nothing after the last step. The take ends

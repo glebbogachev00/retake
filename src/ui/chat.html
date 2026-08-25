@@ -643,7 +643,7 @@ const QUIPS = [
   'Watching the spinner so you do not have to.', 'No sighing this time.',
   'Getting it right the first time, on purpose.',
 ];
-let quipAt = 0, quipTimer = null, elapsedTimer = null, runStart = 0;
+let quipAt = 0, quipTimer = null, elapsedTimer = null, runStart = 0, lastActivity = null;
 
 function fmtElapsed(ms) {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -662,6 +662,9 @@ function startLiveTickers(startedAt) {
   if (!elapsedTimer) {
     elapsedTimer = setInterval(() => {
       const e = $('liveElapsed'); if (e) e.textContent = fmtElapsed(Date.now() - runStart);
+      // No events arrive while ffmpeg works, so the render bar advances on
+      // the clock or it would look frozen for the whole render.
+      if (lastActivity && lastActivity.progress && lastActivity.progress.phase === 'rendering') drawProgress(lastActivity);
     }, 1000);
   }
 }
@@ -672,11 +675,26 @@ function stopLiveTickers() {
 
 function drawProgress(a) {
   const box = $('liveProg'); if (!box) return;
+  if (a) lastActivity = a;
   const p = a && a.progress;
   if (!a || !a.active) { box.style.display = 'none'; stopLiveTickers(); return; }
   startLiveTickers(a.startedAt);
   if (!$('liveQuip').textContent) $('liveQuip').textContent = QUIPS[0];
   $('liveElapsed').textContent = fmtElapsed(Date.now() - (a.startedAt || Date.now()));
+  // Rendering: there are no steps to count, but the last render of this demo
+  // measured itself, so the bar can run on that. Capped at 95% — it must not
+  // claim finished before it is, and an estimate is never a promise.
+  if (p && p.phase === 'rendering') {
+    box.style.display = '';
+    const eta = (p.etaSec || 0) * 1000;
+    const gone = Date.now() - (p.since || Date.now());
+    $('liveBar').style.width = (eta ? Math.min(95, Math.round((gone / eta) * 100)) : 0) + '%';
+    const left = Math.max(0, Math.round((eta - gone) / 1000));
+    $('liveCount').textContent = eta
+      ? (left > 0 ? `rendering · about ${left}s left` : 'rendering · nearly there')
+      : 'rendering';
+    return;
+  }
   if (!p || !p.total) {
     // Working, but nothing countable yet — show the clock, not a fake bar.
     box.style.display = '';
