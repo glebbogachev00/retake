@@ -57,7 +57,7 @@
   .shot video { width:100%; height:auto; display:block; }
   .shot figcaption { background:var(--card); padding:12px 18px 14px; font-size:14px; color:var(--muted); }
   .shot figcaption b { color:var(--ink); font-weight:600; }
-  section { margin-top:112px; }
+  section { margin-top:92px; }
   h2 { font-size:27px; letter-spacing:-.02em; font-weight:600; margin:0 0 10px; }
   .sub { color:var(--muted); margin:0 0 30px; max-width:560px; font-size:16.5px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; }
@@ -177,6 +177,20 @@
 .note .sign span{opacity:.45;margin:0 6px}
 .note .sign a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.22)}
 .note .sign a:hover{color:var(--ink)}
+
+/* The one section that is only words. On its own it was a heading floating
+   in 112px of nothing above and below — so it uses the width instead of the
+   height: the claim on the left, the argument on the right, which is also
+   the right shape for the strongest thing the page says. */
+.stmt{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:16px 56px;align-items:start}
+.stmt h2{margin:0;font-size:30px;line-height:1.16;letter-spacing:-.022em}
+.stmt p{margin:0 0 14px;font-size:16.5px;line-height:1.7;color:var(--muted);max-width:52ch}
+.stmt p.last{margin-bottom:0;color:var(--ink)}
+@media (max-width:760px){
+  .stmt{grid-template-columns:1fr;gap:14px}
+  .stmt h2{font-size:26px}
+  .stmt h2 br{display:none}
+}
 </style>
 </head>
 <body>
@@ -289,9 +303,13 @@ mkdir demos && cd demos && retake install</pre>
     </div>
   </section>
 
-  <section>
-    <h2>Not a recorder, not a test runner</h2>
-    <p class="sub" style="max-width:640px">A screen recording is pixels you can never edit; a browser test is a pass/fail nobody can watch. A Retake demo is both halves: a readable file that proves itself like a test and renders like a film — and reruns when the app changes. And it refuses to become a video editor: if a take needs editing, the file was wrong. Fix the file, run it again.</p>
+  <section class="stmt">
+    <h2>Not a recorder,<br>not a test runner</h2>
+    <div>
+      <p>A screen recording is pixels you can never edit. A browser test is a pass/fail nobody can watch.</p>
+      <p>A Retake demo is both halves — a readable file that proves itself like a test and renders like a film, and reruns when the app changes.</p>
+      <p class="last">And it refuses to become a video editor. If a take needs editing, the file was wrong. Fix the file, run it again.</p>
+    </div>
   </section>
 
   <section>
