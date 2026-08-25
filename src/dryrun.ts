@@ -14,10 +14,12 @@ import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manif
 
 export type DryResult = { ok: boolean; lines: string[]; failures: number };
 
-export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean } = {}): Promise<DryResult> {
+export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean; outRoot?: string } = {}): Promise<DryResult> {
   const q = resolve(m);
   const lines: string[] = [];
   let failures = 0;
+  // Failure pictures land beside the demo's other output, not in the cwd.
+  const shotDir = path.join(opts.outRoot ?? "outputs", m.name);
   // Seeds run here too (file and command kinds — the cheap, out-of-page
   // ones). Without them dry checks a different app state than run will,
   // and a selector failure that is really a state difference looks like a
@@ -97,7 +99,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
       }
       else switch (step.action) {
         case "navigate": await page.goto(expandEnv(step.url), { waitUntil: "domcontentloaded", timeout: 60000 }); await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {}); break;
-        case "waitFor": await page.waitForSelector(step.selector, { timeout: Math.min(step.timeout ?? 15000, 15000) }); break;
+        case "waitFor": await page.waitForSelector(step.selector, { state: step.gone ? "hidden" : "visible", timeout: Math.min(step.timeout ?? 15000, 15000) }); break;
         // noWaitAfter: a click that submits a form starts a navigation, and
         // waiting for the element to settle afterwards reports a false failure
         // for a click that actually worked.
@@ -132,6 +134,15 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         const text = (await page.innerText("body")).replace(/\s+/g, " ").trim().slice(0, 110);
         where = `\n        on ${page.url()} — “${text}”`;
       } catch { /* page may be gone */ }
+      // Text alone cannot say "another element is covering the button" or
+      // "the layout is not what you think". A picture can, and dry is the
+      // cheap pass — it should hand over more than run's does, not less.
+      try {
+        const shot = path.join(shotDir, `dry-failed-${String(failures).padStart(2, "0")}.png`);
+        fs.mkdirSync(shotDir, { recursive: true });
+        await page.screenshot({ path: shot, fullPage: true });
+        where += `\n        picture: ${path.relative(process.cwd(), shot)}`;
+      } catch { /* not fatal */ }
       const line = `✗ [${tag}] ${describe(step)} — ${why}${where}`;
       lines.push(line);
       log(line);

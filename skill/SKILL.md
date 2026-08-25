@@ -243,6 +243,20 @@ output is a video they may publish.
   itself uses — a button flipping from busy to ready
   (`button:has-text("Send")`), a count, a class change.
 
+## Waits that do not lie
+
+A bare `waitFor` resolves the instant the element exists. Three times that
+is the wrong moment, and each has cost a take:
+
+- the element is the **previous** action's success banner, still on screen →
+  `{ action: waitFor, selector: ".landed", gone: true }`
+- the element is an empty shell that **streams** its text in →
+  `minChars: 40`
+- the element is there but still **changing** → `stableMs: 500`
+
+Prefer these to a flat `wait`. A timer that happens to work today is the
+thing that breaks when the app gets slower.
+
 ## When a take fails
 
 The camera stops at the first failed step, so a failed take is short and

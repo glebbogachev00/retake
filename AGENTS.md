@@ -89,6 +89,14 @@ use Retake's drafting, or draft itself; both are fine.
 
 Full reference: `README.md` → "Demo-as-code". The short version:
 
+- **Wait for the RESULT, and know the three ways a bare selector lies.** It
+  resolves the moment the element exists, which is wrong when (a) the element
+  is the PREVIOUS action's banner still on screen — use
+  `{ action: waitFor, selector: ".landed", gone: true }` and wait for it to
+  leave; (b) the element is a shell that streams its text in — use
+  `minChars: 40`; (c) the element is there but still changing — use
+  `stableMs: 500`, which resolves when its subtree has been quiet that long.
+  Each of these cost a real take before it existed.
 - **Wait for results, not timers.** After any click that loads or computes
   something, `{ action: waitFor, selector: <thing that appears> }`. A fixed
   `wait` is for pacing only.

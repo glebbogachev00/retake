@@ -84,3 +84,22 @@ test("idle warp: piecewise time map is monotonic and hits the planned lengths", 
   let prev = -1;
   for (let t = 0; t <= 20; t += 0.25) { const m = warpTime(segs, t); assert.ok(m >= prev); prev = m; }
 });
+
+test("waitFor can wait for absence, for text, and for the DOM to settle", async () => {
+  const { Manifest } = await import("../src/manifest.js");
+  const m = Manifest.parse({
+    name: "w", url: "http://x",
+    steps: [
+      { action: "waitFor", selector: "#banner", gone: true },
+      { action: "waitFor", selector: "#reply", minChars: 40, stableMs: 500 },
+      { action: "waitFor", selector: "#plain" },
+    ],
+  });
+  const [a, b, c] = m.steps as Array<{ gone?: boolean; minChars?: number; stableMs?: number }>;
+  assert.equal(a.gone, true);
+  assert.equal(b.minChars, 40);
+  assert.equal(b.stableMs, 500);
+  assert.equal(c.gone, false, "a bare waitFor still waits for the thing to appear");
+  assert.equal(c.stableMs, undefined);
+  assert.throws(() => Manifest.parse({ name: "w", url: "http://x", steps: [{ action: "waitFor", selector: "#x", stableMs: 10 }] }), /50/);
+});

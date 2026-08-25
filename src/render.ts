@@ -601,11 +601,22 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
       at = last ? last.start - take.trimBefore + 1.0 : Math.max(0, take.duration - take.trimBefore - 0.5);
     }
     thumbnail = path.join(outDir, "thumbnail.png");
-    ff(["-ss", Math.max(0, at + cardShift).toFixed(2), "-i", mp4, "-frames:v", "1", thumbnail], log);
+    // Clamp inside the file. The default is "last scene + 1s", which lands
+    // PAST the end whenever a take stops soon after its final scene — ffmpeg
+    // then writes nothing and the render died on the missing file, reported
+    // in the field as "all steps ok, but no video".
+    const seekable = Math.max(0, probe(mp4).duration - 0.25);
+    const seek = Math.min(Math.max(0, at + cardShift), seekable);
+    ff(["-ss", seek.toFixed(2), "-i", mp4, "-frames:v", "1", thumbnail], log);
+    if (!fs.existsSync(thumbnail)) {
+      log?.(`thumbnail: nothing at ${seek.toFixed(1)}s — taking the last frame instead`);
+      ff(["-sseof", "-0.3", "-i", mp4, "-frames:v", "1", thumbnail], log);
+    }
+    if (!fs.existsSync(thumbnail)) { log?.("thumbnail: could not be taken — the video is fine, the poster is not"); thumbnail = undefined; }
     // A launch cut gets a second candidate: this frame with the title on it.
     // The person picks between them (or any still, or their own file) in the
     // window; both are just PNGs, and the poster is whichever is thumbnail.png.
-    if (m.mode === "launch" && m.intro) {
+    if (m.mode === "launch" && m.intro && thumbnail) {
       const d = probe(mp4);
       await renderTitledCover(ffmpegBin(), thumbnail, path.join(outDir, "cover-titled.png"), m.intro, d.width, d.height, q.theme);
     }
@@ -643,7 +654,7 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
   const p = probe(mp4);
   const facts: Facts = {
     width: p.width, height: p.height, fps: p.fps || fps, duration: p.duration,
-    sizes: Object.fromEntries([master, mp4, gif, thumbnail].filter((f): f is string => !!f).map((f) => [path.basename(f), fs.statSync(f).size])),
+    sizes: Object.fromEntries([master, mp4, gif, thumbnail].filter((f): f is string => !!f && fs.existsSync(f)).map((f) => [path.basename(f), fs.statSync(f).size])),
     gifTool, layout, cameraScenes: cam.count, encoder: q.encoder, timings: t.marks, renderHash: hash, preset: q.name,
     mode: m.mode,
   };
@@ -731,6 +742,20 @@ export function check(outDir: string, m?: Manifest): Check {
     .map((t) => ({ ...t, took: t.end - t.start }))
     .filter((t) => t.took > PATIENCE)
     .sort((a, b) => b.took - a.took);
+  // Did the app break, and was it still broken when the video stopped? A
+  // take can pass every step and end on an error screen; one did, and only
+  // frame-by-frame review found it. An error in the last stretch is the
+  // shape that matters — earlier ones are usually recovered from.
+  const errs = take.pageErrors ?? [];
+  if (errs.length) {
+    const endsAt = take.duration;
+    const late = errs.filter((e) => e.at >= Math.max(0, endsAt - 6));
+    if (late.length) {
+      say(false, `the app reported an error in the last seconds and the video ends on it: “${late[0].text.slice(0, 120)}” at ${late[0].at.toFixed(1)}s — watch the final frames before shipping this`);
+    } else {
+      lines.push(`—     the app reported ${errs.length} error${errs.length > 1 ? "s" : ""} during the take (earliest “${errs[0].text.slice(0, 80)}”), none in the last 6s`);
+    }
+  }
   if (stalled.length) {
     const worst = stalled[0];
     say(false, `${stalled.length} step${stalled.length > 1 ? "s" : ""} stalled over ${PATIENCE}s — ` +

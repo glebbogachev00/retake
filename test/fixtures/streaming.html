@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><title>streaming</title>
+<style>body{margin:0;font:17px system-ui;padding:40px;background:#f6f6f3}
+button{font:inherit;padding:10px 20px;border-radius:9px;border:1px solid #bbb;background:#fff;cursor:pointer}
+.banner{margin:20px 0;padding:12px 16px;background:#dff0df;border-radius:9px}
+#reply{margin:20px 0;padding:14px;border:1px solid #ddd;border-radius:9px;min-height:60px;background:#fff}</style>
+<h1>Streaming + stale banner</h1>
+<button id="go">Ask</button>
+<div id="stale" class="banner">Landed — from the PREVIOUS run</div>
+<div id="reply"></div>
+<script>
+// The stale banner lingers 1.5s after the click — exactly the trap that made
+// a real take click the wrong thing.
+document.getElementById('go').onclick = () => {
+  setTimeout(() => document.getElementById('stale').remove(), 1500);
+  const r = document.getElementById('reply');
+  r.textContent = '';                       // renders as an empty shell first
+  const words = 'the reply streams in one word at a time until it is finally complete'.split(' ');
+  let i = 0;
+  const t = setInterval(() => { r.textContent += words[i++] + ' '; if (i >= words.length) clearInterval(t); }, 180);
+};
+</script>

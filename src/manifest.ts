@@ -102,7 +102,23 @@ export const Step = z.discriminatedUnion("action", [
   Base.extend({ action: z.literal("download"), selector: Selector.optional(), saveAs: z.string().optional(), expect: z.string().optional() }),
   /** Wait for a selector to appear (Retake extra; the thing testreel's JSON lacks
       for AI-driven apps whose next screen arrives whenever the model answers). */
-  Base.extend({ action: z.literal("waitFor"), selector: Selector }),
+  /** Wait for a real result. A bare selector resolves the instant the element
+      exists, which is the wrong moment three ways, all of them seen in the
+      field: the element is a shell that streams its text in afterwards; the
+      element is the PREVIOUS run\'s banner still on screen; the element is
+      there but the app is still busy. Hence: */
+  Base.extend({
+    action: z.literal("waitFor"),
+    selector: Selector,
+    /** Wait for it to go AWAY instead of appear — the fix for waiting on a
+        stale success banner from the previous action. */
+    gone: z.boolean().default(false),
+    /** Resolve only once the subtree has stopped changing for this long.
+        This is how you wait for a streamed reply to finish. */
+    stableMs: z.number().min(50).max(30_000).optional(),
+    /** Resolve only once it holds at least this much text. */
+    minChars: z.number().int().positive().optional(),
+  }),
   /** Run JS in the page (Retake extra). Used for seeding, hiding chrome, etc. */
   Base.extend({ action: z.literal("evaluate"), script: z.string().min(1) }),
   /** Change what a stubbed endpoint answers, mid-take. This is how a demo shows

@@ -43,6 +43,9 @@ export type TimelineEntry = {
 };
 
 export type Take = {
+  /** Errors the APP reported while the camera was rolling, with timestamps.
+      An error still on screen at the end means the video ends broken. */
+  pageErrors?: { at: number; text: string }[];
   video?: string;
   screenshots: string[];
   timeline: TimelineEntry[];
@@ -304,6 +307,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const ctx: StepCtx = { outDir: opts.outDir, manifestDir: opts.manifestDir, downloads: [], stub: armStub };
   let ok = true;
   let partial: string | undefined;
+  const pageErrors: { at: number; text: string }[] = [];
   let video: string | undefined;
   let screenshots: string[] = [];
   let t0 = Date.now();
@@ -320,6 +324,13 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     await context.request.get(expandEnv(m.url)).catch(noop);
     const page = await context.newPage();
     if (process.env.RETAKE_PAGE_CONSOLE) page.on("console", (msg) => log(`  [page] ${msg.text().slice(0, 200)}`));
+    // What the app itself said went wrong, with the moment it said it. A take
+    // can pass every step and still END on "This page couldn\u2019t load" —
+    // one did, and only frame-by-frame review caught it. Timestamped so
+    // `check` can ask the only question that matters: was it still broken
+    // when the video stopped?
+    page.on("pageerror", (e) => pageErrors.push({ at: sec(Date.now() - t0), text: String(e.message ?? e).slice(0, 300) }));
+    page.on("console", (msg) => { if (msg.type() === "error") pageErrors.push({ at: sec(Date.now() - t0), text: msg.text().slice(0, 300) }); });
 
     // --- setup phase (still inside the video; trimmed later by `trimBefore`) ---
     // Document first; idle only if it comes quickly. Busy public sites never
@@ -569,6 +580,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const take: Take = {
     video, screenshots, timeline, duration, startedAt, finishedAt, ok, trimBefore, partial,
     quality: { preset: q.name, width: q.viewport.width, height: q.viewport.height, scale: q.scale, fps: q.fps },
+    pageErrors,
     downloads: ctx.downloads,
     stubbed,
     captureHash: captureHash(m),
@@ -753,9 +765,37 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       ctx.downloads.push(dest);
       break;
     }
-    case "waitFor":
-      await page.waitForSelector(step.selector, { timeout: step.timeout ?? 30_000 });
+    case "waitFor": {
+      const t = step.timeout ?? 30_000;
+      if (step.gone) { await page.waitForSelector(step.selector, { state: "hidden", timeout: t }); break; }
+      await page.waitForSelector(step.selector, { timeout: t });
+      if (step.minChars) {
+        await page.waitForFunction(
+          ([sel, n]) => (document.querySelector(sel as string)?.textContent ?? "").trim().length >= (n as number),
+          [step.selector, step.minChars] as const, { timeout: t },
+        );
+      }
+      if (step.stableMs) {
+        // Quiet for this long, measured in the page: the only honest signal
+        // that a streamed or animating subtree has finished.
+        await page.waitForFunction(
+          ([sel, quiet]) => {
+            const w = window as unknown as { __retakeStable?: Record<string, number> };
+            const el = document.querySelector(sel as string);
+            if (!el) return false;
+            w.__retakeStable ??= {};
+            const key = sel as string;
+            const now = Date.now();
+            const snap = el.innerHTML.length + ":" + (el.textContent ?? "").length;
+            const prev = (w as unknown as { __retakeSnap?: Record<string, string> }).__retakeSnap ??= {};
+            if (prev[key] !== snap) { prev[key] = snap; w.__retakeStable[key] = now; return false; }
+            return now - (w.__retakeStable[key] ?? now) >= (quiet as number);
+          },
+          [step.selector, step.stableMs] as const, { timeout: t, polling: 100 },
+        );
+      }
       break;
+    }
     case "evaluate":
       await page.evaluate(step.script);
       break;
@@ -811,7 +851,7 @@ export function describe(step: Step): string {
     case "download":
       return `download${step.selector ? ` via ${step.selector}` : ""}${step.saveAs ? ` → ${step.saveAs}` : ""}`;
     case "waitFor":
-      return `wait for ${step.selector}`;
+      return `wait for ${step.selector}${step.gone ? " to go" : ""}${step.stableMs ? ` to settle (${step.stableMs}ms quiet)` : ""}${step.minChars ? ` to hold ${step.minChars}+ chars` : ""}`;
     case "evaluate":
       return `evaluate (${step.script.length} chars)`;
     case "stub":
