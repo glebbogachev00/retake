@@ -710,7 +710,7 @@ document.addEventListener('keydown', (e) => {
 // ---------- boot ----------
 (async () => {
   setQuality(quality);
-  try { const ps = await api('/api/presets'); $('sPreset').innerHTML = ps.filter((p) => p.name !== 'preview-fast').map((p) => { const h = p.layout === 'card' ? p.height : p.height + (p.layout === 'band' ? p.bandHeight : 0); return `<option value="${p.name}">${p.name} — ${p.width}×${h}</option>`; }).join(''); } catch {}
+  try { const ps = await api('/api/presets'); $('sPreset').innerHTML = ps.filter((p) => p.name !== 'preview-fast').map((p) => { return `<option value="${p.name}">${p.name} — ${p.width}×${p.height}</option>`; }).join(''); } catch {}
   try { settings = await api('/api/settings'); $('modelTag').textContent = settings.active ? 'model: ' + settings.active : 'no model — set one in Settings'; } catch {}
   const list = await loadDemos();
   // Arriving from the review page's Edit link: /classic#<demo> opens that demo.

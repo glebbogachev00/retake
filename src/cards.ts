@@ -36,6 +36,10 @@ function cardHtml(w: number, h: number, theme: Theme, title: string, subtitle: s
   T.textContent = ${JSON.stringify(title)}; S.textContent = ${JSON.stringify(subtitle ?? "")};
   const DUR = ${ms}, FADE = Math.min(420, DUR * 0.22), OUT = Math.min(320, DUR * 0.18);
   const ez = (t) => (${ease});
+  // The window in which nothing moves. The rule keeps growing until FADE*2 —
+  // well past the title's own fade — so this cannot be guessed from the
+  // outside, and the renderer asks the template rather than assuming.
+  window.__still = [FADE * 2, DUR - OUT];
   window.__seek = (ms) => {
     const a = ez(ms / FADE);                          // entrance
     const o = ez((DUR - ms) / OUT);                   // exit
@@ -64,6 +68,8 @@ function calloutHtml(w: number, h: number, box: { x: number; y: number; width: n
   if (tag) tag.textContent = ${JSON.stringify(label ?? "")};
   const DUR = ${ms}, IN = Math.min(360, DUR * 0.25), OUT = Math.min(280, DUR * 0.2);
   const ez = (t) => (${ease});
+  // The tag lands last, at IN*1.6 — later than the ring's own entrance.
+  window.__still = [IN * 1.6, DUR - OUT];
   window.__seek = (ms) => {
     const a = ez(ms / IN), o = ez((DUR - ms) / OUT), v = Math.min(a, o);
     ring.style.opacity = v;
@@ -74,35 +80,46 @@ function calloutHtml(w: number, h: number, box: { x: number; y: number; width: n
   </script>`;
 }
 
-/** Screenshot a __seek()-driven page at every frame; returns the frame dir. */
-async function renderFrames(html: string, w: number, h: number, ms: number, fps: number, transparent: boolean, anim: { inMs: number; outMs: number }): Promise<string> {
+/** Screenshot a __seek()-driven page at every frame; returns the frame dir.
+ *
+ * A card only MOVES at its ends: it eases in, holds, eases out. Photographing
+ * the held middle was paying ~250ms a frame for an unchanging picture — 30s of
+ * a launch cut's render, for two cards. So the held frames are copies of the
+ * settled one, at a millisecond each.
+ *
+ * Which frames those are is the template's business, not this function's. It
+ * publishes `__still = [from, to]`, because the answer is not guessable from
+ * outside: the card's rule keeps growing until twice the title's fade, and a
+ * renderer that assumed otherwise froze it half-drawn. A template with no
+ * `__still` gets every frame shot — the slow path is the safe default. */
+async function renderFrames(html: string, w: number, h: number, ms: number, fps: number, transparent: boolean): Promise<string> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retake-frames-"));
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: w, height: h } });
-  await page.setContent(html, { waitUntil: "load" });
-  const frames = Math.max(2, Math.round((ms / 1000) * fps));
-  // A card only MOVES at its ends: it eases in, holds, eases out. Screenshotting
-  // the held middle was paying ~250ms a frame to photograph an unchanging
-  // picture — 30s of a launch cut's render, for two cards. Now the animated
-  // frames are shot and the held ones are copies of the settled frame, which
-  // costs a millisecond each and is byte-identical to what it replaced.
-  // Exactly the windows the template animates in, plus a frame of margin.
-  const inS = (anim.inMs + 70) / 1000, outS = (anim.outMs + 70) / 1000;
-  const isMoving = (t: number) => t <= inS || t >= ms / 1000 - outS;
-  let settled = "";
-  for (let i = 0; i < frames; i++) {
-    const t = i / fps;
-    const file = path.join(dir, `f${String(i).padStart(5, "0")}.png`);
-    if (isMoving(t) || !settled) {
-      await page.evaluate((ms2) => (window as unknown as { __seek: (t: number) => void }).__seek(ms2), t * 1000);
-      await page.screenshot({ path: file, omitBackground: transparent });
-      if (!isMoving(t) && !settled) settled = file;
-    } else {
-      fs.copyFileSync(settled, file);
+  try {
+    const page = await browser.newPage({ viewport: { width: w, height: h } });
+    await page.setContent(html, { waitUntil: "load" });
+    const frames = Math.max(2, Math.round((ms / 1000) * fps));
+    const still = await page.evaluate(() => (window as unknown as { __still?: [number, number] }).__still);
+    // One frame of margin at each end, so rounding never lands the copied
+    // frame on a moment the template was still moving.
+    const margin = 1000 / fps;
+    const held = (t: number) => !!still && still[1] - still[0] > 2 * margin && t * 1000 >= still[0] + margin && t * 1000 <= still[1] - margin;
+    let settled = "";
+    for (let i = 0; i < frames; i++) {
+      const t = i / fps;
+      const file = path.join(dir, `f${String(i).padStart(5, "0")}.png`);
+      if (!held(t) || !settled) {
+        await page.evaluate((ms2) => (window as unknown as { __seek: (t: number) => void }).__seek(ms2), t * 1000);
+        await page.screenshot({ path: file, omitBackground: transparent });
+        if (held(t) && !settled) settled = file;
+      } else {
+        fs.copyFileSync(settled, file);
+      }
     }
+    return dir;
+  } finally {
+    await browser.close();
   }
-  await browser.close();
-  return dir;
 }
 
 /** A title card as an H.264 segment at the final canvas size, plus (for the
@@ -112,7 +129,7 @@ export async function renderCard(
   spec: { title: string; subtitle?: string; ms: number },
   w: number, h: number, fps: number, theme: Theme,
 ): Promise<{ mp4: string; cover?: string }> {
-  const dir = await renderFrames(cardHtml(w, h, theme, spec.title, spec.subtitle, spec.ms), w, h, spec.ms, fps, false, { inMs: Math.min(420, spec.ms * 0.22), outMs: Math.min(320, spec.ms * 0.18) });
+  const dir = await renderFrames(cardHtml(w, h, theme, spec.title, spec.subtitle, spec.ms), w, h, spec.ms, fps, false);
   const mp4 = path.join(outDir, `.card-${kind}.mp4`);
   execFileSync(ffmpeg, ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", path.join(dir, "f%05d.png"), "-c:v", "libx264", "-crf", "17", "-preset", "veryfast", "-pix_fmt", "yuv420p", mp4], { stdio: "inherit" });
   let cover: string | undefined;
@@ -132,7 +149,7 @@ export async function renderCalloutOverlay(
   c: { box: { x: number; y: number; width: number; height: number }; label?: string; ms: number },
   w: number, h: number, fps: number, fontSize: number, ink: string,
 ): Promise<string> {
-  const dir = await renderFrames(calloutHtml(w, h, c.box, c.label, c.ms, fontSize, ink), w, h, c.ms, fps, true, { inMs: Math.min(360, c.ms * 0.25), outMs: Math.min(280, c.ms * 0.2) });
+  const dir = await renderFrames(calloutHtml(w, h, c.box, c.label, c.ms, fontSize, ink), w, h, c.ms, fps, true);
   const webm = path.join(outDir, `.callout-${index}.webm`);
   execFileSync(ffmpeg, ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", path.join(dir, "f%05d.png"), "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "28", webm], { stdio: "inherit" });
   fs.rmSync(dir, { recursive: true, force: true });
@@ -162,11 +179,18 @@ export async function renderTitledCover(
   <div class="shot"></div><div class="veil"></div>
   <div class="txt"><p class="t">${escapeHtml(spec.title)}</p><div class="r"></div>${spec.subtitle ? `<p class="s">${escapeHtml(spec.subtitle)}</p>` : ""}</div>`;
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: w, height: h } });
-  await page.setContent(html, { waitUntil: "load" });
-  await page.screenshot({ path: out });
-  await browser.close();
-  return out;
+  try {
+    const page = await browser.newPage({ viewport: { width: w, height: h } });
+    await page.setContent(html, { waitUntil: "load" });
+    await page.screenshot({ path: out });
+    return out;
+  } finally {
+    await browser.close();
+  }
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** @internal The card template, exported so test/cards.test.ts can prove the
+    frame-skipping is byte-identical to shooting every frame. */
+export const __test_cardHtml = cardHtml;
