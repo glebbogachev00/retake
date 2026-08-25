@@ -195,6 +195,24 @@ export function capSecondsFor(m: Manifest): number {
   return Math.min(3600, Math.max(240, Math.round(m.steps.length * 10 + waits)));
 }
 
+
+/** What the LAST take of this demo actually cost, in seconds of wall clock.
+ *
+ * Measured, because estimating it does not work. Fitted against 31 real takes,
+ * step count predicts capture time with ~33% mean error and is wrong in both
+ * directions by 3x: an 11-step demo of a slow remote app took 221s while a
+ * 105-step local one took 116s. What the app does between the steps is the
+ * whole cost, and a manifest cannot know that. The previous take can. */
+export function lastCaptureSeconds(outDir: string): number | null {
+  try {
+    const t = JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take;
+    return typeof t.captureSec === "number" && t.captureSec > 0 ? t.captureSec : null;
+  } catch { return null; }
+}
+
+/** Long enough that a person should see a draft before the full take is spent. */
+export const EXPENSIVE_TAKE_SECONDS = 150;
+
 /** Roughly how many times the cursor will move on camera. */
 /** Cursor moves per take. testreel's nested-if overlay died at ~45 (ffmpeg's
     parser stops at 98 levels); scripts/patch-testreel.mjs flattens those

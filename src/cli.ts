@@ -25,7 +25,7 @@ import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { Command } from "commander";
 import { loadManifest, resolve, warnings, type Manifest } from "./manifest.js";
-import { acquireLock, captureHash, record, releaseLock, type Take } from "./record.js";
+import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, lastCaptureSeconds, record, releaseLock, type Take } from "./record.js";
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
@@ -53,17 +53,17 @@ const say = (l: string) => process.stdout.write(l + "\n");
     shape of a demo has paid for something `--preset draft` would have given
     them in a quarter of the time. The tools existed; nothing said so at the
     moment the cost was being incurred. This is that moment. */
-export function costHints(m: Manifest, opts: { preset?: string; until?: string }): string[] {
+export function costHints(m: Manifest, outDir: string, opts: { preset?: string; until?: string }): string[] {
   const q = resolve(m);
-  // Capture runs at roughly 2.3x the finished video; the video is roughly the
-  // steps' own pacing. Rough on purpose — it only has to be right about
-  // whether this is a long take.
-  const waits = m.steps.reduce((n, st) => n + (st.action === "wait" ? st.ms / 1000 : 0) + ((st as { pauseAfter?: number }).pauseAfter ?? 0) / 1000, 0);
-  const est = Math.round((m.steps.length * 1.6 + waits) * 2.3);
-  if (est < 150) return [];
+  // Only says a number it has actually seen. A demo nobody has recorded yet
+  // gets no estimate, because the honest one does not exist: step count
+  // predicts capture time with ~33% error over 31 real takes, and a confident
+  // wrong number is worse than none.
+  const last = lastCaptureSeconds(outDir);
+  if (last === null || last < EXPENSIVE_TAKE_SECONDS) return [];
   const draft = q.name === "draft" || opts.preset === "draft";
-  const mins = (n: number) => (n >= 120 ? `~${Math.round(n / 60)} min` : `~${n}s`);
-  const out = [`ℹ this is a long take (${mins(est)} of capture, roughly).`];
+  const mins = (n: number) => (n >= 120 ? `${Math.round(n / 60)} min` : `${Math.round(n)}s`);
+  const out = [`ℹ the last take of this demo took ${mins(last)} to record.`];
   const ways: string[] = [];
   if (!draft) ways.push("`--preset draft` records the same layout and timing at a quarter of the pixels — use it while the demo is still changing, then run the real preset once");
   if (!opts.until) ways.push("`--until <scene>` stops after one beat, so fixing the ending does not re-record the beginning");
@@ -105,7 +105,7 @@ program
       } catch { /* record fresh */ }
     }
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
-    if (!take) for (const l of costHints(manifest, opts)) say(l);
+    if (!take) for (const l of costHints(manifest, outDir, opts)) say(l);
     say(`▶ ${manifest.title ?? manifest.name} → ${path.relative(process.cwd(), outDir)}${take ? " · reusing last recording" : ""}`);
     say(`[stage] capture ${take ? "skip" : "start"}`);
 

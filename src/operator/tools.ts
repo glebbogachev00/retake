@@ -20,7 +20,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import YAML from "yaml";
 import { loadManifest, resolve } from "../manifest.js";
-import { record, captureHash, acquireLock, releaseLock, type Take } from "../record.js";
+import { record, captureHash, acquireLock, releaseLock, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
 import { render, check, ffmpegBin } from "../render.js";
 import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
@@ -325,7 +325,7 @@ server.registerTool("dry", { description: "Run a demo with no camera: every sele
   return text(r.ok ? `ok: all ${manifest.steps.length} steps resolve` : r.lines.join("\n"));
 });
 
-server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story. Returns the receipts. SIZE IS NOT RECORDED: any take renders at any preset later (`render` with a preset), so never re-record to change the shape and never set `viewport` in a manifest — the preset owns the size and every take at a preset is identical. `check: pass` and healthy audio prove the FILE is sound, not that the demo is good — call `look` at the payoff scene and judge it: can a stranger state the promise from that frame, is the result legible at playback size, is any beat longer than what it tells you? If you cannot answer yes, fix the cut before calling done.", inputSchema: { name: z.string(), preview: z.boolean().default(true), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo") }, annotations: RETAKE_WRITE }, async ({ name, preview, until }) => { LAST_DEMO = name;
+server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story — ALWAYS start there, and on a long demo show that draft to the person before spending the full take. Returns the receipts. SIZE IS NOT RECORDED: any take renders at any preset later (`render` with a preset), so never re-record to change the shape and never set `viewport` in a manifest — the preset owns the size and every take at a preset is identical. `check: pass` and healthy audio prove the FILE is sound, not that the demo is good — call `look` at the payoff scene and judge it: can a stranger state the promise from that frame, is the result legible at playback size, is any beat longer than what it tells you? If you cannot answer yes, fix the cut before calling done.", inputSchema: { name: z.string(), preview: z.boolean().default(true), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo") }, annotations: RETAKE_WRITE }, async ({ name, preview, until }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const loaded = loadManifest(manifestPath(name));
   const manifest = preview ? { ...loaded.manifest, preset: "preview-fast" } : loaded.manifest;
@@ -343,7 +343,18 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     // A failed take is a finding, not a result: say exactly where and what
     // the page showed, so even a small model gets a one-line repair.
     if (failed) return text(`FAILED at step ${failed.index} — ${failed.summary}: ${failed.error ?? "error"}${failed.screen ? `\nOn screen at that moment: “${failed.screen}”` : ""}\nThe camera stopped there (${(take.duration - take.trimBefore).toFixed(0)}s recorded). This is not a demo yet: edit the manifest, dry, run again. Do NOT call done on a failed take.\n\n${summariseTake(take)}`);
-    return text(`${summariseTake(take)}\nvideo: ${a.mp4 ?? "none"}\ncheck: ${c.ok ? "pass" : "FAIL"}\n${c.lines.filter((l) => l.startsWith("FAIL")).join("\n")}`);
+    // The gate: a person's eyes are the only check for whether this is the
+    // RIGHT video, and they are cheapest to apply to a draft. Say so here,
+    // where the agent is deciding what to do next, rather than after the
+    // expensive take has already been spent.
+    // Measured, not estimated: this draft just performed the same demo against
+    // the same app, so its own capture time is what the full take will cost.
+    const took = take.captureSec ?? 0;
+    const mins = took >= 120 ? `${Math.round(took / 60)} min` : `${Math.round(took)}s`;
+    const gate = preview && took >= EXPENSIVE_TAKE_SECONDS && c.ok
+      ? `\n\nTHIS DRAFT TOOK ${mins} TO RECORD, and the full take costs about the same again. Do not run it at full quality yet. Show this draft to the person — \`ask\` them, say how long it is and what it shows, and point them at the Retake window. Their answer is the one thing no check here can give you: whether this is the right video. If they cannot be reached, stop and say what is ready and what the full take would cost; do not spend it on their behalf.`
+      : "";
+    return text(`${summariseTake(take)}\nvideo: ${a.mp4 ?? "none"}\ncheck: ${c.ok ? "pass" : "FAIL"}\n${c.lines.filter((l) => l.startsWith("FAIL")).join("\n")}${gate}`);
   } finally {
     releaseLock(outDir);
   }

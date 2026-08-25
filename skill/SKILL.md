@@ -62,7 +62,24 @@ say so in one line and stop.
    names actually on screen? Anything in shot that shouldn't be (dev
    badges, leftover data, cut-off text)? Wrong story or failed step →
    `edit`, run again. More than four rounds → ask the person.
-8. When it is right: `run` with `preview=false` once (full quality), then
+8. **Before the expensive take, if it is expensive, show them the draft.**
+   `run` prints an estimate before capture. If it said this is a long take
+   (over ~2.5 minutes), do not go straight to full quality: `ask` them,
+   naming the demo and pointing at the draft in the Retake window, and say
+   what the full take will cost. Something like *"Draft is ready — 40s, 6
+   scenes, in the window. Full quality is about 7 minutes of recording.
+   Worth spending, or change something first?"*
+   - **Their taste is the thing you cannot check.** Every mechanical
+     problem is already caught by `dry` and the take's own checks. What a
+     person sees that no checker will is whether the story lands, whether
+     the payoff reads, whether it looks right for their product. Getting
+     that verdict on a cheap draft is the whole point.
+   - **Short take?** Skip the gate. Asking someone to approve a 30-second
+     recording costs them more than just recording it.
+   - **Nobody there to ask?** Never block and never guess. Leave the draft,
+     `done` with what you have and what it would cost, and let them start
+     the expensive one when they are back.
+9. When they say go: `run` with `preview=false` once (full quality), then
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
 
@@ -286,16 +303,21 @@ average is three to five takes per demo. Most of that is avoidable:
 2. **`--until <scene>`** when the fix is in one beat. Re-recording a 60s
    demo to change its last 8 seconds is paying for 50 seconds you already
    have.
-3. **A caption in the wrong place is a nudge, not a take.** `nudge: -1500` on
+3. **Get a person's eyes on a cheap draft before buying an expensive take.**
+   A draft costs a quarter of the pixels and answers the only question a
+   checker cannot: is this the right video? Spending seven minutes of
+   capture to find out the story was wrong is the most expensive mistake
+   available in this tool.
+4. **A caption in the wrong place is a nudge, not a take.** `nudge: -1500` on
    a scene moves its marker 1.5s earlier in the finished video; the caption,
    the still and the thumbnail all follow. Re-render and look — it is seconds.
-4. **Never re-record for a size or a format.** `render outputs/<name>
+5. **Never re-record for a size or a format.** `render outputs/<name>
    --preset post-vertical` re-frames the take you have. Captions, camera,
    speed, cards and posters are all render-time too.
-5. **`dry` before every `run`** — including after the app restarts. It is
+6. **`dry` before every `run`** — including after the app restarts. It is
    ~10s and it catches the wrong-build-on-the-port failure that otherwise
    costs a take and a confusing video.
-6. **Fix everything `dry` and the proof log report in ONE pass.** Reading
+7. **Fix everything `dry` and the proof log report in ONE pass.** Reading
    the whole failure list before editing turns three rounds into one.
 
 ## Judging the cut
