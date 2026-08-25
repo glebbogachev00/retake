@@ -195,6 +195,75 @@
   .stmt h2{font-size:26px}
   .stmt h2 br{display:none}
 }
+
+/* ── The layout that fixes the floating headings ─────────────────────────
+   Every section was a heading alone above a gap, with a 640px column of
+   text inside an 880px page — a permanent void down the right and a title
+   with nothing beside it. Sections are two columns now: what this is on
+   the left, what it shows on the right. The left column sticks while you
+   read the right one, so scrolling a long section still tells you where
+   you are. */
+section{display:grid;grid-template-columns:minmax(0,215px) minmax(0,1fr);gap:4px 54px;
+  align-items:start;margin-top:88px}
+.shead{grid-column:1;position:sticky;top:26px}
+section > *:not(.shead){grid-column:2}
+.shead h2{font-size:21px;line-height:1.22;letter-spacing:-.018em;font-weight:600;margin:0 0 8px}
+.shead .sub{font-size:14px;line-height:1.6;margin:0;color:var(--muted);max-width:none}
+section > .sub{font-size:16.5px;margin:0 0 22px;max-width:60ch}
+
+/* One control, not a box with a button loose beside it. */
+.copyline{display:flex;align-items:stretch;gap:0;background:var(--card);border-radius:16px;
+  overflow:hidden;margin-top:0}
+.copyline .say{flex:1;margin:0;background:transparent;border-radius:0;padding:18px 20px}
+.copybtn{flex:none;border:0;border-left:1px solid var(--rule);background:transparent;
+  color:var(--ink);padding:0 24px;font:14px/1 inherit;font-weight:600;cursor:pointer;
+  transition:background .15s,color .15s}
+.copybtn:hover{background:var(--ink);color:var(--card)}
+
+/* The numbers the page already earned, said out loud. */
+.punch{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}
+.punch b{display:inline-flex;align-items:baseline;gap:7px;background:var(--card);
+  border-radius:99px;padding:7px 15px;font-size:13.5px;font-weight:500;color:var(--muted)}
+.punch b i{font-style:normal;font-weight:700;color:var(--ink);font-size:15px;
+  font-variant-numeric:tabular-nums}
+
+@media (max-width:820px){
+  section{grid-template-columns:1fr;gap:10px}
+  .shead{position:static}
+  section > *:not(.shead){grid-column:1}
+  .shead h2{font-size:24px}
+  .copyline{flex-direction:column}
+  .copybtn{border-left:0;border-top:1px solid var(--rule);padding:14px 20px}
+}
+
+/* Wide content does not belong in a 600px column. A section whose payload is
+   a grid of cards goes back to full width, heading above it — three cards
+   squeezed into two thirds of the page was worse than the problem I was
+   fixing. */
+section:has(.cases), section:has(.grid), section:has(.videos){grid-template-columns:1fr}
+section:has(.cases) .shead, section:has(.grid) .shead, section:has(.videos) .shead{
+  position:static;grid-column:1;margin-bottom:20px;display:grid;
+  grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:6px 40px;align-items:baseline}
+section:has(.cases) .shead h2, section:has(.grid) .shead h2, section:has(.videos) .shead h2{
+  font-size:24px;margin:0}
+section:has(.cases) > *:not(.shead), section:has(.grid) > *:not(.shead),
+section:has(.videos) > *:not(.shead){grid-column:1}
+
+/* Code that runs past the edge is just broken. Scroll it, and let the long
+   comment wrap rather than disappear. */
+pre, .term{overflow-x:auto;max-width:100%}
+pre code, .term code{white-space:pre}
+@media (max-width:820px){
+  section:has(.cases) .shead, section:has(.grid) .shead, section:has(.videos) .shead{
+    grid-template-columns:1fr}
+}
+.note-after{margin:10px 0 0;font-size:13.5px;color:var(--muted)}
+
+/* A section with no left-hand heading has nothing to sit beside, so it must
+   not be pushed into the right column — that is what shoved the maker note
+   and the changelog 270px inward against empty space. */
+section:not(:has(.shead)){grid-template-columns:1fr}
+section:not(:has(.shead)) > *{grid-column:1}
 </style>
 </head>
 <body>
@@ -248,8 +317,10 @@
   </section>
 
   <section>
-    <h2>Built against three real workflows</h2>
-    <p class="sub" style="max-width:640px">Retake was built inside these, not for a landing page. All three are mine — there are no customer quotes here yet, and this page is not going to pretend otherwise.</p>
+    <div class="shead">
+      <h2>Built against three real workflows</h2>
+      <p class="sub" style="max-width:640px">Retake was built inside these, not for a landing page. All three are mine — there are no customer quotes here yet, and this page is not going to pretend otherwise.</p>
+    </div>
     <div class="cases">
       <div class="case">
         <div class="wordmark"><span class="serif">capture<span style="color:#2F5D3F">.</span></span></div>
@@ -273,20 +344,25 @@
   </section>
 
   <section id="start">
-    <h2>Give it to your agent</h2>
-    <p class="sub">The link is the instruction. The README tells your agent how to install, wire itself up, and open the window for you. You say what to show.</p>
+    <div class="shead">
+      <h2>Give it to your agent</h2>
+      <p class="sub">The link is the instruction. The README tells your agent how to install, wire itself up, and open the window for you. You say what to show.</p>
+    </div>
     <div class="copyline">
       <div class="say"><span class="who">In Claude Code, Codex, Cursor — the agent you already use</span><i id="pasteline">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
       <button class="copybtn" data-copy="pasteline">Copy</button>
     </div>
     <p class="sub" style="margin:22px 0 10px">Doing it yourself is two commands:</p>
-    <pre>npm install -g retake-demos     <span class="c"># Node 20+; ffmpeg bundled, Chromium downloads once</span>
+    <pre>npm install -g retake-demos
 mkdir demos && cd demos && retake install</pre>
+    <p class="note-after">Node 20 or newer. ffmpeg comes bundled; Chromium downloads once.</p>
   </section>
 
   <section id="how">
-    <h2>How it works</h2>
-    <p class="sub">You provide intent. The agent writes the flow. Retake verifies, records, and renders it.</p>
+    <div class="shead">
+      <h2>How it works</h2>
+      <p class="sub">You provide intent. The agent writes the flow. Retake verifies, records, and renders it.</p>
+    </div>
     <div class="how">
       <div class="step"><div><b>You ask</b><p>"Record a demo of checkout." That sentence is the brief for the agent you already use.</p></div></div>
       <div class="step"><div><b>Your agent builds and checks the flow</b><p>It reads your app, writes a small YAML demo, and dry-runs every selector and wait. Nothing records until the walkthrough works.</p></div></div>
@@ -296,8 +372,10 @@ mkdir demos && cd demos && retake install</pre>
   </section>
 
   <section>
-    <h2>What's in the box</h2>
-    <p class="sub">Everything required to produce the same clean take again.</p>
+    <div class="shead">
+      <h2>What's in the box</h2>
+      <p class="sub">Everything required to produce the same clean take again.</p>
+    </div>
     <div class="grid">
       <div class="cell"><b>Scenes with captions</b><p>Captions timed from the actual run, placed under the app — never over it. Every scene also yields a crisp still.</p></div>
       <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
@@ -317,8 +395,10 @@ mkdir demos && cd demos && retake install</pre>
   </section>
 
   <section>
-    <h2>Record your first rerunnable demo</h2>
-    <p class="sub" style="max-width:620px">The demo outlives the video. When the next release moves a button, the fix is a line in a file — and landscape, square, vertical and the GIF all re-render from the same take.</p>
+    <div class="shead">
+      <h2>Record your first rerunnable demo</h2>
+      <p class="sub" style="max-width:620px">The demo outlives the video. When the next release moves a button, the fix is a line in a file — and landscape, square, vertical and the GIF all re-render from the same take.</p>
+    </div>
     <div class="copyline">
       <div class="say"><span class="who">Start with the sentence</span><i id="pasteline2">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
       <button class="copybtn" data-copy="pasteline2">Copy</button>
@@ -326,8 +406,10 @@ mkdir demos && cd demos && retake install</pre>
   </section>
 
   <section id="found">
-    <h2>The bugs a test suite cannot see</h2>
-    <p class="sub" style="max-width:660px">A passing test says the code did what it was told. It cannot say the screen made sense. Recording one long flow at a speed a person can actually read turned up five real problems that a suite of 428 passing checks had no way to notice:</p>
+    <div class="shead">
+      <h2>The bugs a test suite cannot see</h2>
+      <p class="sub" style="max-width:660px">A passing test says the code did what it was told. It cannot say the screen made sense. Recording one long flow at a speed a person can actually read turned up five real problems that a suite of 428 passing checks had no way to notice:</p>
+    </div>
     <div class="found">
       <h3>One demo. Five bugs, all shipped, all obvious on sight.</h3>
       <p class="lede">From a single long recording made for a launch video. Finding these was not the goal; it was a side effect of watching the thing play back.</p>
