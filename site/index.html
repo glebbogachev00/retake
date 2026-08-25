@@ -408,19 +408,19 @@ mkdir demos && cd demos && retake install</pre>
   <section id="found">
     <div class="shead">
       <h2>The bugs a test suite cannot see</h2>
-      <p class="sub" style="max-width:660px">A passing test says the code did what it was told. It cannot say the screen made sense. Recording one long flow at a speed a person can actually read turned up five real problems that a suite of 428 passing checks had no way to notice:</p>
+      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. Watch a demo at the speed a person reads, and you check all of them at once — without having to decide first what to look for. That is the whole difference, and this is what it caught.</p>
     </div>
     <div class="found">
-      <h3>One demo. Five bugs, all shipped, all obvious on sight.</h3>
-      <p class="lede">From a single long recording made for a launch video. Finding these was not the goal; it was a side effect of watching the thing play back.</p>
+      <h3>One demo. Five real bugs, all live, all obvious the second you watch.</h3>
+      <p class="lede">These came out of one long recording made for a launch video. Nobody was looking for them.</p>
       <ul>
-        <li>A step that had quietly become <b>mandatory</b> while still telling users it was optional.</li>
-        <li>A raw <b>IANA timezone string</b> shown to a customer where a city name belonged.</li>
-        <li><b>Radio buttons</b> stretched to the width of a text field.</li>
-        <li>A <b>squashed logo</b>, wrong aspect ratio, on a page nobody had looked at in months.</li>
-        <li>An <b>ISO timestamp</b> in the subject line of a customer-facing email.</li>
+        <li>A form still said a step was <b>optional</b>. It had been required for weeks.</li>
+        <li>A customer was shown a <b>raw timezone code</b> where the name of a city should have been.</li>
+        <li><b>Radio buttons</b> stretched across the entire width of the form.</li>
+        <li>A <b>squashed logo</b>, on a page nobody had opened in months.</li>
+        <li>An email subject line with a <b>machine timestamp</b> in it.</li>
       </ul>
-      <p class="tail">Every one of them was invisible to an assertion and unmissable to an eye. That is the part worth keeping: the video is the deliverable, but the <i>watching</i> is the audit — and because the demo is a file, it reruns on the next release and you watch again for free.</p>
+      <p class="tail">A test can only check what somebody thought to check. Watching catches the rest — and because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
     </div>
   </section>
 
