@@ -257,6 +257,26 @@ is the wrong moment, and each has cost a take:
 Prefer these to a flat `wait`. A timer that happens to work today is the
 thing that breaks when the app gets slower.
 
+## Cheap iteration — a demo should not cost five takes
+
+A take is real time (capture is ~2.3× the finished video) and the field
+average is three to five takes per demo. Most of that is avoidable:
+
+1. **Draft everything.** `--preset draft` has the same layout and timing at
+   a quarter of the pixels. Judge the story there; switch to a post preset
+   once, at the end.
+2. **`--until <scene>`** when the fix is in one beat. Re-recording a 60s
+   demo to change its last 8 seconds is paying for 50 seconds you already
+   have.
+3. **Never re-record for a size or a format.** `render outputs/<name>
+   --preset post-vertical` re-frames the take you have. Captions, camera,
+   speed, cards and posters are all render-time too.
+4. **`dry` before every `run`** — including after the app restarts. It is
+   ~10s and it catches the wrong-build-on-the-port failure that otherwise
+   costs a take and a confusing video.
+5. **Fix everything `dry` and the proof log report in ONE pass.** Reading
+   the whole failure list before editing turns three rounds into one.
+
 ## Judging the cut
 
 `check: pass` proves the file is sound, not that the demo is good. Before

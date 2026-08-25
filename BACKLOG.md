@@ -2,6 +2,57 @@
 
 What's next for Retake, in the open. Roughly in order.
 
+## Speed: where the time actually goes
+
+Measured over 35 takes (2026-08-25), not guessed:
+
+| | share | median |
+|---|---|---|
+| capture (browser doing the demo) | **69%** | 37.7s |
+| render (ffmpeg + cards + stills) | 31% | 16.3s |
+
+Capture runs at **2.3× the length of the video it produces**. A median take
+is ~54s end to end. But the real cost is not one take — the field audits
+recorded **three to five takes per finished demo**, so a demo costs 3–5
+minutes of wall clock and the tokens to drive it. Speed work should attack
+the number of takes first and the seconds per take second.
+
+**Done (2026-08-25):** cards render only their animated frames (33.8s →
+18.2s), stills seek by keyframe in parallel (3s → 1.6s). Size changes are
+re-renders, not re-records. `compressIdle` shortens the video without
+shortening the recording.
+
+### Fewer takes — where the minutes are
+
+- **Render-time scene markers** (see above). The single biggest one: caption
+  placement currently costs a whole take, and the audit spent three takes
+  on one beat, all differing only in where a `scene` sat. Would turn those
+  into 16s re-renders.
+- **`--until <scene>` is under-used.** It exists and records up to one beat.
+  An agent iterating on the payoff of a 60s demo is paying for the first 50s
+  every time. The skill mentions it; it should be the default move when the
+  fix is in the last scene.
+- **Draft first, always.** `--preset draft` is a quarter of the pixels with
+  the same layout: measured 22.4s capture / 1.2s render against 30.1s / 3.6s.
+  Nothing about the story needs 1080p to judge.
+- **`dry` before every `run`, including after a server restart.** One
+  session lost five takes to a dev server serving a stale build. `dry` is
+  ~10s and now names a wrong app outright.
+
+### Seconds per take — what is left
+
+- **Cards still cost ~18s** on a two-card cut: ~50 Playwright screenshots at
+  1920×1230. Options, cheapest first: reuse one browser across both cards
+  and the callouts (2–3 launches saved); shoot the entrance per-frame but do
+  the exit as an ffmpeg `fade` (halves the shots); or render two PNGs and let
+  ffmpeg do the whole thing (fastest, loses the rule-growth flourish).
+- **Two encodes on post presets** — compose to a CRF-14 master, then derive
+  the deliverable. Correct for archiving, but `--no-master` would give a
+  ~40% faster path for anything not being kept.
+- **Capture's 1.3× overhead** beyond the demo itself is browser launch, page
+  load, seeds and teardown. A warm browser reused across takes in one agent
+  session is the obvious idea and the fiddliest to do safely.
+
 ## The launch formula, in phases
 
 Retake serves one person on two days: the day a plain walkthrough is enough
