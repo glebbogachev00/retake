@@ -193,6 +193,7 @@ export type RecordOptions = {
       is. The MCP run tool threw the log away entirely, which is why the
       window said "Recording…" and then nothing at all for sixteen minutes. */
   onProgress?: (p: { phase: "setup" | "recording" | "done"; step: number; total: number; label: string }) => void;
+
 };
 
 const noop = () => {};

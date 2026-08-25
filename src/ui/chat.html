@@ -703,7 +703,11 @@ function drawProgress(a) {
     return;
   }
   box.style.display = '';
-  const pct = Math.min(100, Math.round((p.step / p.total) * 100));
+  // The last STEP is not the end of the take: the final hold still has to
+  // play, the video still has to be finalised and its dead tail trimmed. A
+  // bar sitting at 100% while the thing is visibly still going is the kind
+  // of small lie that makes someone stop trusting the rest of the window.
+  const pct = Math.min(96, Math.round((p.step / p.total) * 96));
   $('liveBar').style.width = pct + '%';
   $('liveCount').textContent = `step ${p.step} of ${p.total}`;
 }
