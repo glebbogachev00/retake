@@ -4,17 +4,23 @@
     {
       "version": "0.4.0",
       "date": "2026-08-25",
-      "headline": "Videos come out the size you asked for — and changing your mind is free",
+      "headline": "Videos come out the size you asked for — and changing your mind is nearly free",
       "notes": [
-        "Every video is now exactly the size of the format you picked. Landscape is 1920×1080, square is square, vertical fits a phone. No more sizes drifting between takes.",
-        "Want it in another shape? It re-renders from the recording you already have, in seconds. Same for the captions, the speed, the zoom, the title card and the cover image. Recording again is only for when the demo itself changed.",
+        "Every video is exactly the size of the format you picked. Landscape is 1920×1080, square is square, vertical fits a phone. No more sizes drifting between takes.",
+        "Changing your mind costs seconds, not another recording. Size, shape, format, captions, speed, zoom, music, title cards and the cover image all re-make themselves from the recording you already have.",
+        "Moved a caption to the wrong moment? Nudge it. The caption, the still and the cover all follow, and you never record again.",
+        "Only the ending changed? Record only the ending. The earlier steps still run so your app gets to the right place, but they happen at full speed and off camera. On a seven-minute demo that is about three minutes instead of sixteen.",
+        "Your old recordings are kept. A re-record no longer throws away the take you had — you can look at the previous ones and go back to any of them. Only the recording itself is stored, so it stays small.",
+        "A failed recording can no longer cost you the one that worked.",
+        "New: clear out old files safely. It shows you what it would free before removing anything, and never touches a recording.",
+        "In the window: pick several demos at once — or a whole folder — and archive them together. The archive empties in one click.",
         "Launch videos can open with a title card and close with your own sign-off, put music underneath, and add a spoken voiceover.",
-        "Dead air gets trimmed. While your app is thinking, the video speeds through the wait instead of sitting in it.",
-        "You choose the cover image. Click any frame of your video to make it the one people see first — and it stays chosen.",
-        "You can sign in to a demo account without any AI ever seeing your password. You type it into your own browser window once; Retake keeps the session, not the password.",
+        "Dead air gets trimmed: while your app is thinking, the video moves through the wait instead of sitting in it.",
+        "You can sign in to a demo account without any AI ever seeing your password.",
         "Renders are about twice as fast.",
-        "The window has been rebuilt: one place for everything, and it stops shouting at you.",
-        "A demo can no longer leave something running on your machine after it finishes."
+        "Your agent now checks far more before recording — that a click will land on something clickable, that a stub is really being used, that it is looking at the same screen the recording will — so fewer takes are wasted finding out mid-recording.",
+        "On a long demo your agent shows you a quick draft and asks before spending the full recording.",
+        "The window has been rebuilt: one place for everything, and it stops shouting at you."
       ]
     },
     {

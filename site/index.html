@@ -48,7 +48,7 @@
   .btn.dark:hover { opacity:.9; }
   .btn.light { border:1px solid var(--rule2); color:var(--ink); background:#fff; }
   .btn.light:hover { border-color:var(--ink); }
-  .say { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:18px 22px; margin:46px 0 10px; font-size:16.5px; box-shadow:0 1px 0 rgba(24,28,24,.03); }
+  .say { background:var(--card); border:0; border-radius:16px; padding:20px 24px; margin:46px 0 10px; font-size:16.5px; }
   .say .who { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:6px; }
   .say i { font-style:normal; }
   .arrow { text-align:center; color:var(--muted); margin:8px 0; }
@@ -57,9 +57,9 @@
   .shot video { width:100%; height:auto; display:block; }
   .shot figcaption { background:var(--card); padding:12px 18px 14px; font-size:14px; color:var(--muted); }
   .shot figcaption b { color:var(--ink); font-weight:600; }
-  section { margin-top:84px; }
-  h2 { font-size:24px; letter-spacing:-.015em; margin:0 0 8px; }
-  .sub { color:var(--muted); margin:0 0 26px; max-width:560px; }
+  section { margin-top:112px; }
+  h2 { font-size:27px; letter-spacing:-.02em; font-weight:600; margin:0 0 10px; }
+  .sub { color:var(--muted); margin:0 0 30px; max-width:560px; font-size:16.5px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; }
   .cell { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:18px 20px; }
   .cell b { display:block; margin-bottom:6px; font-size:15px; }
@@ -111,7 +111,7 @@
   .foot { margin-top:80px; padding-top:22px; border-top:1px solid var(--rule); color:var(--muted); font-size:13.5px; display:flex; gap:18px; flex-wrap:wrap; }
   .foot a { color:inherit; }
 
-.rel{border-top:1px solid var(--line,#dcdfd6);padding:18px 0}
+.rel{border-top:1px solid var(--rule);padding:22px 0}
 .rel:first-child{border-top:0;padding-top:4px}
 .relhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:8px}
 .relhead b{font-size:17px;letter-spacing:-.01em}
@@ -121,13 +121,24 @@
 .rel li{margin:5px 0;line-height:1.55;opacity:.86}
 .rel:not(.latest) ul{opacity:.72}
 
-.found{border:1px solid var(--rule2);border-radius:14px;padding:22px 24px;background:var(--card);max-width:760px}
+.found{border:0;border-radius:16px;padding:24px 26px;background:var(--card);max-width:760px}
 .found h3{margin:0 0 4px;font-size:17px;letter-spacing:-.01em}
 .found .lede{margin:0 0 16px;color:var(--muted);font-size:14.5px;line-height:1.6}
 .found ul{margin:0;padding-left:18px}
 .found li{margin:7px 0;font-size:14px;line-height:1.55;color:var(--muted)}
 .found li b{color:var(--ink);font-weight:600}
 .found .tail{margin:16px 0 0;font-size:13px;color:var(--muted);opacity:.85;line-height:1.55}
+
+.news{border-top:1px solid var(--rule);padding-top:26px}
+.news>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:12px;padding:2px 0}
+.news>summary::-webkit-details-marker{display:none}
+.news>summary .lab{font-size:20px;letter-spacing:-.015em;font-weight:600;color:var(--ink)}
+.news>summary .ver{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.news>summary .cue{margin-left:auto;font-size:13.5px;color:var(--muted)}
+.news>summary .cue::after{content:" ›";}
+.news[open]>summary .cue::after{content:" ‹";}
+.news>summary:hover .cue{color:var(--ink)}
+.news #releases{margin-top:20px}
 </style>
 </head>
 <body>
@@ -147,7 +158,6 @@
       <a class="btn light" href="#proof">Watch the 14-second demo</a>
     </div>
     <p class="flow">one prompt <span>→</span> a YAML demo <span>→</span> dry-run checked <span>→</span> recorded <span>→</span> rerun on the next release</p>
-    <p class="terms">MIT licensed · runs on your machine · no account, nothing uploaded</p>
   </div>
 
   <div class="say"><span class="who">The release renamed a button. This is the whole fix</span>
@@ -252,13 +262,15 @@ mkdir demos && cd demos && retake install</pre>
   </section>
 
   <section id="whatsnew">
-    <h2>What's new</h2>
-    <p class="sub" style="max-width:620px">Every release, in plain words. <a style="color:inherit" href="https://github.com/glebbogachev00/retake/releases">Full history</a>.</p>
-    <div id="releases"></div>
+    <details class="news">
+      <summary><span class="lab">What's new</span><span class="ver" id="newsVer"></span><span class="cue">See the notes</span></summary>
+      <div id="releases"></div>
+      <p class="sub" style="margin:18px 0 0;font-size:14px">Every release, in plain words. <a style="color:inherit" href="https://github.com/glebbogachev00/retake/commits/main">Every change</a>.</p>
+    </details>
   </section>
 
   <div class="foot">
-    <span>MIT licensed.</span>
+    <span>MIT licensed · runs on your machine, nothing uploaded.</span>
     <a href="https://github.com/glebbogachev00/retake">Source</a>
     <span>Built on Playwright, testreel, and ffmpeg.</span>
     <a href="https://github.com/glebbogachev00/retake/issues/new?template=bug.md">Report a bug</a>
@@ -302,6 +314,9 @@ const CANDIDATES = [
   try { data = await (await fetch(base + 'releases.json')).json(); } catch { host.closest('section').remove(); return; }
   const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
   const fmt = (d) => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? '' : x.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }); };
+  const v = document.getElementById('newsVer');
+  const newest = (data.releases || [])[0];
+  if (v && newest) v.textContent = newest.version + (newest.date ? ' · ' + fmt(newest.date) : '');
   host.innerHTML = (data.releases || []).map((r, i) => (
     '<div class="rel' + (i ? '' : ' latest') + '">' +
       '<div class="relhead"><b>' + esc(r.headline) + '</b>' +
