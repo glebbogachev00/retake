@@ -69,6 +69,16 @@ async function waitForHuman(kind: "question" | "approve", text: string, detail?:
   }
 }
 
+
+/** Tell the window how far into a recording we are. Fire-and-forget: a demo
+    must never fail because a progress ping did not land. */
+async function progress(p: { phase: string; step: number; total: number; label: string }) {
+  if (!UI) return;
+  const body = JSON.stringify({ progress: { ...p, demo: LAST_DEMO || undefined } });
+  const url = SESSION ? `${UI}/api/operator/${SESSION}/log` : `${UI}/api/activity`;
+  await fetch(url, { method: "POST", body }).catch(() => {});
+}
+
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const safe = (s: string) => /^[a-z0-9-]+$/.test(s);
 const manifestPath = (name: string) => path.join(DEMOS, `${name}.yaml`);
@@ -343,7 +353,12 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);
     let take: Take;
     try {
-      take = await record(manifest, { outDir, manifestDir: DEMOS, locked: true, until, from, log: () => {} });
+      take = await record(manifest, {
+        outDir, manifestDir: DEMOS, locked: true, until, from, log: () => {},
+        // Throttled: a 251-step demo would otherwise be 251 posts, and the
+        // window only needs to know roughly how far along this is.
+        onProgress: (pr) => { if (pr.step === 1 || pr.step === pr.total || pr.step % 2 === 0) void progress(pr); },
+      });
     } catch (e) {
       if (restorePrevious(outDir)) await tell("Recording failed — your previous take has been put back.");
       throw e;

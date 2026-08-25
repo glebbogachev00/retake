@@ -171,6 +171,19 @@
   .arch summary .emptybtn { margin-left:auto; border:1px solid var(--rule2); background:#fff; color:var(--muted); border-radius:8px; font-size:11px; padding:2px 8px; cursor:pointer; }
   .arch summary .emptybtn:hover { background:var(--bad); border-color:var(--bad); color:#fff; }
   .arch summary { display:flex; align-items:center; gap:6px; }
+  .live .prog { margin-top:12px; }
+  .live .bar { height:4px; border-radius:99px; background:var(--rule); overflow:hidden; }
+  .live .bar i { display:block; height:100%; background:var(--amber); border-radius:99px;
+    transition:width .45s cubic-bezier(.2,.7,.3,1); }
+  .live .under { display:flex; align-items:baseline; gap:8px; margin-top:7px; font-size:12.5px; color:var(--muted); }
+  .live .under .sp { flex:1; }
+  .live .count { font-variant-numeric:tabular-nums; }
+  .live .quip { color:var(--ink); font-weight:500; }
+  .live .elapsed { font-variant-numeric:tabular-nums; opacity:.7; }
+  .spin { width:9px; height:9px; border-radius:99px; background:var(--amber); flex:none;
+    animation:pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity:.35; transform:scale(.82) } 50% { opacity:1; transform:scale(1) } }
+  @media (prefers-reduced-motion:reduce) { .spin { animation:none; opacity:.9 } .live .bar i { transition:none } }
 </style>
 </head>
 <body>
@@ -186,7 +199,11 @@
   <div class="wrap two">
     <div class="col-main">
     <div class="live" id="live">
-      <div class="head"><span class="dot live" id="liveDot"></span><b id="liveWho"></b><span id="liveWhat"></span></div>
+      <div class="head"><span class="spin" id="liveDot"></span><b id="liveWho"></b><span id="liveWhat"></span></div>
+      <div class="prog" id="liveProg" style="display:none">
+        <div class="bar"><i id="liveBar" style="width:0%"></i></div>
+        <div class="under"><span class="quip" id="liveQuip"></span><span class="sp"></span><span class="count" id="liveCount"></span><span class="elapsed" id="liveElapsed"></span></div>
+      </div>
       <div class="lines" id="liveLines"></div>
     </div>
     <div class="pin" id="pin">
@@ -613,14 +630,77 @@ function askSecrets(r) {
 
 // ---- the live feed: an agent working shows up here as it works -------------
 function watchActivity() {
+
+// While a take runs there is nothing to look at and a lot of time to look at
+// it. A bar for how far in, a clock for how long, and something to read that
+// is not a spinner. Recording-flavoured, because that is what is happening,
+// and none of them claim progress they do not have.
+const QUIPS = [
+  'Rolling.', 'Lining up the shot.', 'Waiting on your app.',
+  'Not fumbling the take.', 'Holding the frame.', 'Letting the app think.',
+  'Clicking things, patiently.', 'Doing the boring part.',
+  'Take one. Also the only take.', 'Typing at a speed people can read.',
+  'Watching the spinner so you do not have to.', 'No sighing this time.',
+  'Getting it right the first time, on purpose.',
+];
+let quipAt = 0, quipTimer = null, elapsedTimer = null, runStart = 0;
+
+function fmtElapsed(ms) {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return t < 60 ? t + 's' : Math.floor(t / 60) + 'm ' + String(t % 60).padStart(2, '0') + 's';
+}
+
+function startLiveTickers(startedAt) {
+  runStart = startedAt || Date.now();
+  if (!quipTimer) {
+    // Slow enough to read, and it only moves while something is happening.
+    quipTimer = setInterval(() => {
+      quipAt = (quipAt + 1) % QUIPS.length;
+      const q = $('liveQuip'); if (q) q.textContent = QUIPS[quipAt];
+    }, 4200);
+  }
+  if (!elapsedTimer) {
+    elapsedTimer = setInterval(() => {
+      const e = $('liveElapsed'); if (e) e.textContent = fmtElapsed(Date.now() - runStart);
+    }, 1000);
+  }
+}
+function stopLiveTickers() {
+  clearInterval(quipTimer); clearInterval(elapsedTimer);
+  quipTimer = elapsedTimer = null;
+}
+
+function drawProgress(a) {
+  const box = $('liveProg'); if (!box) return;
+  const p = a && a.progress;
+  if (!a || !a.active) { box.style.display = 'none'; stopLiveTickers(); return; }
+  startLiveTickers(a.startedAt);
+  if (!$('liveQuip').textContent) $('liveQuip').textContent = QUIPS[0];
+  $('liveElapsed').textContent = fmtElapsed(Date.now() - (a.startedAt || Date.now()));
+  if (!p || !p.total) {
+    // Working, but nothing countable yet — show the clock, not a fake bar.
+    box.style.display = '';
+    $('liveBar').style.width = '0%';
+    $('liveCount').textContent = '';
+    return;
+  }
+  box.style.display = '';
+  const pct = Math.min(100, Math.round((p.step / p.total) * 100));
+  $('liveBar').style.width = pct + '%';
+  $('liveCount').textContent = `step ${p.step} of ${p.total}`;
+}
+
   const es = new EventSource('/api/activity/stream');
   const apply = (a) => {
     if (!a || (!a.active && !a.lines?.length)) return;
     $('live').classList.add('show');
-    $('liveDot').className = 'dot ' + (a.active ? 'live' : 'ok');
+    // 'spin' has to survive: this line used to replace it wholesale, so the
+    // spinner existed in the markup and never once appeared.
+    $('liveDot').className = a.active ? 'spin' : 'dot ok';
     $('liveWho').textContent = a.active ? (a.who || 'your agent') : 'Done';
     $('liveWhat').textContent = a.demo ? `· ${a.demo}` : '';
     $('liveLines').innerHTML = (a.lines || []).slice(-4).map((l) => `<div>${esc(l)}</div>`).join('');
+    drawProgress(a);
   };
   es.addEventListener('state', (ev) => {
     const d = JSON.parse(ev.data);
@@ -631,6 +711,7 @@ function watchActivity() {
     for (const r of d.secrets || []) askSecrets(r);
   });
   es.addEventListener('line', (ev) => apply(JSON.parse(ev.data)));
+  es.addEventListener('progress', (ev) => apply(JSON.parse(ev.data)));
   es.addEventListener('secrets', (ev) => askSecrets(JSON.parse(ev.data)));
   es.addEventListener('finished', async (ev) => { apply(JSON.parse(ev.data)); await drawDemos(); await newest(); setTimeout(() => $('live').classList.remove('show'), 8000); });
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };

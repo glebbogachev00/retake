@@ -361,7 +361,8 @@ function pickFolder(): Promise<string | null> {
 const BOOT = Date.now();   // pages compare this and reload themselves after a restart
 
 /** A live view of agent-driven work, so the app is a window and not a folder. */
-type Activity = { active: boolean; who: string; demo?: string; lines: string[]; startedAt: number; finishedAt?: number };
+type Progress = { phase: string; step: number; total: number; label: string; demo?: string };
+type Activity = { active: boolean; who: string; demo?: string; lines: string[]; startedAt: number; finishedAt?: number; progress?: Progress };
 const activity: Activity = { active: false, who: "", lines: [], startedAt: 0 };
 const activityWatchers = new Set<(ev: { type: string; data: unknown }) => void>();
 
@@ -379,13 +380,14 @@ type SecretRequest = { id: string; names: string[]; why: string; filled: boolean
 const secretRequests = new Map<string, SecretRequest>();
 const openSecretRequests = () => [...secretRequests.values()].filter((r) => !r.filled).map(({ id, names, why }) => ({ id, names, why }));
 
-function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: string }) {
+function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: string; progress?: Progress }) {
   if (!activity.active && !b.done) { activity.active = true; activity.startedAt = Date.now(); activity.lines = []; activity.finishedAt = undefined; }
   if (b.who) activity.who = b.who;
   if (b.demo) activity.demo = b.demo;
   if (b.line) { activity.lines.push(b.line); if (activity.lines.length > 200) activity.lines.shift(); }
-  if (b.done) { activity.active = false; activity.finishedAt = Date.now(); }
-  for (const w of activityWatchers) w({ type: b.done ? "finished" : "line", data: { ...activity, latest: b.line } });
+  if (b.progress) { activity.progress = b.progress; if (b.progress.demo) activity.demo = b.progress.demo as string; }
+  if (b.done) { activity.active = false; activity.finishedAt = Date.now(); activity.progress = undefined; }
+  for (const w of activityWatchers) w({ type: b.done ? "finished" : b.progress ? "progress" : "line", data: { ...activity, latest: b.line } });
 }
 
 export function serve(port: number) {

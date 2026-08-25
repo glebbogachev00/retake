@@ -189,6 +189,10 @@ export type RecordOptions = {
   skipSeed?: boolean;
   manifestDir: string;
   log?: (line: string) => void;
+  /** Called as each step is performed, so a watcher can show how far in this
+      is. The MCP run tool threw the log away entirely, which is why the
+      window said "Recording…" and then nothing at all for sixteen minutes. */
+  onProgress?: (p: { phase: "setup" | "recording" | "done"; step: number; total: number; label: string }) => void;
 };
 
 const noop = () => {};
@@ -553,6 +557,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         entry.camera = await resolveCamera(page, m, q, step, i);
       }
       log(`[${String(i).padStart(2, "0")}] ${entry.summary}${entry.camera ? ` · camera ${entry.camera.zoom}× on ${entry.camera.focus}` : ""}`);
+      opts.onProgress?.({ phase: "recording", step: i + 1, total: m.steps.length, label: entry.summary });
       try {
         await runStep(rec, page, step, m, ctx);
       } catch (e) {
