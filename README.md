@@ -65,6 +65,7 @@ outputs/<name>/
   cover.png       launch mode: the title card, settled
   cover-titled.png launch mode: a real frame with the title over it
   proof-log.md    result, shot list, every step's timing, pass/fail, what was on screen when it failed
+  contact.png     launch cuts: one timestamped grid of the whole video (`retake contact`)
   take.json       the raw timeline the renderer reads
 ```
 

@@ -257,6 +257,15 @@ is the wrong moment, and each has cost a take:
 Prefer these to a flat `wait`. A timer that happens to work today is the
 thing that breaks when the app gets slower.
 
+## Judging the cut
+
+`check: pass` proves the file is sound, not that the demo is good. Before
+`done`, look: `retake contact outputs/<name>` writes one timestamped grid
+of the whole video (launch cuts get it automatically). Read it for the
+things checks cannot see — a caption that is true when its scene starts and
+false by the end, a payoff nobody can find, four seconds where nothing
+changes. `look` at the payoff scene is the other half.
+
 ## When a take fails
 
 The camera stops at the first failed step, so a failed take is short and

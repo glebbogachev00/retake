@@ -115,6 +115,10 @@ Full reference: `README.md` → "Demo-as-code". The short version:
   `retake render outputs/<name> --preset post-vertical`. Never re-record to
   change a shape, and never set `viewport` — `validate` warns because it
   makes one demo a different shape from the rest.
+- **`retake contact outputs/<name>`** — one timestamped grid of the whole
+  video. This is how you review a cut without pulling frames by hand, and
+  how you check a caption is still true in the middle of its own scene.
+  Launch cuts write `contact.png` automatically.
 - **The poster** is `thumbnail.png`. `outputs.thumbnail: { scene: <label> }` picks the scene; the person can override it in the window from any frame, a generated cover, or their own image (`POST /api/cover/<name>`). Launch mode also writes `cover.png` (the title card) and `cover-titled.png` (a real frame with the title on it) as candidates. Do not re-render to change a poster.
 - **`mode:`** — `demo` (default) proves the interaction: nothing in the frame
   but the product. A CLIENT WALKTHROUGH IS A DEMO. `launch` presents the

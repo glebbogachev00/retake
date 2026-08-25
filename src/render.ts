@@ -622,6 +622,12 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
     }
     mark("thumbnail");
   }
+  // A launch cut is a thing someone signs off, so give them the artifact
+  // that makes signing off possible without ffmpeg by hand.
+  if (m.mode === "launch" && !o.scene && fs.existsSync(path.join(outDir, "demo.mp4"))) {
+    try { contactSheet(outDir, 2, 420, undefined); mark("contact"); } catch (e) { log?.(`contact sheet: ${(e as Error).message}`); }
+  }
+
   // --- 5. scene stills -------------------------------------------------------
   // Every scene already carries its real timestamp, so one crisp frame per
   // scene is free — and a video usually ships with a picture next to it.
@@ -665,6 +671,37 @@ export async function render(m: Manifest, take: Take, outDir: string, opts: Rend
 }
 
 /** GIF straight from the finished demo.mp4 — no re-render, no browser. */
+/** One timestamped contact sheet of the finished video.
+ *
+ * Reviewing a take meant pulling frames out with ffmpeg by hand, a dozen
+ * timestamps at a time, eight videos deep. This is that, once: a grid with
+ * the playback time burned into every cell, so a still can be reasoned about
+ * as a moment rather than a picture. Per-scene stills cannot do this — they
+ * cannot show a caption going false *inside* a scene, and they carry no clock.
+ */
+export function contactSheet(outDir: string, everySec = 2, width = 420, log?: (l: string) => void): string {
+  const mp4 = path.join(outDir, "demo.mp4");
+  if (!fs.existsSync(mp4)) throw new Error(`no demo.mp4 in ${outDir} — render it first`);
+  const dur = probe(mp4).duration;
+  const cells = Math.max(1, Math.ceil(dur / everySec));
+  const cols = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(cells))));
+  const rows = Math.ceil(cells / cols);
+  const fontFile = DEFAULT_FONTS.find((f) => fs.existsSync(f));
+  const font = fontFile ? `fontfile='${fontFile}':` : "";
+  const out = path.join(outDir, "contact.png");
+  // drawtext runs before tile, so each cell carries its own playback time.
+  const vf = [
+    `fps=1/${everySec}`,
+    `scale=${width}:-2`,
+    `drawtext=${font}text='%{pts\\:hms}':x=8:y=8:fontsize=${Math.round(width / 20)}:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=5`,
+    `tile=${cols}x${rows}:margin=8:padding=6:color=#e6e9e2`,
+  ].join(",");
+  ff(["-i", mp4, "-vf", vf, "-frames:v", "1", out], log);
+  if (!fs.existsSync(out)) throw new Error("ffmpeg produced no contact sheet");
+  log?.(`contact: ${cells} frames every ${everySec}s, ${cols}×${rows} → ${path.relative(process.cwd(), out)}`);
+  return out;
+}
+
 export function makeGif(outDir: string, width = 900, fps = 18, log?: (l: string) => void): string {
   const mp4 = path.join(outDir, "demo.mp4");
   if (!fs.existsSync(mp4)) throw new Error("no demo.mp4 to make a GIF from — run the demo first");

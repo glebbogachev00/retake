@@ -452,6 +452,18 @@ program
   });
 
 program
+  .command("contact")
+  .argument("<dir>", "an outputs/<name> dir")
+  .option("--every <seconds>", "seconds between frames", "2")
+  .option("-w, --width <px>", "width of each cell", "420")
+  .description("one timestamped contact sheet of the finished video — the artifact for signing a cut off")
+  .action(async (dir: string, opts: { every: string; width: string }) => {
+    const { contactSheet } = await import("./render.js");
+    const out = contactSheet(path.resolve(dir), Number(opts.every), Number(opts.width), say);
+    say(`✓ ${path.relative(process.cwd(), out)}`);
+  });
+
+program
   .command("gif")
   .argument("<dir>", "an outputs/<name> dir")
   .option("-w, --width <px>", "width", "900")
