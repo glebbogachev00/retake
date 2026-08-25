@@ -430,6 +430,20 @@ export function warnings(m: Manifest): string[] {
       w.push(`\`viewport\` overrides the preset, so this video will be ${m.viewport.width}×${m.viewport.height + band} instead of ${p.name}'s ${p.width}×${p.height}. Two demos of the same app then come out different shapes and players letterbox them. Drop \`viewport\` unless the app genuinely needs it.`);
     }
   }
+  // A navigation that only changes the #fragment does not reload the document.
+  // An SPA keeps every bit of in-memory state, so a stub armed just before it
+  // is never fetched — and the screen looks plausible, just stale, which is
+  // the worst kind of wrong to debug. Knowable from the manifest alone.
+  {
+    const hops = [m.url, ...m.steps.flatMap((st) => (st.action === "navigate" ? [st.url] : []))];
+    for (let i = 1; i < hops.length; i++) {
+      const [a, b] = [hops[i - 1], hops[i]];
+      const strip = (u: string) => u.split("#")[0];
+      if (a !== b && strip(a) === strip(b) && b.includes("#")) {
+        w.push(`step ${i} navigates to \`${b}\` which differs from the previous URL ONLY by its #fragment — the browser will not reload the document. A single-page app keeps all of its in-memory state, so anything you armed just before this (a \`stub\`, a seed) is never re-fetched and the screen looks right but stale. Add a throwaway query param (\`?r=${i}\`) before the fragment to force a real load, or drive the change by clicking the app's own link.`);
+      }
+    }
+  }
   if (m.mode === "demo") {
     const launchy = [m.intro && "intro card", m.outro && "outro card", m.music && "music", m.steps.some((s) => s.action === "callout") && "callouts"].filter(Boolean) as string[];
     if (launchy.length) w.push(`this is \`mode: demo\` but carries ${launchy.join(", ")} — a demo proves the interaction and wants nothing else in the frame. Set \`mode: launch\` if it is a launch video, or drop them.`);

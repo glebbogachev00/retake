@@ -810,14 +810,40 @@ export function check(outDir: string, m?: Manifest): Check {
   }
   if (stalled.length) {
     const worst = stalled[0];
+    // A timestamp says a stall happened; it cannot say why. The frame can —
+    // a spinner, a modal, an error, or the app simply sitting there are four
+    // different problems and "25.5s at 0:56" is the same sentence for all of
+    // them. Pulled from the finished video, so it costs a seek, not a take.
+    const shots: string[] = [];
+    const trim = shownTake.trimBefore ?? 0;
+    for (const [i, t] of stalled.slice(0, 3).entries()) {
+      // A third of the way in: past whatever triggered it, still inside the
+      // held stretch rather than on the frame that ends it.
+      const at = Math.max(0, t.start - trim + Math.min(t.took / 3, 4));
+      const file = path.join(outDir, `stalled-${String(i + 1).padStart(2, "0")}.png`);
+      try {
+        ff(["-ss", at.toFixed(2), "-i", mp4, "-frames:v", "1", "-y", file]);
+        if (fs.existsSync(file)) shots.push(path.relative(process.cwd(), file));
+      } catch { /* a picture is a bonus, never the reason a check fails */ }
+    }
     say(false, `${stalled.length} step${stalled.length > 1 ? "s" : ""} stalled over ${PATIENCE}s — ` +
       `the take holds a still frame there. Worst: ${worst.took.toFixed(1)}s at ` +
       `${Math.floor(worst.start / 60)}:${String(Math.floor(worst.start % 60)).padStart(2, "0")} — ${worst.summary}`);
-    for (const t of stalled.slice(1, 4)) {
-      lines.push(`—     also ${t.took.toFixed(1)}s: ${t.summary}`);
+    if (shots[0]) lines.push(`—     what the frame shows there: ${shots[0]} — open it; a spinner, a modal and an idle app are three different fixes`);
+    for (const [i, t] of stalled.slice(1, 4).entries()) {
+      lines.push(`—     also ${t.took.toFixed(1)}s: ${t.summary}${shots[i + 1] ? ` (${shots[i + 1]})` : ""}`);
     }
   } else {
     say(true, `no step stalled (nothing over ${PATIENCE}s)`);
+  }
+
+  // A stub nobody asked for is a silent lie: the take passes and the screen
+  // shows live data where the demo promised canned. Worth a failed check, not
+  // a footnote — this is the one the reporter spent a morning on.
+  const dead = Object.entries(take.stubHits ?? {}).filter(([, n]) => !n).map(([k]) => k);
+  if (take.stubbed?.length) {
+    if (dead.length) say(false, `${dead.length} stub${dead.length > 1 ? "s" : ""} never answered a request: ${dead.join(", ")} — those screens showed the app's real data. Check the URL pattern matches, and that the page actually re-fetched (a navigate that changes only the #fragment does not reload an SPA).`);
+    else say(true, `all ${take.stubbed.length} stub${take.stubbed.length > 1 ? "s" : ""} answered at least one request`);
   }
 
   const mb = (f: string) => (fs.statSync(f).size / 1e6).toFixed(1) + " MB";
@@ -873,7 +899,10 @@ function renderProof(m: Manifest, take: Take, q: Resolved, a: Partial<Artifacts>
     `- Finished: ${take.finishedAt}`,
     `- Result: **${take.ok ? "all steps passed" : "some steps failed"}**${take.partial ? ` · **partial** — ${take.partial}` : ""}`,
     `- Setup trimmed: ${take.trimBefore.toFixed(1)}s · final length ≈ ${(take.duration - take.trimBefore).toFixed(1)}s`,
-    ...(take.stubbed?.length ? [`- **Stubbed data**: ${take.stubbed.join(", ")} — these screens were fed canned responses, not a live backend.`] : []),
+    ...(take.stubbed?.length ? [`- **Stubbed data**: ${take.stubbed.map((k) => `${k}${take.stubHits ? ` (${take.stubHits[k] ?? 0} request${(take.stubHits[k] ?? 0) === 1 ? "" : "s"})` : ""}`).join(", ")} — these screens were fed canned responses, not a live backend.`] : []),
+    ...(take.stubHits && Object.entries(take.stubHits).some(([, n]) => !n)
+      ? [`- **Stubs that never fired**: ${Object.entries(take.stubHits).filter(([, n]) => !n).map(([k]) => k).join(", ")} — armed, but no request matched, so those screens showed whatever the app really returned. Usually the pattern does not match the real URL, or the page never re-fetched (a navigation that only changes the #fragment does not reload an SPA).`]
+      : []),
     "",
     "## Artifacts",
     "",

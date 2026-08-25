@@ -257,6 +257,24 @@ is the wrong moment, and each has cost a take:
 Prefer these to a flat `wait`. A timer that happens to work today is the
 thing that breaks when the app gets slower.
 
+## Rules the manifest enforces, so you do not have to remember them
+
+`validate` and `dry` refuse these outright rather than letting a take discover
+them:
+
+- **Scene labels are unique.** `thumbnail`, `--until`, the stills and the proof
+  log all address a scene by its label.
+- **The action has to fit the element.** `type` on a `<select>`, `select` on a
+  `<div>`, `upload` on something that is not a file input, `click` on a button
+  that is disabled at that moment — `dry` names the fix.
+- **A navigate that changes only the `#fragment` is flagged.** It does not
+  reload the document, so an SPA keeps its state and a stub armed just before
+  it never fires. Add a throwaway query param, or click the app's own link.
+- **A stub that never answers a request fails `check`.** Armed but unmatched
+  means that screen showed the app's real data.
+- **Seeds may not leave anything running** — no `&`, `nohup`, `pm2`. Starting
+  the app is `start_app`'s job, which the person authorises.
+
 ## Cheap iteration — a demo should not cost five takes
 
 A take is real time (capture is ~2.3× the finished video) and the field

@@ -73,6 +73,10 @@ export type Take = {
   /** Endpoints answered with canned data during this take. Named in the proof
       log so a stubbed demo can never quietly pass as a live one. */
   stubbed?: string[];
+  /** How many requests each stub actually answered. Zero means the stub never
+      matched anything — the take is showing live data where it meant to show
+      canned, and nothing else about the run would say so. */
+  stubHits?: Record<string, number>;
 };
 
 /** What the *recording* depends on — nothing that render can change afterwards.
@@ -288,15 +292,22 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // path — they are different answers to different questions.
   const stubs = new Map<string, Stub>();
   const stubbed: string[] = [];
+  // How many requests each stub actually answered. A stub that answered NONE
+  // is the quiet failure: the take passes, the screen looks plausible, and it
+  // is showing live data the demo was written to replace. Counting is free;
+  // not counting cost someone a morning of reading screenshots.
+  const stubHits = new Map<string, number>();
   const armStub = async (d: Stub) => {
     const key = `${d.method ?? "ANY"} ${d.url}`;
     const fresh = !stubs.has(key);
     stubs.set(key, d);
     if (!stubbed.includes(key)) stubbed.push(key);
+    if (!stubHits.has(key)) stubHits.set(key, 0);
     if (!fresh) return;
     await context.route(d.url, async (route, request) => {
       const cur = stubs.get(key)!;
       if (cur.method && request.method().toUpperCase() !== cur.method.toUpperCase()) return route.fallback();
+      stubHits.set(key, (stubHits.get(key) ?? 0) + 1);
       const body =
         cur.json !== undefined
           ? JSON.stringify(cur.json)
@@ -594,6 +605,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     pageErrors,
     downloads: ctx.downloads,
     stubbed,
+    stubHits: Object.fromEntries(stubHits),
     captureHash: captureHash(m),
     captureSec: Math.round((Date.parse(finishedAt) - Date.parse(startedAt)) / 100) / 10,
   };
