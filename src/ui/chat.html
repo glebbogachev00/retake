@@ -143,11 +143,13 @@
   .relhead { display:flex; flex-wrap:wrap; align-items:baseline; gap:9px; margin-bottom:7px; }
   .relhead b { font-size:14.5px; color:var(--ink); letter-spacing:-.01em; }
   .relmeta { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
-  .rel.latest .relmeta::after { content:"newest"; margin-left:7px; padding:1.5px 7px; border-radius:99px; background:var(--accent,#e8b04b); color:#221f19; font-size:10.5px; font-weight:600; }
+  /* --accent is near-black in this window; the badge needs the amber token or
+     it renders dark ink on a dark pill and reads as a redaction bar. */
+  .rel.latest .relmeta::after { content:"newest"; margin-left:7px; padding:1.5px 7px; border-radius:99px; background:var(--amber); color:#241d0c; font-size:10.5px; font-weight:600; letter-spacing:.01em; }
   .rel ul { margin:0; padding-left:17px; }
   .rel li { margin:4px 0; font-size:13.5px; line-height:1.55; color:var(--muted); }
   .rel:not(.latest) li { opacity:.8; }
-  .chip .ndot { display:inline-block; width:6px; height:6px; border-radius:99px; background:var(--accent,#e8b04b); margin-left:6px; vertical-align:middle; }
+  .chip .ndot { display:inline-block; width:6px; height:6px; border-radius:99px; background:var(--amber); margin-left:6px; vertical-align:middle; }
   .lib h2 { display:flex; align-items:center; gap:8px; }
   .lib h2 .selbtn { margin-left:auto; border:1px solid var(--rule2); background:#fff; color:var(--muted); border-radius:8px; font-size:11.5px; padding:3px 9px; cursor:pointer; line-height:1.4; }
   .lib h2 .selbtn:hover { border-color:var(--ink); color:var(--ink); }
@@ -164,6 +166,11 @@
   .selbar button.go { background:var(--bad); border-color:var(--bad); color:#fff; }
   .selbar button.go:disabled { opacity:.4; cursor:default; }
   .selbar button.go:not(:disabled):hover { filter:brightness(.92); }
+  .group summary .gpick { display:none; width:15px; height:15px; margin-right:2px; accent-color:var(--ink); flex:none; cursor:pointer; vertical-align:middle; }
+  body.selecting .group summary .gpick { display:inline-block; }
+  .arch summary .emptybtn { margin-left:auto; border:1px solid var(--rule2); background:#fff; color:var(--muted); border-radius:8px; font-size:11px; padding:2px 8px; cursor:pointer; }
+  .arch summary .emptybtn:hover { background:var(--bad); border-color:var(--bad); color:#fff; }
+  .arch summary { display:flex; align-items:center; gap:6px; }
 </style>
 </head>
 <body>
@@ -407,7 +414,26 @@ async function drawDemos() {
     det.className = 'group';
     const holdsCurrent = items.some((x) => x.name === current);
     if (open.has(g) || groups.size === 1 || holdsCurrent) det.open = true;
-    det.innerHTML = `<summary><span class="tri">▶</span><span class="fold" aria-hidden="true"></span><b>${esc(g)}</b><small>${items.length}</small></summary>`;
+    det.innerHTML = `<summary><input type="checkbox" class="gpick"><span class="tri">▶</span><span class="fold" aria-hidden="true"></span><b>${esc(g)}</b><small>${items.length}</small></summary>`;
+    // A whole folder in one click — with 35 demos in a handful of projects,
+    // ticking them one at a time is the thing this is meant to replace.
+    const gbox = det.querySelector('.gpick');
+    const names = items.map((x) => x.name);
+    gbox.checked = names.length > 0 && names.every((n) => picked.has(n));
+    // Clicking a checkbox inside <summary> also toggles the folder open/shut,
+    // and preventDefault would stop BOTH — including the tick, which is what
+    // makes "select the folder" look like it did nothing. So the fold is
+    // allowed to happen and then put straight back, and the tick is left
+    // entirely alone.
+    gbox.onclick = (ev) => {
+      ev.stopPropagation();
+      const wasOpen = det.open;
+      const all = names.every((n) => picked.has(n));
+      for (const n of names) all ? picked.delete(n) : picked.add(n);
+      for (const b of det.querySelectorAll('.demo .pick')) b.checked = !all;
+      drawSelBar();
+      setTimeout(() => { det.open = wasOpen; }, 0);
+    };
     det.addEventListener('toggle', () => {
       const now = [...document.querySelectorAll('details.group[open] summary b')].map((b) => b.textContent);
       localStorage.setItem('retake.openGroups', JSON.stringify(now));
@@ -419,11 +445,12 @@ async function drawDemos() {
       const when = p.lastTake ? new Date(p.lastTake.finishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no take yet';
       el.innerHTML = `<input type="checkbox" class="pick"${picked.has(p.name) ? ' checked' : ''}><span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small><button class="zap" title="Archive this demo">✕</button>`;
       const box = el.querySelector('.pick');
-      box.onclick = (ev) => { ev.stopPropagation(); box.checked ? picked.add(p.name) : picked.delete(p.name); drawSelBar(); };
+      const syncGroup = () => { const gb = det.querySelector('.gpick'); if (gb) gb.checked = items.every((x) => picked.has(x.name)); };
+      box.onclick = (ev) => { ev.stopPropagation(); box.checked ? picked.add(p.name) : picked.delete(p.name); syncGroup(); drawSelBar(); };
       el.onclick = () => {
         // In select mode the whole row is the checkbox — hunting for a 15px
         // target is exactly the fiddliness this is meant to remove.
-        if (selecting) { box.checked = !box.checked; box.checked ? picked.add(p.name) : picked.delete(p.name); drawSelBar(); return; }
+        if (selecting) { box.checked = !box.checked; box.checked ? picked.add(p.name) : picked.delete(p.name); syncGroup(); drawSelBar(); return; }
         if (p.lastTake) pin(p.name);
       };
       el.querySelector('.zap').onclick = async (ev) => {
@@ -499,7 +526,7 @@ async function drawArchive() {
   if (!items.length) return;
   const det = document.createElement('details');
   det.className = 'group arch';
-  det.innerHTML = `<summary><span class="tri">▶</span><b>Archive</b><small>${items.length}</small></summary>`;
+  det.innerHTML = `<summary><span class="tri">▶</span><b>Archive</b><small>${items.length}</small><button class="emptybtn" id="emptyArch" title="Delete every archived demo, permanently">Empty</button></summary>`;
   for (const t of items) {
     const el = document.createElement('div');
     el.className = 'row2';
@@ -509,12 +536,15 @@ async function drawArchive() {
   }
   const clear = document.createElement('button');
   clear.className = 'clear';
-  clear.textContent = 'Clear archive — gone for good';
-  clear.onclick = async () => {
-    if (!(await ask('Clear the archive?', `${items.length} archived demo${items.length === 1 ? '' : 's'} will be deleted permanently. There is no way back from this one.`, 'Delete forever'))) return;
+  clear.textContent = `Empty the archive — delete ${items.length} demo${items.length === 1 ? '' : 's'} for good`;
+  const empty = async (ev) => {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }   // the summary must not fold
+    if (!(await ask('Empty the archive?', `${items.length} archived demo${items.length === 1 ? '' : 's'} will be deleted permanently — the manifests and everything recorded from them. There is no way back from this one.`, 'Delete forever'))) return;
     await api('/api/trash/clear', { method: 'POST' });
     await drawDemos();
   };
+  clear.onclick = empty;
+  det.querySelector('#emptyArch').onclick = empty;
   det.appendChild(clear);
   $('demos').appendChild(det);
 }

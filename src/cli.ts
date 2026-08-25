@@ -89,7 +89,17 @@ program
   .option("--name <name>", "write to outputs/<name> instead of the manifest's name — revise a cut without overwriting the published one")
   .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; until?: string; from?: string; name?: string }) => {
     const loaded = loadManifest(file);
-    let manifest = opts.preset ? { ...loaded.manifest, preset: opts.preset } : loaded.manifest;
+    // Asking for a preset means asking for its SHAPE. A manifest that pins its
+    // own `viewport` used to win silently, so `--preset draft` recorded at
+    // full size and saved nothing — on the one demo where iterating cheaply
+    // mattered most, and with a failing "matches draft" check as the only
+    // hint. An explicit --preset now drops the pin.
+    let manifest = loaded.manifest;
+    if (opts.preset) {
+      const { viewport: pinned, ...rest } = loaded.manifest;
+      manifest = { ...rest, preset: opts.preset };
+      if (pinned) say(`ℹ --preset ${opts.preset} overrides this manifest's viewport (${pinned.width}×${pinned.height}); recording at the preset's own size`);
+    }
     if (opts.gif) manifest = { ...manifest, outputs: { ...manifest.outputs, gif: true } };
     if (opts.preset && !presetNames().includes(opts.preset)) throw new Error(`unknown preset ${opts.preset} — one of ${presetNames().join(", ")}`);
     const dir = loaded.dir;
