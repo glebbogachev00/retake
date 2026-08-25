@@ -235,3 +235,18 @@ recording-relevant changed, and the UI's one button works this out for you.
   adds ~8s to every take and competes with the app being recorded. Ladder:
   `draft` while fixing, `preview-fast` to check final framing, a post preset to
   ship. Never ship a draft.
+
+## Every release gets a note a non-developer can read
+
+`site/releases.json` is the one list of what shipped. The landing page and the
+Retake window both read it — there is no second copy to update.
+
+When a release changes anything a person can see, add an entry: a version, a
+date, a headline, and a few lines. Write them for the person using Retake, not
+for whoever wrote the code. Name no files. Name no flag they will not type. Do
+not write "refactor", "regression", "schema" or "pipeline". If a line only
+makes sense to someone who has read the source, it is not a release note —
+it belongs in the commit message, which is where that audience already is.
+
+Good: "You choose the cover image. Click any frame to make it the one people
+see first." Bad: "Poster selection is now persisted via a marker file."

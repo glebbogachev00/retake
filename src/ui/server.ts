@@ -10,6 +10,7 @@
  *   POST /api/describe              { name, url, describe } → scout + model → draft manifest (saved)
  *   GET  /api/provider              { active, available }
  *   GET  /api/presets               [{name, ...}]
+ *   GET  /api/releases              what's new, from site/releases.json
  *   GET/PUT/DELETE /api/drafts/:id   an unfinished "new demo" (auto-saved as you go)
  *   DELETE /api/demos/:name         remove a demo (manifest + outputs)
  *   PATCH /api/demos/:name/settings { preset?, layout?, camera?, cursor? } → edits keys, keeps comments
@@ -403,6 +404,15 @@ export function serve(port: number) {
       }
       // Both prefixes: the page is served at /landing here and from a site
       // root when deployed, so its asset paths are relative either way.
+      // releases.json sits beside index.html when deployed, so the preview
+      // has to serve it from the same two prefixes the page might be under.
+      const mrel = /^(?:\/landing)?\/releases\.json$/.exec(p);
+      if (mrel && (req.method === "GET" || req.method === "HEAD")) {
+        const f = path.join(PKG_ROOT, "site", "releases.json");
+        if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(req.method === "HEAD" ? undefined : fs.readFileSync(f));
+      }
       const msite = /^(?:\/landing)?\/(media|logos)\/([A-Za-z0-9._-]+)$/.exec(p);
       if (msite && (req.method === "GET" || req.method === "HEAD")) {
         const f = path.join(PKG_ROOT, "site", msite[1], msite[2]);
@@ -448,6 +458,14 @@ export function serve(port: number) {
         catch (e) { return json(res, 500, { error: `Could not open the folder picker: ${(e as Error).message}` }); }
       }
       if (p === "/api/provider" && req.method === "GET") return json(res, 200, providerStatus());
+      if (p === "/api/releases" && req.method === "GET") {
+        // The same site/releases.json the landing page reads — one list, so
+        // the window and the page can never disagree about what shipped.
+        const f = path.join(PKG_ROOT, "site", "releases.json");
+        if (!fs.existsSync(f)) return json(res, 200, { releases: [] });
+        try { return json(res, 200, JSON.parse(fs.readFileSync(f, "utf8"))); }
+        catch { return json(res, 200, { releases: [] }); }
+      }
       if (p === "/api/presets" && req.method === "GET") return json(res, 200, Object.values(PRESETS));
       if (p === "/api/drafts" && req.method === "GET") return json(res, 200, listDrafts());
       const md = /^\/api\/drafts\/([a-z0-9-]+)$/.exec(p);

@@ -110,6 +110,16 @@
   }
   .foot { margin-top:80px; padding-top:22px; border-top:1px solid var(--rule); color:var(--muted); font-size:13.5px; display:flex; gap:18px; flex-wrap:wrap; }
   .foot a { color:inherit; }
+
+.rel{border-top:1px solid var(--line,#dcdfd6);padding:18px 0}
+.rel:first-child{border-top:0;padding-top:4px}
+.relhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:8px}
+.relhead b{font-size:17px;letter-spacing:-.01em}
+.relmeta{font-size:12.5px;opacity:.55;font-variant-numeric:tabular-nums}
+.rel.latest .relmeta::after{content:"newest";margin-left:8px;padding:2px 7px;border-radius:99px;background:#e8b04b;color:#221f19;font-size:11px;font-weight:600}
+.rel ul{margin:0;padding-left:18px;max-width:660px}
+.rel li{margin:5px 0;line-height:1.55;opacity:.86}
+.rel:not(.latest) ul{opacity:.72}
 </style>
 </head>
 <body>
@@ -216,6 +226,12 @@ mkdir demos && cd demos && retake install</pre>
     </div>
   </section>
 
+  <section id="whatsnew">
+    <h2>What's new</h2>
+    <p class="sub" style="max-width:620px">Every release, in plain words. <a style="color:inherit" href="https://github.com/glebbogachev00/retake/releases">Full history</a>.</p>
+    <div id="releases"></div>
+  </section>
+
   <div class="foot">
     <span>MIT licensed.</span>
     <a href="https://github.com/glebbogachev00/retake">Source</a>
@@ -251,6 +267,25 @@ const CANDIDATES = [
   }
   if (!host.children.length) host.innerHTML = '<div class="say" style="margin-top:0"><span class="who">Proof pending</span>Record a demo and drop its render into <code>site/media/</code> — this section fills itself.</div>';
 })();
+
+// What's new — the same site/releases.json the Retake window reads.
+(async () => {
+  const host = document.getElementById('releases');
+  if (!host) return;
+  const base = location.pathname.startsWith('/landing') ? '/landing/' : '';
+  let data;
+  try { data = await (await fetch(base + 'releases.json')).json(); } catch { host.closest('section').remove(); return; }
+  const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
+  const fmt = (d) => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? '' : x.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }); };
+  host.innerHTML = (data.releases || []).map((r, i) => (
+    '<div class="rel' + (i ? '' : ' latest') + '">' +
+      '<div class="relhead"><b>' + esc(r.headline) + '</b>' +
+        '<span class="relmeta">' + esc(r.version) + (r.date ? ' · ' + fmt(r.date) : '') + '</span></div>' +
+      '<ul>' + (r.notes || []).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' +
+    '</div>'
+  )).join('');
+})();
+
 for (const b of document.querySelectorAll('.copybtn')) b.onclick = async () => {
   const t = document.getElementById(b.dataset.copy).textContent.replace(/^“|”$/g, '');
   try { await navigator.clipboard.writeText(t); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1600); } catch {}

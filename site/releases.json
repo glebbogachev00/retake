@@ -1,0 +1,39 @@
+{
+  "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
+  "releases": [
+    {
+      "version": "0.4.0",
+      "date": "2026-08-25",
+      "headline": "Videos come out the size you asked for — and changing your mind is free",
+      "notes": [
+        "Every video is now exactly the size of the format you picked. Landscape is 1920×1080, square is square, vertical fits a phone. No more sizes drifting between takes.",
+        "Want it in another shape? It re-renders from the recording you already have, in seconds. Same for the captions, the speed, the zoom, the title card and the cover image. Recording again is only for when the demo itself changed.",
+        "Launch videos can open with a title card and close with your own sign-off, put music underneath, and add a spoken voiceover.",
+        "Dead air gets trimmed. While your app is thinking, the video speeds through the wait instead of sitting in it.",
+        "You choose the cover image. Click any frame of your video to make it the one people see first — and it stays chosen.",
+        "You can sign in to a demo account without any AI ever seeing your password. You type it into your own browser window once; Retake keeps the session, not the password.",
+        "Renders are about twice as fast.",
+        "The window has been rebuilt: one place for everything, and it stops shouting at you.",
+        "A demo can no longer leave something running on your machine after it finishes."
+      ]
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-08-23",
+      "headline": "Demos behind a login",
+      "notes": [
+        "Demos of apps that need signing in. You sign in once in a real browser window; nothing types your password and nothing records it.",
+        "The video player shows your video in its own shape, with no black bars around it."
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-08-23",
+      "headline": "The first public release",
+      "notes": [
+        "Describe a demo in one readable file, and get a video, still frames, and a written record of what happened.",
+        "When your app changes, fix the file and run it again — instead of recording the whole thing over."
+      ]
+    }
+  ]
+}

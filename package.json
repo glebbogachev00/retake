@@ -39,7 +39,8 @@
     "LICENSE",
     "scripts/patch-testreel.mjs",
     "AGENTS.md",
-    "llms.txt"
+    "llms.txt",
+    "site/releases.json"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",
