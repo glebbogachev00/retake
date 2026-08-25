@@ -55,5 +55,12 @@
         }
       ]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "canvas": false,
+      "chat": false,
+      "operator": false
+    }
+  }
 }

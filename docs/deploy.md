@@ -111,3 +111,22 @@ contents are published cuts only — never raw takes. When a demo is
 re-recorded, copy the new `demo.mp4` and its poster in, and the immutable
 cache header means you should change the file name or the page will keep
 serving the old one to anyone who has visited before.
+
+## Only `main` deploys
+
+`vercel.json` disables deployments for the working branches:
+
+```json
+"git": { "deploymentEnabled": { "canvas": false, "chat": false, "operator": false } }
+```
+
+Without it every commit pushed to three branches is three deployments, and
+a busy day runs into Vercel's daily cap — after which pushes land on GitHub
+and the site silently stops updating, with nothing broken to find. That
+happened on 2026-08-25: 25 commits, ~75 deploy events, deploys stopped at
+18:28 and the last four hours of work never reached the site.
+
+If the site stops updating, check that before checking the code: compare a
+file you changed (`curl -s https://<domain>/releases.json`) against the
+local one. If the deployment is old rather than the CDN being stale, it is
+a deploy that never ran.
