@@ -206,3 +206,69 @@ bites.
   "re-record and hope"; I still do not know whether that one was the machine or
   the page. A frame grab would settle it, the way `dry` now does.
 - **Scene-label uniqueness.** Still unchecked.
+
+---
+
+# Update after 0.5.x — `--from` is the win it was predicted to be
+
+Two demos re-recorded after a product fix. Notes from that session only.
+
+## `--from` did exactly what it was supposed to
+
+The change was in the last 70 seconds of a 7½-minute demo. `run --from
+track-confirmed` proved the whole new ending in **3 minutes instead of 8**,
+and — the part I did not expect — it still executes every earlier step, so a
+green `--from` run is also proof that the *whole* manifest still resolves
+against the live app. I went straight to a full-quality take on that
+evidence and it passed first time. Under the old workflow that would have
+been a preview take plus a full take.
+
+Both `dry` and `--from` now catch different things and neither is wasted.
+That is the loop working.
+
+## The new finding: `nudge` cannot fix a still whose beat scrolls away
+
+I lost four rounds to this, so it is worth writing down.
+
+A still is sampled at **the midpoint between this scene's start and the
+NEXT scene's start** — not inside the scene's own span. So for a beat that
+holds a good frame for 2 seconds and then scrolls somewhere else for 8, the
+midpoint is always in the scroll. Nudging the scene moves its start *and*
+its midpoint together, so a positive nudge makes it later and a negative one
+drags the caption backwards out of the beat. There is no value that lands on
+the frame you want.
+
+The actual fix is pacing: hold longer before scrolling away. That also made
+the video better, which is the tell that it was the right fix — the beat
+was too short for a viewer to read ten names off, and the bad still was the
+symptom rather than the problem.
+
+**What would help:** say this in the failure surface people actually meet.
+Either a line in `look` — *"still sampled at 28.0s, midway to the next
+scene"* — or, better, let a scene name its own still: `still: after-scroll`
+/ `still: 2500` sampled within the scene rather than halfway to the next
+one. A knob that cannot express "the first two seconds of this beat" is a
+knob you will keep reaching for and missing with.
+
+The `-end.png` variants are genuinely useful and I use them to diagnose
+drift, so the sampling model is sound. It is just invisible, and the
+guessing costs renders.
+
+## Smaller
+
+- **`viewport` warns, and the warning is right to be conditional.** This app
+  needs 1440 CSS px (breakpoints at 1020/1240/1400) and the preset gives 960,
+  so the override stays. `validate` only complains when the override would
+  change the *output shape*, which mine does not. That is the correct line to
+  draw, and it is the first time this manifest's viewport has not felt like a
+  fight with the tool.
+- **Watching it again found two more product defects** that every check
+  passed: a tracker rail that stopped four steps short of the end, and a
+  finished trip still describing itself in the present tense. Neither is
+  visible to a test. That is now seven real bugs this tool has found by
+  being watched, which remains the strongest argument for it.
+
+Ratings unchanged from the 0.4.x update except **efficiency 7 → 8** — `--from`
+is most of the remaining gap closed. The last point is the still-sampling
+model above: it is the only thing left that cost me renders rather than
+minutes.

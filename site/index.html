@@ -139,6 +139,30 @@
 .news[open]>summary .cue::after{content:" ‹";}
 .news>summary:hover .cue{color:var(--ink)}
 .news #releases{margin-top:20px}
+
+/* the version chip — small, live, and proof the thing is moving */
+.ship{margin:14px 0 0;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);
+  background:var(--card);border-radius:99px;padding:6px 14px}
+.ship .dot{width:6px;height:6px;border-radius:99px;background:#6a9c62;flex:none}
+.ship .sep{opacity:.45}
+.ship a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.2)}
+.ship a:hover{color:var(--ink)}
+
+/* a note from a person, not a brochure */
+/* A letter, and it should look like one: warmer paper than the page, a rule
+   the amber runs along, and room around the words. */
+.note{max-width:680px;font-size:17px;line-height:1.75;background:#f4f2ea;border-radius:20px;
+  padding:38px 40px 32px;position:relative;overflow:hidden}
+.note::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--amber)}
+.note p{margin:0 0 16px}
+.note .hi{font-size:21px;letter-spacing:-.015em;color:var(--ink);font-weight:600;margin-bottom:20px}
+.note p:not(.hi):not(.sign){color:#3b423a}
+.note .sign{margin-top:26px;padding-top:18px;border-top:1px solid rgba(0,0,0,.08);font-size:15px;color:var(--muted)}
+.note .sign b{color:var(--ink);font-weight:600;margin-right:2px}
+@media (max-width:640px){.note{padding:28px 24px 24px;font-size:16px}}
+.note .sign span{opacity:.45;margin:0 6px}
+.note .sign a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.22)}
+.note .sign a:hover{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -150,7 +174,7 @@
 </div>
 <main>
   <div class="hero">
-    <p class="kicker">your product changed. your demo is outdated.</p>
+    <p class="kicker">you shipped on Tuesday. your demo is from March.</p>
     <h1>Demos that<br><em>re-record themselves.</em></h1>
     <p class="lede">A demo is a small file your coding agent writes. When the UI changes, change one line and run it again — the client walkthrough on Tuesday and the launch video on Friday, from the same current take.</p>
     <div class="actions">
@@ -158,6 +182,7 @@
       <a class="btn light" href="#proof">Watch the 14-second demo</a>
     </div>
     <p class="flow">one prompt <span>→</span> a YAML demo <span>→</span> dry-run checked <span>→</span> recorded <span>→</span> rerun on the next release</p>
+    <p class="ship"><span class="dot"></span><span id="shipVer">v0.4.0</span> <span class="sep">·</span> <span id="shipWhen">out now</span> <span class="sep">·</span> <a href="#whatsnew">what changed</a></p>
   </div>
 
   <div class="say"><span class="who">The release renamed a button. This is the whole fix</span>
@@ -169,6 +194,18 @@
   </div>
   <p class="arrow" style="font-size:13.5px">one line changed · <code>retake run</code> · a new take of the same demo ↓</p>
   <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
+
+
+  <section id="note">
+    <div class="note">
+      <p class="hi">Hey — a quick word about why this exists.</p>
+      <p>I kept re-recording the same demo. Every release moved a button, and every time it meant opening a screen recorder, performing the whole flow again without fumbling, and hoping the take was clean. An afternoon, for a video that was wrong again three weeks later.</p>
+      <p>So the demo became a file instead. When the button gets renamed you change the line that names it and run it again. The video is the output, not the thing you maintain.</p>
+      <p>I use it for two things. Demos — which is most of it, and where it has genuinely saved me a lot of time and energy. And launch videos, the kind that actually stay with someone. The first one I have working well. The second I am still figuring out, and the tool is honest about the difference: a demo proves an interaction, a launch presents a product, and they want almost opposite things in the frame.</p>
+      <p>It is early, and I am one person. The three examples on this page are my own projects — there are no customer quotes here yet, because I would rather show you my own work than borrow someone else's words. If you try it and something is stupid, tell me and I will fix it. That is roughly how everything on this page got built.</p>
+      <p class="sign"><b>Gleb</b> <span>·</span> <a href="https://github.com/glebbogachev00/retake/issues/new">tell me what broke</a></p>
+    </div>
+  </section>
 
   <section>
     <h2>Built against three real workflows</h2>
@@ -314,9 +351,16 @@ const CANDIDATES = [
   try { data = await (await fetch(base + 'releases.json')).json(); } catch { host.closest('section').remove(); return; }
   const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
   const fmt = (d) => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? '' : x.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }); };
+  const chipV = document.getElementById('shipVer'), chipW = document.getElementById('shipWhen');
   const v = document.getElementById('newsVer');
   const newest = (data.releases || [])[0];
   if (v && newest) v.textContent = newest.version + (newest.date ? ' · ' + fmt(newest.date) : '');
+  if (chipV && newest) chipV.textContent = 'v' + newest.version;
+  if (chipW && newest && newest.date) {
+    // floor, not round: 20 hours after midnight is still today, not yesterday
+    const days = Math.floor((Date.now() - new Date(newest.date + 'T00:00:00')) / 864e5);
+    chipW.textContent = days <= 0 ? 'shipped today' : days === 1 ? 'shipped yesterday' : days < 30 ? `shipped ${days} days ago` : 'released ' + fmt(newest.date);
+  }
   host.innerHTML = (data.releases || []).map((r, i) => (
     '<div class="rel' + (i ? '' : ' latest') + '">' +
       '<div class="relhead"><b>' + esc(r.headline) + '</b>' +
