@@ -240,12 +240,10 @@ section > .sub{font-size:16.5px;margin:0 0 22px;max-width:60ch}
    a grid of cards goes back to full width, heading above it — three cards
    squeezed into two thirds of the page was worse than the problem I was
    fixing. */
+/* Card sections keep their full width; the header above them is the same
+   centred header every other section gets. An earlier two-column version of
+   this put the title and its gloss on different centres. */
 section:has(.cases), section:has(.grid), section:has(.videos){grid-template-columns:1fr}
-section:has(.cases) .shead, section:has(.grid) .shead, section:has(.videos) .shead{
-  position:static;grid-column:1;margin-bottom:20px;display:grid;
-  grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:6px 40px;align-items:baseline}
-section:has(.cases) .shead h2, section:has(.grid) .shead h2, section:has(.videos) .shead h2{
-  font-size:24px;margin:0}
 section:has(.cases) > *:not(.shead), section:has(.grid) > *:not(.shead),
 section:has(.videos) > *:not(.shead){grid-column:1}
 
@@ -283,8 +281,7 @@ section:not(:has(.shead)) > *{grid-column:1}
   .hero { text-align: center; padding: 76px 0 44px; }
   h1 { font-size: clamp(54px, 5.6vw, 82px); max-width: none; }
   .hero .lede { max-width: 640px; margin-left: auto; margin-right: auto; }
-  .hero .actions { justify-content: center; }
-  .hero .flow, .hero .ship { justify-content: center; }
+  .hero .actions, .hero .flow, .hero .ship { justify-content: center; }
   .hero .ship { margin-left: auto; margin-right: auto; }
 
   /* Reading measure belongs to the paragraph, not to its container. Capping
@@ -294,6 +291,21 @@ section:not(:has(.shead)) > *{grid-column:1}
 
   /* Section headings sit beside their content with more room to breathe. */
   section { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 4px 64px; }
+
+
+  /* Sections match the top: a centred header above its own content, rather
+     than a heading in a left rail — which reads as a different page from the
+     hero above it. Prose inside cards stays left: centring a paragraph makes
+     it harder to read, and the axis is set by the blocks, not the sentences. */
+  section { grid-template-columns: 1fr; gap: 0; }
+  section > .shead { grid-column: 1; position: static; text-align: center;
+    margin: 0 auto 26px; max-width: 720px; }
+  section > .shead h2 { font-size: 26px; }
+  section > .shead .sub { font-size: 16px; margin-left: auto; margin-right: auto; }
+  section > *:not(.shead) { grid-column: 1; }
+  section .sub { margin-left: auto; margin-right: auto; }
+  .stmt { text-align: left; }
+  .note, .found, .cell, .case, .step { text-align: left; }
 
   /* What can pair, pairs. This is where width actually gets used — related
      things beside each other, not prose stretched wider. */

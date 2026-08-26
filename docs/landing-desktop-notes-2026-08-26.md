@@ -69,7 +69,9 @@ section of c with text."*
 .site-hero    { text-align: center; }
 .site-hero h1 { font-size: clamp(64px, 7vw, 104px); max-width: none; }
 .site-lede    { max-width: 620px; margin-inline: auto; }
-.site-actions { justify-content: center; }
+/* Scoped. Unscoped, this centres every call to action on the page,
+   including the closing one under a left-aligned paragraph. */
+.site-hero .site-actions { justify-content: center; }
 ```
 
 **Rows that have something to pair, pair.** This is where width gets used — not
@@ -244,6 +246,70 @@ heading silently attached to the wrong section: *"Yours to keep"* landed at the
 top of the page and *"What it will not become"* sat over *"Your thinking stays
 yours."* It fails silently and looks like a content bug.
 
+## Alignment: pick one rule and hold it
+
+Centred section headers over left-aligned card bodies felt like hierarchy when
+I built it and read as a mismatch on the page — half the content pulled to the
+middle, half to the edge. Gleb: *"in some sections the text is centred, in some
+sections the text is on the left… I'm not sure if we should consolidate."*
+
+What landed: **the hero is centred, everything below shares one left edge.** The
+hero earns it because it is the arrival and it is short. Section headers line up
+with the cards they introduce. Do not centre body copy — a ragged left edge
+makes the eye hunt for the start of every line.
+
+Watch for unscoped rules leaking. `.site-wrap .site-actions { justify-content:
+center }` was written for the hero and silently centred the closing call to
+action under a left-aligned paragraph. Scope to `> .site-hero`.
+
+## A card that stacks four layouts is the messy one
+
+The maker's note held an avatar row, prose, a **four-column grid of projects**,
+a ruled definition list, and a closing line — five patterns inside one border.
+Gleb: *"one of the sections is still quite messy… the way it's organized is
+kinda hard to follow."*
+
+The grid was the odd one: name-over-gloss in four columns reads as *data* when
+it is really a sentence about where the thing has been used. Setting it inline
+removed a whole pattern from the card and the note became legible.
+
+```css
+.note-rail ul { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+.note-rail li { flex-direction: row; align-items: baseline; gap: 7px; }
+```
+
+Rule of thumb: **count the distinct layout patterns inside a single card.** More
+than two and it is doing too much.
+
+## Trim the branded cards off demo videos
+
+Retake writes an intro and outro card into every take. On a landing page both
+are dead weight: the viewer presses play and gets two seconds of logo before
+anything happens, then finishes and is left staring at another logo. The poster
+disagrees with the first frame, so the thumbnail changes the moment the video
+loads — which is what Gleb saw and flagged: *"this should have a captured
+thumbnail, cannot emphasise this enough."*
+
+Find the boundaries by sampling frames, then cut inside them:
+
+```bash
+# tile candidate frames and look at them
+ffmpeg -i in.mp4 -vf "select='eq(n\,55)+eq(n\,65)+eq(n\,370)+eq(n\,385)',\
+  scale=240:-2,tile=4x1" -frames:v 1 bounds.png
+
+# cut, then take the poster from the LAST frame — the payoff
+ffmpeg -ss 2.10 -to 12.15 -i in.mp4 -c:v libx264 -crf 20 -preset slow \
+  -pix_fmt yuv420p -movflags +faststart -an out.mp4
+ffmpeg -sseof -0.1 -i out.mp4 -frames:v 1 -q:v 2 poster.jpg
+```
+
+Leave a little margin — the first cut caught the fade into the outro, so the
+last frame was a half-dissolved logo. Verify by extracting frame 0 and frame
+N-1 and looking at both. Capture's demo went 14s → 10s and now opens on an
+empty board and ends on the sorted one.
+
+Keep the cards for takes posted to social, where the branding is the point.
+
 ---
 
 # Failures worth not repeating
@@ -347,8 +413,11 @@ a round looking at the root wondering why nothing had changed.
 12. Check each signpost describes *everything* beneath it.
 
 **Media and shipping**
-13. Give every `<video>` its real `width`/`height`; poster on a payoff frame; no
-    autoplay if the take opens on a title card.
+13. Give every `<video>` its real `width`/`height`; trim the intro/outro cards
+    off; poster on the payoff frame; no autoplay.
+13b. Count the layout patterns inside each card. More than two, flatten one.
+13c. One alignment rule: centred hero, single left edge below it. Check for
+    unscoped `justify-content: center` leaking past the hero.
 14. `git status --porcelain site/` — no untracked media.
 15. Screenshot at true 1440 with headless Chrome and **look at it**.
 16. Check the phone width; the `min-width` guard should mean nothing below 1100
