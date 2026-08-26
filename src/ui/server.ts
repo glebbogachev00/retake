@@ -361,7 +361,7 @@ function pickFolder(): Promise<string | null> {
 const BOOT = Date.now();   // pages compare this and reload themselves after a restart
 
 /** A live view of agent-driven work, so the app is a window and not a folder. */
-type Progress = { phase: string; step: number; total: number; label: string; demo?: string; etaSec?: number; since?: number; runStart?: number; clear?: boolean };
+type Progress = { phase: string; step: number; total: number; label: string; demo?: string; etaSec?: number; since?: number; runStart?: number; clear?: boolean; quietSec?: number };
 type Activity = { active: boolean; who: string; demo?: string; lines: string[]; startedAt: number; finishedAt?: number; progress?: Progress };
 const activity: Activity = { active: false, who: "", lines: [], startedAt: 0 };
 const activityWatchers = new Set<(ev: { type: string; data: unknown }) => void>();

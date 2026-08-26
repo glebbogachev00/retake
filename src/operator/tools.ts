@@ -72,14 +72,40 @@ async function waitForHuman(kind: "question" | "approve", text: string, detail?:
 
 /** Tell the window how far into a recording we are. Fire-and-forget: a demo
     must never fail because a progress ping did not land. */
-async function progress(p: { phase: string; step: number; total: number; label: string; etaSec?: number; runStart?: number; clear?: boolean }) {
+async function progress(p: { phase: string; step: number; total: number; label: string; etaSec?: number; runStart?: number; clear?: boolean; quietSec?: number }) {
   if (!UI) return;
   const body = JSON.stringify({ progress: { ...p, demo: LAST_DEMO || undefined } });
   const url = SESSION ? `${UI}/api/operator/${SESSION}/log` : `${UI}/api/activity`;
   await fetch(url, { method: "POST", body }).catch(() => {});
 }
 
-const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
+
+/** Was Retake updated after this server started?
+ *
+ * Node reads this file once. A session that began before an update keeps
+ * running the old code forever, and the failure is silent: the tools still
+ * answer, they just answer with yesterday's behaviour. That has now bitten
+ * this project repeatedly -- a progress bar built one minute after the
+ * server started, and four processes that could never report progress no
+ * matter how many times it was rebuilt.
+ *
+ * So the server notices, and says so in the one place an agent cannot miss:
+ * the result of the next tool it calls. */
+const BOOTED_AT = Date.now();
+let staleTold = false;
+function stalenessNote(): string {
+  if (staleTold) return "";
+  try {
+    const self = new URL(import.meta.url).pathname;
+    const built = fs.statSync(self).mtimeMs;
+    if (built <= BOOTED_AT + 1000) return "";
+    staleTold = true;
+    const mins = Math.max(1, Math.round((built - BOOTED_AT) / 60000));
+    return `\n\n⚠ Retake was updated ${mins} minute(s) after this session started, so these tools are running the older build. Anything added since is missing until the person restarts this agent. Tell them.`;
+  } catch { return ""; }
+}
+
+const text = (s: string) => ({ content: [{ type: "text" as const, text: s + stalenessNote() }] });
 const safe = (s: string) => /^[a-z0-9-]+$/.test(s);
 const manifestPath = (name: string) => path.join(DEMOS, `${name}.yaml`);
 
@@ -371,7 +397,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
         outDir, manifestDir: DEMOS, locked: true, until, from, log: () => {},
         // Throttled: a 251-step demo would otherwise be 251 posts, and the
         // window only needs to know roughly how far along this is.
-        onProgress: (pr) => { if (pr.step === 1 || pr.step === pr.total || pr.step % 2 === 0) void progress({ ...pr, runStart }); },
+        onProgress: (pr) => { if (pr.phase === "stuck" || pr.step === 1 || pr.step === pr.total || pr.step % 2 === 0) void progress({ ...pr, runStart }); },
       });
     } catch (e) {
       if (restorePrevious(outDir)) await tell("Recording failed — your previous take has been put back.");

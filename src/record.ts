@@ -231,7 +231,7 @@ export type RecordOptions = {
   /** Called as each step is performed, so a watcher can show how far in this
       is. The MCP run tool threw the log away entirely, which is why the
       window said "Recording…" and then nothing at all for sixteen minutes. */
-  onProgress?: (p: { phase: "setup" | "recording" | "done"; step: number; total: number; label: string }) => void;
+  onProgress?: (p: { phase: "setup" | "recording" | "done" | "stuck"; step: number; total: number; label: string; quietSec?: number }) => void;
 
 };
 
@@ -445,6 +445,8 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   let screenshots: string[] = [];
   let layoutWidth: number | undefined;
   let contentWidth: number | undefined;
+  let watchdog: NodeJS.Timeout | undefined;
+  let lastStepAt = Date.now();
   let t0 = Date.now();
   let setupEnd = t0;
   let endMs = t0;
@@ -549,6 +551,26 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // overlay silently fails and the video ships with no cursor at all.
     const moves = cursorMoves(m);
     if (q.cursor !== false && moves > CURSOR_MOVE_LIMIT) log(`cursor: ~${moves} cursor moves — past ~${CURSOR_MOVE_LIMIT} the cursor filter no longer fits in one ffmpeg argument and the overlay may be MISSING. Split the demo (a viewer wants chapters anyway), or set cursor: false to be honest about it.`);
+    // A take can stop making progress without failing: a step inside its own
+    // timeout, an app that never answers, a wait that will not resolve. The
+    // step timeout eventually fires and maxSeconds eventually fires, but in
+    // between there is a long silence with nothing saying anything is wrong.
+    // This says it — it does not intervene, because a slow app is not a
+    // broken one and only the person watching can tell the difference.
+    lastStepAt = Date.now();
+    let toldStuck = false;
+    const QUIET_MS = 90_000;
+    watchdog = setInterval(() => {
+      const quiet = Date.now() - lastStepAt;
+      if (quiet < QUIET_MS) { toldStuck = false; return; }
+      if (toldStuck) return;
+      toldStuck = true;
+      const secs = Math.round(quiet / 1000);
+      log(`⚠ no step has completed in ${secs}s — the app may be stuck, or this step may just be slow`);
+      opts.onProgress?.({ phase: "stuck", step: 0, total: m.steps.length, label: `nothing for ${secs}s`, quietSec: secs });
+    }, 15_000);
+    watchdog.unref?.();
+
     let pastUntil = false;
     // --from <scene>: everything before it still runs (the app must reach that
     // state) but at full speed, and `trimBefore` moves to the moment it lands,
@@ -597,6 +619,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         entry.camera = await resolveCamera(page, m, q, step, i);
       }
       log(`[${String(i).padStart(2, "0")}] ${entry.summary}${entry.camera ? ` · camera ${entry.camera.zoom}× on ${entry.camera.focus}` : ""}`);
+      lastStepAt = Date.now();
       opts.onProgress?.({ phase: "recording", step: i + 1, total: m.steps.length, label: entry.summary });
       // A resume point on disk, so a take that dies is not a take lost. It
       // survives a kill because it is written as it goes, not at the end —
@@ -717,6 +740,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // Timeline offsets are already relative to videoStartedAt (= document commit,
   // calibrated to within ~0.2s of the first video frame on a warm route). The
   // real file length is authoritative for the end.
+  if (watchdog) clearInterval(watchdog);
   // The take finished, so there is nothing to resume: leaving the hint would
   // send someone back into the middle of a demo they already have.
   try { fs.rmSync(path.join(opts.outDir, "reached.json"), { force: true }); } catch { /* fine */ }

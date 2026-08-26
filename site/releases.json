@@ -9,7 +9,9 @@
         "Re-recording only what changed. Edit part of a demo you already recorded and Retake works out which scene your change starts at, then records from there instead of from the beginning. On a long demo that is a couple of minutes instead of eight.",
         "A progress bar while a demo records — how many steps in, how long it has been going, and roughly how long the render has left. The window used to just say \"Recording…\" and then nothing at all, sometimes for a quarter of an hour.",
         "If your agent disconnects mid-recording, the recording now finishes and saves instead of dying halfway.",
-        "And if a recording is killed outright, it leaves a note saying which part it reached — so you can pick up from there instead of starting the whole thing again."
+        "And if a recording is killed outright, it leaves a note saying which part it reached — so you can pick up from there instead of starting the whole thing again.",
+        "If a recording quietly stops making progress, the window says so — no step finished in 90 seconds — instead of leaving you guessing whether it is working or hung.",
+        "And if Retake gets updated while your agent is mid-session, it now tells the agent that it is running the older version and needs restarting, rather than silently missing the new behaviour."
       ]
     },
     {

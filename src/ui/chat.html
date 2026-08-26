@@ -178,6 +178,7 @@
   .live .under { display:flex; align-items:baseline; gap:8px; margin-top:7px; font-size:12.5px; color:var(--muted); }
   .live .under .sp { flex:1; }
   .live .count { font-variant-numeric:tabular-nums; }
+  .live.stuck .bar i, .live .bar i.stuck { background:#c98a2e; }
   .live .quip { color:var(--ink); font-weight:500; }
   .live .elapsed { font-variant-numeric:tabular-nums; opacity:.7; }
   .spin { width:9px; height:9px; border-radius:99px; background:var(--amber); flex:none;
@@ -692,6 +693,15 @@ function drawProgress(a) {
   // Rendering: there are no steps to count, but the last render of this demo
   // measured itself, so the bar can run on that. Capped at 95% — it must not
   // claim finished before it is, and an estimate is never a promise.
+  // Nothing has finished for a while. Say so plainly and leave the bar where
+  // it is: a slow app is not a broken one, and only the person watching can
+  // tell which this is.
+  if (p && p.phase === 'stuck') {
+    box.style.display = '';
+    $('liveQuip').textContent = 'Nothing has moved for a bit.';
+    $('liveCount').textContent = `no step finished in ${p.quietSec}s`;
+    return;
+  }
   if (p && p.phase === 'rendering') {
     box.style.display = '';
     const eta = (p.etaSec || 0) * 1000;
