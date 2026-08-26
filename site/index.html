@@ -357,6 +357,49 @@ section:not(:has(.shead)) > *{grid-column:1}
     </div>
   </section>
 
+
+
+
+
+
+
+
+  <section id="how">
+    <div class="shead">
+      <h2>How it works</h2>
+      <p class="sub">You provide intent. The agent writes the flow. Retake verifies, records, and renders it.</p>
+    </div>
+    <div class="how">
+      <div class="step"><div><b>You ask</b><p>"Record a demo of checkout." That sentence is the brief for the agent you already use.</p></div></div>
+      <div class="step"><div><b>Your agent builds and checks the flow</b><p>It reads your app, writes a small YAML demo, and dry-runs every selector and wait. Nothing records until the walkthrough works.</p></div></div>
+      <div class="step"><div><b>Retake records the real interaction</b><p>Real typing, real clicks, real waits. The result is demo.mp4, a still for each scene, and a proof log of what happened.</p></div></div>
+      <div class="step"><div><b>You revise without starting over</b><p>Change captions, zoom, layout, or format in seconds. When the UI changes, rerun the same flow instead of recording by hand.</p></div></div>
+    </div>
+  </section>
+  <section class="stmt">
+    <h2>Not a recorder,<br><b>not a test runner</b></h2>
+    <div>
+      <p>A screen recording is pixels you can never edit. A browser test is a pass/fail nobody can watch.</p>
+      <p>A Retake demo is both halves — a readable file that proves itself like a test and renders like a film, and reruns when the app changes.</p>
+      <p class="last">And it refuses to become a video editor. If a take needs editing, the file was wrong. Fix the file, run it again.</p>
+    </div>
+  </section>
+  <section>
+    <div class="shead">
+      <h2>What's in the box</h2>
+      <p class="sub">Everything required to produce the same clean take again.</p>
+    </div>
+    <div class="grid">
+      <div class="cell"><b>Scenes with captions</b><p>Captions timed from the actual run, placed under the app — never over it. Every scene also yields a crisp still.</p></div>
+      <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
+      <div class="cell"><b>Renders you are not waiting on</b>
+        <p>One preset switch re-frames a take for landscape, square or vertical, and <code>--no-master</code> drops the archival copy while you are still iterating — measured at three times faster on an eight-minute demo, and marginally sharper, because the archival path re-encodes a file it already encoded.</p>
+      </div>
+      <div class="cell"><b>Presets that post well</b><p>Landscape, a true square, a true 9:16, docs GIF — the same take, re-rendered. Stubs and seeds keep it repeatable.</p></div>
+      <div class="cell"><b>Behind the login, off camera</b><p>The agent asks for a demo account by name; you type it into the window and it stays in one local file. The sign-in runs before recording and is trimmed off. 2FA included.</p></div>
+      <div class="cell"><b>Plain, or produced</b><p><code>mode: demo</code> keeps everything but your product out of the frame. <code>mode: launch</code> adds a title card, cuts the waiting, and lets you pick the poster. Demo is the default; your agent never upgrades one on its own.</p></div>
+    </div>
+  </section>
   <section>
     <div class="shead">
       <h2>Built against three real workflows</h2>
@@ -383,72 +426,6 @@ section:not(:has(.shead)) > *{grid-column:1}
       </div>
     </div>
   </section>
-
-  <section id="start">
-    <div class="shead">
-      <h2>Give it to your agent</h2>
-      <p class="sub">The link is the instruction. The README tells your agent how to install, wire itself up, and open the window for you. You say what to show.</p>
-    </div>
-    <div class="copyline">
-      <div class="say"><span class="who">In Claude Code, Codex, Cursor — the agent you already use</span><i id="pasteline">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
-      <button class="copybtn" data-copy="pasteline">Copy</button>
-    </div>
-    <p class="sub" style="margin:22px 0 10px">Doing it yourself is two commands:</p>
-    <pre>npm install -g retake-demos
-mkdir demos && cd demos && retake install</pre>
-    <p class="note-after">Node 20 or newer. ffmpeg comes bundled; Chromium downloads once.</p>
-  </section>
-
-  <section id="how">
-    <div class="shead">
-      <h2>How it works</h2>
-      <p class="sub">You provide intent. The agent writes the flow. Retake verifies, records, and renders it.</p>
-    </div>
-    <div class="how">
-      <div class="step"><div><b>You ask</b><p>"Record a demo of checkout." That sentence is the brief for the agent you already use.</p></div></div>
-      <div class="step"><div><b>Your agent builds and checks the flow</b><p>It reads your app, writes a small YAML demo, and dry-runs every selector and wait. Nothing records until the walkthrough works.</p></div></div>
-      <div class="step"><div><b>Retake records the real interaction</b><p>Real typing, real clicks, real waits. The result is demo.mp4, a still for each scene, and a proof log of what happened.</p></div></div>
-      <div class="step"><div><b>You revise without starting over</b><p>Change captions, zoom, layout, or format in seconds. When the UI changes, rerun the same flow instead of recording by hand.</p></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="shead">
-      <h2>What's in the box</h2>
-      <p class="sub">Everything required to produce the same clean take again.</p>
-    </div>
-    <div class="grid">
-      <div class="cell"><b>Scenes with captions</b><p>Captions timed from the actual run, placed under the app — never over it. Every scene also yields a crisp still.</p></div>
-      <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
-      <div class="cell"><b>Renders you are not waiting on</b>
-        <p>One preset switch re-frames a take for landscape, square or vertical, and <code>--no-master</code> drops the archival copy while you are still iterating — measured at three times faster on an eight-minute demo, and marginally sharper, because the archival path re-encodes a file it already encoded.</p>
-      </div>
-      <div class="cell"><b>Presets that post well</b><p>Landscape, a true square, a true 9:16, docs GIF — the same take, re-rendered. Stubs and seeds keep it repeatable.</p></div>
-      <div class="cell"><b>Behind the login, off camera</b><p>The agent asks for a demo account by name; you type it into the window and it stays in one local file. The sign-in runs before recording and is trimmed off. 2FA included.</p></div>
-      <div class="cell"><b>Plain, or produced</b><p><code>mode: demo</code> keeps everything but your product out of the frame. <code>mode: launch</code> adds a title card, cuts the waiting, and lets you pick the poster. Demo is the default; your agent never upgrades one on its own.</p></div>
-    </div>
-  </section>
-
-  <section class="stmt">
-    <h2>Not a recorder,<br><b>not a test runner</b></h2>
-    <div>
-      <p>A screen recording is pixels you can never edit. A browser test is a pass/fail nobody can watch.</p>
-      <p>A Retake demo is both halves — a readable file that proves itself like a test and renders like a film, and reruns when the app changes.</p>
-      <p class="last">And it refuses to become a video editor. If a take needs editing, the file was wrong. Fix the file, run it again.</p>
-    </div>
-  </section>
-
-  <section>
-    <div class="shead">
-      <h2>Record your first rerunnable demo</h2>
-      <p class="sub" style="max-width:620px">The demo outlives the video. When the next release moves a button, the fix is a line in a file — and landscape, square, vertical and the GIF all re-render from the same take.</p>
-    </div>
-    <div class="copyline">
-      <div class="say"><span class="who">Start with the sentence</span><i id="pasteline2">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
-      <button class="copybtn" data-copy="pasteline2">Copy</button>
-    </div>
-  </section>
-
   <section id="found">
     <div class="shead">
       <h2>The bugs a test suite cannot see</h2>
@@ -467,7 +444,20 @@ mkdir demos && cd demos && retake install</pre>
       <p class="tail">A test can only check what somebody thought to check. Watching catches the rest — and because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
     </div>
   </section>
-
+  <section id="start">
+    <div class="shead">
+      <h2>Record your first rerunnable demo</h2>
+      <p class="sub">The demo outlives the video: when the next release moves a button the fix is a line in a file, and landscape, square, vertical and the GIF all re-render from the same take. The link is the instruction. The README tells your agent how to install, wire itself up, and open the window for you. You say what to show.</p>
+    </div>
+    <div class="copyline">
+      <div class="say"><span class="who">In Claude Code, Codex, Cursor — the agent you already use</span><i id="pasteline">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
+      <button class="copybtn" data-copy="pasteline">Copy</button>
+    </div>
+    <p class="sub" style="margin:22px 0 10px">Doing it yourself is two commands:</p>
+    <pre>npm install -g retake-demos
+mkdir demos && cd demos && retake install</pre>
+    <p class="note-after">Node 20 or newer. ffmpeg comes bundled; Chromium downloads once.</p>
+  </section>
   <section id="whatsnew">
     <details class="news">
       <summary><span class="lab">What's new</span><span class="ver" id="newsVer"></span><span class="cue">See the notes</span></summary>
