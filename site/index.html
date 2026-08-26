@@ -297,15 +297,21 @@ section:not(:has(.shead)) > *{grid-column:1}
      than a heading in a left rail — which reads as a different page from the
      hero above it. Prose inside cards stays left: centring a paragraph makes
      it harder to read, and the axis is set by the blocks, not the sentences. */
-  section { grid-template-columns: 1fr; gap: 0; }
-  section > .shead { grid-column: 1; position: static; text-align: center;
-    margin: 0 auto 26px; max-width: 720px; }
   section > .shead h2 { font-size: 26px; }
-  section > .shead .sub { font-size: 16px; margin-left: auto; margin-right: auto; }
-  section > *:not(.shead) { grid-column: 1; }
-  section .sub { margin-left: auto; margin-right: auto; }
-  .stmt { text-align: left; }
-  .note, .found, .cell, .case, .step { text-align: left; }
+
+
+  /* A card with a max-width and no auto margins sits left inside a centred
+     section. The bugs card was 188px off the centre of its own heading. */
+  .found, .note { margin-left: auto; margin-right: auto; }
+
+  /* A signpost has just said what this section is. The section saying it
+     again puts four blocks of text on top of each other before any content
+     appears — the signpost's gloss and the section's gloss are the same
+     sentence twice. The section keeps its title, which labels the part; the
+     second gloss goes. */
+  .movement + section > .shead .sub { display: none; }
+  .movement + section > .shead { margin-bottom: 18px; }
+  .movement + section > .shead h2 { font-size: 22px; }
 
   /* What can pair, pairs. This is where width actually gets used — related
      things beside each other, not prose stretched wider. */
@@ -337,6 +343,19 @@ section:not(:has(.shead)) > *{grid-column:1}
   .movement p { font-size: 17px; margin-left: auto; margin-right: auto; }
   .movement + section { margin-top: 30px; }
 }
+
+/* One layout for every width above a phone: a centred header above its own
+   content. This used to live in the desktop block, which left 821–1099px on
+   the old left-rail layout — headings in a rail while everything else
+   centred, 441px apart. Prose inside cards stays left; centring paragraphs
+   makes them harder to read, and the axis is set by where blocks sit. */
+section { grid-template-columns: 1fr; gap: 0; }
+section > .shead { grid-column: 1; position: static; text-align: center;
+  margin: 0 auto 26px; max-width: 720px; }
+section > .shead .sub { margin-left: auto; margin-right: auto; }
+section > *:not(.shead) { grid-column: 1; }
+.stmt, .note, .found, .cell, .case, .step { text-align: left; }
+.found, .note { margin-left: auto; margin-right: auto; }
 </style>
 </head>
 <body>
@@ -452,11 +471,10 @@ section:not(:has(.shead)) > *{grid-column:1}
   <section id="found">
     <div class="shead">
       <h2>The bugs a test suite cannot see</h2>
-      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. Watch a demo at the speed a person reads, and you check all of them at once — without having to decide first what to look for. That is the whole difference, and this is what it caught.</p>
+      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. Watching checks all of them at once.</p>
     </div>
     <div class="found">
-      <h3>One demo. Five real bugs, all live, all obvious the second you watch.</h3>
-      <p class="lede">These came out of one long recording made for a launch video. Nobody was looking for them.</p>
+      <h3>One recording, made for a launch video. Nobody was looking for these.</h3>
       <ul>
         <li>A form still said a step was <b>optional</b>. It had been required for weeks.</li>
         <li>A customer was shown a <b>raw timezone code</b> where the name of a city should have been.</li>

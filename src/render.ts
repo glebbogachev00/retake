@@ -49,6 +49,9 @@ export type Facts = {
   encoder: string;
   /** Seconds per stage. */
   timings: Record<string, number>;
+  /** Whether THIS render kept an archival master — not whether the preset
+      would have. `--no-master` is a choice, and check has to respect it. */
+  master?: boolean;
   renderHash: string;
   /** demo or launch — so an output says what it was made to be. */
   mode?: "demo" | "launch";
@@ -732,7 +735,7 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
   const facts: Facts = {
     width: p.width, height: p.height, fps: p.fps || fps, duration: p.duration,
     sizes: Object.fromEntries([master, mp4, gif, thumbnail].filter((f): f is string => !!f && fs.existsSync(f)).map((f) => [path.basename(f), fs.statSync(f).size])),
-    gifTool, layout, cameraScenes: cam.count, encoder: q.encoder, timings: t.marks, renderHash: hash, preset: q.name,
+    gifTool, layout, cameraScenes: cam.count, encoder: q.encoder, timings: t.marks, renderHash: hash, preset: q.name, master: !!master,
     mode: m.mode,
   };
   const a: Artifacts = { master, mp4, gif, thumbnail, proofLog, facts };
@@ -916,7 +919,14 @@ export function check(outDir: string, m?: Manifest): Check {
   const mb = (f: string) => (fs.statSync(f).size / 1e6).toFixed(1) + " MB";
   say(true, `demo.mp4: ${mb(mp4)}`);
   const master = path.join(outDir, "master.mp4");
-  if (q?.master) say(fs.existsSync(master), `master.mp4 kept${fs.existsSync(master) ? ` (${mb(master)})` : ""}`); else lines.push(`—     master.mp4: not part of this preset`);
+  // Ask what this RENDER did, not what the preset would have done: --no-master
+  // is a deliberate choice, and failing a take for honouring it made the flag
+  // unusable on the presets it helps most.
+  let madeMaster: boolean | undefined;
+  try { madeMaster = (JSON.parse(fs.readFileSync(path.join(outDir, "facts.json"), "utf8")) as Facts).master; } catch { /* older take */ }
+  const wantedMaster = madeMaster !== undefined ? madeMaster : !!q?.master;
+  if (wantedMaster) say(fs.existsSync(master), `master.mp4 kept${fs.existsSync(master) ? ` (${mb(master)})` : ""}`);
+  else lines.push(`—     master.mp4: not made for this render`);
   const gif = path.join(outDir, "demo.gif");
   if (fs.existsSync(gif)) say(true, `demo.gif: ${mb(gif)} (secondary)`); else lines.push(`—     demo.gif: not requested`);
   if (!m || m.outputs.thumbnail) say(fs.existsSync(path.join(outDir, "thumbnail.png")), "thumbnail exists");

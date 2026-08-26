@@ -287,8 +287,12 @@ both were obvious in a screenshot.
 There is a demo for it. Before committing any change to the page:
 
 ```bash
-retake run demos/landing-review.yaml --preset draft --no-master
+retake run demos/landing-review.yaml --no-master
 ```
+
+No `--preset`: the manifest pins 1440 so this checks the DESKTOP layout,
+and a preset override would drop it to 960 — below the breakpoint — so the
+review would check a layout nobody sees on a laptop.
 
 Then LOOK at `outputs/landing-review/stills/` — one still per section, named
 after the section. Thirty seconds, and it is the only check that catches
