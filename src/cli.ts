@@ -25,7 +25,7 @@ import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { Command } from "commander";
 import { loadManifest, resolve, warnings, type Manifest } from "./manifest.js";
-import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
+import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, unchangedUpTo, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 import { applyTidy, mb, planTidy } from "./tidy.js";
@@ -118,6 +118,16 @@ program
     }
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
     if (!take) for (const l of costHints(manifest, outDir, opts)) say(l);
+    // Say it while it can still be acted on, not in the summary afterwards.
+    if (!take && !opts.until && !opts.from) {
+      const u = unchangedUpTo(manifest, outDir);
+      const last = lastCaptureSeconds(outDir);
+      if (u && u.steps > 3) {
+        const share = Math.round((u.steps / manifest.steps.length) * 100);
+        say(`ℹ the first ${u.steps} of ${manifest.steps.length} steps are identical to your last take of this demo (${share}% of it).`);
+        say(`  · --from ${u.scene} records only what changed${last ? `, so roughly ${Math.max(5, Math.round((last * (100 - share)) / 100))}s instead of ${Math.round(last)}s` : ""}`);
+      }
+    }
     say(`▶ ${manifest.title ?? manifest.name} → ${path.relative(process.cwd(), outDir)}${take ? " · reusing last recording" : ""}`);
     say(`[stage] capture ${take ? "skip" : "start"}`);
 

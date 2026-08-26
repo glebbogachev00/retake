@@ -20,7 +20,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import YAML from "yaml";
 import { loadManifest, resolve } from "../manifest.js";
-import { record, captureHash, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
+import { record, captureHash, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, unchangedUpTo, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
 import { render, check, ffmpegBin } from "../render.js";
 import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
@@ -354,6 +354,14 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     // The clock has to measure THIS run. It used to count from whenever the
     // activity feed first went active, which on a long-lived window meant
     // hours: someone watched a four-minute take report 529 minutes.
+    // The same suggestion the CLI makes, where an agent will actually read it:
+    // before the take, in the tool it is already calling.
+    if (!until && !from) {
+      const u = unchangedUpTo(manifest, outDir);
+      if (u && u.steps > 3) {
+        await tell(`The first ${u.steps} steps match your last take — from: "${u.scene}" would record only what changed.`);
+      }
+    }
     const runStart = Date.now();
     void progress({ phase: "recording", step: 0, total: manifest.steps.length, label: "starting", runStart });
     await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);

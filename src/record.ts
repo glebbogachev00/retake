@@ -12,6 +12,7 @@ import os from "node:os";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { execFileSync, execSync, spawn } from "node:child_process";
+import YAML from "yaml";
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { recordPage, moveCursorToPoint, type PageRecorder } from "testreel";
 import { expandEnv, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
@@ -172,6 +173,44 @@ export async function gateOnApp(page: Page, m: Manifest, outDir: string): Promis
       );
     }
   }
+}
+
+
+/** Where a re-record actually has to start.
+ *
+ * Every take saves the manifest it used, so a later run can compare against
+ * it and find the last scene whose preceding steps are byte-identical. Below
+ * that point nothing about the recording changed, and `from: <that scene>`
+ * records only what did.
+ *
+ * This exists because the capability was already there and nobody used it:
+ * of four takes of one 251-step demo, the two that used `from` were mine and
+ * the two the agent made were full re-records at twice the cost. A feature
+ * nobody reaches for is worth less than one that speaks up. */
+export function unchangedUpTo(m: Manifest, outDir: string): { scene: string; steps: number } | null {
+  let prev: Manifest;
+  try {
+    const raw = fs.readFileSync(path.join(outDir, "manifest.used.yaml"), "utf8");
+    prev = YAML.parse(raw) as Manifest;
+  } catch { return null; }
+  if (!prev?.steps?.length) return null;
+  // Anything outside the steps changes the whole recording, so there is no
+  // safe head to keep.
+  const frame = (x: Manifest) => JSON.stringify({ url: x.url, viewport: x.viewport, scale: x.scale, seed: x.seed, stub: x.stub, setup: x.setup, auth: x.auth, speed: x.speed });
+  if (frame(m) !== frame(prev)) return null;
+
+  let same = 0;
+  while (same < m.steps.length && same < prev.steps.length &&
+         JSON.stringify(m.steps[same]) === JSON.stringify(prev.steps[same])) same++;
+  if (same === m.steps.length && same === prev.steps.length) return null;  // nothing changed at all
+
+  // Back up to the last scene at or before the divergence: a take can only
+  // start at a scene, and starting later than the change would miss it.
+  for (let i = Math.min(same, m.steps.length - 1); i >= 0; i--) {
+    const st = m.steps[i];
+    if (st.action === "scene" && st.label) return { scene: st.label, steps: i };
+  }
+  return null;
 }
 
 export type RecordOptions = {
