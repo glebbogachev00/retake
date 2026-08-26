@@ -57,6 +57,12 @@ export type Facts = {
 };
 
 export type RenderOptions = {
+  /** Skip the archival CRF-14 master and compose straight to the deliverable.
+      Halves render on a long take, and the deliverable is marginally BETTER
+      for it: the master path encodes to CRF 14 and then re-encodes that to
+      the delivery CRF, so the file you hand over is a compression of a
+      compression. One pass encodes once, from the source frames. */
+  noMaster?: boolean;
   log?: (l: string) => void;
   /** Re-render even if the render hash matches the last one. */
   force?: boolean;
@@ -507,7 +513,7 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
     // One pass, hardware: compose straight into the deliverable.
     ff([...inputs, ...compose, ...vt, mp4], log);
     mark("compose+encode");
-  } else if (q.master) {
+  } else if (q.master && !o.noMaster) {
     // Compose once into a CRF-14 master, then derive the deliverable.
     master = path.join(outDir, "master.mp4");
     ff([...inputs, ...compose, ...x264(14, "fast"), master], log);

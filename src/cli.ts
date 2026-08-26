@@ -84,10 +84,11 @@ program
   .option("--preset <name>", `override the manifest's preset (${presetNames().join(", ")})`)
   .option("--reuse", "reuse the last raw recording if nothing that shapes it changed (re-render only)", false)
   .option("--gif", "also produce a GIF (overrides the manifest)", false)
+  .option("--no-master", "skip the archival CRF-14 master — roughly halves render on a long take, and the deliverable is marginally better for it (one encode instead of an encode of an encode)")
   .option("--until <scene>", "record up to the end of this scene, then stop (iterate on one beat without paying for the whole take)")
   .option("--from <scene>", "start the take at this scene — earlier steps still run, at full speed and off camera, so a demo whose ENDING changed stops costing its beginning")
   .option("--name <name>", "write to outputs/<name> instead of the manifest's name — revise a cut without overwriting the published one")
-  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; until?: string; from?: string; name?: string }) => {
+  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; master: boolean; until?: string; from?: string; name?: string }) => {
     const loaded = loadManifest(file);
     // Asking for a preset means asking for its SHAPE. A manifest that pins its
     // own `viewport` used to win silently, so `--preset draft` recorded at
@@ -151,7 +152,7 @@ program
       if (opts.render) {
         say(`[stage] render start`);
         const tr = Date.now();
-        const a = await render(manifest, take, outDir, { log: (l) => { if (!l.startsWith("$")) say(l); } });
+        const a = await render(manifest, take, outDir, { noMaster: opts.master === false, log: (l) => { if (!l.startsWith("$")) say(l); } });
         if (!opts.keepRaw) cleanRaw(outDir, take, a.mp4);
         for (const f of [a.master, a.mp4, a.gif, a.thumbnail, a.proofLog]) if (f) say(`✓ ${path.relative(process.cwd(), f)}`);
         if (a.facts) say(`  ${a.facts.width}×${a.facts.height} @ ${a.facts.fps}fps · ${a.facts.duration.toFixed(1)}s · ${a.facts.encoder} · mp4 ${(a.facts.sizes["demo.mp4"] / 1e6).toFixed(1)} MB${a.gif ? ` · gif ${(a.facts.sizes["demo.gif"] / 1e6).toFixed(1)} MB (${a.facts.gifTool})` : ""} · camera on ${a.facts.cameraScenes} scenes${a.facts.cached ? " · cached" : ""} · render ${((Date.now() - tr) / 1000).toFixed(1)}s`);
@@ -238,8 +239,9 @@ program
   .option("--scene <label>", "render just one scene to scene-<label>.mp4 (fast, hardware encode)")
   .option("--gif", "also produce a GIF", false)
   .option("--force", "ignore the render cache", false)
+  .option("--no-master", "skip the archival CRF-14 master — halves render on a long take")
   .option("--out <dir>", "write the render into a NEW directory, leaving the original untouched")
-  .action(async (dir: string, manifestFile: string | undefined, opts: { preset?: string; scene?: string; gif: boolean; force: boolean; out?: string }) => {
+  .action(async (dir: string, manifestFile: string | undefined, opts: { preset?: string; scene?: string; gif: boolean; force: boolean; master: boolean; out?: string }) => {
     const takePath = path.join(dir, "take.json");
     const take = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take;
     // Revising a published cut should not destroy it. Copy the take (and the
@@ -272,7 +274,7 @@ program
     if (opts.gif) manifest = { ...manifest, outputs: { ...manifest.outputs, gif: true } };
     acquireLock(path.resolve(dir));
     try {
-      const a = await render(manifest, take, path.resolve(dir), { log: say, force: opts.force, scene: opts.scene });
+      const a = await render(manifest, take, path.resolve(dir), { log: say, force: opts.force, scene: opts.scene, noMaster: opts.master === false });
       for (const f of [a.master, a.mp4, a.gif, a.thumbnail]) if (f) say(`✓ ${path.relative(process.cwd(), f)}`);
       if (a.facts) say(`  ${Object.entries(a.facts.timings).map(([k, v]) => `${k} ${v}s`).join(" · ")}${a.facts.cached ? " (cached)" : ""}`);
       if (!opts.scene) say(check(path.resolve(dir), manifest).lines.join("\n"));

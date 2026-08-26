@@ -59,7 +59,9 @@ and in another terminal, `retake ui` → http://localhost:4310 to watch it happe
 ```
 outputs/<name>/
   demo.mp4        the shareable — captions burned in
-  master.mp4      the CRF-14 keeper (post presets only)
+  master.mp4      the CRF-14 keeper (post presets only; --no-master skips it,
+                  which is ~3x faster on a long take and, because the master
+                  path re-encodes an already-encoded file, marginally better)
   stills/         one PNG per scene, mid-scene and at its last moment
   thumbnail.png   the poster — pick any frame, a cover, or your own image in the window
   cover.png       launch mode: the title card, settled

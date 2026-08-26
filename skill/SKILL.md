@@ -336,27 +336,34 @@ average is three to five takes per demo. Most of that is avoidable:
    take one full recording for the deliverable. Iterating is where takes
    multiply, and this is the whole of that cost.
 
-3. **`--until <scene>` for the head, `--from <scene>` for the tail.** These
+3. **On a long take, `--no-master`.** The archival CRF-14 copy is worth
+   keeping for a video you are publishing and is pure waste for the nine
+   renders before it. Measured on an 8-minute demo: 495s of encoding became
+   147s. The deliverable is marginally BETTER without it — the master path
+   encodes to CRF 14 and then re-encodes THAT to the delivery CRF, so what
+   you hand over is a compression of a compression.
+
+4. **`--until <scene>` for the head, `--from <scene>` for the tail.** These
    are the two halves of the same idea and `--from` is the one people miss:
    when the ending changed, everything before it still runs (the app has to
    reach that state) but at full speed and off camera. Re-recording a 60s
    demo to change its last 8 seconds is paying for 50 seconds you already
    have.
-4. **Get a person's eyes on a cheap draft before buying an expensive take.**
+5. **Get a person's eyes on a cheap draft before buying an expensive take.**
    A draft costs a quarter of the pixels and answers the only question a
    checker cannot: is this the right video? Spending seven minutes of
    capture to find out the story was wrong is the most expensive mistake
    available in this tool.
-5. **A caption in the wrong place is a nudge, not a take.** `nudge: -1500` on
+6. **A caption in the wrong place is a nudge, not a take.** `nudge: -1500` on
    a scene moves its marker 1.5s earlier in the finished video; the caption,
    the still and the thumbnail all follow. Re-render and look — it is seconds.
-6. **Never re-record for a size or a format.** `render outputs/<name>
+7. **Never re-record for a size or a format.** `render outputs/<name>
    --preset post-vertical` re-frames the take you have. Captions, camera,
    speed, cards and posters are all render-time too.
-7. **`dry` before every `run`** — including after the app restarts. It is
+8. **`dry` before every `run`** — including after the app restarts. It is
    ~10s and it catches the wrong-build-on-the-port failure that otherwise
    costs a take and a confusing video.
-8. **Fix everything `dry` and the proof log report in ONE pass.** Reading
+9. **Fix everything `dry` and the proof log report in ONE pass.** Reading
    the whole failure list before editing turns three rounds into one.
 
 ## Judging the cut

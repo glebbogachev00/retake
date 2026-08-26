@@ -442,7 +442,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   });
 });
 
-server.registerTool("render", { description: "Re-render the last recording with the current manifest. No browser, seconds. THIS, NOT `run`, IS THE ANSWER TO ALMOST EVERY CHANGE: size and shape and format, a caption's words, speed, zoom, cards, music, the poster, and WHERE a caption sits (`nudge: <ms>` on the scene moves its marker, and the still and thumbnail follow). Only a change to what the demo DOES needs the camera again — and even then, `run` with `from`/`until` records one end of it rather than all of it.", inputSchema: { name: z.string() }, annotations: RETAKE_WRITE }, async ({ name }) => { LAST_DEMO = name;
+server.registerTool("render", { description: "Re-render the last recording with the current manifest. No browser, seconds. THIS, NOT `run`, IS THE ANSWER TO ALMOST EVERY CHANGE: size and shape and format, a caption's words, speed, zoom, cards, music, the poster, and WHERE a caption sits (`nudge: <ms>` on the scene moves its marker, and the still and thumbnail follow). Only a change to what the demo DOES needs the camera again — and even then, `run` with `from`/`until` records one end of it rather than all of it.", inputSchema: { name: z.string(), no_master: z.boolean().default(false).describe("skip the archival CRF-14 master. On a long take this is roughly 3x faster (measured: 495s of encoding became 147s on an 8-minute demo) and the deliverable is marginally BETTER for it, because the master path re-encodes an already-encoded file. Use it for every render except the one you are publishing") }, annotations: RETAKE_WRITE }, async ({ name, no_master }) => { LAST_DEMO = name;
   const outDir = path.join(OUT, name);
   const tp = path.join(outDir, "take.json");
   if (!fs.existsSync(tp)) return text("no recording yet — run first");
@@ -450,7 +450,7 @@ server.registerTool("render", { description: "Re-render the last recording with 
   const take = JSON.parse(fs.readFileSync(tp, "utf8")) as Take;
   if (take.captureHash && take.captureHash !== captureHash(manifest)) return text("the recording no longer matches the manifest's steps — use run, not render");
   await tell(`Re-rendering ${name}…`);
-  const a = await render(manifest, take, outDir, { force: true });
+  const a = await render(manifest, take, outDir, { force: true, noMaster: no_master });
   return text(`rendered: ${a.mp4}`);
 });
 
