@@ -419,10 +419,14 @@ export function serve(port: number) {
       const mroot = /^(?:\/landing)?\/([A-Za-z0-9._-]+\.(?:json|jpg|jpeg|png|svg|webp|ico|txt))$/.exec(p);
       if (mroot && (req.method === "GET" || req.method === "HEAD")) {
         const f = path.join(PKG_ROOT, "site", mroot[1]);
-        if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
+        // Fall THROUGH when site/ has no such file, rather than 404ing: this
+        // pattern also matches things with their own handlers further down.
+        // It swallowed /favicon.svg, which is why the tab lost its icon.
+        if (!fs.existsSync(f)) { /* not ours — keep going */ } else {
         res.writeHead(200, { "content-type": MIME[path.extname(f)] ?? "application/octet-stream", "content-length": fs.statSync(f).size });
         if (req.method === "HEAD") return res.end();
         return fs.createReadStream(f).pipe(res);
+        }
       }
       const msite = /^(?:\/landing)?\/(media|logos)\/([A-Za-z0-9._-]+)$/.exec(p);
       if (msite && (req.method === "GET" || req.method === "HEAD")) {
