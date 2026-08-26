@@ -275,3 +275,23 @@ it belongs in the commit message, which is where that audience already is.
 
 Good: "You choose the cover image. Click any frame to make it the one people
 see first." Bad: "Poster selection is now persisted via a marker file."
+
+## The landing page is public — look at it before you commit
+
+`site/index.html` is the page strangers see. It has been shipped broken
+twice by checking that a string was present rather than that the page was
+right: an unbalanced `<div>` dropped a card out of its grid, and a
+catch-all route quietly swallowed the favicon. Neither showed up in a grep;
+both were obvious in a screenshot.
+
+There is a demo for it. Before committing any change to the page:
+
+```bash
+retake run demos/landing-review.yaml --preset draft --no-master
+```
+
+Then LOOK at `outputs/landing-review/stills/` — one still per section, named
+after the section. Thirty seconds, and it is the only check that catches
+layout.
+
+Grep proves a string exists. It proves nothing about whether the page works.
