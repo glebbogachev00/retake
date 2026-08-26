@@ -264,6 +264,47 @@ pre code, .term code{white-space:pre}
    and the changelog 270px inward against empty space. */
 section:not(:has(.shead)){grid-template-columns:1fr}
 section:not(:has(.shead)) > *{grid-column:1}
+
+/* ── A desktop layout, which this page did not have ──────────────────────
+   Every media query here was max-width: a phone layout that never stopped
+   applying. At 1440 that left 880px of content between 280px margins — 39%
+   of the screen unused, and the wide view was the narrow view with more
+   air around it.
+   
+   Everything below applies only once there IS width to use, so nothing
+   under 1100 changes. One container width for the whole page: four
+   different edges stacked down a page reads as a mess, however carefully
+   each one is chosen. */
+@media (min-width: 1100px) {
+  main { max-width: 1120px; padding-left: 32px; padding-right: 32px; }
+
+  /* The hero gets to be a hero: centred, and the headline allowed to grow
+     into the room rather than wrapping early at a size chosen for a phone. */
+  .hero { text-align: center; padding: 76px 0 44px; }
+  h1 { font-size: clamp(54px, 5.6vw, 82px); max-width: none; }
+  .hero .lede { max-width: 640px; margin-left: auto; margin-right: auto; }
+  .hero .actions { justify-content: center; }
+  .hero .flow, .hero .ship { justify-content: center; }
+  .hero .ship { margin-left: auto; margin-right: auto; }
+
+  /* Reading measure belongs to the paragraph, not to its container. Capping
+     the cards instead produces a ragged right edge where full-width blocks
+     alternate with narrow ones. */
+  .sub, .note p, .found p, .stmt p, .rel li { max-width: 66ch; }
+
+  /* Section headings sit beside their content with more room to breathe. */
+  section { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 4px 64px; }
+
+  /* What can pair, pairs. This is where width actually gets used — related
+     things beside each other, not prose stretched wider. */
+  .grid { grid-template-columns: repeat(3, 1fr); }
+  .note-beats { grid-template-columns: repeat(2, 1fr); gap: 22px 40px; }
+}
+
+@media (min-width: 1360px) {
+  main { max-width: 1200px; }
+}
+.videos video{width:100%;height:auto;display:block}
 </style>
 </head>
 <body>
@@ -446,7 +487,7 @@ mkdir demos && cd demos && retake install</pre>
 // The proof section fills itself from whatever clean renders exist in
 // site/media/. Committed pages carry no product footage; media is local.
 const CANDIDATES = [
-  { file: 'capture-two-places', cap: '<b>Capture — the launch pitch.</b> One messy sentence lands as an action and a thread. Drafted, dry-run, recorded, titled and posterised from one YAML file. 14 seconds.' },
+  { file: 'capture-two-places', cap: '<b>Capture — the launch pitch.</b> One messy sentence lands as an action and a thread. Drafted, dry-run, recorded, titled and posterised from one YAML file. 14 seconds.', w: 1920, h: 1180 },
 ];
 (async () => {
   const host = document.getElementById('proof');
@@ -458,7 +499,11 @@ const CANDIDATES = [
     } catch { continue; }
     const f = document.createElement('figure');
     f.className = 'shot'; f.style.margin = 0;
-    f.innerHTML = '<video src="' + url + '" poster="' + url.replace('.mp4', '.jpg') + '" controls muted playsinline preload="metadata"></video><figcaption>' + c.cap + '</figcaption>';
+    // width/height come from the file (scripts/site-media.mjs stamps them),
+    // so the box is reserved at the right shape before metadata loads and a
+    // re-recorded take can never leave a stale ratio behind.
+    const dim = c.w && c.h ? ' width="' + c.w + '" height="' + c.h + '"' : '';
+    f.innerHTML = '<video src="' + url + '"' + dim + ' poster="' + url.replace('.mp4', '.jpg') + '" controls muted playsinline preload="metadata"></video><figcaption>' + c.cap + '</figcaption>';
     host.appendChild(f);
   }
   if (host.children.length) {
