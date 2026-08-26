@@ -651,7 +651,8 @@ function fmtElapsed(ms) {
 }
 
 function startLiveTickers(startedAt) {
-  runStart = startedAt || Date.now();
+  const want = startedAt || Date.now();
+  if (runStart !== want) runStart = want;   // a new run restarts the clock
   if (!quipTimer) {
     // Slow enough to read, and it only moves while something is happening.
     quipTimer = setInterval(() => {
@@ -678,9 +679,16 @@ function drawProgress(a) {
   if (a) lastActivity = a;
   const p = a && a.progress;
   if (!a || !a.active) { box.style.display = 'none'; stopLiveTickers(); return; }
-  startLiveTickers(a.startedAt);
+  // Nothing has reported in five minutes: the run is over, or whatever was
+  // running is gone. Either way the bar is lying, so stop showing it.
+  if (p && p.since && Date.now() - p.since > 5 * 60_000) { box.style.display = 'none'; stopLiveTickers(); return; }
+  if (!p) { box.style.display = 'none'; stopLiveTickers(); return; }
+  // Measure THIS run, not the activity feed. The feed goes active on the
+  // first line and stays that way, so a window left open all day reported a
+  // four-minute take as 529 minutes.
+  startLiveTickers(p.runStart || a.startedAt);
   if (!$('liveQuip').textContent) $('liveQuip').textContent = QUIPS[0];
-  $('liveElapsed').textContent = fmtElapsed(Date.now() - (a.startedAt || Date.now()));
+  $('liveElapsed').textContent = fmtElapsed(Date.now() - runStart);
   // Rendering: there are no steps to count, but the last render of this demo
   // measured itself, so the bar can run on that. Capped at 95% — it must not
   // claim finished before it is, and an estimate is never a promise.

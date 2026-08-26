@@ -72,7 +72,7 @@ async function waitForHuman(kind: "question" | "approve", text: string, detail?:
 
 /** Tell the window how far into a recording we are. Fire-and-forget: a demo
     must never fail because a progress ping did not land. */
-async function progress(p: { phase: string; step: number; total: number; label: string; etaSec?: number }) {
+async function progress(p: { phase: string; step: number; total: number; label: string; etaSec?: number; runStart?: number; clear?: boolean }) {
   if (!UI) return;
   const body = JSON.stringify({ progress: { ...p, demo: LAST_DEMO || undefined } });
   const url = SESSION ? `${UI}/api/operator/${SESSION}/log` : `${UI}/api/activity`;
@@ -351,6 +351,11 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     // Moved aside, not deleted: a failed recording must not cost the person
     // the take they already had.
     stashPrevious(outDir);
+    // The clock has to measure THIS run. It used to count from whenever the
+    // activity feed first went active, which on a long-lived window meant
+    // hours: someone watched a four-minute take report 529 minutes.
+    const runStart = Date.now();
+    void progress({ phase: "recording", step: 0, total: manifest.steps.length, label: "starting", runStart });
     await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);
     let take: Take;
     try {
@@ -358,7 +363,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
         outDir, manifestDir: DEMOS, locked: true, until, from, log: () => {},
         // Throttled: a 251-step demo would otherwise be 251 posts, and the
         // window only needs to know roughly how far along this is.
-        onProgress: (pr) => { if (pr.step === 1 || pr.step === pr.total || pr.step % 2 === 0) void progress(pr); },
+        onProgress: (pr) => { if (pr.step === 1 || pr.step === pr.total || pr.step % 2 === 0) void progress({ ...pr, runStart }); },
       });
     } catch (e) {
       if (restorePrevious(outDir)) await tell("Recording failed — your previous take has been put back.");
@@ -373,7 +378,7 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
       const f = JSON.parse(fs.readFileSync(path.join(outDir, "facts.json"), "utf8")) as { timings?: Record<string, number> };
       etaSec = Math.round(Object.values(f.timings ?? {}).reduce((a, b) => a + Number(b), 0));
     } catch { /* first render of this demo: no estimate to give */ }
-    void progress({ phase: "rendering", step: 0, total: 0, label: "rendering", etaSec });
+    void progress({ phase: "rendering", step: 0, total: 0, label: "rendering", etaSec, runStart });
     await tell(`Rendering…`);
     const a = await render(manifest, take, outDir, {});
     const c = check(outDir, manifest);
@@ -396,6 +401,9 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     return text(`${summariseTake(take)}\nvideo: ${a.mp4 ?? "none"}\ncheck: ${c.ok ? "pass" : "FAIL"}\n${c.lines.filter((l) => l.startsWith("FAIL")).join("\n")}${gate}`);
   } finally {
     releaseLock(outDir);
+    // The run is over. `done` is a separate tool the agent may never call, so
+    // waiting for it left the bar sitting at "nearly there" indefinitely.
+    void progress({ phase: "idle", step: 0, total: 0, label: "", clear: true });
   }
   });
 });

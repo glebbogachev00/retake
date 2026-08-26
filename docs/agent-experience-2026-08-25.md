@@ -272,3 +272,71 @@ Ratings unchanged from the 0.4.x update except **efficiency 7 → 8** — `--fro
 is most of the remaining gap closed. The last point is the still-sampling
 model above: it is the only thing left that cost me renders rather than
 minutes.
+
+---
+
+# Update — three findings from a re-record session
+
+## 1. `look` shows a frame the deliverable never contains
+
+This cost me a whole take, and it is the most fixable thing here.
+
+`look` defaults to `frame: "end"` — the scene's last moment. The PNG that
+ships in `stills/` and becomes the thumbnail is sampled somewhere else
+entirely: **the midpoint between this scene's start and the NEXT scene's
+start**. Those are routinely different frames, and for any beat that scrolls
+or clicks near its end they are wildly different.
+
+So I inspected a thumbnail with `look`, saw the wrong page, did arithmetic on
+scene timings, lengthened a hold, re-recorded 85 seconds — and then opened the
+actual PNG and found it had been correct all along.
+
+**What would help:** make `look` say which frame it is showing relative to the
+still, or add `frame: "still"` that samples exactly where the exported still
+does. One line — *"this is the end frame; the still ships from 34.2s"* — turns
+a wasted take into a glance.
+
+Related: the midpoint rule means a beat's still cannot be moved without moving
+the beat. Holding for H moves the good window's end by H but the sample point
+by only H/2, so a still that lands just past the end of a hold needs **twice**
+the shortfall in extra hold. That is worth one sentence in the docs; I derived
+it the slow way.
+
+## 2. The stall check is right, and does not say what to blame
+
+It fired twice in one session and was correct both times. It is doing real work
+and I would not want it gone.
+
+But the message names the step — *"8.4s at 5:50 — go http://localhost:3200/#/track"* —
+which points at the demo, and the demo was fine. The cause was system load. I
+only established that by dropping to `ps` and `uptime`, and the numbers were
+unambiguous once I did:
+
+| load average | same 265-step take |
+|---|---|
+| 69.6 | 506s, one stall, `check: FAIL` |
+| 7.9 | 458s, clean |
+
+48 seconds — 10% of the runtime — purely contention on an 8GB M1. The short
+demo told the same story: 80s clean, 149s with four stalls, 85s clean again.
+
+**What would help:** sample load average at capture start and again at any
+stall, and print it with the failure. *"stalled 8.4s · load average 69.6 — the
+machine, not the demo"* would have saved the investigation and stopped me
+suspecting my own manifest. Retake already knows capture is real-time; it is
+the one tool in a position to say so.
+
+## 3. What saved a lost manifest
+
+`demos/avex-manifest-check.yaml` was deleted from disk mid-session, along with
+its output folder, and it had never been committed. I rebuilt it from context
+and the dry run came back at exactly 49 steps, matching the original.
+
+Worth writing down: **`outputs/<name>/manifest.used.yaml` is a full copy of the
+manifest a take was recorded from.** Had the output folder survived, the rebuild
+would have been a `cp`. That is a genuinely good design decision that is not
+advertised anywhere — the recovery path exists and nothing points at it.
+
+**What would help:** one line in the docs, and possibly `retake restore <name>`.
+Manifests live outside git by default, which makes them exactly the thing people
+lose.
