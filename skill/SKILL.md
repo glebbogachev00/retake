@@ -94,7 +94,7 @@ re-render would do. Almost nothing needs the camera twice.
 | a caption's words, the speed, a zoom, cards, music | edit the manifest, `render` | seconds |
 | **where** a caption or still sits in time | `nudge: <ms>` on the scene, then `render` | seconds |
 | which frame is the poster | click a frame in the window, or `--scene` | seconds |
-| the ENDING of a demo | `run --from <scene>` | the tail only |
+| the ending, or any part of a demo you already recorded | `run --from <scene>` — it tells you which scene | only what changed |
 | one beat, iterating | `run --until <scene>` | the head only |
 | the steps themselves — what the demo DOES | full `run` | the whole thing |
 
@@ -326,27 +326,37 @@ average is three to five takes per demo. Most of that is avoidable:
 1. **Draft everything.** `--preset draft` has the same layout and timing at
    a quarter of the pixels. Judge the story there; switch to a post preset
    once, at the end.
-2. **`--until <scene>` for the head, `--from <scene>` for the tail.** These
+2. **Record only what changed.** When you edit a demo you have already
+   recorded, `run` diffs your manifest against the one the last take used and
+   tells you the scene the change starts at. Pass that as `from` and the
+   earlier steps still run — the app has to reach that state — but at full
+   speed and off camera. On a 251-step demo with the last third edited that
+   is about 103 seconds against 469. What comes back is a FRAGMENT for
+   checking the fix, not the finished video: watch it, and when it is right,
+   take one full recording for the deliverable. Iterating is where takes
+   multiply, and this is the whole of that cost.
+
+3. **`--until <scene>` for the head, `--from <scene>` for the tail.** These
    are the two halves of the same idea and `--from` is the one people miss:
    when the ending changed, everything before it still runs (the app has to
    reach that state) but at full speed and off camera. Re-recording a 60s
    demo to change its last 8 seconds is paying for 50 seconds you already
    have.
-3. **Get a person's eyes on a cheap draft before buying an expensive take.**
+4. **Get a person's eyes on a cheap draft before buying an expensive take.**
    A draft costs a quarter of the pixels and answers the only question a
    checker cannot: is this the right video? Spending seven minutes of
    capture to find out the story was wrong is the most expensive mistake
    available in this tool.
-4. **A caption in the wrong place is a nudge, not a take.** `nudge: -1500` on
+5. **A caption in the wrong place is a nudge, not a take.** `nudge: -1500` on
    a scene moves its marker 1.5s earlier in the finished video; the caption,
    the still and the thumbnail all follow. Re-render and look — it is seconds.
-5. **Never re-record for a size or a format.** `render outputs/<name>
+6. **Never re-record for a size or a format.** `render outputs/<name>
    --preset post-vertical` re-frames the take you have. Captions, camera,
    speed, cards and posters are all render-time too.
-6. **`dry` before every `run`** — including after the app restarts. It is
+7. **`dry` before every `run`** — including after the app restarts. It is
    ~10s and it catches the wrong-build-on-the-port failure that otherwise
    costs a take and a confusing video.
-7. **Fix everything `dry` and the proof log report in ONE pass.** Reading
+8. **Fix everything `dry` and the proof log report in ONE pass.** Reading
    the whole failure list before editing turns three rounds into one.
 
 ## Judging the cut

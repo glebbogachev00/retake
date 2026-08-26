@@ -6,6 +6,7 @@
       "date": "2026-08-26",
       "headline": "You can see what your agent is doing, and it finishes what it started",
       "notes": [
+        "Re-recording only what changed. Edit part of a demo you already recorded and Retake works out which scene your change starts at, then records from there instead of from the beginning. On a long demo that is a couple of minutes instead of eight.",
         "A progress bar while a demo records — how many steps in, how long it has been going, and roughly how long the render has left. The window used to just say \"Recording…\" and then nothing at all, sometimes for a quarter of an hour.",
         "If your agent disconnects mid-recording, the recording now finishes and saves instead of dying halfway.",
         "And if a recording is killed outright, it leaves a note saying which part it reached — so you can pick up from there instead of starting the whole thing again."
