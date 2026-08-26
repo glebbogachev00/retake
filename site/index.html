@@ -305,6 +305,26 @@ section:not(:has(.shead)) > *{grid-column:1}
   main { max-width: 1200px; }
 }
 .videos video{width:100%;height:auto;display:block}
+
+/* ── A level above the boxes ─────────────────────────────────────────────
+   Measured on this page before adding it: every heading was 20–24px against
+   13.5px body — all within a few pixels of each other, so none of them read
+   as a level. The page had cards and whitespace and no sections.
+   A signpost sits on the page background, is larger than anything in the
+   boxes beneath it, and says what you are about to look at and why. */
+.movement { margin: 60px 0 22px; }
+.movement h2 { font-size: 27px; line-height: 1.14; letter-spacing: -.022em;
+  font-weight: 600; margin: 0 0 9px; color: var(--ink); }
+.movement p { margin: 0; color: var(--muted); font-size: 15.5px; line-height: 1.55; max-width: 56ch; }
+/* The section under a signpost belongs to it. */
+.movement + section { margin-top: 22px; }
+
+@media (min-width: 1100px) {
+  .movement { margin: 84px 0 26px; text-align: center; }
+  .movement h2 { font-size: 40px; }
+  .movement p { font-size: 17px; margin-left: auto; margin-right: auto; }
+  .movement + section { margin-top: 30px; }
+}
 </style>
 </head>
 <body>
@@ -338,24 +358,6 @@ section:not(:has(.shead)) > *{grid-column:1}
   <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
 
 
-  <section id="note">
-    <div class="note">
-      <div class="note-who">
-        <img src="gleb.jpg" alt="" width="44" height="44">
-        <span>
-          <span class="note-label">From the person who made it</span>
-          <span class="note-name">Gleb, who records with it most days</span>
-        </span>
-      </div>
-      <h2 class="note-h">This is where the testimonials usually go.</h2>
-      <p>I do not have any yet, so here is the honest version. I kept re-recording the same demo — an afternoon each release, for a video that was wrong again three weeks later. So the demo became a file instead.</p>
-      <dl class="note-beats">
-        <div><dt>Demos</dt><dd>Most of what I use it for. It has saved me real time and real energy.</dd></div>
-        <div><dt>Launch videos</dt><dd>The kind that stay with someone. Still figuring that one out.</dd></div>
-      </dl>
-      <p class="sign"><b>Gleb</b> <span>·</span> <a href="https://github.com/glebbogachev00/retake/issues/new">tell me what broke</a></p>
-    </div>
-  </section>
 
 
 
@@ -364,6 +366,10 @@ section:not(:has(.shead)) > *{grid-column:1}
 
 
 
+  <div class="movement" data-move="how">
+    <h2>How a demo becomes a file</h2>
+    <p>The part that replaces the screen recorder. Two sections: what your agent does, and what you get back.</p>
+  </div>
   <section id="how">
     <div class="shead">
       <h2>How it works</h2>
@@ -374,14 +380,6 @@ section:not(:has(.shead)) > *{grid-column:1}
       <div class="step"><div><b>Your agent builds and checks the flow</b><p>It reads your app, writes a small YAML demo, and dry-runs every selector and wait. Nothing records until the walkthrough works.</p></div></div>
       <div class="step"><div><b>Retake records the real interaction</b><p>Real typing, real clicks, real waits. The result is demo.mp4, a still for each scene, and a proof log of what happened.</p></div></div>
       <div class="step"><div><b>You revise without starting over</b><p>Change captions, zoom, layout, or format in seconds. When the UI changes, rerun the same flow instead of recording by hand.</p></div></div>
-    </div>
-  </section>
-  <section class="stmt">
-    <h2>Not a recorder,<br><b>not a test runner</b></h2>
-    <div>
-      <p>A screen recording is pixels you can never edit. A browser test is a pass/fail nobody can watch.</p>
-      <p>A Retake demo is both halves — a readable file that proves itself like a test and renders like a film, and reruns when the app changes.</p>
-      <p class="last">And it refuses to become a video editor. If a take needs editing, the file was wrong. Fix the file, run it again.</p>
     </div>
   </section>
   <section>
@@ -400,6 +398,19 @@ section:not(:has(.shead)) > *{grid-column:1}
       <div class="cell"><b>Plain, or produced</b><p><code>mode: demo</code> keeps everything but your product out of the frame. <code>mode: launch</code> adds a title card, cuts the waiting, and lets you pick the poster. Demo is the default; your agent never upgrades one on its own.</p></div>
     </div>
   </section>
+  <section class="stmt">
+    <h2>Not a recorder,<br><b>not a test runner</b></h2>
+    <div>
+      <p>A screen recording is pixels you can never edit. A browser test is a pass/fail nobody can watch.</p>
+      <p>A Retake demo is both halves — a readable file that proves itself like a test and renders like a film, and reruns when the app changes.</p>
+      <p class="last">And it refuses to become a video editor. If a take needs editing, the file was wrong. Fix the file, run it again.</p>
+    </div>
+  </section>
+
+  <div class="movement" data-move="proof">
+    <h2>Where it has earned its place</h2>
+    <p>Three products it was built inside, and the five bugs one recording turned up that a test suite could not.</p>
+  </div>
   <section>
     <div class="shead">
       <h2>Built against three real workflows</h2>
@@ -442,6 +453,28 @@ section:not(:has(.shead)) > *{grid-column:1}
         <li>An email subject line with a <b>machine timestamp</b> in it.</li>
       </ul>
       <p class="tail">A test can only check what somebody thought to check. Watching catches the rest — and because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
+    </div>
+  </section>
+  <div class="movement" data-move="who">
+    <h2>Who made it</h2>
+    <p>One person, using it most days. There are no customer quotes here yet and this page is not going to invent any.</p>
+  </div>
+  <section id="note">
+    <div class="note">
+      <div class="note-who">
+        <img src="gleb.jpg" alt="" width="44" height="44">
+        <span>
+          <span class="note-label">From the person who made it</span>
+          <span class="note-name">Gleb, who records with it most days</span>
+        </span>
+      </div>
+      <h2 class="note-h">This is where the testimonials usually go.</h2>
+      <p>I do not have any yet, so here is the honest version. I kept re-recording the same demo — an afternoon each release, for a video that was wrong again three weeks later. So the demo became a file instead.</p>
+      <dl class="note-beats">
+        <div><dt>Demos</dt><dd>Most of what I use it for. It has saved me real time and real energy.</dd></div>
+        <div><dt>Launch videos</dt><dd>The kind that stay with someone. Still figuring that one out.</dd></div>
+      </dl>
+      <p class="sign"><b>Gleb</b> <span>·</span> <a href="https://github.com/glebbogachev00/retake/issues/new">tell me what broke</a></p>
     </div>
   </section>
   <section id="start">
