@@ -150,7 +150,8 @@ A launch cut ends with THEIR product, never with Retake. Retake branding
 belongs only in a video that presents Retake.
 
 **Two kinds of take, one file — and the destination decides.** The default
-is the plain cut: still camera, cursor, captions, nothing else. That is
+is the plain cut: still camera, cursor, no burned-in captions, nothing
+else. That is
 correct for PRs, clients, docs, lessons — most takes. When the person's
 answer to "where is this going?" is a launch, a post, or anything public
 and promotional, offer the produced cut in ONE sentence: "Want the launch
@@ -192,7 +193,8 @@ Anything they would tell a videographer maps to a knob, in plain English:
 
 - "no zooms" / "keep the camera still" → `camera: static` on scenes
 - "hide the cursor" → `cursor: false`
-- "no captions" / "shorter captions" → captions off, or rewrite them
+- "no captions" / "shorter captions" → already off; rewrite the scene
+  captions if the proof log reads badly
 - "slower" / "hold the ending" → `pauseAfter`, scene `holdMs`, end waits
 - "square" / "vertical" / "for X" → preset `post-square` / `post-vertical`,
   and this is a RE-RENDER of the take you already have, never a re-record:
@@ -365,6 +367,21 @@ average is three to five takes per demo. Most of that is avoidable:
    costs a take and a confusing video.
 9. **Fix everything `dry` and the proof log report in ONE pass.** Reading
    the whole failure list before editing turns three rounds into one.
+
+
+## Captions are off, and that is on purpose
+
+`captions` defaults to FALSE. A caption under the app makes a viewer look
+away from the thing they came to watch and read instead of see — which is
+why they were turned off here after being tried.
+
+Still write a caption on every scene. They name the beats in the proof log,
+the shot list and the stills, which is how anybody reviews a take. They are
+just not painted onto the video.
+
+Turn them on (`captions: true`) only when the person asks, or when a viewer
+genuinely cannot follow the demo without them — a flow whose meaning is not
+visible on screen. Never add them because a video "usually" has them.
 
 ## Judging the cut
 

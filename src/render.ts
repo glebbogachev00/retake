@@ -285,6 +285,39 @@ function cameraFilter(take: Take, W: number, H: number, fps: number): { filter: 
   return { filter: `zoompan=z='${z}':x='${x}':y='${y}':d=1:s=${W}x${H}:fps=${fps}`, count };
 }
 
+// --- joining segments --------------------------------------------------------
+
+/** Build the filter graph that joins intro, body and outro.
+ *
+ * `cut` stays a plain concat — byte-identical to what Retake produced before
+ * transitions existed. Anything else chains `xfade`, whose offset must be
+ * measured in the timeline built SO FAR, not in the source segment: each
+ * transition overlaps the two clips, so every later offset shifts earlier by
+ * the duration already consumed. Getting that wrong is how a dissolve ends up
+ * cutting off the last half-second of a card.
+ */
+export function joinGraph(segs: string[], tr: { style: string; ms: number }, fps: number): string {
+  const labels = segs.map((_, i) => `[${i}:v]`);
+  if (tr.style === "cut" || segs.length < 2) {
+    return `${labels.join("")}concat=n=${segs.length}:v=1:a=0[out]`;
+  }
+  const d = tr.ms / 1000;
+  const durations = segs.map((f) => probe(f).duration);
+  const chain: string[] = [];
+  let prev = labels[0];
+  let elapsed = durations[0];
+  for (let i = 1; i < segs.length; i++) {
+    const out = i === segs.length - 1 ? "[out]" : `[x${i}]`;
+    // Offset is where the overlap starts on the timeline assembled so far.
+    const offset = Math.max(0, elapsed - d);
+    chain.push(`${prev}${labels[i]}xfade=transition=${tr.style}:duration=${d.toFixed(3)}:offset=${offset.toFixed(3)}${out}`);
+    // The overlap is shared, so the timeline grows by less than the new clip.
+    elapsed = offset + d + durations[i] - d;
+    prev = out;
+  }
+  return chain.join(";");
+}
+
 // --- card frame --------------------------------------------------------------
 
 type CardGeom = { vx: number; vy: number; vw: number; vh: number; bandY: number };
@@ -541,7 +574,8 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
     if (m.outro) segs.push((await renderCard(ffmpegBin(), outDir, "outro", m.outro, dims.width, dims.height, fps, q.theme)).mp4);
     if (segs.length > 1) {
       const joined = path.join(outDir, ".joined.mp4");
-      ff([...segs.flatMap((f) => ["-i", f]), "-filter_complex", `${segs.map((_, i) => `[${i}:v]`).join("")}concat=n=${segs.length}:v=1:a=0[out]`, "-map", "[out]", "-r", String(fps), "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", ...x264(q.crf, "medium"), joined], log);
+      const tr = m.transition ?? { style: "cut" as const, ms: 400 };
+      ff([...segs.flatMap((f) => ["-i", f]), "-filter_complex", joinGraph(segs, tr, fps), "-map", "[out]", "-r", String(fps), "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", ...x264(q.crf, "medium"), joined], log);
       fs.renameSync(joined, mp4);
       for (const f of segs) if (f !== mp4) fs.rmSync(f, { force: true });
     }

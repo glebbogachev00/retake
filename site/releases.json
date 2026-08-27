@@ -6,6 +6,7 @@
       "date": "2026-08-26",
       "headline": "You can see what your agent is doing, and it finishes what it started",
       "notes": [
+        "Captions are off by default now. A caption under the app makes you look away from the thing you came to watch, so a demo no longer paints them on unless you ask. Scene captions are still worth writing — they name the beats in the proof log and the stills.",
         "Re-recording only what changed. Edit part of a demo you already recorded and Retake works out which scene your change starts at, then records from there instead of from the beginning. On a long demo that is a couple of minutes instead of eight.",
         "Renders are much faster while you are still working on a demo. Skipping the archival copy took an eight-minute video from about eight minutes of encoding down to under three — and the video you hand over is very slightly better for it, because it is no longer a copy of a copy.",
         "A progress bar while a demo records — how many steps in, how long it has been going, and roughly how long the render has left. The window used to just say \"Recording…\" and then nothing at all, sometimes for a quarter of an hour.",

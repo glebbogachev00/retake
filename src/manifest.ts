@@ -276,6 +276,13 @@ const ManifestShape = z.object({
   /** Title cards, rendered at render time (change them, re-render in seconds).
       The intro's settled frame is also written as cover.png — the poster. */
   intro: z.object({ title: z.string().max(60), subtitle: z.string().max(90).optional(), ms: z.number().positive().max(6000).default(2400) }).optional(),
+  /** How the cards join the body. `cut` is what Retake has always done and stays
+      the default: a change of default would silently restyle every existing demo.
+      A transition costs real time — it eats into the card, not into the demo. */
+  transition: z.object({
+    style: z.enum(["cut", "fade", "dissolve", "wipeleft", "wiperight", "slideleft", "slideup", "circleopen"]).default("cut"),
+    ms: z.number().int().min(120).max(1200).default(400),
+  }).default({ style: "cut", ms: 400 }),
   outro: z.object({ title: z.string().max(60), subtitle: z.string().max(90).optional(), ms: z.number().positive().max(6000).default(2000) }).optional(),
   /** Still by default. A zoom is something a person asks for after seeing a
       take, never something that happens to them: a calm demo reads as real
@@ -298,7 +305,13 @@ const ManifestShape = z.object({
       setup: z.array(Step).default([]),
     })
     .optional(),
-  captions: z.union([z.boolean(), z.object({ fontSize: z.number().int().optional(), color: z.string().optional() })]).default(true),
+  /** Burned-in captions. OFF by default, and deliberately: a caption under
+      the app makes a viewer look away from the thing they came to watch, and
+      read instead of see. Scene captions are still worth writing — they name
+      the beats in the proof log, the shot list and the stills — this only
+      controls whether they are painted onto the video. Ask for `captions:
+      true` when a viewer genuinely cannot follow without them. */
+  captions: z.union([z.boolean(), z.object({ fontSize: z.number().int().optional(), color: z.string().optional() })]).default(false),
   theme: z.object({ background: z.string().optional(), ink: z.string().optional() }).prefault({}),
   colorScheme: z.enum(["light", "dark"]).default("light"),
   /** Ask the page for reduced motion. Apps that respect it lose their infinite
