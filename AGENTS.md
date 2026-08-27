@@ -65,6 +65,8 @@ write demos/<name>.yaml
   → read outputs/<name>/proof-log.md                  what actually happened, per step
   → retake check outputs/<name>             pass/fail on the result
   → retake verify outputs/<name>            did it LOOK right — each scene's `expect`, judged
+  → retake sense outputs/<name>             does the run ADD UP — input vs output
+  → retake destroy demos/<name>.yaml        what happens just off the happy path
   → retake notes                            what keeps going wrong across every demo
   → adjust, then: retake run demos/<name>.yaml          final quality
 ```
@@ -209,6 +211,23 @@ Most real demos start behind a sign-in. The agent never sees a password:
 - `outputs/<name>/take.json` — the same, machine-readable.
 - `outputs/<name>/demo.mp4` — the video. `master.mp4` is the CRF-14 keeper
   on post presets.
+- `retake sense outputs/<name>` — the verdict on the RUN, not on one frame.
+  Everything the demo typed, chose and clicked, put against the frames that
+  came out, through six lenses: quantity, continuity, state, units and labels,
+  order, dead ends. Needs nothing declared — the inputs are already in the
+  take. It ASKS rather than fails (exit stays 0), because whether a number adds
+  up is judgement. Found a real one first time out: two flight legs entered,
+  one unlabelled price shown.
+- `retake destroy demos/<name>.yaml` — the flows nobody wrote down. Derives a
+  manifest for each of nine abuses (double-submit, reload-midway, back-button,
+  provider-down, provider-empty, empty-state, long-input, awkward-input,
+  impatient), writes them under `outputs/.destroy/<name>/`, and tries them.
+  `--run` performs them for real and keeps the frames. Three verdicts, not
+  two: **broke**, **worth a look** (only a person can call it), **held** — and
+  a failed second press counts as held, because the button being gone is the
+  app defending itself. Refuses a non-local URL, a demo that neither seeds nor
+  stubs, and an app somebody else is recording. Each refusal names its own
+  override; using one is the person's call.
 - `retake notes` — the watcher. Reads every take in `outputs/` back and says
   the few things a person would say after looking through them: a stub that
   answered nothing (the demo is showing live data), the same selector failing

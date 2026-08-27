@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { questions, stillFor, verify, __test_readAnswer } from "../src/verify.js";
+import { questions, stillFor, verify, __test_readAnswer } from "../src/ext/verify.js";
 import type { Manifest } from "../src/manifest.js";
 
 const base = { name: "t", url: "http://x", steps: [] } as unknown as Manifest;

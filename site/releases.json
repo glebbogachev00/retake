@@ -2,6 +2,20 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.6.0",
+      "date": "2026-08-27",
+      "headline": "Retake checks whether your app makes sense — and goes looking for what you didn't think of",
+      "notes": [
+        "New: Retake can tell you when a flow doesn't add up. It reads everything a demo typed, chose and clicked, puts that against the pictures it took, and asks about the parts that don't agree. It found a real one the first time it ran: a charter quote where two flights were entered and one price was shown. Every step had passed. Every frame looked fine. The recording had known for weeks.",
+        "It asks rather than accuses. Whether a number adds up is a judgement call, so what comes back is questions you settle in a couple of seconds — not a red X that stops everything.",
+        "New: a way to find what you didn't think of. Point it at a demo you already have and it writes out a whole set of new ones — the same flow but with the button pressed twice, the page reloaded halfway, the thing it depends on switched off, nothing in the app yet, 540 characters typed into every box, quotes and emoji everywhere, nothing waiting for anything. Then it tries them all.",
+        "What comes back is files, not a report. Every one of them is a normal demo you can read, run again, keep, or throw away — so if it finds something, you already have the recipe for it.",
+        "It knows the difference between your app breaking and your app defending itself. A second press that finds nothing means the button went away, which is your app doing the right thing — it says so instead of crying wolf. And when something is genuinely a judgement call, it says that too rather than guessing.",
+        "It refuses to touch anything that isn't running on your own machine, anything whose data it can't put back, and anything somebody else is recording at that moment. Each of those can be overruled, but only by you and only on purpose.",
+        "Under the hood: the checks now live apart from the recorder, so none of them can affect a recording, and any of them could be removed tomorrow without the rest noticing."
+      ]
+    },
+    {
       "version": "0.5.0",
       "date": "2026-08-27",
       "headline": "Retake can now tell you whether your app actually looks right — and what keeps going wrong",

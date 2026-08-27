@@ -22,10 +22,10 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
-import type { Manifest } from "./manifest.js";
-import { pickProvider, type Provider } from "./describe.js";
-import type { Take } from "./record.js";
+import type { Manifest } from "../manifest.js";
+import type { Take } from "../record.js";
+import { ask, pickJudge, readJson, why as short } from "./judge.js";
+import type { Provider } from "../describe.js";
 
 export type Answer = {
   scene: string;
@@ -77,44 +77,22 @@ const PROMPT = (question: string) =>
   `answer false and say so. Do not assume it is fine because it probably is. ` +
   `Do not be generous.`;
 
-/** Ask the one reader that can see. Only providers that can actually take an
-    image are used — answering a visual question from a filename would be
-    worse than not answering it. */
 function judgeWith(p: Provider, still: string, question: string): { ok: boolean | null; why: string } {
-  if (p.name !== "claude-code" && p.name !== "codex") {
-    return { ok: null, why: `${p.name} cannot be given an image` };
-  }
   try {
-    const args = p.name === "claude-code"
-      ? ["-p", "--output-format", "text", "--add-dir", path.dirname(still), "--allowedTools", "Read", ...(p.model !== "default" ? ["--model", p.model] : [])]
-      : ["exec", "--skip-git-repo-check"];
-    const ask = `${PROMPT(question)}\n\nThe screenshot is the file at: ${still}\nRead that image file first, then answer.`;
-    // stderr is piped, not inherited: the codex CLI prints a session banner
-    // and a token count to it, which would bury the one line that matters.
-    const out = execFileSync(p.baseUrl, args, { input: ask, encoding: "utf8", timeout: 120_000, maxBuffer: 1 << 22, stdio: ["pipe", "pipe", "pipe"] });
-    // The LAST such object, not the first: some CLIs echo the prompt (which
-    // contains the example shape) before answering.
-    return readAnswer(out, p.name);
+    return readAnswer(ask(p, PROMPT(question), [still], 120_000), p.name);
   } catch (e) {
-    return { ok: null, why: `judge failed: ${String((e as Error).message).split("\n")[0].slice(0, 120)}` };
+    return { ok: null, why: `judge failed: ${short(e)}` };
   }
 }
 
+type Said = { ok: boolean; why?: string };
+const isSaid = (v: unknown): v is Said => !!v && typeof v === "object" && typeof (v as Said).ok === "boolean";
+
 /** Read a verdict out of whatever the CLI printed. */
 function readAnswer(out: string, who: string): { ok: boolean | null; why: string } {
-    const all = [...out.matchAll(/\{[^{}]*"ok"\s*:\s*(true|false)[^{}]*\}/g)].map((x) => x[0]);
-    // Walk backwards to the last one that actually parses. Some CLIs echo the
-    // prompt first, and the prompt contains the example shape — which matches
-    // the pattern and is not valid JSON. Reading that as the answer would turn
-    // a real verdict into "no usable answer".
-    for (let i = all.length - 1; i >= 0; i--) {
-      try {
-        const parsed = JSON.parse(all[i]) as { ok: boolean; why?: string };
-        if (typeof parsed.ok !== "boolean") continue;
-        return { ok: parsed.ok, why: (parsed.why ?? "").trim() || "(no reason given)" };
-      } catch { /* the echoed template; keep looking */ }
-    }
-    return { ok: null, why: `no usable answer from ${who}` };
+  const said = readJson(out, isSaid);
+  if (!said) return { ok: null, why: `no usable answer from ${who}` };
+  return { ok: said.ok, why: (said.why ?? "").trim() || "(no reason given)" };
 }
 
 /** Exposed for the test: reading a verdict out of whatever a CLI printed is
@@ -140,12 +118,11 @@ export function verify(m: Manifest, outDir: string, log?: (l: string) => void): 
     return { ok: false, answers: [], judge: "none", lines };
   }
 
-  const provider = pickProvider();
-  const judge = provider ? `${provider.name}${provider.model !== "default" ? ` (${provider.model})` : ""}` : "none";
+  const { provider, name: judge, why: noJudge } = pickJudge();
   if (!provider) {
     // A check that could not run is not a check that passed.
     say("FAIL  nothing available to look at the frames.");
-    say("      Sign in to the `claude` or `codex` CLI, or set RETAKE_MODEL — verify needs a reader that can see an image.");
+    say(`      ${noJudge}`);
     return { ok: false, answers: qs.map((q) => ({ scene: q.scene, question: q.question, ok: null, why: "no judge available", still: q.still ?? "" })), judge, lines };
   }
 

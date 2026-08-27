@@ -24,8 +24,10 @@ import { record, captureHash, acquireLock, releaseLock, keepPrevious, restorePre
 import { render, check, ffmpegBin } from "../render.js";
 import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
-import { verify } from "../verify.js";
-import { notes } from "../notes.js";
+import { verify } from "../ext/verify.js";
+import { notes } from "../ext/notes.js";
+import { sense } from "../ext/sense.js";
+import { describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "../ext/destroy.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
 import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
@@ -526,6 +528,36 @@ server.registerTool("notes", {
   inputSchema: { all: z.boolean().optional() },
   annotations: READ_ONLY,
 }, async ({ all }) => text(notes(OUT, { all: all === true }).lines.join("\n")));
+
+
+server.registerTool("sense", {
+  description: "DOES THE RUN ADD UP. `verify` judges one frame — is the button readable. This judges the whole demo: everything the run typed, chose and clicked, against the frames that came out, through six bounded lenses (quantity, continuity, state, units and labels, order, dead ends). It found a real one on its first outing: a charter quote entered two legs, SGN→SIN and SIN→SGN, and showed a single unlabelled price. Nothing else was ever going to catch that — every step passed and every frame looked fine. It ASKS rather than fails, so treat what comes back as questions to settle, not defects to fix, and show them to the person rather than acting on them alone. Needs nothing declared in the manifest: the inputs are already in the take.",
+  inputSchema: { name: z.string() },
+  annotations: READ_ONLY,
+}, async ({ name }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const { manifest } = loadManifest(manifestPath(name));
+  await tell(`Checking whether ${name} adds up…`);
+  const v = sense(manifest, path.join(OUT, name), (l) => void tell(l));
+  return text(v.lines.join("\n"));
+});
+
+server.registerTool("destroy", {
+  description: "THE FLOWS NOBODY WROTE DOWN. Takes a demo you already have and writes a manifest for each way it could be abused — the second click, a reload mid-flight, the provider answering 500 or answering empty, the app with nothing in it yet, 540 characters in every field, quotes and emoji and right-to-left script, no waiting for anything to be ready. Then it tries them. What comes back is FILES: ordinary manifests under outputs/.destroy/<demo>/, so anything it finds arrives with the repro attached and can be kept as a demo of its own. By default it resolves the candidates without clicking (fast, catches structural breakage); pass run=true to actually perform them, which is the only way to catch what happens when an app is really used. It refuses a non-local URL, and refuses to run a demo that does not seed its own state — do not try to talk it out of either; tell the person what it said.",
+  inputSchema: { name: z.string(), only: z.array(z.string()).optional(), run: z.boolean().optional(), generate_only: z.boolean().optional() },
+  annotations: RETAKE_WRITE,
+}, async ({ name, only, run, generate_only }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const loaded = loadManifest(manifestPath(name));
+  const plan = planDestroy(loaded.manifest, OUT, { only });
+  const out = describePlan(plan, loaded.manifest);
+  if (plan.refused || generate_only === true || !plan.candidates.length) return text(out.join("\n"));
+  const no = refuseToRun(loaded.manifest, process.env, OUT);
+  if (no) return text([...out, "", `Not running these: ${no}`].join("\n"));
+  await tell(`Trying ${plan.candidates.length} ways to break ${name}…`);
+  const trials = await tryCandidates(plan, { mode: run === true ? "run" : "dry", manifestDir: loaded.dir, outRoot: OUT, log: (l) => void tell(l) });
+  return text([...out, ...describeTrials(trials, run === true ? "run" : "dry")].join("\n"));
+});
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {
   await tell(`Done: ${summary}`);

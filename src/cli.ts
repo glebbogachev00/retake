@@ -11,6 +11,8 @@
  *   retake render outputs/x                       re-render from the existing take (--preset to switch)
  *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
  *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
+ *   retake sense outputs/x                        does the run ADD UP — what went in vs what came out
+ *   retake destroy demos/x.yaml                   the flows nobody wrote down — abuse this demo nine ways
  *   retake notes                                  read outputs/ back: what keeps going wrong, and what it costs
  *   retake dry demos/x.yaml                       every selector and wait, no camera
  *   retake validate demos/x.yaml                  schema check only
@@ -31,8 +33,10 @@ import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTak
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 import { applyTidy, mb, planTidy } from "./tidy.js";
-import { verify } from "./verify.js";
-import { notes } from "./notes.js";
+import { verify } from "./ext/verify.js";
+import { notes } from "./ext/notes.js";
+import { sense } from "./ext/sense.js";
+import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
 
@@ -47,6 +51,11 @@ try {
 
 const program = new Command();
 program.name("retake").description("Rerun the demo instead of re-recording it.").version(VERSION);
+
+// `retake notes | head` closes the pipe before the writer is done, and node
+// turns that into an unhandled EPIPE and a stack trace. A command-line tool
+// should stop quietly when whoever was reading walks away.
+process.stdout.on("error", (e: NodeJS.ErrnoException) => { if (e.code === "EPIPE") process.exit(0); throw e; });
 
 const say = (l: string) => process.stdout.write(l + "\n");
 
@@ -236,6 +245,52 @@ program
   });
 
 
+
+
+
+program
+  .command("destroy")
+  .description("the flows nobody wrote down — writes a manifest for each way this demo could be abused, and tries them")
+  .argument("<manifest>", "the demo to derive candidates from")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("--only <shapes>", "just these, comma-separated (see --shapes)")
+  .option("--shapes", "list the ways it knows how to break something, and stop", false)
+  .option("--run", "actually perform the steps instead of only resolving them — slower, and the only way to catch what happens when an app is really used", false)
+  .option("--no-try", "write the candidates and stop")
+  .action(async (file: string, opts: { out: string; only?: string; shapes: boolean; run: boolean; try: boolean }) => {
+    if (opts.shapes) {
+      for (const s of SHAPES) { say(`${s.name}`); say(`  ${s.asks}`); say(`  ${s.because}`); say(""); }
+      return;
+    }
+    const loaded = loadManifest(file);
+    const plan = planDestroy(loaded.manifest, path.resolve(opts.out), { only: opts.only?.split(",").map((x) => x.trim()).filter(Boolean) });
+    for (const l of describePlan(plan, loaded.manifest)) say(l);
+    if (plan.refused) { process.exitCode = 2; return; }
+    if (!opts.try || !plan.candidates.length) return;
+
+    // Generating is safe — it makes files. Running clicks things, and that is
+    // where the two refusals bite.
+    const no = refuseToRun(loaded.manifest, process.env, path.resolve(opts.out));
+    if (no) { say(""); say(`✗ not running these: ${no}`); process.exitCode = 2; return; }
+
+    say("");
+    const trials = await tryCandidates(plan, { mode: opts.run ? "run" : "dry", manifestDir: loaded.dir, outRoot: path.resolve(opts.out), log: say });
+    for (const l of describeTrials(trials, opts.run ? "run" : "dry")) say(l);
+    if (trials.some((t) => t.verdict === "broke")) process.exitCode = 3;
+  });
+
+program
+  .command("sense")
+  .description("does the run ADD UP — what went in against what came out, across the whole demo")
+  .argument("<dir>", "an outputs/<name> dir")
+  .argument("[manifest]", "manifest (default demos/<name>.yaml)")
+  .action((dir: string, manifestFile?: string) => {
+    const outDir = path.resolve(dir);
+    const file = manifestFile ?? path.join("demos", `${path.basename(outDir)}.yaml`);
+    if (!fs.existsSync(file)) throw new Error(`no ${file} — pass the manifest path`);
+    // Deliberately no exit code. sense asks questions; `verify` is the gate.
+    sense(loadManifest(file).manifest, outDir, say);
+  });
 
 program
   .command("notes")

@@ -1,6 +1,6 @@
 ---
 name: recording-product-demos
-description: Record a silent product demo video of a web app with Retake, and prove a web app actually LOOKS right before saying it works. Use when the user asks for a demo video, screen recording, or product walkthrough — or asks what demos would be worth recording — and ALSO whenever you have changed something a person will look at (a page, a screen, a flow) and are about to report that it works. Works through Retake's MCP tools (preferred) or its CLI.
+description: Record a silent product demo video of a web app with Retake, prove a web app actually LOOKS right before saying it works, check that a flow ADDS UP, and find what breaks just off the happy path. Use when the user asks for a demo video, screen recording, or product walkthrough — or asks what demos would be worth recording — and ALSO whenever you have changed something a person will look at (a page, a screen, a flow) and are about to report that it works. Works through Retake's MCP tools (preferred) or its CLI.
 ---
 
 # Recording product demos with Retake
@@ -83,6 +83,28 @@ say so in one line and stop.
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
 
+## The five checks, and what each one actually answers
+
+These are separate questions. Running the wrong one and reporting it as
+"tested" is the failure this whole set exists to prevent.
+
+| Question | Verb | Costs | Gates? |
+|---|---|---|---|
+| Will the steps resolve, and does the flow work at all? | `dry` | seconds | yes — exit 3 |
+| Does one moment LOOK right? | `verify` | ~10s a question | yes — exit 3 |
+| Does the whole run ADD UP — input vs output? | `sense` | ~45s | no, it asks |
+| What happens just off the happy path? | `destroy` | minutes | flags, you judge |
+| What keeps going wrong across every demo? | `notes` | instant | no |
+
+`dry` really does click and fill — at full speed, with short timeouts, no
+camera. What it does not do is keep frames, so anything whose damage is
+visual passes it. That is what `verify` is for.
+
+**Before you report that something works, at minimum: `dry`, then `run`, then
+`verify`.** `sense` on anything with numbers or a summary in it. `destroy`
+when you have changed something people depend on and want to know what you
+did not think of.
+
 ## Arriving in a workspace you did not set up
 
 Call **`notes`** first. It reads every take on disk back and says only what is
@@ -161,6 +183,73 @@ who is not you.
 A change nobody looks at — types, a build script, a pure function — needs a
 test, not a picture. Verify is for pixels. If you cannot write a sentence
 about what should be visible, there is nothing here to verify.
+
+## Does the run add up — `sense`
+
+`verify` judges one frame. `sense` judges the whole run: everything the demo
+typed, chose and clicked, against the frames that came out.
+
+Nothing needs declaring. The inputs are already in the take — this is the half
+of the recording nothing has ever read.
+
+It found a real one on its first outing. An Avex quote entered two legs:
+
+```
+type "SGN" → #leg-from-0      type "SIN" → #leg-to-0
+type "SIN" → #leg-from-1      type "SGN" → #leg-to-1
+type "17400" → [data-op-field='price']
+```
+
+and showed a single unlabelled price of 17,400. Every step passed. Every frame
+looked fine. `verify` would not have caught it, because no single frame is
+wrong — the run is wrong.
+
+Six lenses, and nothing else: **quantity** (n went in, does the result account
+for n), **continuity** (does a value entered early still read the same later),
+**state** (an action was taken — did the screen move), **units and labels**
+(per-item or total, which currency, whose timezone), **order** (does anything
+arrive before what it depends on), **dead ends**.
+
+**It asks, it does not fail.** Whether a number adds up is judgement, and a
+false FAIL on judgement is how a check gets switched off. What comes back is
+questions. Put them to the person in their own words — do not act on them
+alone, and do not report them as bugs you found.
+
+On a long demo it samples the frames and says so. Do not read "12 frames" as
+"the whole demo was checked".
+
+## What you did not think of — `destroy`
+
+Takes a demo you already have and writes a manifest for each way it could be
+abused, then tries them. Nine shapes: **double-submit**, **reload-midway**,
+**back-button**, **provider-down**, **provider-empty**, **empty-state**,
+**long-input** (540 characters everywhere), **awkward-input** (quotes, tags,
+emoji, right-to-left), **impatient** (every wait removed).
+
+What comes back is **files** — ordinary manifests under
+`outputs/.destroy/<demo>/`. So anything it finds arrives with the repro
+attached, and a good one can be kept as a demo of its own.
+
+Read the verdicts carefully, because they are not all the same kind:
+
+- **✗ broke** — the flow came apart, or the app threw. A finding.
+- **? worth a look** — something happened that only a person can call. A flow
+  that stops when its provider is down might be a handled error screen or a
+  dead end. Do not resolve these yourself; show them.
+- **· held** — it took the abuse. Note that **a failed second press counts as
+  held**: the button was gone after the first, which is the app refusing to do
+  it twice. That is the app winning.
+
+By default it resolves the candidates without keeping frames. `run: true`
+performs them for real and keeps the pictures — then `verify` and `sense` can
+judge those, which is the only way to catch damage that is visual.
+
+**Three refusals you must not try to talk it out of.** It will not touch a
+non-local URL. It will not run a demo that neither seeds its state nor stubs
+what it reads. And it will not run against an app somebody else is recording
+right now. Each names an environment variable that overrides it — that
+override is the person's call to make, never yours. If it refuses, say what it
+said and stop.
 
 ## What a change costs — read this before re-recording anything
 
