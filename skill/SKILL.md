@@ -83,6 +83,18 @@ say so in one line and stop.
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
 
+## Arriving in a workspace you did not set up
+
+Call **`notes`** first. It reads every take on disk back and says only what is
+true of the files: a stub that never answered (that demo is showing live data
+where it meant to show canned), the same selector failing across several demos
+(the app moved — fix it once, not five times), a fragment sitting where a
+finished cut should be, a dead lock holding a folder, demos nobody has ever
+verified. It is silent when there is nothing, so it costs you one turn.
+
+It also proposes the occasional line for AGENTS.md. Show those to the person
+rather than writing them in yourself — a policy is theirs to set.
+
 ## Proving it looks right — before you say it works
 
 **Read this whenever you have changed something a person will look at.** Not

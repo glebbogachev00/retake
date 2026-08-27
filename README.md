@@ -83,6 +83,7 @@ retake dry demos/x.yaml        # every selector and wait, no camera (~30s)
 retake run demos/x.yaml --preset draft   # first take, quarter-size, fast
 retake check outputs/x         # resolution, fps, duration, files: pass/fail
 retake verify outputs/x        # did it LOOK right: each scene's `expect`, judged (exit 3 on failure)
+retake notes                  # read every take back: what keeps going wrong, and what it costs
 retake run demos/x.yaml        # the real one
 retake render outputs/x        # captions/camera/speed changed? re-render, no browser
 ```

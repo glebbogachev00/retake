@@ -65,6 +65,7 @@ write demos/<name>.yaml
   → read outputs/<name>/proof-log.md                  what actually happened, per step
   → retake check outputs/<name>             pass/fail on the result
   → retake verify outputs/<name>            did it LOOK right — each scene's `expect`, judged
+  → retake notes                            what keeps going wrong across every demo
   → adjust, then: retake run demos/<name>.yaml          final quality
 ```
 
@@ -208,6 +209,13 @@ Most real demos start behind a sign-in. The agent never sees a password:
 - `outputs/<name>/take.json` — the same, machine-readable.
 - `outputs/<name>/demo.mp4` — the video. `master.mp4` is the CRF-14 keeper
   on post presets.
+- `retake notes` — the watcher. Reads every take in `outputs/` back and says
+  the few things a person would say after looking through them: a stub that
+  answered nothing (the demo is showing live data), the same selector failing
+  in several demos (the app moved, not the demos), a fragment left where a
+  finished cut should be, a dead lock holding a folder, demos nobody has ever
+  verified. Silent when there is nothing. Run it when you arrive in a
+  workspace you did not set up.
 - `retake verify outputs/<name>` — the verdict on the PICTURE. Every scene
   with an `expect:` has its plain-language question put to a separate reader
   that can see the still. Exit 3 on failure; an unanswerable question counts

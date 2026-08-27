@@ -4,13 +4,15 @@
     {
       "version": "0.5.0",
       "date": "2026-08-27",
-      "headline": "Retake can now tell you whether your app actually looks right",
+      "headline": "Retake can now tell you whether your app actually looks right — and what keeps going wrong",
       "notes": [
         "New: say what should be visible, and Retake checks it. On any scene you can write a plain sentence — \"every card sits inside its own box\", \"the button's text is readable against its background\" — and Retake puts that question to a second pair of eyes, against the actual frame it recorded. It answers yes or no, and tells you what it saw.",
         "This is the check nothing else was doing. A page can pass every test, build clean, and still be broken in a way only a person notices: an animation frozen halfway, an icon that never loaded, a card that fell out of its grid, a label in dark text on a dark background. All four of those happened here in one day, and all four were caught by someone looking — not by anything the tools did. Now the tool looks.",
         "The one judging it is never the one who made it. Retake asks a separate reader that sees only the picture and the question, so an agent cannot mark its own homework.",
         "If it couldn't check, it says so rather than passing. No frame, nothing available to look at it, an answer it couldn't read — every one of those counts as a failure. A check that didn't run is not a check that passed.",
-        "Nothing changes unless you want it to. Demos without any of these sentences record exactly as before."
+        "Nothing changes unless you want it to. Demos without any of these sentences record exactly as before.",
+        "Also new: Retake reads your own recordings back to you. One command and it goes through every demo you have made and says the few things worth saying — a demo quietly showing live data when it was meant to show fake, the same button failing in five different demos because your app moved, a half-recording left sitting where the finished one should be, a demo nobody has ever checked the look of. It says nothing when there is nothing to say.",
+        "And when something it finds is really a habit rather than a one-off, it hands you a sentence to put in your agents' instructions — so the next agent does not repeat it."
       ]
     },
     {

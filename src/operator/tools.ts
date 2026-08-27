@@ -25,6 +25,7 @@ import { render, check, ffmpegBin } from "../render.js";
 import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
 import { verify } from "../verify.js";
+import { notes } from "../notes.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
 import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
@@ -518,6 +519,13 @@ server.registerTool("verify", {
   await tell(v.ok ? `Looks right.` : `Something does not look right in ${name}.`);
   return text(v.lines.join("\n"));
 });
+
+
+server.registerTool("notes", {
+  description: "What has actually been going on across every demo in this workspace — reads the takes on disk back and reports the few things worth saying: a stub that answered nothing, the same selector failing in several demos (the app moved, not the demos), a fragment sitting where a finished cut should be, a dead lock holding a folder, demos nobody has ever verified. Call it when you arrive in a workspace you did not set up, when something fails for a reason that smells like it has failed before, or when the person asks how things are going. It is silent when there is nothing to say.",
+  inputSchema: { all: z.boolean().optional() },
+  annotations: READ_ONLY,
+}, async ({ all }) => text(notes(OUT, { all: all === true }).lines.join("\n")));
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {
   await tell(`Done: ${summary}`);

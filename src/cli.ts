@@ -11,6 +11,7 @@
  *   retake render outputs/x                       re-render from the existing take (--preset to switch)
  *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
  *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
+ *   retake notes                                  read outputs/ back: what keeps going wrong, and what it costs
  *   retake dry demos/x.yaml                       every selector and wait, no camera
  *   retake validate demos/x.yaml                  schema check only
  *   retake presets                                list quality presets
@@ -31,6 +32,7 @@ import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 import { applyTidy, mb, planTidy } from "./tidy.js";
 import { verify } from "./verify.js";
+import { notes } from "./notes.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
 
@@ -233,6 +235,18 @@ program
     say(`\nfreed ${mb(freed)}. Every demo can still be rebuilt with \`retake render outputs/<name>\`.`);
   });
 
+
+
+program
+  .command("notes")
+  .description("what everyone has actually been doing — reads outputs/ back and says the few things worth saying")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("--all", "every note, not just the five that matter", false)
+  .option("--days <n>", "how far back to look", "14")
+  .action((opts: { out: string; all: boolean; days: string }) => {
+    const { lines } = notes(path.resolve(opts.out), { all: opts.all, days: Number(opts.days) || 14 });
+    for (const l of lines) say(l);
+  });
 
 program
   .command("verify")
