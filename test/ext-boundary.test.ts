@@ -120,3 +120,24 @@ test("nothing the recorder reaches, however indirectly, is an extension", () => 
   }
   assert.ok(seen.size > 5, "the walk found almost nothing — did the graph change shape?");
 });
+
+test("nothing that runs during a recording can reach the flag ledger or the clip cutter", () => {
+  // His constraint, stated plainly: the extended functionality must not slow
+  // the recording down in any way. The strongest form of that is that the
+  // recorder cannot reach it at all — so it cannot run, cost time, or fail
+  // while a camera is rolling.
+  const reach = new Set<string>();
+  const stack = ["record.ts", "render.ts"];
+  while (stack.length) {
+    const rel = stack.pop()!;
+    if (reach.has(rel) || !fs.existsSync(path.join(SRC, rel))) continue;
+    reach.add(rel);
+    for (const i of imports(read(rel))) {
+      if (!i.spec.startsWith(".")) continue;
+      stack.push(path.normalize(path.join(path.dirname(rel), i.spec.replace(/\.js$/, ".ts"))));
+    }
+  }
+  for (const forbidden of ["ext/flags.ts", "ext/clip.ts", "ext/sense.ts", "ext/verify.ts", "ext/destroy.ts", "ext/notes.ts"]) {
+    assert.ok(!reach.has(forbidden), `the recorder reaches ${forbidden}`);
+  }
+});

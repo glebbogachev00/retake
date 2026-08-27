@@ -37,6 +37,7 @@ import { startOperator, getSession, addPending, answerPending, markDone, stopSes
 import { ffmpegBin, gifskiBin, makeGif } from "../render.js";
 import { captureHash, restorePrevious } from "../record.js";
 import { digest } from "../digest.js";
+import { readFlags } from "../ext/flags.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
@@ -164,6 +165,10 @@ function cachedManifest(file: string) {
   return manifest;
 }
 
+/** Demos whose flagged list is being answered right now, so the window can
+    say so and a second click cannot start a second judge. */
+const CHECKING = new Set<string>();
+
 function listDemos(project?: string) {
   if (!fs.existsSync(DEMOS)) return [];
   const wanted = project?.trim() ? projectKey(project) : null;
@@ -173,7 +178,7 @@ function listDemos(project?: string) {
     const mm = cachedManifest(path.join(DEMOS, f));
     if (mm) { const asg = assignments[mm.name]; if (asg && mm.url && !byUrl.has(mm.url)) byUrl.set(mm.url, asg); }
   }
-  return fs
+  const listed = fs
     .readdirSync(DEMOS)
     .filter((f) => /\.ya?ml$/.test(f))
     .map((f) => {
@@ -221,6 +226,55 @@ function listDemos(project?: string) {
       return { name, file: f, title, url, group, valid, settings, lastTake, needsRecord };
     })
     .filter((demo) => !wanted || assignments?.[demo.name] === wanted);
+  return [...listed, ...orphanedRecordings(listed.map((d) => d.name))].filter((demo) => !wanted || assignments?.[demo.name] === wanted);
+}
+
+/**
+ * Recordings whose demo file is gone.
+ *
+ * The window lists demos and shows each one's take, which means a finished
+ * recording becomes invisible the moment its manifest disappears — and one
+ * did: five minutes, seventeen scenes, rendered, and nowhere in the library.
+ * Retake keeps `manifest.used.yaml` inside every output folder precisely so
+ * this is recoverable, and nothing was reading it.
+ *
+ * Only recordings with a rendered video are surfaced. A probe run that was
+ * never rendered is scratch, and filling the library with scratch is its own
+ * way of hiding things.
+ */
+function orphanedRecordings(known: string[]): ReturnType<typeof describeOrphan>[] {
+  const out: ReturnType<typeof describeOrphan>[] = [];
+  let dirs: string[] = [];
+  try { dirs = fs.readdirSync(outRoot()); } catch { return out; }
+  for (const name of dirs) {
+    if (name.startsWith(".") || known.includes(name)) continue;
+    const dir = path.join(outRoot(), name);
+    const used = path.join(dir, "manifest.used.yaml");
+    try {
+      if (!fs.statSync(dir).isDirectory()) continue;
+      if (!fs.existsSync(path.join(dir, "take.json")) || !fs.existsSync(used)) continue;
+      if (!fs.existsSync(path.join(dir, "demo.mp4"))) continue;
+      out.push(describeOrphan(name, dir, used));
+    } catch { /* mid-write, or not ours */ }
+  }
+  return out;
+}
+
+function describeOrphan(name: string, dir: string, used: string) {
+  let title = "", url = "";
+  try { const m = YAML.parse(fs.readFileSync(used, "utf8")) as { title?: string; url?: string }; title = m.title ?? ""; url = m.url ?? ""; } catch { /* keep the blanks */ }
+  let lastTake: unknown = null;
+  try {
+    const t = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8"));
+    lastTake = { finishedAt: t.finishedAt, ok: t.ok, partial: t.partial ?? null, duration: Math.round((t.duration - t.trimBefore) * 10) / 10 };
+  } catch { /* none */ }
+  return {
+    name, file: "", title, url, group: shortGroup(url), valid: true, settings: {} as Record<string, unknown>,
+    lastTake, needsRecord: true,
+    /** The demo file is gone; only the recording and the copy of the manifest
+        Retake kept are left. `retake heal` writes the file back. */
+    orphan: true,
+  };
 }
 
 function starterManifest(name: string, url: string, describe: string): string {
@@ -940,6 +994,21 @@ export function serve(port: number) {
         req.on("close", () => run.listeners.delete(res));
         return;
       }
+      m = /^\/api\/flagged\/([a-z0-9-]+)\/check$/.exec(p);
+      if (m && req.method === "POST") {
+        const name = m[1];
+        if (CHECKING.has(name)) return json(res, 200, { started: false, running: true });
+        // A separate process on purpose. Judging blocks on a CLI call, and
+        // this server is single-threaded — doing it here would freeze the
+        // window for everyone, including an agent mid-recording.
+        CHECKING.add(name);
+        const cli = entry("cli");
+        const child = spawn(cli.command, [...cli.args, "fixed", name, "--out", outRoot()], { cwd: ROOT, env: process.env, stdio: "ignore" });
+        child.on("exit", () => CHECKING.delete(name));
+        child.on("error", () => CHECKING.delete(name));
+        return json(res, 200, { started: true, running: true });
+      }
+
       m = /^\/api\/take\/([a-z0-9-]+)$/.exec(p);
       if (m && req.method === "GET") {
         const dir = path.join(outRoot(), m[1]);
@@ -947,13 +1016,32 @@ export function serve(port: number) {
         if (!fs.existsSync(tp)) return json(res, 404, { error: "no take yet" });
         const take = JSON.parse(fs.readFileSync(tp, "utf8"));
         const files = fs.readdirSync(dir).filter((f) => !f.startsWith(".")).flatMap((f) =>
-          f === "stills" ? fs.readdirSync(path.join(dir, "stills")).map((x) => `stills/${x}`) : [f]);
+          f === "stills" || f === "clips" ? fs.readdirSync(path.join(dir, f)).map((x) => `${f}/${x}`) : [f]);
         const proof = fs.existsSync(path.join(dir, "proof-log.md")) ? fs.readFileSync(path.join(dir, "proof-log.md"), "utf8") : "";
         const facts = fs.existsSync(path.join(dir, "facts.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "facts.json"), "utf8")) : null;
         const stamp = fs.statSync(tp).mtimeMs;
-        return json(res, 200, { take, files, proof, facts, stamp, dir });
+        // What was flagged on this demo, and the last answer. Read from disk,
+        // never judged here: a page load must cost nothing, and a recording
+        // must never wait on it.
+        let flagged: unknown = null;
+        try {
+          const mf = path.join(DEMOS, `${m[1]}.yaml`);
+          const list = readFlags(mf);
+          if (list.length) {
+            let last: { checkedAt?: string; takeFinishedAt?: string; items?: unknown[] } | null = null;
+            try { last = JSON.parse(fs.readFileSync(path.join(dir, "fixed.json"), "utf8")); } catch { /* never checked */ }
+            flagged = {
+              flags: list.map((f) => ({ id: f.id, scene: f.scene, expect: f.expect, question: f.question })),
+              last,
+              // The answer is only about the take it was run against.
+              stale: !last || last.takeFinishedAt !== take.finishedAt,
+              running: CHECKING.has(m[1]),
+            };
+          }
+        } catch { /* no manifest, no flags */ }
+        return json(res, 200, { take, files, proof, facts, stamp, dir, flagged });
       }
-      m = /^\/out\/([a-z0-9-]+)\/((?:stills\/)?[A-Za-z0-9._-]+)$/.exec(p);
+      m = /^\/out\/([a-z0-9-]+)\/((?:stills\/|clips\/)?[A-Za-z0-9._-]+)$/.exec(p);
       if (m && req.method === "GET") {
         const f = path.join(outRoot(), m[1], m[2]);
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });

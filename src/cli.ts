@@ -13,6 +13,9 @@
  *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
  *   retake sense outputs/x                        does the run ADD UP — what went in vs what came out
  *   retake destroy demos/x.yaml                   the flows nobody wrote down — abuse this demo nine ways
+ *   retake flag demos/x.yaml --scene s --expect "…"  this one is real: watch it from now on
+ *   retake fixed x                                did what you flagged get fixed — with the clip that shows it
+ *   retake heal                                  demo files back for recordings whose manifest went missing
  *   retake notes                                  read outputs/ back: what keeps going wrong, and what it costs
  *   retake dry demos/x.yaml                       every selector and wait, no camera
  *   retake validate demos/x.yaml                  schema check only
@@ -36,6 +39,7 @@ import { applyTidy, mb, planTidy } from "./tidy.js";
 import { verify } from "./ext/verify.js";
 import { notes } from "./ext/notes.js";
 import { sense } from "./ext/sense.js";
+import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
@@ -248,6 +252,50 @@ program
 
 
 
+
+program
+  .command("flag")
+  .description("mark something as really wrong — it becomes an `expect:` on that scene, and every later recording answers it")
+  .argument("<manifest>", "the demo it is wrong in")
+  .requiredOption("--scene <label>", "which scene shows it")
+  .requiredOption("--expect <sentence>", "what has to be true once it is fixed, in plain words")
+  .option("--question <sentence>", "what was originally raised, if it came from `sense`")
+  .action((file: string, opts: { scene: string; expect: string; question?: string }) => {
+    const r = flag(path.resolve(file), { scene: opts.scene, expect: opts.expect, question: opts.question ?? opts.expect, source: opts.question ? "sense" : "you" });
+    if ("error" in r) { say(`✗ ${r.error}`); process.exitCode = 2; return; }
+    say(`flagged on ${opts.scene}: "${r.flag.expect}"`);
+    say(`Every recording from here on answers it — \`verify\` and \`fixed\` both.`);
+    say(`\`retake fixed ${path.basename(file).replace(/\.[^.]+$/, "")}\` after the next take.`);
+  });
+
+
+program
+  .command("unflag")
+  .description("stop watching something you flagged")
+  .argument("<manifest>", "the demo it was flagged on")
+  .argument("<what>", "the flag's id, or the expectation itself")
+  .action((file: string, what: string) => {
+    const r = unflag(path.resolve(file), what);
+    if ("error" in r) { say(`✗ ${r.error}`); process.exitCode = 2; return; }
+    say(`no longer watching: "${r.removed.expect}"`);
+  });
+
+program
+  .command("fixed")
+  .description("did the things you flagged get fixed — answers each one against the newest take, with the few seconds that show it")
+  .argument("<demo>", "demo name, or a path to its manifest")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("--no-clips", "skip cutting the clips")
+  .action((demo: string, opts: { out: string; clips: boolean }) => {
+    const file = fs.existsSync(demo) ? path.resolve(demo) : path.resolve("demos", `${demo}.yaml`);
+    if (!fs.existsSync(file)) throw new Error(`no ${path.relative(process.cwd(), file)}`);
+    const { manifest } = loadManifest(file);
+    const outDir = path.resolve(opts.out, manifest.name);
+    const r = checkFlags(file, manifest, outDir, { clips: opts.clips, log: say });
+    // Something flagged and still wrong is a failure; nothing flagged is not.
+    if (r.checked.some((c) => c.ok !== true)) process.exitCode = 3;
+  });
+
 program
   .command("destroy")
   .description("the flows nobody wrote down — writes a manifest for each way this demo could be abused, and tries them")
@@ -292,6 +340,36 @@ program
     sense(loadManifest(file).manifest, outDir, say);
   });
 
+
+program
+  .command("heal")
+  .description("write back the demo files for recordings whose manifest went missing — the window only lists demos, so those recordings are invisible until it does")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("--apply", "actually write them (without this it only says what it would do)", false)
+  .action((opts: { out: string; apply: boolean }) => {
+    const root = path.resolve(opts.out);
+    const found: { name: string; used: string; when: string }[] = [];
+    for (const name of fs.existsSync(root) ? fs.readdirSync(root) : []) {
+      if (name.startsWith(".")) continue;
+      const dir = path.join(root, name);
+      const used = path.join(dir, "manifest.used.yaml");
+      try {
+        if (!fs.statSync(dir).isDirectory()) continue;
+        if (!fs.existsSync(used) || !fs.existsSync(path.join(dir, "take.json"))) continue;
+        if (fs.existsSync(path.join("demos", `${name}.yaml`))) continue;
+        const t = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8")) as { finishedAt?: string };
+        found.push({ name, used, when: (t.finishedAt ?? "").slice(0, 16).replace("T", " ") });
+      } catch { /* not ours */ }
+    }
+    if (!found.length) { say("every recording has its demo file. Nothing hidden."); return; }
+    say(`${found.length} recording${found.length === 1 ? "" : "s"} the window cannot show, because the demo file is gone:`);
+    for (const f of found) say(`  ${f.name.padEnd(24)} recorded ${f.when}`);
+    if (!opts.apply) { say(""); say("`retake heal --apply` writes each one back from the copy Retake kept inside its own folder."); return; }
+    for (const f of found) { fs.copyFileSync(f.used, path.join("demos", `${f.name}.yaml`)); say(`  → demos/${f.name}.yaml`); }
+    say("");
+    say("Written from `manifest.used.yaml` — the exact manifest each run used, so they re-run as they were recorded.");
+  });
+
 program
   .command("notes")
   .description("what everyone has actually been doing — reads outputs/ back and says the few things worth saying")
@@ -313,7 +391,7 @@ program
     const file = manifestFile ?? path.join("demos", `${path.basename(outDir)}.yaml`);
     if (!fs.existsSync(file)) throw new Error(`no ${file} — pass the manifest path`);
     const { manifest } = loadManifest(file);
-    const v = verify(manifest, outDir, say);
+    const v = verify(manifest, outDir, say, file);
     // 3, the same code dry and check already use for "this did not pass".
     if (!v.ok) process.exitCode = 3;
   });

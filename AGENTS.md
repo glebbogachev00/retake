@@ -228,6 +228,13 @@ Most real demos start behind a sign-in. The agent never sees a password:
   app defending itself. Refuses a non-local URL, a demo that neither seeds nor
   stubs, and an app somebody else is recording. Each refusal names its own
   override; using one is the person's call.
+- `retake heal` — writes back the demo files for recordings whose manifest went
+  missing. The window lists demos, not recordings, so a manifest deleted or
+  written outside `demos/` makes a finished video invisible. Every output folder
+  keeps `manifest.used.yaml`; this restores from that. Shows what it would do
+  unless you pass `--apply`. **Never record from a manifest that does not live
+  in `demos/` — this verb exists to clean up after that mistake, not to license
+  it.**
 - `retake notes` — the watcher. Reads every take in `outputs/` back and says
   the few things a person would say after looking through them: a stub that
   answered nothing (the demo is showing live data), the same selector failing

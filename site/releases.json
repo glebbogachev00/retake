@@ -2,6 +2,19 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.7.0",
+      "date": "2026-08-27",
+      "headline": "Check the things you flagged without watching the whole demo again",
+      "notes": [
+        "New: when something is wrong in a demo, say so once and Retake watches it from then on. Every recording after that answers it — and shows you the few seconds of video that prove it, instead of asking you to sit through the whole thing again. On a five-minute walkthrough that is about twenty seconds instead of five minutes.",
+        "The clips are cut from the video you already have. Nothing is re-recorded and nothing is re-rendered.",
+        "In the window: a quiet line above the frames — \"2 things you flagged here. 1 now passes.\" Click either one to watch just that moment, and one button puts the whole demo back. It only appears when you have actually flagged something.",
+        "Flagging never edits your demo file. It is kept in a small list beside it, so the file you wrote stays exactly as you wrote it.",
+        "Fixed: recordings that were invisible. The window used to list demos, and show each demo's recording — so if the file a demo came from went missing, a perfectly good video simply never appeared. Eight of them were sitting on this machine, including a five-minute one. They show up now, and there is a one-line way to put the missing files back.",
+        "None of this happens while you are recording. It cannot slow a take down, and there is a test that proves the recorder cannot even reach it."
+      ]
+    },
+    {
       "version": "0.6.0",
       "date": "2026-08-27",
       "headline": "Retake checks whether your app makes sense — and goes looking for what you didn't think of",

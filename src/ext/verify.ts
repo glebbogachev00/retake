@@ -25,6 +25,7 @@ import path from "node:path";
 import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { ask, pickJudge, readJson, why as short } from "./judge.js";
+import { readFlags } from "./flags.js";
 import type { Provider } from "../describe.js";
 
 export type Answer = {
@@ -48,6 +49,11 @@ export function stillFor(outDir: string, label: string, index: number): string |
   const mid = files.find((f) => f.startsWith(n) && f.includes(label));
   const any = end ?? mid;
   return any ? path.join(dir, any) : null;
+}
+
+/** Where a scene sits among the scenes, which is how the stills are numbered. */
+export function sceneIndexOf(m: Manifest, label: string): number {
+  return m.steps.filter((s) => s.action === "scene").findIndex((s) => (s as { label: string }).label === label);
 }
 
 /** Every question this manifest asks, paired with the frame that answers it. */
@@ -77,7 +83,10 @@ const PROMPT = (question: string) =>
   `answer false and say so. Do not assume it is fine because it probably is. ` +
   `Do not be generous.`;
 
-function judgeWith(p: Provider, still: string, question: string): { ok: boolean | null; why: string } {
+/** One bounded question about one frame. Exported so anything else that needs
+    the same answer asks it the same way — two different phrasings of "does
+    this look right" would give two different standards. */
+export function judgeWith(p: Provider, still: string, question: string): { ok: boolean | null; why: string } {
   try {
     return readAnswer(ask(p, PROMPT(question), [still], 120_000), p.name);
   } catch (e) {
@@ -99,10 +108,19 @@ function readAnswer(out: string, who: string): { ok: boolean | null; why: string
     the part that silently turns a real answer into "could not answer". */
 export function __test_readAnswer(out: string) { return readAnswer(out, "test"); }
 
-export function verify(m: Manifest, outDir: string, log?: (l: string) => void): Verdict {
+export function verify(m: Manifest, outDir: string, log?: (l: string) => void, manifestFile?: string): Verdict {
   const lines: string[] = [];
   const say = (l: string) => { lines.push(l); log?.(l); };
   const qs = questions(m, outDir);
+  // Things flagged as really wrong are checked here too, so `verify` is one
+  // answer and not two. They live in a ledger rather than in the manifest —
+  // see flags.ts for why nothing writes to a file a person wrote.
+  if (manifestFile) {
+    for (const f of readFlags(manifestFile)) {
+      if (qs.some((q) => q.scene === f.scene && q.question === f.expect)) continue;
+      qs.push({ scene: f.scene, question: f.expect, still: stillFor(outDir, f.scene, sceneIndexOf(m, f.scene)) });
+    }
+  }
 
   if (!qs.length) {
     say("no `expect` on any scene — nothing to verify.");

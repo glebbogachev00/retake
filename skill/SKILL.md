@@ -83,6 +83,19 @@ say so in one line and stop.
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
 
+### Leave the manifest where it lives
+
+**Every demo you record must have its file in `demos/<name>.yaml` when you are
+done.** The window lists demos and shows each one's recording — so a manifest
+written to a temp path, or deleted after the take, makes the finished video
+invisible. It has happened: a five-minute, seventeen-scene recording sat
+rendered on disk and nowhere in the library, because the file it came from was
+gone.
+
+Never record from a manifest outside `demos/`. If you were experimenting, the
+experiment still gets a name and stays. `retake heal` writes back what is
+missing, but nobody should need it.
+
 ## The five checks, and what each one actually answers
 
 These are separate questions. Running the wrong one and reporting it as
