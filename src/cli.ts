@@ -42,6 +42,7 @@ import { notes } from "./ext/notes.js";
 import { sense } from "./ext/sense.js";
 import { sweep } from "./ext/sweep.js";
 import { checkFlags, flag, unflag } from "./ext/flags.js";
+import { describeOrphans, findOrphans, healOrphans } from "./ext/heal.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
@@ -365,27 +366,9 @@ program
   .option("-o, --out <dir>", "output root", "outputs")
   .option("--apply", "actually write them (without this it only says what it would do)", false)
   .action((opts: { out: string; apply: boolean }) => {
-    const root = path.resolve(opts.out);
-    const found: { name: string; used: string; when: string }[] = [];
-    for (const name of fs.existsSync(root) ? fs.readdirSync(root) : []) {
-      if (name.startsWith(".")) continue;
-      const dir = path.join(root, name);
-      const used = path.join(dir, "manifest.used.yaml");
-      try {
-        if (!fs.statSync(dir).isDirectory()) continue;
-        if (!fs.existsSync(used) || !fs.existsSync(path.join(dir, "take.json"))) continue;
-        if (fs.existsSync(path.join("demos", `${name}.yaml`))) continue;
-        const t = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8")) as { finishedAt?: string };
-        found.push({ name, used, when: (t.finishedAt ?? "").slice(0, 16).replace("T", " ") });
-      } catch { /* not ours */ }
-    }
-    if (!found.length) { say("every recording has its demo file. Nothing hidden."); return; }
-    say(`${found.length} recording${found.length === 1 ? "" : "s"} the window cannot show, because the demo file is gone:`);
-    for (const f of found) say(`  ${f.name.padEnd(24)} recorded ${f.when}`);
-    if (!opts.apply) { say(""); say("`retake heal --apply` writes each one back from the copy Retake kept inside its own folder."); return; }
-    for (const f of found) { fs.copyFileSync(f.used, path.join("demos", `${f.name}.yaml`)); say(`  → demos/${f.name}.yaml`); }
-    say("");
-    say("Written from `manifest.used.yaml` — the exact manifest each run used, so they re-run as they were recorded.");
+    const orphans = findOrphans(path.resolve(opts.out), path.resolve("demos"));
+    const written = opts.apply ? healOrphans(orphans, path.resolve("demos")) : null;
+    for (const l of describeOrphans(orphans, written)) say(l);
   });
 
 program

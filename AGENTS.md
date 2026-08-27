@@ -66,6 +66,8 @@ write demos/<name>.yaml
   → retake check outputs/<name>             pass/fail on the result
   → retake verify outputs/<name>            did it LOOK right — each scene's `expect`, judged
   → retake sweep outputs/<name>             every frame, as a whole — what nobody asked about
+  → retake flag demos/<name>.yaml           this one is real: watch it from now on
+  → retake fixed <name>                     did what was flagged get fixed, with the clip
   → retake sense outputs/<name>             does the run ADD UP — input vs output
   → retake destroy demos/<name>.yaml        what happens just off the happy path
   → retake notes                            what keeps going wrong across every demo
@@ -212,6 +214,16 @@ Most real demos start behind a sign-in. The agent never sees a password:
 - `outputs/<name>/take.json` — the same, machine-readable.
 - `outputs/<name>/demo.mp4` — the video. `master.mp4` is the CRF-14 keeper
   on post presets.
+- `retake flag demos/<name>.yaml --scene <label> --expect "<sentence>"` — the
+  person has confirmed something raised by `sense` or `sweep` is a real defect.
+  Give the sentence that must be TRUE once it is fixed, not a description of
+  the bug. It becomes a check every later recording answers, and it survives a
+  re-record. Writes nothing into the manifest — the ledger sits beside it as
+  `demos/<name>.flags.json`. **Never flag on your own judgement.**
+- `retake fixed <name>` — answers every flagged item against the newest take
+  and cuts the few seconds of video that show each one, so a long demo does not
+  have to be re-watched to learn whether one thing changed. Exit 3 while
+  anything flagged is still wrong. `retake unflag` stops watching one.
 - `retake sweep outputs/<name>` — the one that finds what nobody thought to
   ask about. `verify` answers written-down questions, so it can only find what
   was already suspected. `sweep` inspects EVERY scene's frame, one at a time,

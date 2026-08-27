@@ -147,6 +147,7 @@ These are separate questions. Running the wrong one and reporting it as
 | Is anything wrong in this frame that nobody asked about? | `sweep` | ~1 judge call a frame | no, it reports |
 | Does the whole run ADD UP — input vs output? | `sense` | ~45s | no, it asks |
 | What happens just off the happy path? | `destroy` | minutes | flags, you judge |
+| Did the things they flagged get fixed? | `fixed` | ~13s each | yes — exit 3 |
 | What keeps going wrong across every demo? | `notes` | instant | no |
 
 `dry` really does click and fill — at full speed, with short timeouts, no
@@ -304,6 +305,43 @@ what it reads. And it will not run against an app somebody else is recording
 right now. Each names an environment variable that overrides it — that
 override is the person's call to make, never yours. If it refuses, say what it
 said and stop.
+
+## When something really is wrong — `flag`, then `fixed`
+
+`sense` and `sweep` raise things. Most are not defects: a question about a
+number, a duplicate the app is grouping on purpose, spacing somebody chose.
+**The person decides which ones are real. Never flag on your own judgement.**
+
+When they confirm one, `flag` it. Give the sentence that has to be TRUE once
+it is fixed, not a description of the bug:
+
+- yes — "the quote shows one total covering both legs"
+- no — "the price is wrong for two legs"
+
+That turns a question into a check. It stops being judgement and becomes
+something every later recording answers, and it survives a re-record — which
+"the price thing" does not.
+
+Then, after the demo is recorded again, `fixed`. It answers every flagged item
+against the newest take and cuts the few seconds of video that show each one:
+
+```
+2 things you flagged here. 1 now passes.
+  ✓ uc01-track — the passenger count reads 1
+  ✗ uc01-ops — a total price in US dollars is shown on this screen
+        No total price in US dollars is visible on the screen.
+```
+
+**Lead with what it says.** That is the answer the person is waiting for, and
+it is not yours to summarise away. On a long demo it is the difference between
+twenty seconds and re-watching the whole thing — so run it rather than telling
+them the fix landed.
+
+`unflag` stops watching one, by its id or by the sentence. Ask first: a flag is
+their judgement, not yours.
+
+Flagging writes nothing into their manifest. It is kept in a small list beside
+it, so the file they wrote stays exactly as they wrote it.
 
 ## What a change costs — read this before re-recording anything
 

@@ -38,6 +38,7 @@ import { ffmpegBin, gifskiBin, makeGif } from "../render.js";
 import { captureHash, restorePrevious } from "../record.js";
 import { digest } from "../digest.js";
 import { readFlags } from "../ext/flags.js";
+import { findOrphans } from "../ext/heal.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
@@ -230,51 +231,21 @@ function listDemos(project?: string) {
 }
 
 /**
- * Recordings whose demo file is gone.
- *
- * The window lists demos and shows each one's take, which means a finished
- * recording becomes invisible the moment its manifest disappears — and one
- * did: five minutes, seventeen scenes, rendered, and nowhere in the library.
- * Retake keeps `manifest.used.yaml` inside every output folder precisely so
- * this is recoverable, and nothing was reading it.
- *
- * Only recordings with a rendered video are surfaced. A probe run that was
- * never rendered is scratch, and filling the library with scratch is its own
- * way of hiding things.
+ * Recordings whose demo file is gone, in the shape the library expects.
+ * The finding of them lives in src/ext/heal.ts so the window and `retake heal`
+ * can never disagree about what is hidden.
  */
-function orphanedRecordings(known: string[]): ReturnType<typeof describeOrphan>[] {
-  const out: ReturnType<typeof describeOrphan>[] = [];
-  let dirs: string[] = [];
-  try { dirs = fs.readdirSync(outRoot()); } catch { return out; }
-  for (const name of dirs) {
-    if (name.startsWith(".") || known.includes(name)) continue;
-    const dir = path.join(outRoot(), name);
-    const used = path.join(dir, "manifest.used.yaml");
-    try {
-      if (!fs.statSync(dir).isDirectory()) continue;
-      if (!fs.existsSync(path.join(dir, "take.json")) || !fs.existsSync(used)) continue;
-      if (!fs.existsSync(path.join(dir, "demo.mp4"))) continue;
-      out.push(describeOrphan(name, dir, used));
-    } catch { /* mid-write, or not ours */ }
-  }
-  return out;
-}
-
-function describeOrphan(name: string, dir: string, used: string) {
-  let title = "", url = "";
-  try { const m = YAML.parse(fs.readFileSync(used, "utf8")) as { title?: string; url?: string }; title = m.title ?? ""; url = m.url ?? ""; } catch { /* keep the blanks */ }
-  let lastTake: unknown = null;
-  try {
-    const t = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8"));
-    lastTake = { finishedAt: t.finishedAt, ok: t.ok, partial: t.partial ?? null, duration: Math.round((t.duration - t.trimBefore) * 10) / 10 };
-  } catch { /* none */ }
-  return {
-    name, file: "", title, url, group: shortGroup(url), valid: true, settings: {} as Record<string, unknown>,
-    lastTake, needsRecord: true,
-    /** The demo file is gone; only the recording and the copy of the manifest
-        Retake kept are left. `retake heal` writes the file back. */
-    orphan: true,
-  };
+function orphanedRecordings(known: string[]) {
+  return findOrphans(outRoot(), DEMOS)
+    .filter((o) => o.rendered && !known.includes(o.name))
+    .map((o) => ({
+      name: o.name, file: "", title: o.title, url: o.url, group: shortGroup(o.url),
+      valid: true, settings: {} as Record<string, unknown>,
+      lastTake: o.finishedAt ? { finishedAt: o.finishedAt, ok: true, partial: null, duration: o.seconds ?? 0 } : null,
+      needsRecord: true,
+      /** The demo file is gone; `retake heal` writes it back. */
+      orphan: true,
+    }));
 }
 
 function starterManifest(name: string, url: string, describe: string): string {

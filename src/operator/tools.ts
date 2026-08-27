@@ -28,6 +28,8 @@ import { verify } from "../ext/verify.js";
 import { notes } from "../ext/notes.js";
 import { sense } from "../ext/sense.js";
 import { sweep } from "../ext/sweep.js";
+import { checkFlags, flag, unflag } from "../ext/flags.js";
+import { describeOrphans, findOrphans, healOrphans } from "../ext/heal.js";
 import { describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "../ext/destroy.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
@@ -307,7 +309,7 @@ server.registerTool("plan_mark", {
   return text(planText(items));
 });
 
-server.registerTool("list_demos", { description: "Demos that exist, with their last take.", inputSchema: {}, annotations: READ_ONLY }, async () => {
+server.registerTool("list_demos", { description: "Every demo in this workspace, with when it was last recorded and whether that take passed. Call it first in a session you did not start: it tells you what already exists, so you extend a demo rather than writing a second one for the same flow — and it is how you learn the exact names the other tools want.", inputSchema: {}, annotations: READ_ONLY }, async () => {
   if (!fs.existsSync(DEMOS)) return text("no demos yet");
   const rows = fs.readdirSync(DEMOS).filter((f) => /\.ya?ml$/.test(f)).map((f) => {
     const name = f.replace(/\.ya?ml$/, "");
@@ -319,7 +321,7 @@ server.registerTool("list_demos", { description: "Demos that exist, with their l
   return text(rows.join("\n") || "no demos yet");
 });
 
-server.registerTool("read_manifest", { description: "The YAML of a demo.", inputSchema: { name: z.string() }, annotations: READ_ONLY }, async ({ name }) => { LAST_DEMO = name;
+server.registerTool("read_manifest", { description: "The full manifest of one demo, as written. Read it before you edit anything: the steps, the waits, the stubs, the seeds and any `expect:` sentences are all here, and changing a demo without reading it first is how a working take gets broken.", inputSchema: { name: z.string() }, annotations: READ_ONLY }, async ({ name }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   return text(fs.readFileSync(manifestPath(name), "utf8"));
 });
@@ -518,7 +520,11 @@ server.registerTool("verify", {
   const { manifest } = loadManifest(manifestPath(name));
   const outDir = path.join(OUT, name);
   await tell(`Looking at ${name}…`);
-  const v = verify(manifest, outDir, (l) => void tell(l));
+  // The manifest PATH matters: without it `verify` cannot read the flag
+  // ledger, and every flagged expectation is skipped while the run still
+  // reports a pass. Silently checking less than you claimed is the exact lie
+  // this verb exists to prevent.
+  const v = verify(manifest, outDir, (l) => void tell(l), manifestPath(name));
   await tell(v.ok ? `Looks right.` : `Something does not look right in ${name}.`);
   return text(v.lines.join("\n"));
 });
@@ -571,6 +577,51 @@ server.registerTool("sweep", {
   await tell(`Looking at every frame of ${name}…`);
   const r = await sweep(manifest, path.join(OUT, name), (l) => void tell(l), { all: all === true });
   return text(r.lines.join("\n"));
+});
+
+
+server.registerTool("flag", {
+  description: "THIS ONE IS REALLY WRONG. When `sense` or `sweep` raises something and the person confirms it is a real defect, flag it: from then on every recording of this demo answers it, and `fixed` shows the few seconds of video that prove it either way. Give `expect` as the plain sentence that must be TRUE once it is fixed — \"the quote shows a total covering both legs\" — not a description of the bug. Only flag what the person has confirmed; a question you raised yourself and answered yourself is not a defect. It writes nothing into their manifest.",
+  inputSchema: { name: z.string(), scene: z.string(), expect: z.string(), question: z.string().optional() },
+  annotations: RETAKE_WRITE,
+}, async ({ name, scene, expect, question }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const r = flag(manifestPath(name), { scene, expect, question: question ?? expect, source: question ? "sense" : "you" });
+  if ("error" in r) return text(`could not flag it: ${r.error}`);
+  await tell(`Flagged on ${scene}: ${expect}`);
+  return text(`Flagged. Every recording of ${name} from here on answers "${expect}" on scene ${scene} — \`verify\` and \`fixed\` both.`);
+});
+
+server.registerTool("fixed", {
+  description: "DID THE THINGS THEY FLAGGED GET FIXED. Answers every flagged item against the newest take and cuts the few seconds of video that show each one, so nobody has to re-watch a long demo to find out whether one thing changed. Run it after re-recording a demo that has anything flagged, and lead with what it says — it is the answer the person actually wants, and it is not yours to summarise away.",
+  inputSchema: { name: z.string(), clips: z.boolean().optional() },
+  annotations: READ_ONLY,
+}, async ({ name, clips }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const { manifest } = loadManifest(manifestPath(name));
+  await tell(`Checking what was flagged on ${name}…`);
+  const r = checkFlags(manifestPath(name), manifest, path.join(OUT, name), { clips: clips !== false, log: (l) => void tell(l) });
+  return text(r.lines.join("\n"));
+});
+
+server.registerTool("unflag", {
+  description: "Stop watching something that was flagged — because it is genuinely fixed and settled, or because it was never a defect. Takes the flag's id or the expectation itself. Ask the person before removing one: a flag is their judgement, not yours.",
+  inputSchema: { name: z.string(), what: z.string() },
+  annotations: RETAKE_WRITE,
+}, async ({ name, what }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const r = unflag(manifestPath(name), what);
+  return text("error" in r ? r.error : `No longer watching: "${r.removed.expect}"`);
+});
+
+server.registerTool("heal", {
+  description: "Recordings the window cannot show. It lists demos and shows each demo's take, so a finished recording whose manifest went missing appears nowhere — however good the video is. This finds them and, with apply, writes the demo files back from the copy Retake keeps inside every output folder. Run it if the person says a recording is missing. Better: never cause it — record only from manifests that live in demos/.",
+  inputSchema: { apply: z.boolean().optional() },
+  annotations: RETAKE_WRITE,
+}, async ({ apply }) => {
+  const orphans = findOrphans(OUT, DEMOS);
+  const written = apply === true ? healOrphans(orphans, DEMOS) : null;
+  return text(describeOrphans(orphans, written).join("\n"));
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {

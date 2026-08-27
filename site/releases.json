@@ -2,6 +2,16 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.8.1",
+      "date": "2026-08-27",
+      "headline": "The flagging feature your agents could not see",
+      "notes": [
+        "Fixed: everything to do with flagging — saying something is really wrong, and checking later whether it got fixed — existed only as a terminal command. Your agents drive Retake through a different door and had no way to reach it, and no document mentioned it. So a whole feature shipped that nobody could use. It is reachable now, and written into the instructions agents read.",
+        "Fixed: when an agent ran the picture check, anything you had flagged was quietly skipped — and it still reported a pass. It now answers those too.",
+        "Retake now fails its own build if a new feature is not reachable from every place it should be. A promise to remember was not going to hold."
+      ]
+    },
+    {
       "version": "0.8.0",
       "date": "2026-08-27",
       "headline": "Retake looks at every frame the way a stranger would",
