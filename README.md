@@ -83,6 +83,7 @@ retake dry demos/x.yaml        # every selector and wait, no camera (~30s)
 retake run demos/x.yaml --preset draft   # first take, quarter-size, fast
 retake check outputs/x         # resolution, fps, duration, files: pass/fail
 retake verify outputs/x        # did it LOOK right: each scene's `expect`, judged (exit 3 on failure)
+retake sweep outputs/x        # every frame as a whole: the ten ways a picture can be wrong
 retake sense outputs/x        # does the run ADD UP — what went in against what came out
 retake destroy demos/x.yaml   # the flows nobody wrote down: nine ways to abuse this demo
 retake notes                  # read every take back: what keeps going wrong, and what it costs

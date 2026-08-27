@@ -11,7 +11,7 @@
  * question about a picture from a filename would be worse than not answering.
  */
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { pickProvider, type Provider } from "../describe.js";
 
 /** A provider that can be shown an image, or null with the reason why not. */
@@ -23,7 +23,7 @@ export function pickJudge(): { provider: Provider | null; name: string; why?: st
 }
 
 /** Put a prompt and some images to the judge. Returns raw stdout, or throws. */
-export function ask(p: Provider, prompt: string, images: string[], timeoutMs = 180_000): string {
+function shape(p: Provider, prompt: string, images: string[]): { args: string[]; body: string } {
   const dirs = [...new Set(images.map((i) => path.dirname(i)))];
   const args = p.name === "claude-code"
     ? ["-p", "--output-format", "text", ...dirs.flatMap((d) => ["--add-dir", d]), "--allowedTools", "Read", ...(p.model !== "default" ? ["--model", p.model] : [])]
@@ -31,6 +31,11 @@ export function ask(p: Provider, prompt: string, images: string[], timeoutMs = 1
   const body = images.length
     ? `${prompt}\n\n${images.length === 1 ? "The screenshot is the file at:" : "The screenshots, in order, are the files at:"}\n${images.map((i) => `  ${i}`).join("\n")}\nRead ${images.length === 1 ? "that image file" : "those image files"} first, then answer.`
     : prompt;
+  return { args, body };
+}
+
+export function ask(p: Provider, prompt: string, images: string[], timeoutMs = 180_000): string {
+  const { args, body } = shape(p, prompt, images);
   // stderr is piped, not inherited: the codex CLI prints a session banner and
   // a token count to it, which would bury the one line that matters.
   return execFileSync(p.baseUrl, args, { input: body, encoding: "utf8", timeout: timeoutMs, maxBuffer: 1 << 22, stdio: ["pipe", "pipe", "pipe"] });
@@ -67,3 +72,46 @@ export function readJson<T>(out: string, want: (v: unknown) => v is T): T | null
 
 /** One line of a caught error, short enough to print next to a question. */
 export const why = (e: unknown) => String((e as Error).message).split("\n")[0].slice(0, 140);
+
+
+/**
+ * The same question, asked without blocking.
+ *
+ * `spawn`, not `execFile`: the async execFile has no `input` option — only the
+ * sync one does — so the prompt has to be written to stdin by hand. Passing
+ * `input` to execFile silently sends nothing, and the judge answers a question
+ * it was never asked.
+ */
+export function askAsync(p: Provider, prompt: string, images: string[], timeoutMs = 180_000): Promise<string> {
+  const { args, body } = shape(p, prompt, images);
+  return new Promise((resolve, reject) => {
+    const child = spawn(p.baseUrl, args, { stdio: ["pipe", "pipe", "pipe"] });
+    let out = "", err = "";
+    const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error(`the judge took longer than ${Math.round(timeoutMs / 1000)}s`)); }, timeoutMs);
+    child.stdout.on("data", (d) => { out += d; });
+    child.stderr.on("data", (d) => { err += String(d).slice(0, 2000); });
+    child.on("error", (e) => { clearTimeout(timer); reject(e); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(out);
+      else reject(new Error(err.split("\n").filter(Boolean).pop() ?? `the judge exited ${code}`));
+    });
+    child.stdin.on("error", () => { /* the judge closed stdin early; the close handler reports */ });
+    child.stdin.end(body);
+  });
+}
+
+/** Run at most `limit` at once. Order of results matches order of inputs. */
+export async function pool<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}

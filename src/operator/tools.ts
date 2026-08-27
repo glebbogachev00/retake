@@ -27,6 +27,7 @@ import { dryRun } from "../dryrun.js";
 import { verify } from "../ext/verify.js";
 import { notes } from "../ext/notes.js";
 import { sense } from "../ext/sense.js";
+import { sweep } from "../ext/sweep.js";
 import { describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "../ext/destroy.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
@@ -557,6 +558,19 @@ server.registerTool("destroy", {
   await tell(`Trying ${plan.candidates.length} ways to break ${name}…`);
   const trials = await tryCandidates(plan, { mode: run === true ? "run" : "dry", manifestDir: loaded.dir, outRoot: OUT, log: (l) => void tell(l) });
   return text([...out, ...describeTrials(trials, run === true ? "run" : "dry")].join("\n"));
+});
+
+
+server.registerTool("sweep", {
+  description: "LOOK AT EVERY FRAME AS A WHOLE. This is the one that finds what nobody thought to ask about. `verify` answers the questions you wrote down, which means it can only ever find what you already suspected — the same flaw as checking a screen against the change you just made. `sweep` goes through EVERY scene's frame, one at a time, never a sample, against a closed checklist: clipped text, overlapping elements, unreadable contrast, things cut off, misalignment, an element rendered twice, a spinner still spinning, broken images, dev badges in shot, empty regions. On its first real outing it found three labels with the card below sitting on top of them — a bug a person had already missed while looking straight at that frame. Run it before you report that a screen works, and show the person what it says: these are things to look at, not verdicts, and a closed checklist is a floor rather than a ceiling.",
+  inputSchema: { name: z.string(), all: z.boolean().optional() },
+  annotations: READ_ONLY,
+}, async ({ name, all }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const { manifest } = loadManifest(manifestPath(name));
+  await tell(`Looking at every frame of ${name}…`);
+  const r = await sweep(manifest, path.join(OUT, name), (l) => void tell(l), { all: all === true });
+  return text(r.lines.join("\n"));
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {

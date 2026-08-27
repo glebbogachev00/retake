@@ -96,7 +96,46 @@ Never record from a manifest outside `demos/`. If you were experimenting, the
 experiment still gets a name and stays. `retake heal` writes back what is
 missing, but nobody should need it.
 
-## The five checks, and what each one actually answers
+## Inspect the frame, not the change
+
+**This is a method, and it is the one that fails silently.**
+
+After you fix something, the natural thing is to open the frame and check
+whether the fix landed — *is the doubled card gone?* That is confirmation, not
+inspection, and it will miss anything you were not already looking for, every
+time. It has: a frame was looked at directly, by someone paying attention, and
+three labels with the card below sitting on top of them went straight past.
+
+So read every frame as if you had never seen the app, BEFORE you check whether
+your change worked. Ask what a stranger would notice, not what you hoped to
+confirm. And do it on every frame, not the ones you think are interesting —
+the ones you think are interesting are the ones you already have a theory
+about.
+
+**`sweep` is this, mechanised.** It puts a closed ten-item checklist to every
+scene's frame — clipped text, overlap, contrast, cut off, misalignment,
+doubled, unfinished, broken media, dev UI in shot, empty regions — one frame
+at a time, never a sample.
+
+Use it whenever you have changed something a person will look at. It costs
+about a judge call per frame, roughly two minutes on a long demo.
+
+Three things about reading what it says:
+
+- **They are things to look at, not verdicts.** Open the frame it names and
+  decide for yourself. Some findings are correct and unimportant; a duplicate
+  under a grouping header that says "· 2" is the app working.
+- **Show the person, do not silently resolve.** You are the one with an
+  investment in the answer.
+- **A clean sweep is a floor, not a ceiling.** A closed checklist cannot find
+  what is not on it. It catches the ten things that go wrong in every app; it
+  does not certify the frame.
+
+And the ordinary caution still applies: `sweep` reads the pictures a run
+produced. If a scene was never recorded, there is no frame, and nothing was
+checked — it says so, and that is not a pass.
+
+## The checks, and what each one actually answers
 
 These are separate questions. Running the wrong one and reporting it as
 "tested" is the failure this whole set exists to prevent.
@@ -105,6 +144,7 @@ These are separate questions. Running the wrong one and reporting it as
 |---|---|---|---|
 | Will the steps resolve, and does the flow work at all? | `dry` | seconds | yes — exit 3 |
 | Does one moment LOOK right? | `verify` | ~10s a question | yes — exit 3 |
+| Is anything wrong in this frame that nobody asked about? | `sweep` | ~1 judge call a frame | no, it reports |
 | Does the whole run ADD UP — input vs output? | `sense` | ~45s | no, it asks |
 | What happens just off the happy path? | `destroy` | minutes | flags, you judge |
 | What keeps going wrong across every demo? | `notes` | instant | no |
@@ -114,7 +154,8 @@ camera. What it does not do is keep frames, so anything whose damage is
 visual passes it. That is what `verify` is for.
 
 **Before you report that something works, at minimum: `dry`, then `run`, then
-`verify`.** `sense` on anything with numbers or a summary in it. `destroy`
+`verify`, then `sweep`.** `verify` answers what you thought to ask; `sweep`
+finds what you did not. `sense` on anything with numbers or a summary in it. `destroy`
 when you have changed something people depend on and want to know what you
 did not think of.
 

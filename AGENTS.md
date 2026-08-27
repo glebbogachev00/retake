@@ -65,6 +65,7 @@ write demos/<name>.yaml
   → read outputs/<name>/proof-log.md                  what actually happened, per step
   → retake check outputs/<name>             pass/fail on the result
   → retake verify outputs/<name>            did it LOOK right — each scene's `expect`, judged
+  → retake sweep outputs/<name>             every frame, as a whole — what nobody asked about
   → retake sense outputs/<name>             does the run ADD UP — input vs output
   → retake destroy demos/<name>.yaml        what happens just off the happy path
   → retake notes                            what keeps going wrong across every demo
@@ -211,6 +212,13 @@ Most real demos start behind a sign-in. The agent never sees a password:
 - `outputs/<name>/take.json` — the same, machine-readable.
 - `outputs/<name>/demo.mp4` — the video. `master.mp4` is the CRF-14 keeper
   on post presets.
+- `retake sweep outputs/<name>` — the one that finds what nobody thought to
+  ask about. `verify` answers written-down questions, so it can only find what
+  was already suspected. `sweep` inspects EVERY scene's frame, one at a time,
+  never sampled, against a closed ten-item checklist: clipped text, overlap,
+  contrast, cut off, misalignment, doubled, unfinished, broken media, dev UI in
+  shot, empty regions. Advisory — it reports, it does not gate. Roughly one
+  judge call per frame, so about two minutes on a seventeen-scene demo.
 - `retake sense outputs/<name>` — the verdict on the RUN, not on one frame.
   Everything the demo typed, chose and clicked, put against the frames that
   came out, through six lenses: quantity, continuity, state, units and labels,

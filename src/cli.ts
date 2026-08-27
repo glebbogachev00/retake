@@ -11,6 +11,7 @@
  *   retake render outputs/x                       re-render from the existing take (--preset to switch)
  *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
  *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
+ *   retake sweep outputs/x                        look at every frame as a whole — what nobody thought to ask about
  *   retake sense outputs/x                        does the run ADD UP — what went in vs what came out
  *   retake destroy demos/x.yaml                   the flows nobody wrote down — abuse this demo nine ways
  *   retake flag demos/x.yaml --scene s --expect "…"  this one is real: watch it from now on
@@ -39,6 +40,7 @@ import { applyTidy, mb, planTidy } from "./tidy.js";
 import { verify } from "./ext/verify.js";
 import { notes } from "./ext/notes.js";
 import { sense } from "./ext/sense.js";
+import { sweep } from "./ext/sweep.js";
 import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
@@ -325,6 +327,22 @@ program
     const trials = await tryCandidates(plan, { mode: opts.run ? "run" : "dry", manifestDir: loaded.dir, outRoot: path.resolve(opts.out), log: say });
     for (const l of describeTrials(trials, opts.run ? "run" : "dry")) say(l);
     if (trials.some((t) => t.verdict === "broke")) process.exitCode = 3;
+  });
+
+
+program
+  .command("sweep")
+  .description("look at every frame as a whole — the ten ways a picture can be wrong, checked on each one, whether or not anybody asked")
+  .argument("<dir>", "an outputs/<name> dir")
+  .argument("[manifest]", "manifest (default demos/<name>.yaml)")
+  .option("--all", "the middle of each scene too, not just its last moment", false)
+  .option("--concurrency <n>", "how many frames to look at at once", "4")
+  .action(async (dir: string, manifestFile: string | undefined, opts: { all: boolean; concurrency: string }) => {
+    const outDir = path.resolve(dir);
+    const file = manifestFile ?? path.join("demos", `${path.basename(outDir)}.yaml`);
+    if (!fs.existsSync(file)) throw new Error(`no ${file} — pass the manifest path`);
+    // No exit code, deliberately. Some of these are judgement; `verify` gates.
+    await sweep(loadManifest(file).manifest, outDir, say, { all: opts.all, concurrency: Number(opts.concurrency) || 4 });
   });
 
 program
