@@ -72,6 +72,16 @@
   .frames { margin-top:16px; border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 16px; }
   /* What you flagged, and whether it is still wrong. Shown only when there is
      something flagged — an empty one would be clutter with a heading on it. */
+  /* One line: what has actually been looked at, and whether the answer is
+     about the recording that is there now. Never a panel — the question is
+     "did anyone check this", and that is one line's worth of answer. */
+  .checked { margin-top:10px; font-size:12.5px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:baseline; }
+  .checked .c { display:inline-flex; gap:5px; align-items:baseline; }
+  .checked .c b { font-weight:500; color:var(--ink); }
+  .checked .c.none b { color:var(--muted); }
+  .checked .c.old { opacity:.6; }
+  .checked .c.bad b { color:var(--bad); }
+  .checked .why { font-size:12px; }
   .flagged { margin-top:16px; border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 16px; }
   .flagged .row { display:flex; gap:10px; align-items:baseline; padding:7px 0; border-top:1px solid var(--rule); cursor:pointer; }
   .flagged .row:first-child { border-top:0; }
@@ -244,6 +254,7 @@
         </div>
         <div id="flagRows"></div>
       </div>
+      <div class="checked" id="checked"></div>
       <div class="frames">
         <div class="fhead">
           <span class="lab">Poster & frames</span>
@@ -435,6 +446,7 @@ $('vidCover').onclick = () => setCover({ at: $('vid').currentTime });
     r.onload = () => setCover({ dataUrl: r.result });
     r.readAsDataURL(f);
   };
+  drawChecked(d.checks, d.take);
   drawFlagged(name, d.flagged, q);
   $('pin').classList.add('show');
   drawDemos();
@@ -444,6 +456,29 @@ $('vidCover').onclick = () => setCover({ at: $('vid').currentTime });
 // What you said was wrong here, and whether it still is. Reads the answer that
 // `retake fixed` already wrote — this never judges anything itself, so opening
 // a demo costs nothing and a recording is never waiting on it.
+// Has anyone actually looked at this take, or was it only recorded? The
+// checks write a line each when they run; this reads it back. Anything
+// answering an older recording is dimmed rather than counted.
+const CHECKS = [
+  ['verify', 'verify', 'the questions written on the scenes'],
+  ['sweep',  'sweep',  'every frame, against the ten ways a picture goes wrong'],
+  ['sense',  'sense',  'whether what went in matches what came out'],
+  ['fixed',  'fixed',  'the things you flagged'],
+];
+function drawChecked(checks, take) {
+  const box = $('checked');
+  const now = take && take.finishedAt;
+  box.innerHTML = CHECKS.map(([key, label, title]) => {
+    const r = checks && checks[key];
+    if (!r) return `<span class="c none" title="${esc(title)} — never run on this demo">${label} <b>—</b></span>`;
+    const stale = !now || r.takeFinishedAt !== now;
+    const mark = r.ok === false ? '✗' : r.ok === true ? '✓' : '·';
+    const cls = 'c' + (stale ? ' old' : '') + (r.ok === false ? ' bad' : '');
+    const when = stale ? ' (an older take)' : '';
+    return `<span class="${cls}" title="${esc(title)}${when}">${label} <b>${mark}</b> <span class="why">${esc(r.summary)}${when}</span></span>`;
+  }).join('');
+}
+
 let wholeMeta = '';
 function drawFlagged(name, f, q) {
   wholeMeta = $('vidMeta').textContent;

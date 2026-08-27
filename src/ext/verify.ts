@@ -26,6 +26,7 @@ import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { ask, pickJudge, readJson, why as short } from "./judge.js";
 import { readFlags } from "./flags.js";
+import { noteCheck } from "./checked.js";
 import type { Provider } from "../describe.js";
 
 export type Answer = {
@@ -162,6 +163,8 @@ export function verify(m: Manifest, outDir: string, log?: (l: string) => void, m
   // not been answered, and reporting it as a pass is the exact lie this verb
   // exists to make impossible.
   const ok = answers.every((a) => a.ok === true);
-  say(ok ? `verify: pass (${answers.length}/${answers.length})` : `verify: FAIL (${answers.filter((a) => a.ok === true).length}/${answers.length} answered yes)`);
+  const yes = answers.filter((a) => a.ok === true).length;
+  say(ok ? `verify: pass (${answers.length}/${answers.length})` : `verify: FAIL (${yes}/${answers.length} answered yes)`);
+  noteCheck(outDir, "verify", { takeFinishedAt: take.finishedAt, ok, count: answers.length, summary: ok ? `${answers.length} answered yes` : `${yes} of ${answers.length} answered yes` });
   return { ok, answers, judge, lines };
 }

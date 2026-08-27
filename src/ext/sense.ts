@@ -27,6 +27,7 @@ import path from "node:path";
 import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { ask, pickJudge, readJson, why as short } from "./judge.js";
+import { noteCheck } from "./checked.js";
 
 /** How many frames one judgement is allowed. A 37-scene demo does not get 37
     images; it gets an even spread including the first and last, and is told
@@ -168,6 +169,10 @@ export function sense(m: Manifest, outDir: string, log?: (l: string) => void): S
     concerns.push({ lens: (o.lens ?? "").toString().slice(0, 24) || "—", scene: o.scene?.toString() || undefined, question: o.question.toString(), saw: (o.saw ?? "").toString() });
   }
 
+  noteCheck(outDir, "sense", {
+    takeFinishedAt: take.finishedAt, ok: null, count: concerns.length,
+    summary: concerns.length ? `${concerns.length} question${concerns.length === 1 ? "" : "s"}` : "the run adds up",
+  });
   if (!concerns.length) {
     say("the run adds up — nothing to ask about.");
     if (of > used.length) say(`(${of - used.length} of ${of} scenes were not looked at — this is a sample, not a sweep.)`);

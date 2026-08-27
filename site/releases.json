@@ -2,6 +2,17 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.9.0",
+      "date": "2026-08-27",
+      "headline": "See at a glance whether anyone actually checked a demo",
+      "notes": [
+        "New: one quiet line under each recording showing what has been checked on it — the questions written on its scenes, every frame swept for the ten ways a picture goes wrong, whether the numbers add up, and anything you flagged. With a dash where nothing has run.",
+        "It is about the recording that is there now. Re-record a demo and every earlier answer is shown as answering an older take, because it is.",
+        "This closes a real gap: an agent could tell you it checked something and there was no way to know. Now there is — the checks write it down when they run, and the window reads it back.",
+        "And Retake will tell you which demos nobody has looked at. Run the one-line summary of your whole workspace and it names them."
+      ]
+    },
+    {
       "version": "0.8.1",
       "date": "2026-08-27",
       "headline": "The flagging feature your agents could not see",

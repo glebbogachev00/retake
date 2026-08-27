@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import type { Take } from "../record.js";
+import { isCurrent, readChecks, type Checks } from "./checked.js";
 
 export type Note = {
   /** problem: something shipped wrong. cost: time being spent for nothing.
@@ -34,6 +35,8 @@ type Run = {
   dir: string;
   take: Take | null;
   used: Record<string, unknown> | null;
+  /** Which checks have run, and against which take. */
+  checks: Checks;
   /** Prior takes this demo has replaced, kept under .history/ and .previous/. */
   priors: number;
   when: number;
@@ -57,7 +60,7 @@ function readRun(dir: string): Run | null {
     try { return fs.statSync(dir).mtimeMs; } catch { return 0; }
   })();
   if (!take && !used) return null; // an empty folder is not a run
-  return { name, dir, take, used, priors, when };
+  return { name, dir, take, used, priors, when, checks: readChecks(dir) };
 }
 
 /** Every scene label in a used manifest that carries no `expect:`. */
@@ -157,6 +160,20 @@ export function collect(root: string, sinceDays = 14): { runs: Run[]; notes: Not
   if (gb > 3) add({ kind: "cost", demos: ["outputs"], line: `outputs/ is ${gb.toFixed(1)} GB. \`retake tidy\` shows what it would free before it removes anything, and never touches a recording.` });
 
   // --- habits: the ones worth a policy -------------------------------------
+
+  // Recorded and never looked at. This is the workspace-level version of the
+  // question "did the agent actually check it, or just say so" — and unlike
+  // the answer an agent gives, this one is on disk.
+  const unlooked = runs.filter((r) => {
+    const t = r.take?.finishedAt;
+    return !isCurrent(r.checks.verify, t) && !isCurrent(r.checks.sweep, t);
+  }).map((r) => r.name);
+  add({
+    kind: "habit",
+    demos: unlooked,
+    line: `${list(unlooked)} ${unlooked.length === 1 ? "was" : "were"} recorded and never looked at — no \`verify\` and no \`sweep\` has run against the take that is there now.`,
+    policy: "A demo is not finished until `verify` and `sweep` have run against the take that exists — a recording nobody has looked at is a recording, not a result.",
+  });
 
   // Nobody is checking the picture. This is the note the whole watcher exists
   // for: a demo recorded repeatedly with no `expect:` anywhere is one nobody

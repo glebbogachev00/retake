@@ -75,16 +75,44 @@ test("a selector that failed in only one demo is not blamed on the app", () => {
 test("re-recorded with no expect anywhere → the note the watcher exists for, with a policy", () => {
   const rt = root();
   run(rt, "unchecked", {}, { steps: [{ action: "scene", label: "a" }, { action: "scene", label: "b" }] }, 2);
-  const ns = collect(rt).notes.filter((n) => n.kind === "habit");
+  const ns = collect(rt).notes.filter((n) => /no `expect:` on any scene/.test(n.line));
   assert.equal(ns.length, 1);
-  assert.match(ns[0].line, /no `expect:` on any scene/);
+  assert.equal(ns[0].kind, "habit");
   assert.match(ns[0].policy!, /retake verify/);
 });
 
 test("scenes that DO carry expect are silent", () => {
   const rt = root();
   run(rt, "checked", {}, { steps: [{ action: "scene", label: "a", expect: "a board" }, { action: "scene", label: "b", expect: "two items" }] }, 2);
-  assert.doesNotMatch(flat(rt), /habit/);
+  assert.doesNotMatch(flat(rt), /no `expect:` on any scene/);
+});
+
+test("a take nobody has verified or swept is said out loud", () => {
+  // The workspace-level version of "did the agent actually check it". Unlike
+  // the agent's own answer, this one is on disk.
+  const rt = root();
+  run(rt, "unlooked", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  assert.match(flat(rt), /recorded and never looked at/);
+});
+
+test("a take that HAS been looked at is not nagged about", () => {
+  const rt = root();
+  const dir = run(rt, "looked", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
+    verify: { at: "now", takeFinishedAt: "2026-08-27T10:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+  }));
+  assert.doesNotMatch(flat(rt), /recorded and never looked at/);
+});
+
+test("a check answering an OLDER take does not count as looked at", () => {
+  // A re-record makes every previous answer stale. Treating a stale pass as a
+  // pass is the whole failure mode.
+  const rt = root();
+  const dir = run(rt, "restale", { finishedAt: "2026-08-27T12:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
+    verify: { at: "then", takeFinishedAt: "2026-08-26T09:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+  }));
+  assert.match(flat(rt), /recorded and never looked at/);
 });
 
 test("a fresh lock is left alone; an hour-old one is a dead run holding the folder", () => {
@@ -100,7 +128,10 @@ test("a fresh lock is left alone; an hour-old one is a dead run holding the fold
 
 test("nothing to report says so in one line, and never invents a fifth", () => {
   const rt = root();
-  run(rt, "clean", {}, { steps: [{ action: "scene", label: "a", expect: "something" }] });
+  const dir = run(rt, "clean", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "something" }] });
+  fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
+    verify: { at: "now", takeFinishedAt: "2026-08-27T10:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+  }));
   const out = notes(rt);
   assert.equal(out.notes.length, 0);
   assert.equal(out.lines.length, 1);

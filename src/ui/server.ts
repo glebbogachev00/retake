@@ -39,6 +39,7 @@ import { captureHash, restorePrevious } from "../record.js";
 import { digest } from "../digest.js";
 import { readFlags } from "../ext/flags.js";
 import { findOrphans } from "../ext/heal.js";
+import { readChecks } from "../ext/checked.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
@@ -1010,7 +1011,10 @@ export function serve(port: number) {
             };
           }
         } catch { /* no manifest, no flags */ }
-        return json(res, 200, { take, files, proof, facts, stamp, dir, flagged });
+        // Which checks have actually run against THIS take. Read from disk,
+        // never judged here — the window must cost nothing to open.
+        const checks = readChecks(dir);
+        return json(res, 200, { take, files, proof, facts, stamp, dir, flagged, checks });
       }
       m = /^\/out\/([a-z0-9-]+)\/((?:stills\/|clips\/)?[A-Za-z0-9._-]+)$/.exec(p);
       if (m && req.method === "GET") {

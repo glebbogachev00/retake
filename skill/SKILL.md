@@ -156,7 +156,17 @@ visual passes it. That is what `verify` is for.
 
 **Before you report that something works, at minimum: `dry`, then `run`, then
 `verify`, then `sweep`.** `verify` answers what you thought to ask; `sweep`
-finds what you did not. `sense` on anything with numbers or a summary in it. `destroy`
+finds what you did not.
+
+**Whether you ran them is visible.** Each check writes a line into the demo's
+own folder when it finishes, and the window shows it — `verify ✓ 32 of 34
+answered yes · sweep — · sense — · fixed ✗`. A check against an older
+recording is shown as answering an older recording. So "did you actually look
+at it" is not a question anybody has to take your word for, and `retake notes`
+lists every demo that was recorded and never looked at.
+
+Which means: say what the checks said. Do not summarise a run as fine when the
+line will say `sweep —`. `sense` on anything with numbers or a summary in it. `destroy`
 when you have changed something people depend on and want to know what you
 did not think of.
 

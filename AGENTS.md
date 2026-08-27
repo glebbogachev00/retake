@@ -255,6 +255,10 @@ Most real demos start behind a sign-in. The agent never sees a password:
   unless you pass `--apply`. **Never record from a manifest that does not live
   in `demos/` — this verb exists to clean up after that mistake, not to license
   it.**
+- Every check leaves a receipt in `outputs/<name>/checks.json` — which check
+  ran, against which take, and what it said. The window shows it as one line,
+  and `retake notes` names every demo that was recorded and never looked at.
+  Whether you checked is not something anyone has to take your word for.
 - `retake notes` — the watcher. Reads every take in `outputs/` back and says
   the few things a person would say after looking through them: a stub that
   answered nothing (the demo is showing live data), the same selector failing

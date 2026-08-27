@@ -27,6 +27,7 @@ import path from "node:path";
 import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
+import { noteCheck } from "./checked.js";
 
 /**
  * The list. Closed on purpose — no "anything else that looks wrong" slot,
@@ -154,6 +155,11 @@ export async function sweep(
     // Never silent: a frame nobody could look at has not been checked.
     say(`${failed.length} frame${failed.length === 1 ? " was" : "s were"} not looked at at all: ${failed.map((f) => `${f.scene} (${f.error})`).join(", ")}`);
   }
+  const found = hit.reduce((n, f) => n + f.issues.length, 0);
+  noteCheck(outDir, "sweep", {
+    takeFinishedAt: take.finishedAt, ok: null, count: frames.length - failed.length,
+    summary: found ? `${found} thing${found === 1 ? "" : "s"} on ${hit.length} of ${frames.length} frames` : `${frames.length - failed.length} frames, nothing caught the eye`,
+  });
   say("");
   say("These are things to look at, not verdicts — open the frame and decide. A closed checklist cannot find what is not on it, so this is a floor, not a ceiling.");
   return { frames, judge, lines, looked: frames.length - failed.length };

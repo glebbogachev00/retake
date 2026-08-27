@@ -24,6 +24,7 @@ import type { Take } from "../record.js";
 import { pickJudge } from "./judge.js";
 import { judgeWith } from "./verify.js";
 import { clipFor, type Clip } from "./clip.js";
+import { noteCheck } from "./checked.js";
 
 export type Flag = {
   /** Short and stable: scene + a slug of the expectation. Survives a
@@ -182,6 +183,10 @@ export function checkFlags(manifestFile: string, _m: Manifest, outDir: string, o
   } catch { /* the report still printed */ }
 
   const pass = checked.filter((c) => c.ok === true).length;
+  noteCheck(outDir, "fixed", {
+    takeFinishedAt: take.finishedAt, ok: pass === checked.length, count: checked.length,
+    summary: `${pass} of ${checked.length} flagged now pass${pass === 1 ? "es" : ""}`,
+  });
   say(`${flags.length} thing${flags.length === 1 ? "" : "s"} you flagged here. ${pass === flags.length ? "All" : pass} now pass${pass === 1 ? "es" : ""}.`);
   say("");
   for (const c of checked) {
