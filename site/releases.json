@@ -2,6 +2,18 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.5.0",
+      "date": "2026-08-27",
+      "headline": "Retake can now tell you whether your app actually looks right",
+      "notes": [
+        "New: say what should be visible, and Retake checks it. On any scene you can write a plain sentence — \"every card sits inside its own box\", \"the button's text is readable against its background\" — and Retake puts that question to a second pair of eyes, against the actual frame it recorded. It answers yes or no, and tells you what it saw.",
+        "This is the check nothing else was doing. A page can pass every test, build clean, and still be broken in a way only a person notices: an animation frozen halfway, an icon that never loaded, a card that fell out of its grid, a label in dark text on a dark background. All four of those happened here in one day, and all four were caught by someone looking — not by anything the tools did. Now the tool looks.",
+        "The one judging it is never the one who made it. Retake asks a separate reader that sees only the picture and the question, so an agent cannot mark its own homework.",
+        "If it couldn't check, it says so rather than passing. No frame, nothing available to look at it, an answer it couldn't read — every one of those counts as a failure. A check that didn't run is not a check that passed.",
+        "Nothing changes unless you want it to. Demos without any of these sentences record exactly as before."
+      ]
+    },
+    {
       "version": "0.4.1",
       "date": "2026-08-26",
       "headline": "You can see what your agent is doing, and it finishes what it started",

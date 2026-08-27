@@ -1,0 +1,172 @@
+/**
+ * The verdict: did the app LOOK right, not did the steps execute.
+ *
+ * Every check Retake had before this proves something about the run — the
+ * step passed, the file is 1920 wide, no scene stalled. None of them can see
+ * that an animation froze half-drawn, that an icon 404'd, that a card fell
+ * out of its grid, or that a label is dark text on a dark pill. All four of
+ * those shipped from this repository in one day, every one DOM-correct and
+ * visually wrong, and every one caught by a person looking rather than by
+ * anything the tool did.
+ *
+ * So the tool looks. A scene declares, in plain words, what somebody should
+ * be able to see at that moment; verify puts that question to a vision model
+ * against the scene's own still and returns a verdict the caller cannot
+ * manufacture. An agent can forget a rule written in a document. It cannot
+ * forget to run the verb it is being asked to run, and it cannot claim the
+ * picture was fine when a second reader has already said otherwise.
+ *
+ * The judging is deliberately NOT done by whoever asked for it: the agent
+ * that built the thing has an investment in the answer. This asks a separate
+ * reader holding only the question and the image.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import type { Manifest } from "./manifest.js";
+import { pickProvider, type Provider } from "./describe.js";
+import type { Take } from "./record.js";
+
+export type Answer = {
+  scene: string;
+  question: string;
+  /** null when nothing could judge it — which is a FAILURE, never a pass. */
+  ok: boolean | null;
+  why: string;
+  still: string;
+};
+export type Verdict = { ok: boolean; answers: Answer[]; judge: string; lines: string[] };
+
+/** The still to ask about: a scene's END frame, because "did it happen" is
+    almost always the question, and the middle of a scene is mid-motion. */
+export function stillFor(outDir: string, label: string, index: number): string | null {
+  const dir = path.join(outDir, "stills");
+  if (!fs.existsSync(dir)) return null;
+  const files = fs.readdirSync(dir);
+  const n = String(index + 1).padStart(2, "0");
+  const end = files.find((f) => f.startsWith(n) && f.includes(label) && f.includes("-end."));
+  const mid = files.find((f) => f.startsWith(n) && f.includes(label));
+  const any = end ?? mid;
+  return any ? path.join(dir, any) : null;
+}
+
+/** Every question this manifest asks, paired with the frame that answers it. */
+export function questions(m: Manifest, outDir: string): { scene: string; question: string; still: string | null }[] {
+  const out: { scene: string; question: string; still: string | null }[] = [];
+  let sceneIndex = 0;
+  for (const st of m.steps) {
+    if (st.action !== "scene") continue;
+    const here = sceneIndex++;
+    const exp = (st as { expect?: string | string[] }).expect;
+    if (!exp) continue;
+    const label = (st as { label: string }).label;
+    for (const q of Array.isArray(exp) ? exp : [exp]) {
+      out.push({ scene: label, question: q, still: stillFor(outDir, label, here) });
+    }
+  }
+  return out;
+}
+
+const PROMPT = (question: string) =>
+  `Look at this screenshot of a web app and answer one question about it.\n\n` +
+  `QUESTION: ${question}\n\n` +
+  `Answer with a single line of JSON and nothing else:\n` +
+  `{"ok": true|false, "why": "<one short sentence naming what you actually see>"}\n\n` +
+  `Rules: judge ONLY what is visible in this image. If the thing asked about is ` +
+  `not visible, or is present but unreadable, cut off, overlapping, or blank, ` +
+  `answer false and say so. Do not assume it is fine because it probably is. ` +
+  `Do not be generous.`;
+
+/** Ask the one reader that can see. Only providers that can actually take an
+    image are used — answering a visual question from a filename would be
+    worse than not answering it. */
+function judgeWith(p: Provider, still: string, question: string): { ok: boolean | null; why: string } {
+  if (p.name !== "claude-code" && p.name !== "codex") {
+    return { ok: null, why: `${p.name} cannot be given an image` };
+  }
+  try {
+    const args = p.name === "claude-code"
+      ? ["-p", "--output-format", "text", "--add-dir", path.dirname(still), "--allowedTools", "Read", ...(p.model !== "default" ? ["--model", p.model] : [])]
+      : ["exec", "--skip-git-repo-check"];
+    const ask = `${PROMPT(question)}\n\nThe screenshot is the file at: ${still}\nRead that image file first, then answer.`;
+    // stderr is piped, not inherited: the codex CLI prints a session banner
+    // and a token count to it, which would bury the one line that matters.
+    const out = execFileSync(p.baseUrl, args, { input: ask, encoding: "utf8", timeout: 120_000, maxBuffer: 1 << 22, stdio: ["pipe", "pipe", "pipe"] });
+    // The LAST such object, not the first: some CLIs echo the prompt (which
+    // contains the example shape) before answering.
+    return readAnswer(out, p.name);
+  } catch (e) {
+    return { ok: null, why: `judge failed: ${String((e as Error).message).split("\n")[0].slice(0, 120)}` };
+  }
+}
+
+/** Read a verdict out of whatever the CLI printed. */
+function readAnswer(out: string, who: string): { ok: boolean | null; why: string } {
+    const all = [...out.matchAll(/\{[^{}]*"ok"\s*:\s*(true|false)[^{}]*\}/g)].map((x) => x[0]);
+    // Walk backwards to the last one that actually parses. Some CLIs echo the
+    // prompt first, and the prompt contains the example shape — which matches
+    // the pattern and is not valid JSON. Reading that as the answer would turn
+    // a real verdict into "no usable answer".
+    for (let i = all.length - 1; i >= 0; i--) {
+      try {
+        const parsed = JSON.parse(all[i]) as { ok: boolean; why?: string };
+        if (typeof parsed.ok !== "boolean") continue;
+        return { ok: parsed.ok, why: (parsed.why ?? "").trim() || "(no reason given)" };
+      } catch { /* the echoed template; keep looking */ }
+    }
+    return { ok: null, why: `no usable answer from ${who}` };
+}
+
+/** Exposed for the test: reading a verdict out of whatever a CLI printed is
+    the part that silently turns a real answer into "could not answer". */
+export function __test_readAnswer(out: string) { return readAnswer(out, "test"); }
+
+export function verify(m: Manifest, outDir: string, log?: (l: string) => void): Verdict {
+  const lines: string[] = [];
+  const say = (l: string) => { lines.push(l); log?.(l); };
+  const qs = questions(m, outDir);
+
+  if (!qs.length) {
+    say("no `expect` on any scene — nothing to verify.");
+    say("Add one to a scene: expect: \"the board shows two items\" — a question answerable yes/no from one frame.");
+    return { ok: true, answers: [], judge: "none", lines };
+  }
+
+  const take = (() => {
+    try { return JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take; } catch { return null; }
+  })();
+  if (!take) {
+    say("FAIL  no take.json — record it first; verify judges the frames a run produced.");
+    return { ok: false, answers: [], judge: "none", lines };
+  }
+
+  const provider = pickProvider();
+  const judge = provider ? `${provider.name}${provider.model !== "default" ? ` (${provider.model})` : ""}` : "none";
+  if (!provider) {
+    // A check that could not run is not a check that passed.
+    say("FAIL  nothing available to look at the frames.");
+    say("      Sign in to the `claude` or `codex` CLI, or set RETAKE_MODEL — verify needs a reader that can see an image.");
+    return { ok: false, answers: qs.map((q) => ({ scene: q.scene, question: q.question, ok: null, why: "no judge available", still: q.still ?? "" })), judge, lines };
+  }
+
+  say(`judging ${qs.length} question(s) with ${judge}`);
+  const answers: Answer[] = [];
+  for (const q of qs) {
+    if (!q.still) {
+      answers.push({ scene: q.scene, question: q.question, ok: null, why: "no still for this scene", still: "" });
+      say(`FAIL  [${q.scene}] ${q.question}\n      no still for that scene — was it recorded?`);
+      continue;
+    }
+    const a = judgeWith(provider, q.still, q.question);
+    answers.push({ scene: q.scene, question: q.question, ok: a.ok, why: a.why, still: q.still });
+    const mark = a.ok === true ? "pass" : a.ok === false ? "FAIL" : "FAIL";
+    say(`${mark}  [${q.scene}] ${q.question}\n      ${a.why}${a.ok !== true ? `\n      look: ${path.relative(process.cwd(), q.still)}` : ""}`);
+  }
+
+  // null counts as failure, deliberately: a question nobody could answer has
+  // not been answered, and reporting it as a pass is the exact lie this verb
+  // exists to make impossible.
+  const ok = answers.every((a) => a.ok === true);
+  say(ok ? `verify: pass (${answers.length}/${answers.length})` : `verify: FAIL (${answers.filter((a) => a.ok === true).length}/${answers.length} answered yes)`);
+  return { ok, answers, judge, lines };
+}

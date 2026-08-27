@@ -155,6 +155,20 @@ export const Step = z.discriminatedUnion("action", [
   Base.extend({
     action: z.literal("scene"),
     label: z.string().min(1),
+    /** What a person should be able to SEE at this moment, in plain words —
+        "the board shows two items", "the Continue button is readable against
+        its background". `retake verify` puts this question to a vision model
+        against the scene's own still and fails the run if the answer is no.
+        
+        Deliberately a question about the PICTURE, not a selector. Every
+        regression worth catching this way was DOM-correct and visually wrong:
+        an animation frozen half-drawn, an icon that 404'd, a card that fell
+        out of its grid, dark text on a dark pill. A selector assertion passes
+        all four.
+        
+        Keep it answerable yes/no from one frame. "Is this page OK" is not a
+        question, it is a wish. */
+    expect: z.union([z.string(), z.array(z.string())]).optional(),
     /** Move this scene's marker in the finished video, in milliseconds
         (negative = earlier). RENDER-TIME: it shifts where the caption, the
         still and the thumbnail land, and never costs a new recording. A

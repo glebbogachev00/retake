@@ -64,6 +64,7 @@ write demos/<name>.yaml
   → retake run demos/<name>.yaml --preset preview-fast   first take (~2 min)
   → read outputs/<name>/proof-log.md                  what actually happened, per step
   → retake check outputs/<name>             pass/fail on the result
+  → retake verify outputs/<name>            did it LOOK right — each scene's `expect`, judged
   → adjust, then: retake run demos/<name>.yaml          final quality
 ```
 
@@ -207,6 +208,12 @@ Most real demos start behind a sign-in. The agent never sees a password:
 - `outputs/<name>/take.json` — the same, machine-readable.
 - `outputs/<name>/demo.mp4` — the video. `master.mp4` is the CRF-14 keeper
   on post presets.
+- `retake verify outputs/<name>` — the verdict on the PICTURE. Every scene
+  with an `expect:` has its plain-language question put to a separate reader
+  that can see the still. Exit 3 on failure; an unanswerable question counts
+  as a failure, never a pass. This is the one check that catches DOM-correct,
+  visually-wrong: a frozen animation, a 404ing icon, a card out of its grid,
+  dark text on a dark pill. Use it before reporting that a screen works.
 - `retake check outputs/<name>` — resolution, fps, duration, files,
   pass/fail. Exit 3 on failure.
 

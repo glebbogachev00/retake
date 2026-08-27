@@ -1,6 +1,6 @@
 ---
 name: recording-product-demos
-description: Record a silent product demo video of a web app with Retake. Use when the user asks for a demo video, screen recording, or product walkthrough of an app — or asks what demos would be worth recording. Works through Retake's MCP tools (preferred) or its CLI.
+description: Record a silent product demo video of a web app with Retake, and prove a web app actually LOOKS right before saying it works. Use when the user asks for a demo video, screen recording, or product walkthrough — or asks what demos would be worth recording — and ALSO whenever you have changed something a person will look at (a page, a screen, a flow) and are about to report that it works. Works through Retake's MCP tools (preferred) or its CLI.
 ---
 
 # Recording product demos with Retake
@@ -82,6 +82,73 @@ say so in one line and stop.
 9. When they say go: `run` with `preview=false` once (full quality), then
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
+
+## Proving it looks right — before you say it works
+
+**Read this whenever you have changed something a person will look at.** Not
+only when someone asks for a video. If you are about to write "the page now
+works" or "fixed — the button shows up", this section is the difference
+between saying that and knowing it.
+
+You cannot verify a screen by reading the code that draws it, and you cannot
+verify it by checking that a selector exists. Every one of these shipped from
+a green build, a passing test, and an agent that said it was fine:
+
+- an animation frozen half-drawn — the element was there, at the right size
+- an icon 404ing — the `<link>` tag was correct, the route shadowed it
+- a card knocked out of its grid — the DOM was valid, the class was consumed
+- a label in dark text on a dark pill — perfect contrast in the stylesheet
+
+All four were DOM-correct and visually wrong. The only thing that catches
+them is looking, and the only thing that makes looking reliable is a reader
+who is not you.
+
+### The procedure
+
+1. **Write the flow as a manifest** — the same manifest you would write for a
+   demo. Steps that reach the screen you changed.
+2. **Put the question on the scene.** Each `scene` step takes `expect:` — one
+   plain sentence, or a list of them, answerable yes or no from a single
+   frame:
+
+   ```yaml
+   - action: scene
+     label: board
+     expect:
+       - "every card sits inside its own rounded box, none overlapping"
+       - "the Continue button's text is readable against its background"
+   ```
+
+   Write what a person would notice, not what the DOM contains. `expect` is a
+   question about the picture. "the heading is fully visible and not cut off"
+   is a good one. "`h1.title` exists" is not — that is what `dry` is for, and
+   it would have passed on all four bugs above.
+3. **`dry`**, then **`run`** (use `--preset draft` while iterating — the same
+   layout at a quarter of the pixels).
+4. **`verify`** — MCP tool `verify`, or `retake verify outputs/<name>`. It
+   takes each scene's still, puts your question to a separate reader that can
+   see it, and reports the verdict. Exit code 3 if anything failed.
+5. **Report what verify said, not what you believe.** If it failed, the line
+   names the still — open it with `look`, fix the real thing, run again.
+
+### The rules that make it worth anything
+
+- **A question nobody could answer is a FAILURE, never a pass.** No still, no
+  reader available, an unparseable answer — all fail. A check that could not
+  run did not run.
+- **You do not judge your own work.** `verify` asks a separate reader holding
+  only the question and the image, because the agent that built the thing has
+  an investment in the answer. Do not substitute your own look for it.
+- **Bounded questions only.** "does anything look broken" is not a question,
+  it is a wish. Name the one thing.
+- **Never report a run you did not finish.** A skipped scene is an incomplete
+  run, not a pass.
+
+### When it is not worth it
+
+A change nobody looks at — types, a build script, a pure function — needs a
+test, not a picture. Verify is for pixels. If you cannot write a sentence
+about what should be visible, there is nothing here to verify.
 
 ## What a change costs — read this before re-recording anything
 

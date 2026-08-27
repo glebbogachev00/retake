@@ -10,6 +10,7 @@
  *   retake run demos/x.yaml --headed --no-render  watch the browser, keep only the raw take
  *   retake render outputs/x                       re-render from the existing take (--preset to switch)
  *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
+ *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
  *   retake dry demos/x.yaml                       every selector and wait, no camera
  *   retake validate demos/x.yaml                  schema check only
  *   retake presets                                list quality presets
@@ -29,6 +30,7 @@ import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTak
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 import { applyTidy, mb, planTidy } from "./tidy.js";
+import { verify } from "./verify.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
 
@@ -229,6 +231,22 @@ program
     }
     const freed = applyTidy(plan);
     say(`\nfreed ${mb(freed)}. Every demo can still be rebuilt with \`retake render outputs/<name>\`.`);
+  });
+
+
+program
+  .command("verify")
+  .description("did it LOOK right — puts each scene's `expect` question to a vision model against that scene's still")
+  .argument("<dir>", "an outputs/<name> dir containing take.json and stills/")
+  .argument("[manifest]", "manifest to read the expectations from (default demos/<name>.yaml)")
+  .action((dir: string, manifestFile?: string) => {
+    const outDir = path.resolve(dir);
+    const file = manifestFile ?? path.join("demos", `${path.basename(outDir)}.yaml`);
+    if (!fs.existsSync(file)) throw new Error(`no ${file} — pass the manifest path`);
+    const { manifest } = loadManifest(file);
+    const v = verify(manifest, outDir, say);
+    // 3, the same code dry and check already use for "this did not pass".
+    if (!v.ok) process.exitCode = 3;
   });
 
 program

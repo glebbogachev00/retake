@@ -24,6 +24,7 @@ import { record, captureHash, acquireLock, releaseLock, keepPrevious, restorePre
 import { render, check, ffmpegBin } from "../render.js";
 import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
+import { verify } from "../verify.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
 import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
@@ -501,6 +502,21 @@ server.registerTool("look", {
     content.push(frame(t, `${i}-${sc.label}`));
   }
   return { content };
+});
+
+
+server.registerTool("verify", {
+  description: "DID IT LOOK RIGHT. Puts each scene's `expect` question to a vision model against that scene's own still, and returns a verdict. Use this instead of claiming a demo looks fine: `look` hands you pictures and trusts you to judge them, verify has a second reader judge them and reports what it saw. A question nobody could answer counts as a FAILURE, never a pass. Add expectations to scenes as plain sentences answerable yes/no from one frame — \"the board shows two items\", \"the Continue button is readable against its background\" — not selectors: the regressions this catches are the ones that are DOM-correct and visually wrong.",
+  inputSchema: { name: z.string() },
+  annotations: READ_ONLY,
+}, async ({ name }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const { manifest } = loadManifest(manifestPath(name));
+  const outDir = path.join(OUT, name);
+  await tell(`Looking at ${name}…`);
+  const v = verify(manifest, outDir, (l) => void tell(l));
+  await tell(v.ok ? `Looks right.` : `Something does not look right in ${name}.`);
+  return text(v.lines.join("\n"));
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {
