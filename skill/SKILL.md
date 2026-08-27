@@ -378,11 +378,23 @@ re-render would do. Almost nothing needs the camera twice.
 | which frame is the poster | click a frame in the window, or `--scene` | seconds |
 | the ending, or any part of a demo you already recorded | `run --from <scene>` — it tells you which scene | only what changed |
 | one beat, iterating | `run --until <scene>` | the head only |
+| **the whole demo, while it is still changing** | `run --brisk` | the steps without the pacing |
 | the steps themselves — what the demo DOES | full `run` | the whole thing |
 
 Only the last row needs the camera for the whole demo. If you are about to
 re-record and your reason is not in that last row, you are paying for
 something you already have.
+
+**`--brisk` records everything without the holding still.** Every `pauseAfter`
+skipped, every `wait` capped. All the steps run and all of them are in the
+video; only the pacing is gone. On a real demo 317 of 509 seconds were pauses
+— 62% of the recording — so this is three and a half minutes instead of eight
+and a half.
+
+Use it for every take while the demo is still changing, and record the real
+one without it. The result is correct and unwatchable: the take is marked
+`brisk` so `--reuse` can never hand it back as the finished thing, and so
+nothing that judges a finished cut is fooled by it.
 
 `nudge` and `--from` are the two most recently added and the two most often
 missed. `nudge: -1500` moves a scene's marker 1.5s earlier in the finished

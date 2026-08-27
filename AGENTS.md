@@ -65,6 +65,7 @@ write demos/<name>.yaml
   → read outputs/<name>/proof-log.md                  what actually happened, per step
   → retake check outputs/<name>             pass/fail on the result
   → retake verify outputs/<name>            did it LOOK right — each scene's `expect`, judged
+  → retake run --brisk                      the steps without the pacing — for iterating
   → retake sweep outputs/<name>             every frame, as a whole — what nobody asked about
   → retake flag demos/<name>.yaml           this one is real: watch it from now on
   → retake fixed <name>                     did what was flagged get fixed, with the clip

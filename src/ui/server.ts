@@ -238,7 +238,10 @@ function listDemos(project?: string) {
  */
 function orphanedRecordings(known: string[]) {
   return findOrphans(outRoot(), DEMOS)
-    .filter((o) => o.rendered && !known.includes(o.name))
+    // Rendered, not already listed, and not a fragment. A `--from` piece of
+    // another demo is iteration scratch — putting it in the library shows two
+    // rows that look like failed demos and are not demos at all.
+    .filter((o) => o.rendered && !o.fragment && !known.includes(o.name))
     .map((o) => ({
       name: o.name, file: "", title: o.title, url: o.url, group: shortGroup(o.url),
       valid: true, settings: {} as Record<string, unknown>,

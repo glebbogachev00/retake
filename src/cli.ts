@@ -33,7 +33,7 @@ import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { Command } from "commander";
 import { loadManifest, resolve, warnings, type Manifest } from "./manifest.js";
-import { acquireLock, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, unchangedUpTo, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
+import { acquireLock, canReuse, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, unchangedUpTo, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
 import { check, render } from "./render.js";
 import { presetNames } from "./presets.js";
 import { applyTidy, mb, planTidy } from "./tidy.js";
@@ -106,9 +106,10 @@ program
   .option("--gif", "also produce a GIF (overrides the manifest)", false)
   .option("--no-master", "skip the archival CRF-14 master — roughly halves render on a long take, and the deliverable is marginally better for it (one encode instead of an encode of an encode)")
   .option("--until <scene>", "record up to the end of this scene, then stop (iterate on one beat without paying for the whole take)")
+  .option("--brisk", "record the whole thing without its pacing — every pause skipped, every wait capped. All the steps, none of the holding still: on a long demo that is minutes instead of many. For iterating; record the real one without it.", false)
   .option("--from <scene>", "start the take at this scene — earlier steps still run, at full speed and off camera, so a demo whose ENDING changed stops costing its beginning")
   .option("--name <name>", "write to outputs/<name> instead of the manifest's name — revise a cut without overwriting the published one")
-  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; master: boolean; until?: string; from?: string; name?: string }) => {
+  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; master: boolean; until?: string; from?: string; name?: string; brisk: boolean }) => {
     const loaded = loadManifest(file);
     // Asking for a preset means asking for its SHAPE. A manifest that pins its
     // own `viewport` used to win silently, so `--preset draft` recorded at
@@ -134,7 +135,7 @@ program
     if (opts.reuse && fs.existsSync(takePath)) {
       try {
         const prev = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take;
-        if (prev.captureHash && prev.captureHash === captureHash(manifest) && prev.video && fs.existsSync(prev.video) && !prev.partial) take = prev;
+        if (canReuse(prev, manifest)) take = prev;
       } catch { /* record fresh */ }
     }
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
@@ -158,7 +159,7 @@ program
       // the person still has the one that worked. See stashPrevious.
       stashPrevious(outDir);
       try {
-        take = await record(manifest, { until: opts.until, from: opts.from, outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
+        take = await record(manifest, { until: opts.until, from: opts.from, brisk: opts.brisk, outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
       } catch (e) {
         if (restorePrevious(outDir)) say("↩ recording failed — your previous take has been put back");
         releaseLock(outDir);
@@ -232,9 +233,10 @@ program
   .option("--apply", "actually remove them", false)
   .option("--deep", "also remove demo.mp4 (still re-renderable, but it is the deliverable)", false)
   .option("--orphans", "also remove whole folders whose manifest is gone", false)
-  .action((opts: { out: string; apply: boolean; deep: boolean; orphans: boolean }) => {
+  .option("--failed", "also remove the whole folder of any take whose steps failed — raw recording included, and there is no getting it back", false)
+  .action((opts: { out: string; apply: boolean; deep: boolean; orphans: boolean; failed: boolean }) => {
     const root = path.resolve(opts.out);
-    const plan = planTidy(root, { deep: opts.deep, orphans: opts.orphans, demosDir: path.resolve("demos") });
+    const plan = planTidy(root, { deep: opts.deep, orphans: opts.orphans, failed: opts.failed, demosDir: path.resolve("demos") });
     if (!plan.bytes) { say(`nothing to reclaim in ${path.relative(process.cwd(), root)} — ${mb(plan.keptBytes)} of recordings and deliverables, all of it worth keeping.`); return; }
     for (const g of plan.groups) {
       say(`${mb(g.bytes).padStart(8)}  ${g.what} — ${g.why}`);

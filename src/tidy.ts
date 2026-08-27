@@ -31,13 +31,22 @@ export const mb = (n: number) => `${(n / 1e6).toFixed(0)} MB`;
 
 /** Derived files: every one of these comes back from a re-render. */
 const DERIVED = ["master.mp4", "thumbnail.png", "cover.png", "cover-titled.png", "contact.png", "stills"];
-const DERIVED_RE = [/\.gif$/, /^\.card-.*\.mp4$/, /^\.callout-.*\.webm$/, /^\.paced\.mp4$/, /^\.joined\.mp4$/, /^debug-filter\.txt$/, /^stalled-\d+\.png$/, /^dry-failed-\d+\.png$/, /^failed-step\.png$/, /^not-the-app\.png$/];
+// `<name>-processed.webm` is the cursor-overlay pass, not the recording — an
+// intermediate that `render` makes again from the raw in seconds. The rule
+// below used to keep every .webm, so a second copy of every demo sat there
+// forever: 6.9 MB on one, 3.0 MB on another, and nobody could see why the
+// folder was so big.
+const PROCESSED_RE = /-processed\.webm$/;
+const DERIVED_RE = [PROCESSED_RE, /\.gif$/, /^\.card-.*\.mp4$/, /^\.callout-.*\.webm$/, /^\.paced\.mp4$/, /^\.joined\.mp4$/, /^debug-filter\.txt$/, /^stalled-\d+\.png$/, /^dry-failed-\d+\.png$/, /^failed-step\.png$/, /^not-the-app\.png$/];
 
 export type TidyOptions = {
   /** Also remove demo.mp4 — still re-renderable, but it is the deliverable. */
   deep?: boolean;
   /** Also remove whole output folders whose manifest no longer exists. */
   orphans?: boolean;
+  /** Also remove the whole folder of any take whose steps failed — raw
+      recording and all. Off by default; there is no getting it back. */
+  failed?: boolean;
   /** Where manifests live, for deciding what is an orphan. */
   demosDir: string;
 };
@@ -66,12 +75,17 @@ export function planTidy(outRoot: string, o: TidyOptions): Plan {
     let take: Take | null = null;
     try { take = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take; } catch { /* no take */ }
 
-    // A take whose steps failed is not something anyone goes back to.
-    if (take && take.ok === false) { failed.push(dir); continue; }
+    // A take whose steps failed. Behind a flag, not in the default sweep:
+    // this removes the WHOLE folder including the raw recording, and "nobody
+    // goes back to a broken recording" turned out to be plainly untrue — a
+    // failed take is often the thing you most want to look at, and it is the
+    // only copy. It quietly took a real 68-second recording during a routine
+    // `tidy --apply` that was reported as reclaiming only re-renderable files.
+    if (take && take.ok === false) { if (o.failed) { failed.push(dir); continue; } }
 
     for (const f of fs.readdirSync(dir)) {
       const full = path.join(dir, f);
-      if (f === "take.json" || f.endsWith(".webm") || f === ".retake-lock" || f === ".poster" || f === ".history" || f === "manifest.used.yaml" || f === "proof-log.md" || f === "facts.json") {
+      if (f === "take.json" || (f.endsWith(".webm") && !PROCESSED_RE.test(f)) || f === ".retake-lock" || f === ".poster" || f === ".history" || f === "manifest.used.yaml" || f === "proof-log.md" || f === "facts.json") {
         keptBytes += bytesOf(full);
         continue;
       }
@@ -82,7 +96,7 @@ export function planTidy(outRoot: string, o: TidyOptions): Plan {
   }
 
   add("re-renderable", "master, stills, thumbnails, gifs, working files — all come back from `retake render`, in seconds", derived);
-  add("failed takes", "their steps did not pass; nobody goes back to a broken recording", failed);
+  if (o.failed) add("failed takes", "THE WHOLE FOLDER, raw recording included — their steps did not pass", failed);
   if (o.orphans) add("orphaned folders", "no manifest in demos/ — nothing here can be re-recorded or re-rendered", orphaned);
   if (o.deep) add("deliverables", "demo.mp4 — re-renders from the recording, but it IS the file you hand over", deliverables);
 

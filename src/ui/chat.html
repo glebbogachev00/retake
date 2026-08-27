@@ -495,9 +495,9 @@ function drawFlagged(name, f, q) {
   $('flagLab').textContent = !answered.length
     ? `${n} thing${n === 1 ? '' : 's'} you flagged here`
     : `${n} thing${n === 1 ? '' : 's'} you flagged here. ${pass === n ? 'All' : pass} now pass${pass === 1 && n !== 1 ? 'es' : pass === n && n === 1 ? 'es' : ''}.`;
-  $('flagHint').textContent = f.running ? 'checking…'
-    : !f.last ? 'not checked against this take yet'
-    : f.stale ? 'answered against an older recording' : '';
+  $('flagHint').textContent = f.running ? '· checking…'
+    : !f.last ? '· not checked against this recording yet'
+    : f.stale ? '· the answers below are about an older recording' : '';
   $('flagCheck').disabled = !!f.running;
 
   $('flagRows').innerHTML = f.flags.map((x) => {

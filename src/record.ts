@@ -59,6 +59,10 @@ export type Take = {
   trimBefore: number;
   /** Set when the polished path failed and the video is a raw fallback (no cursor overlay). */
   partial?: string;
+  /** Recorded with `--brisk`: all the steps, none of the pacing. Every check
+      that judges a finished cut has to know, or it fails a take that is doing
+      exactly what was asked of it. */
+  brisk?: boolean;
   /** The resolved preset the take was recorded with (render reads it). */
   quality: { preset: string; width: number; height: number; scale: number; fps: number };
   /** Hash of everything that shapes the recording — same hash → the raw take can be reused. */
@@ -100,6 +104,24 @@ export function captureHash(m: Manifest): string {
   return h.digest("hex").slice(0, 12);
 }
 
+
+/**
+ * Can the last raw take be reused instead of opening the browser again?
+ *
+ * The capture hash is computed from the MANIFEST, so it cannot see how a take
+ * was recorded — only what it recorded. Two takes of the same demo, one paced
+ * and one brisk, hash identically. Without the flags below, `--reuse` would
+ * quietly hand back a take with no pacing in it, or a fragment, as if it were
+ * the finished thing.
+ */
+export function canReuse(prev: Take | null | undefined, m: Manifest): boolean {
+  if (!prev) return false;
+  if (!prev.captureHash || prev.captureHash !== captureHash(m)) return false;
+  if (!prev.video || !fs.existsSync(prev.video)) return false;
+  if (prev.partial) return false;   // a --from/--until fragment, or a run that fell over
+  if (prev.brisk) return false;     // all the steps, none of the pacing
+  return true;
+}
 
 /** The session a take should start from, and whether it is still good.
     Shared so `dry` starts signed in exactly when `run` would — a dry run
@@ -222,6 +244,17 @@ export type RecordOptions = {
       costing its beginning. */
   from?: string;
   outDir: string;
+  /**
+   * Record the whole take without its pacing: every `pauseAfter` skipped and
+   * every `wait` capped, exactly as the fast-forward half of `--from` already
+   * does. The steps all run and all appear; only the holding still is gone.
+   *
+   * On a real demo, 317 of 509 seconds were spent holding — 62% of the take.
+   * That pacing is right for a video somebody watches and pure cost while the
+   * demo is still changing, and until now there was no way to pay for one
+   * without the other.
+   */
+  brisk?: boolean;
   /** The caller already holds the folder lock. */
   locked?: boolean;
   headed?: boolean;
@@ -578,6 +611,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     let fastForward = !!opts.from && m.steps.some((st) => st.action === "scene" && st.label === opts.from);
     if (opts.from && !fastForward) throw new Error(`--from "${opts.from}": no scene with that label. Scenes here: ${m.steps.filter((st) => st.action === "scene").map((st) => (st as { label: string }).label).join(", ") || "(none)"}`);
     if (fastForward) log(`fast-forwarding to scene "${opts.from}" — the steps before it run but are not in the video`);
+    if (opts.brisk) log("brisk: every pause skipped and every wait capped — the steps are all here, the pacing is not");
     for (const [i, step] of m.steps.entries()) {
       if (fastForward && step.action === "scene" && step.label === opts.from) {
         fastForward = false;
@@ -593,7 +627,8 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         if (pastUntil) { partial = `stopped after scene "${opts.until}" (until)`; log(`■ ${partial}`); break; }
         if (step.label === opts.until) pastUntil = true;
       }
-      ctx.fast = fastForward;
+      // Fast for the head of a --from, or for the whole take when asked.
+      ctx.fast = fastForward || !!opts.brisk;
       const start = Date.now();
       const entry: TimelineEntry = {
         index: i,
@@ -760,7 +795,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
 
   const finishedAt = new Date().toISOString();
   const take: Take = {
-    video, screenshots, timeline, duration, startedAt, finishedAt, ok, trimBefore, partial,
+    video, screenshots, timeline, duration, startedAt, finishedAt, ok, trimBefore, partial, brisk: opts.brisk || undefined,
     quality: { preset: q.name, width: q.viewport.width, height: q.viewport.height, scale: q.scale, fps: q.fps },
     layoutWidth,
     contentWidth,

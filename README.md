@@ -83,6 +83,7 @@ retake dry demos/x.yaml        # every selector and wait, no camera (~30s)
 retake run demos/x.yaml --preset draft   # first take, quarter-size, fast
 retake check outputs/x         # resolution, fps, duration, files: pass/fail
 retake verify outputs/x        # did it LOOK right: each scene's `expect`, judged (exit 3 on failure)
+retake run demos/x.yaml --brisk  # the steps without the pacing — for iterating, not for keeping
 retake sweep outputs/x        # every frame as a whole: the ten ways a picture can be wrong
 retake flag demos/x.yaml --scene s --expect "…"   # this one is real — watch it from now on
 retake fixed x                # did what you flagged get fixed, with the clip that shows it
