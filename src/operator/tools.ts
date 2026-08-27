@@ -524,7 +524,7 @@ server.registerTool("verify", {
   // ledger, and every flagged expectation is skipped while the run still
   // reports a pass. Silently checking less than you claimed is the exact lie
   // this verb exists to prevent.
-  const v = verify(manifest, outDir, (l) => void tell(l), manifestPath(name));
+  const v = await verify(manifest, outDir, (l) => void tell(l), manifestPath(name));
   await tell(v.ok ? `Looks right.` : `Something does not look right in ${name}.`);
   return text(v.lines.join("\n"));
 });
@@ -600,7 +600,7 @@ server.registerTool("fixed", {
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const { manifest } = loadManifest(manifestPath(name));
   await tell(`Checking what was flagged on ${name}…`);
-  const r = checkFlags(manifestPath(name), manifest, path.join(OUT, name), { clips: clips !== false, log: (l) => void tell(l) });
+  const r = await checkFlags(manifestPath(name), manifest, path.join(OUT, name), { clips: clips !== false, log: (l) => void tell(l) });
   return text(r.lines.join("\n"));
 });
 

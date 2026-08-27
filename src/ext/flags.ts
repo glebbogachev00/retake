@@ -21,7 +21,7 @@ import path from "node:path";
 import YAML from "yaml";
 import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
-import { pickJudge } from "./judge.js";
+import { pickJudge, pool } from "./judge.js";
 import { judgeWith } from "./verify.js";
 import { clipFor, type Clip } from "./clip.js";
 import { noteCheck } from "./checked.js";
@@ -135,7 +135,7 @@ function stillFor(outDir: string, take: Take, label: string): string | null {
  * seconds that show it. This is the verb that exists so a long demo does not
  * have to be re-watched.
  */
-export function checkFlags(manifestFile: string, _m: Manifest, outDir: string, opts: { clips?: boolean; log?: (l: string) => void } = {}): FixedReport {
+export async function checkFlags(manifestFile: string, _m: Manifest, outDir: string, opts: { clips?: boolean; log?: (l: string) => void } = {}): Promise<FixedReport> {
   const lines: string[] = [];
   const say = (l: string) => { lines.push(l); opts.log?.(l); };
   const flags = readFlags(manifestFile);
@@ -153,22 +153,21 @@ export function checkFlags(manifestFile: string, _m: Manifest, outDir: string, o
   }
 
   const { provider, name: judge, why: noJudge } = pickJudge();
-  const checked: Checked[] = [];
-  for (const f of flags) {
-    const still = stillFor(outDir, take, f.scene) ?? undefined;
+  const checked: Checked[] = await pool(flags, 4, async (f): Promise<Checked> => {
+    const still = stillFor(outDir, take!, f.scene) ?? undefined;
     let ok: boolean | null = null;
     let why = "";
     if (!still) why = `no still for scene "${f.scene}" in the newest take — was that scene recorded?`;
     else if (!provider) why = noJudge ?? "nothing available to look at the frame";
-    else ({ ok, why } = judgeWith(provider, still, f.expect));
+    else ({ ok, why } = await judgeWith(provider, still, f.expect));
     let clip: Clip | undefined;
     let clipError: string | undefined;
     if (opts.clips !== false) {
       const c = clipFor(outDir, take!, f.scene);
       if ("file" in c) clip = c; else clipError = c.error;
     }
-    checked.push({ flag: f, ok, why, still, clip, clipError });
-  }
+    return { flag: f, ok, why, still, clip, clipError };
+  });
 
   // Written down so the window can show the answer instantly and for free.
   // Judging costs a model call per flag; nothing should pay that on a page

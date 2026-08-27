@@ -24,7 +24,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
-import { ask, pickJudge, readJson, why as short } from "./judge.js";
+import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
 import { readFlags } from "./flags.js";
 import { noteCheck } from "./checked.js";
 import type { Provider } from "../describe.js";
@@ -74,42 +74,56 @@ export function questions(m: Manifest, outDir: string): { scene: string; questio
   return out;
 }
 
+/**
+ * Describe first, then judge.
+ *
+ * Measured on a real frame: asked "does the layer count sit clear of the card
+ * below it", the judge answered yes — on the exact frame where `sweep` had
+ * already found the overlap. Twice, on two phrasings. A question that invites
+ * confirmation gets confirmed; that is the same bias that made a person miss
+ * the bug in the first place, reproduced inside the checker.
+ *
+ * So the answer has to carry what was actually seen at that spot BEFORE the
+ * verdict, which forces looking rather than agreeing.
+ */
 const PROMPT = (question: string) =>
   `Look at this screenshot of a web app and answer one question about it.\n\n` +
   `QUESTION: ${question}\n\n` +
+  `First describe, in one sentence, exactly what is at the place the question is about — the real text, and how it sits against the things around it. Then answer.\n\n` +
   `Answer with a single line of JSON and nothing else:\n` +
-  `{"ok": true|false, "why": "<one short sentence naming what you actually see>"}\n\n` +
+  `{"saw": "<what is actually there>", "ok": true|false, "why": "<one short sentence>"}\n\n` +
   `Rules: judge ONLY what is visible in this image. If the thing asked about is ` +
   `not visible, or is present but unreadable, cut off, overlapping, or blank, ` +
-  `answer false and say so. Do not assume it is fine because it probably is. ` +
-  `Do not be generous.`;
+  `answer false and say so. The question is not a hint that the answer is yes — ` +
+  `it is as likely to be describing something that is broken. Do not assume it ` +
+  `is fine because it probably is. Do not be generous.`;
 
-/** One bounded question about one frame. Exported so anything else that needs
-    the same answer asks it the same way — two different phrasings of "does
-    this look right" would give two different standards. */
-export function judgeWith(p: Provider, still: string, question: string): { ok: boolean | null; why: string } {
+export async function judgeWith(p: Provider, still: string, question: string): Promise<{ ok: boolean | null; why: string }> {
   try {
-    return readAnswer(ask(p, PROMPT(question), [still], 120_000), p.name);
+    return readAnswer(await askAsync(p, PROMPT(question), [still], 120_000), p.name);
   } catch (e) {
     return { ok: null, why: `judge failed: ${short(e)}` };
   }
 }
 
-type Said = { ok: boolean; why?: string };
+type Said = { ok: boolean; why?: string; saw?: string };
 const isSaid = (v: unknown): v is Said => !!v && typeof v === "object" && typeof (v as Said).ok === "boolean";
 
 /** Read a verdict out of whatever the CLI printed. */
 function readAnswer(out: string, who: string): { ok: boolean | null; why: string } {
   const said = readJson(out, isSaid);
   if (!said) return { ok: null, why: `no usable answer from ${who}` };
-  return { ok: said.ok, why: (said.why ?? "").trim() || "(no reason given)" };
+  const why = (said.why ?? "").trim();
+  const saw = (said.saw ?? "").trim();
+  // Both, when they differ: what it saw is how you catch a wrong verdict.
+  return { ok: said.ok, why: [saw, why].filter(Boolean).join(" — ") || "(no reason given)" };
 }
 
 /** Exposed for the test: reading a verdict out of whatever a CLI printed is
     the part that silently turns a real answer into "could not answer". */
 export function __test_readAnswer(out: string) { return readAnswer(out, "test"); }
 
-export function verify(m: Manifest, outDir: string, log?: (l: string) => void, manifestFile?: string): Verdict {
+export async function verify(m: Manifest, outDir: string, log?: (l: string) => void, manifestFile?: string, concurrency = 4): Promise<Verdict> {
   const lines: string[] = [];
   const say = (l: string) => { lines.push(l); log?.(l); };
   const qs = questions(m, outDir);
@@ -146,17 +160,19 @@ export function verify(m: Manifest, outDir: string, log?: (l: string) => void, m
   }
 
   say(`judging ${qs.length} question(s) with ${judge}`);
-  const answers: Answer[] = [];
-  for (const q of qs) {
-    if (!q.still) {
-      answers.push({ scene: q.scene, question: q.question, ok: null, why: "no still for this scene", still: "" });
-      say(`FAIL  [${q.scene}] ${q.question}\n      no still for that scene — was it recorded?`);
-      continue;
-    }
-    const a = judgeWith(provider, q.still, q.question);
-    answers.push({ scene: q.scene, question: q.question, ok: a.ok, why: a.why, still: q.still });
-    const mark = a.ok === true ? "pass" : a.ok === false ? "FAIL" : "FAIL";
-    say(`${mark}  [${q.scene}] ${q.question}\n      ${a.why}${a.ok !== true ? `\n      look: ${path.relative(process.cwd(), q.still)}` : ""}`);
+  // A few at a time. Serially, a demo with thirty-four expectations took six
+  // minutes to answer — long enough that an agent skips it, which makes the
+  // check worthless however good it is.
+  const answers: Answer[] = await pool(qs, Math.max(1, concurrency), async (q): Promise<Answer> => {
+    if (!q.still) return { scene: q.scene, question: q.question, ok: null, why: "no still for that scene — was it recorded?", still: "" };
+    const a = await judgeWith(provider, q.still, q.question);
+    return { scene: q.scene, question: q.question, ok: a.ok, why: a.why, still: q.still };
+  });
+  // Printed in manifest order after the fact, so the report reads down the
+  // demo rather than in whatever order the answers came back.
+  for (const a of answers) {
+    const mark = a.ok === true ? "pass" : "FAIL";
+    say(`${mark}  [${a.scene}] ${a.question}\n      ${a.why}${a.ok !== true ? `\n      look: ${a.still ? path.relative(process.cwd(), a.still) : "(no still)"}` : ""}`);
   }
 
   // null counts as failure, deliberately: a question nobody could answer has

@@ -35,16 +35,16 @@ test("questions pair each expect with its own scene's end still", () => {
   assert.equal(stillFor(dir, "nope", 9), null);
 });
 
-test("a manifest with no expect verifies vacuously and says how to add one", () => {
+test("a manifest with no expect verifies vacuously and says how to add one", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-"));
-  const v = verify({ ...base, steps: [{ action: "scene", label: "a" }] } as unknown as Manifest, dir);
+  const v = await verify({ ...base, steps: [{ action: "scene", label: "a" }] } as unknown as Manifest, dir);
   assert.equal(v.ok, true);
   assert.match(v.lines.join("\n"), /expect/);
 });
 
-test("expectations with no take.json FAIL — a check that could not run did not pass", () => {
+test("expectations with no take.json FAIL — a check that could not run did not pass", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-"));
   const m = { ...base, steps: [{ action: "scene", label: "a", expect: "something" }] } as unknown as Manifest;
-  const v = verify(m, dir);
+  const v = await verify(m, dir);
   assert.equal(v.ok, false);
 });

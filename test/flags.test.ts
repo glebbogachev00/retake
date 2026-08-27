@@ -79,19 +79,19 @@ test("unflag removes by id or by the sentence", () => {
   assert.equal(readFlags(file).length, 0);
 });
 
-test("nothing flagged says so, and does not pretend to have checked", () => {
+test("nothing flagged says so, and does not pretend to have checked", async () => {
   const file = demo();
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "out-"));
-  const r = checkFlags(file, {} as Manifest, out);
+  const r = await checkFlags(file, {} as Manifest, out);
   assert.equal(r.checked.length, 0);
   assert.match(r.lines[0], /nothing flagged/);
 });
 
-test("flagged but never recorded is not a pass", () => {
+test("flagged but never recorded is not a pass", async () => {
   const file = demo();
   flag(file, { scene: "form", question: "q", expect: "a" });
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "out-"));
-  const r = checkFlags(file, {} as Manifest, out);
+  const r = await checkFlags(file, {} as Manifest, out);
   assert.equal(r.checked.length, 0);
   assert.match(r.lines[0], /has not been recorded/);
 });

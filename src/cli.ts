@@ -289,12 +289,12 @@ program
   .argument("<demo>", "demo name, or a path to its manifest")
   .option("-o, --out <dir>", "output root", "outputs")
   .option("--no-clips", "skip cutting the clips")
-  .action((demo: string, opts: { out: string; clips: boolean }) => {
+  .action(async (demo: string, opts: { out: string; clips: boolean }) => {
     const file = fs.existsSync(demo) ? path.resolve(demo) : path.resolve("demos", `${demo}.yaml`);
     if (!fs.existsSync(file)) throw new Error(`no ${path.relative(process.cwd(), file)}`);
     const { manifest } = loadManifest(file);
     const outDir = path.resolve(opts.out, manifest.name);
-    const r = checkFlags(file, manifest, outDir, { clips: opts.clips, log: say });
+    const r = await checkFlags(file, manifest, outDir, { clips: opts.clips, log: say });
     // Something flagged and still wrong is a failure; nothing flagged is not.
     if (r.checked.some((c) => c.ok !== true)) process.exitCode = 3;
   });
@@ -387,12 +387,12 @@ program
   .description("did it LOOK right — puts each scene's `expect` question to a vision model against that scene's still")
   .argument("<dir>", "an outputs/<name> dir containing take.json and stills/")
   .argument("[manifest]", "manifest to read the expectations from (default demos/<name>.yaml)")
-  .action((dir: string, manifestFile?: string) => {
+  .action(async (dir: string, manifestFile?: string) => {
     const outDir = path.resolve(dir);
     const file = manifestFile ?? path.join("demos", `${path.basename(outDir)}.yaml`);
     if (!fs.existsSync(file)) throw new Error(`no ${file} — pass the manifest path`);
     const { manifest } = loadManifest(file);
-    const v = verify(manifest, outDir, say, file);
+    const v = await verify(manifest, outDir, say, file);
     // 3, the same code dry and check already use for "this did not pass".
     if (!v.ok) process.exitCode = 3;
   });
