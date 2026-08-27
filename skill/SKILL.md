@@ -130,6 +130,18 @@ Three things about reading what it says:
 - **A clean sweep is a floor, not a ceiling.** A closed checklist cannot find
   what is not on it. It catches the ten things that go wrong in every app; it
   does not certify the frame.
+- **One pass is not reliable, and this is measured.** On a frame with a real
+  overlap on it, three consecutive sweeps missed it and a fourth found it. The
+  judge is not deterministic. So a frame that has already been looked at is
+  never asked about again — the answer is kept against the frame's contents,
+  and a re-sweep of an unchanged demo costs about a second instead of a minute
+  — and `--fresh` asks again and ADDS whatever it finds to what was already
+  known. Two extra passes on a real demo took its findings from nine frames to
+  eleven, including the one that mattered.
+
+  So: for a screen you actually care about, sweep it more than once. It is
+  nearly free after the first time, and it raises what you know rather than
+  rolling the dice again.
 
 And the ordinary caution still applies: `sweep` reads the pictures a run
 produced. If a scene was never recorded, there is no frame, and nothing was

@@ -2,6 +2,17 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.10.0",
+      "date": "2026-08-27",
+      "headline": "Checking a demo again is nearly free — and looking twice finds more",
+      "notes": [
+        "Checking every frame of a demo used to cost a minute or so every time, even when nothing had changed. Now an answer is kept against the frame itself, so re-checking a demo you have not re-recorded takes about a second. Change one screen and only that screen is looked at again.",
+        "And a thing worth knowing, because it was measured rather than assumed: looking once is not reliable. On a frame with a genuine problem on it, three checks in a row walked past it and a fourth caught it.",
+        "So looking again now adds to what is already known instead of replacing it. Two extra passes over a real recording took it from nine frames with something on them to eleven — including the one that mattered. Because repeat passes are nearly free, that is now the sensible thing to do on any screen you care about.",
+        "None of it is stored anywhere you have to manage, and none of it runs while you are recording."
+      ]
+    },
+    {
       "version": "0.9.1",
       "date": "2026-08-27",
       "headline": "The checks are four times faster, and they say what they saw",

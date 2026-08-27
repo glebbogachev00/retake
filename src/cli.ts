@@ -338,12 +338,13 @@ program
   .argument("[manifest]", "manifest (default demos/<name>.yaml)")
   .option("--all", "the middle of each scene too, not just its last moment", false)
   .option("--concurrency <n>", "how many frames to look at at once", "4")
-  .action(async (dir: string, manifestFile: string | undefined, opts: { all: boolean; concurrency: string }) => {
+  .option("--fresh", "ask about every frame again, even the ones that have not changed", false)
+  .action(async (dir: string, manifestFile: string | undefined, opts: { all: boolean; concurrency: string; fresh: boolean }) => {
     const outDir = path.resolve(dir);
     const file = manifestFile ?? path.join("demos", `${path.basename(outDir)}.yaml`);
     if (!fs.existsSync(file)) throw new Error(`no ${file} — pass the manifest path`);
     // No exit code, deliberately. Some of these are judgement; `verify` gates.
-    await sweep(loadManifest(file).manifest, outDir, say, { all: opts.all, concurrency: Number(opts.concurrency) || 4 });
+    await sweep(loadManifest(file).manifest, outDir, say, { all: opts.all, concurrency: Number(opts.concurrency) || 4, fresh: opts.fresh });
   });
 
 program

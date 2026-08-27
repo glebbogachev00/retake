@@ -28,6 +28,7 @@ import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
 import { noteCheck } from "./checked.js";
+import { memo } from "./memo.js";
 
 /**
  * The list. Closed on purpose — no "anything else that looks wrong" slot,
@@ -49,7 +50,7 @@ export const LOOK_FOR = [
 
 export type Issue = { kind: string; what: string; where: string };
 export type Frame = { scene: string; still: string; issues: Issue[]; error?: string };
-export type Sweep = { frames: Frame[]; judge: string; lines: string[]; looked: number };
+export type Sweep = { frames: Frame[]; judge: string; lines: string[]; looked: number; recalled: number };
 
 const PROMPT = [
   "Look at this one screenshot of a web app and inspect it as a whole.",
@@ -92,7 +93,7 @@ export async function sweep(
   m: Manifest,
   outDir: string,
   log?: (l: string) => void,
-  opts: { all?: boolean; concurrency?: number } = {},
+  opts: { all?: boolean; concurrency?: number; fresh?: boolean } = {},
 ): Promise<Sweep> {
   const lines: string[] = [];
   const say = (l: string) => { lines.push(l); log?.(l); };
@@ -101,26 +102,33 @@ export async function sweep(
   try { take = JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take; } catch { /* not recorded */ }
   if (!take) {
     say("no take.json — record it first; sweep reads the frames a run produced.");
-    return { frames: [], judge: "none", lines, looked: 0 };
+    return { frames: [], judge: "none", lines, looked: 0, recalled: 0 };
   }
 
   const shots = framesOf(outDir, take, opts.all === true);
   if (!shots.length) {
     say("no stills in this folder — there is nothing to look at.");
-    return { frames: [], judge: "none", lines, looked: 0 };
+    return { frames: [], judge: "none", lines, looked: 0, recalled: 0 };
   }
 
   const { provider, name: judge, why: noJudge } = pickJudge();
   if (!provider) {
     say(`could not look: ${noJudge}`);
-    return { frames: [], judge, lines, looked: 0 };
+    return { frames: [], judge, lines, looked: 0, recalled: 0 };
   }
 
   // Every frame. Never a sample — sampling is how the method fails in the
   // first place, and the cost is honest: one question per frame.
   say(`looking at all ${shots.length} frame${shots.length === 1 ? "" : "s"} of ${m.name}, one at a time, with ${judge}`);
 
+  // Frames that have not changed since they were last looked at are answered
+  // from what is already known. A re-record usually moves one screen, not
+  // thirty, and asking about the other twenty-nine again buys nothing.
+  const known = memo<Issue[]>(outDir, { reask: opts.fresh === true });
+  let recalled = 0;
   const frames: Frame[] = await pool<{ scene: string; still: string }, Frame>(shots, Math.max(1, opts.concurrency ?? 4), async (shot): Promise<Frame> => {
+    const seen = known.recall(shot.still, PROMPT);
+    if (seen) { recalled++; return { ...shot, issues: seen }; }
     try {
       const raw = readJson(await askAsync(provider, PROMPT, [shot.still], 120_000), isRaw);
       if (!raw) return { ...shot, issues: [], error: "no usable answer from the judge" };
@@ -130,11 +138,19 @@ export async function sweep(
         if (!o?.what) continue;
         issues.push({ kind: (o.kind ?? "").toString().slice(0, 20) || "—", what: o.what.toString(), where: (o.where ?? "").toString() });
       }
-      return { ...shot, issues };
+      // Union with anything a previous look found on this same frame — see
+      // memo.remember. Two passes of one image do not return the same list.
+      known.remember(shot.still, PROMPT, issues, (was, now) => {
+        const seenAlready = new Set(was.map((i) => `${i.kind}|${i.what}`));
+        return [...was, ...now.filter((i) => !seenAlready.has(`${i.kind}|${i.what}`))];
+      });
+      return { ...shot, issues: known.all(shot.still, PROMPT) ?? issues };
     } catch (e) {
+      // Never remembered: a failure is not an answer about the frame.
       return { ...shot, issues: [], error: short(e) };
     }
   });
+  known.flush();
 
   const hit = frames.filter((f) => f.issues.length);
   const failed = frames.filter((f) => f.error);
@@ -162,5 +178,6 @@ export async function sweep(
   });
   say("");
   say("These are things to look at, not verdicts — open the frame and decide. A closed checklist cannot find what is not on it, so this is a floor, not a ceiling.");
-  return { frames, judge, lines, looked: frames.length - failed.length };
+  if (recalled) say(`(${recalled} of ${frames.length} frames had not changed since they were last looked at, and were not asked about again — \`--fresh\` asks anyway.)`);
+  return { frames, judge, lines, looked: frames.length - failed.length, recalled };
 }
