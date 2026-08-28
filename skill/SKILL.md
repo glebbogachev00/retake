@@ -134,6 +134,13 @@ Three things about reading what it says:
 - **A clean sweep is a floor, not a ceiling.** A closed checklist cannot find
   what is not on it. It catches the ten things that go wrong in every app; it
   does not certify the frame.
+- **Say what it is worth, if anybody has measured.** `calibrate` seeds each
+  defect on the checklist into a real recording of the app and counts what
+  `sweep` finds. On Retake's own guide page: seven or eight of eight found,
+  and no false positives on the control across repeated runs. Read the report
+  before telling somebody how much a finding is worth, and repeat its limits
+  — the seeds were written by somebody who had read the checklist, so recall
+  is an upper bound. Never run it unasked: nine takes, about ten minutes.
 - **One pass is not reliable, and this is measured.** On a frame with a real
   overlap on it, three consecutive sweeps missed it and a fourth found it. The
   judge is not deterministic. So a frame that has already been looked at is
@@ -219,6 +226,7 @@ These are separate questions. Running the wrong one and reporting it as
 | What happens just off the happy path? | `destroy` | minutes | flags, you judge |
 | Did the things they flagged get fixed? | `fixed` | ~13s each | yes — exit 3 |
 | What is this product FOR? | `intent` | instant | context, not a check |
+| How much is a `sweep` finding worth here? | `calibrate` | ~10 min, nine takes | a measurement, not a check |
 | What keeps going wrong across every demo? | `notes` | instant | no |
 
 `dry` really does click and fill — at full speed, with short timeouts, no

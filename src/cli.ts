@@ -11,6 +11,7 @@
  *   retake render outputs/x                       re-render from the existing take (--preset to switch)
  *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
  *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
+ *   retake calibrate demos/x.yaml               how much to trust `sweep` — seed defects, count what it finds
  *   retake intent                                 what this product IS — context every visual check needs
  *   retake sweep outputs/x                        look at every frame as a whole — what nobody thought to ask about
  *   retake sense outputs/x                        does the run ADD UP — what went in vs what came out
@@ -44,6 +45,7 @@ import { notes } from "./ext/notes.js";
 import { sense } from "./ext/sense.js";
 import { sweep } from "./ext/sweep.js";
 import { TEMPLATE, readIntent, writeIntent } from "./ext/intent.js";
+import { landed, planCalibration, report, type Result } from "./ext/calibrate.js";
 import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "./ext/heal.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
@@ -341,6 +343,43 @@ program
   });
 
 
+
+
+program
+  .command("calibrate")
+  .description("how much to trust `sweep` — seeds a known defect into a working demo, records each one, and counts what it finds")
+  .argument("<manifest>", "a demo whose app is running")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("--only <names>", "just these defects, comma-separated")
+  .option("--plan", "write the variants and stop", false)
+  .action(async (file: string, opts: { out: string; only?: string; plan: boolean }) => {
+    const loaded = loadManifest(file);
+    const outRoot = path.resolve(opts.out);
+    const plan = planCalibration(loaded.manifest, outRoot, { only: opts.only?.split(",").map((x) => x.trim()).filter(Boolean) });
+    say(`${plan.variants.length} variants in ${path.relative(process.cwd(), plan.root)}/ — one control, ${plan.variants.length - 1} seeded`);
+    if (opts.plan) return;
+
+    const results: Result[] = [];
+    for (const v of plan.variants) {
+      const dir = path.join(plan.root, v.name);
+      say(`\n${v.name}${v.defect ? ` — ${v.defect.looks}` : ""}`);
+      try {
+        const take = await record(v.manifest, { outDir: dir, manifestDir: loaded.dir, headed: false, log: () => {} });
+        await render(v.manifest, take, dir, { log: () => {}, noMaster: true });
+        const s = await sweep(v.manifest, dir, () => {}, { demosDir: path.resolve("demos") });
+        const took = !v.defect || landed(path.join(plan.root, "control"), dir);
+        const kinds = s.frames.flatMap((f) => f.issues.map((i) => i.kind));
+        const found = !v.defect ? false : kinds.some((k) => k.toUpperCase().startsWith(v.defect!.expect.split(" ")[0]));
+        results.push({ variant: v.name, defect: v.defect, kinds, found: found && took, seeded: took, other: v.defect ? kinds.filter((k) => !k.toUpperCase().startsWith(v.defect!.expect.split(" ")[0])).length : 0 });
+        say(`  → ${kinds.join(", ") || "nothing"}${v.defect && !took ? "   (the seed did not land — nothing was asked of the check)" : ""}`);
+      } catch (e) {
+        results.push({ variant: v.name, defect: v.defect, kinds: [], found: false, seeded: true, other: 0, error: String((e as Error).message).split("\n")[0].slice(0, 90) });
+        say(`  → could not run: ${String((e as Error).message).split("\n")[0].slice(0, 90)}`);
+      }
+    }
+    for (const l of report(results)) say(l);
+    fs.writeFileSync(path.join(plan.root, "report.json"), JSON.stringify({ at: new Date().toISOString(), demo: loaded.manifest.name, results }, null, 2) + "\n");
+  });
 
 program
   .command("intent")

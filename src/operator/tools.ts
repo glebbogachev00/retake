@@ -29,6 +29,7 @@ import { notes } from "../ext/notes.js";
 import { sense } from "../ext/sense.js";
 import { sweep } from "../ext/sweep.js";
 import { NO_INTENT_NOTE, TEMPLATE, readIntent, writeIntent } from "../ext/intent.js";
+import { report as describeCalibration } from "../ext/calibrate.js";
 import { checkFlags, flag, unflag } from "../ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "../ext/heal.js";
 import { describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "../ext/destroy.js";
@@ -649,6 +650,20 @@ server.registerTool("intent", {
   const f = writeIntent(DEMOS, note, demo);
   await tell(`Noted what ${demo ?? "this product"} is for.`);
   return text(`saved to ${path.relative(ROOT, f)} — every visual check reads it from now on.`);
+});
+
+
+server.registerTool("calibrate", {
+  description: "HOW MUCH TO TRUST `sweep`. Reads the last measurement: a working demo is recorded once per known visual defect — clipped text, overlap, unreadable contrast, content off the edge, a doubled element, a stuck spinner, broken media, a dev badge — plus a control where nothing is wrong. Recall is how many seeded faults were found; false positives are findings on the control. Read this BEFORE telling somebody how much a sweep result is worth, and quote the numbers rather than your impression. Reading is instant. `run: true` measures again, which records nine full takes and takes about ten minutes and needs the app running — do not do that without being asked. Its limits are printed with it and should be repeated: the seeds were written by somebody who has read the checklist, so recall is an upper bound, and injected faults are cleaner than real ones.",
+  inputSchema: { name: z.string().describe("the demo to read (or measure) the calibration of"), run: z.boolean().optional() },
+  annotations: READ_ONLY,
+}, async ({ name, run }) => {
+  if (!safe(name)) return text(`no demo "${name}"`);
+  const file = path.join(OUT, ".calibrate", name, "report.json");
+  if (run === true) return text(`Measuring takes about ten minutes and records nine takes, so it is not run from here. Ask the person to run:\n\n  retake calibrate demos/${name}.yaml`);
+  if (!fs.existsSync(file)) return text(`${name} has never been calibrated, so there is no measured answer to how much its sweep results are worth. \`retake calibrate demos/${name}.yaml\` produces one.`);
+  const r = JSON.parse(fs.readFileSync(file, "utf8")) as { at: string; results: Parameters<typeof describeCalibration>[0] };
+  return text([...describeCalibration(r.results), "", `measured ${r.at}`].join("\n"));
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {

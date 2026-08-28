@@ -230,6 +230,14 @@ Most real demos start behind a sign-in. The agent never sees a password:
   whatever it can work out — which, with no product note, means folders called
   `localhost:3200`. The first heading of a product note names that folder.
   Writing one is part of setting a demo up, not an afterthought.
+- `retake calibrate demos/<name>.yaml` — how much `sweep` is worth on this app.
+  Records the demo once per known visual defect, seeded for real, plus a
+  control where nothing is wrong, then reports recall and false positives.
+  Expensive: nine takes, about ten minutes, needs the app running. The report
+  it leaves is cheap to read, and **you should read it before telling anybody
+  how much a sweep finding is worth.** Its stated limits travel with it: the
+  seeds were written by somebody who has read the checklist, so recall is an
+  upper bound.
 - `retake intent` — what the product IS, in the builder's words: what it does,
   who uses it, and what about it is deliberate. Every visual check reads it.
   Without it they judge the app as a generic web page — measured on a real
