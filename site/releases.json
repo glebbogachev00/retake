@@ -2,6 +2,18 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.12.3",
+      "date": "2026-08-28",
+      "headline": "A finished recording now looks finished",
+      "notes": [
+        "Fixed: a completed recording was quiet grey text while a failed optional check was a bold red mark — so a demo that recorded perfectly read as broken. Every recording now says what it is, next to its name: complete, partial, brisk, or steps failed.",
+        "The optional checks have moved into their own area, headed and explained. They are things you can run against a finished recording, and the window now looks like that instead of like four missing parts.",
+        "On a phone: each check gets its own line instead of breaking into fragments, the buttons along the top stop wrapping inside themselves, and Use current frame is a proper full-width button rather than three wrapped lines.",
+        "On the website: the button that says it copies the setup prompt now copies it. It used to scroll you five thousand pixels down the page to a different button that did the copying.",
+        "And two sentences on that page have been corrected. They claimed watching a recording checks everything at once. Retake's own evidence says otherwise — one pass can miss something a second pass finds — so the page now says what is true: a recording puts the whole screen in front of you, the optional checks surface things nobody wrote down, and you decide what matters."
+      ]
+    },
+    {
       "version": "0.12.2",
       "date": "2026-08-28",
       "headline": "A security fix, and the starter demo now passes its own check",

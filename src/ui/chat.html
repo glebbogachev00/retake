@@ -17,12 +17,21 @@
   button, input { font:inherit; color:inherit; }
   .app { min-height:100%; display:flex; flex-direction:column; }
   .top { display:flex; align-items:center; gap:10px; padding:0 24px; height:56px; border-bottom:1px solid var(--rule); background:var(--paper); }
+  /* A phone has room for the pills or for the padding, not both. */
+  @media (max-width: 700px) {
+    .top { padding:0 12px; gap:6px; overflow-x:auto; scrollbar-width:none; }
+    .top::-webkit-scrollbar { display:none; }
+    .chip { padding:0 11px; font-size:12.5px; }
+  }
   .mark { width:22px; height:22px; border-radius:7px; background:var(--accent); position:relative; flex:none; }
   .mark i { position:absolute; left:5.5px; height:2.5px; border-radius:2px; background:#eceee9; }
   .mark i:nth-child(1){top:4px;width:4px;opacity:.55} .mark i:nth-child(2){top:8px;width:7px;opacity:.8} .mark i:nth-child(3){top:12px;width:11px;background:var(--amber)} .mark i:nth-child(4){top:16px;width:7px;opacity:.8}
   .top h1 { font-size:15px; font-weight:600; margin:0; }
   .controls { position:relative; display:flex; align-items:center; gap:8px; margin-left:8px; }
-  .chip { border:1px solid var(--rule2); background:#fff; border-radius:999px; height:32px; padding:0 14px; display:inline-flex; align-items:center; font-size:13px; font-weight:500; color:var(--ink); cursor:pointer; transition:border-color .12s; }
+  /* `white-space: nowrap` because these are pills: without it "How it works"
+     and "What's new" wrapped INSIDE their own borders on a phone, which reads
+     as a broken control rather than a narrow screen. */
+  .chip { border:1px solid var(--rule2); background:#fff; border-radius:999px; height:32px; padding:0 14px; display:inline-flex; align-items:center; white-space:nowrap; flex:none; font-size:13px; font-weight:500; color:var(--ink); cursor:pointer; transition:border-color .12s; }
   .chip:hover { border-color:var(--ink); }
   .pop { position:absolute; left:0; top:38px; z-index:40; background:#fff; border:1px solid var(--rule2); border-radius:14px; box-shadow:0 12px 34px rgba(24,28,24,.13); padding:8px; width:290px; display:none; }
   .pop.show { display:block; }
@@ -64,6 +73,13 @@
   .under { display:flex; align-items:baseline; gap:8px; margin-top:16px; flex-wrap:wrap; }
   .vtitle { font-size:15px; font-weight:600; color:var(--ink); }
   .vmeta { font-size:13px; color:var(--muted); }
+  /* The recording's own state, in its own colour. A finished take was quiet
+     grey metadata while a failed OPTIONAL check was a red mark — so a demo
+     that recorded perfectly read as broken. */
+  .vstate { font-size:12px; font-weight:500; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+  .vstate.done { color:var(--ok); background:rgba(47,93,63,.10); }
+  .vstate.part { color:var(--amber); background:rgba(232,176,75,.16); }
+  .vstate.bad  { color:var(--bad); background:rgba(162,59,44,.10); }
   .under a, .under button { color:var(--ink); text-decoration:none; border:1px solid var(--rule2); background:#fff; border-radius:999px; padding:0 14px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; align-items:center; transition:border-color .12s; }
   .under a:hover, .under button:hover { border-color:var(--ink); }
   /* A native select with its arrow removed leaves lopsided padding; make it
@@ -72,12 +88,31 @@
   .under a, .under button { height:32px; box-sizing:border-box; align-self:center; }
   .under select:hover { border-color:var(--ink); }
   .frames { margin-top:16px; border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 16px; }
+  /* On a phone the heading, its hint and "Use current frame" fought for one
+     line and the button wrapped to three. Stack them instead. */
+  @media (max-width: 700px) {
+    .frames .fhead { flex-wrap:wrap; row-gap:8px; }
+    .frames .fhead .sp { display:none; }
+    .frames .fhead .chip { order:3; width:100%; justify-content:center; }
+    .frames .fhead .hint { order:2; flex-basis:100%; }
+  }
   /* What you flagged, and whether it is still wrong. Shown only when there is
      something flagged — an empty one would be clutter with a heading on it. */
   /* One line: what has actually been looked at, and whether the answer is
      about the recording that is there now. Never a panel — the question is
      "did anyone check this", and that is one line's worth of answer. */
-  .checked { margin-top:10px; font-size:12.5px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:baseline; }
+  /* Its own area, named. Loose grey dashes under the video read as parts of
+     the recording that were missing; they are optional services you can run. */
+  .review { margin-top:14px; border:1px solid var(--rule); border-radius:12px; padding:10px 14px 12px; background:var(--card); }
+  .rhead { font-size:11.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  .rhint { text-transform:none; letter-spacing:0; font-size:12px; opacity:.85; }
+  .checked { margin-top:8px; font-size:12.5px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:baseline; }
+  /* One per row on a phone: four of these side by side break into fragments
+     that read as unrelated words. */
+  @media (max-width: 700px) {
+    .checked { display:grid; grid-template-columns:1fr; gap:6px; }
+    .checked .c { justify-content:flex-start; }
+  }
   .checked .c { display:inline-flex; gap:5px; align-items:baseline; }
   .checked .c b { font-weight:500; color:var(--ink); }
   .checked .c.none b { color:var(--muted); }
@@ -238,6 +273,7 @@
       <video id="vid" controls playsinline></video>
       <div class="under">
         <span class="vtitle" id="vidName"></span>
+        <span class="vstate" id="vidState"></span>
         <span class="vmeta" id="vidMeta"></span>
         <span class="sp"></span>
         <select id="vidSpeed" title="Playback speed — preview now, and Download gets this speed">
@@ -256,7 +292,10 @@
         </div>
         <div id="flagRows"></div>
       </div>
-      <div class="checked" id="checked"></div>
+      <div class="review" id="review" style="display:none">
+        <div class="rhead">Optional review<span class="rhint">checks you can run against this recording — it is complete without them</span></div>
+        <div class="checked" id="checked"></div>
+      </div>
       <div class="frames">
         <div class="fhead">
           <span class="lab">Poster & frames</span>
@@ -430,6 +469,12 @@ async function pin(name) {
   const t = d.take;
   const failed = (t.timeline || []).find((e) => e.ok === false);
   $('vidName').textContent = name;
+  // What the RECORDING did — separate from anything optional that looked at it.
+  const stateEl = $('vidState');
+  if (t.brisk) { stateEl.className = 'vstate part'; stateEl.textContent = 'Brisk take'; stateEl.title = 'All the steps, none of the pacing. For iterating, not for keeping.'; }
+  else if (t.partial) { stateEl.className = 'vstate part'; stateEl.textContent = 'Partial'; stateEl.title = t.partial; }
+  else if (t.ok === false) { stateEl.className = 'vstate bad'; stateEl.textContent = 'Steps failed'; stateEl.title = 'Some steps did not pass — see the proof log.'; }
+  else { stateEl.className = 'vstate done'; stateEl.textContent = 'Recording complete'; stateEl.title = 'The take is sound: every step passed and the artifacts check out.'; }
   $('vidMeta').textContent = `${(t.duration - t.trimBefore).toFixed(0)}s · ${t.ok ? 'all steps passed' : failed ? `stopped at step ${failed.index}: ${failed.summary}` : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
   $('vidMeta').title = failed?.screen ? 'On screen at that moment: ' + failed.screen : '';
   $('vidDl').href = `/out/${name}/demo.mp4${q}`; $('vidDl').setAttribute('download', name + '.mp4');
@@ -484,7 +529,8 @@ function drawChecked(checks, take) {
   const now = take && take.finishedAt;
   // Labelled, because four bare dashes read as four things missing. They are
   // optional checks against a finished recording, not parts of it.
-  box.innerHTML = `<span class="c none" title="These are optional checks you can run against this take. The recording is complete without them.">checked:</span>` + CHECKS.map(([key, label, title]) => {
+  $('review').style.display = '';
+  box.innerHTML = CHECKS.map(([key, label, title]) => {
     const r = checks && checks[key];
     if (!r) return `<span class="c none" title="${esc(title)} — not run on this take. Optional; the recording is complete without it.">${label} <b>—</b></span>`;
     const stale = !now || r.takeFinishedAt !== now;

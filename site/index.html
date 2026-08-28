@@ -371,7 +371,7 @@ section > *:not(.shead) { grid-column: 1; }
     <h1>Demos that<br><em>re-record themselves.</em></h1>
     <p class="lede">A demo is a small file your coding agent writes. When the UI changes, change one line and run it again — the client walkthrough on Tuesday and the launch video on Friday, from the same current take.</p>
     <div class="actions">
-      <a class="btn dark" href="#start">Copy the setup prompt</a>
+      <a class="btn dark" href="#start" id="heroCopy">Copy the setup prompt</a>
       <a class="btn light" href="#proof">Watch the 14-second demo</a>
     </div>
     <p class="flow">one prompt <span>→</span> a YAML demo <span>→</span> dry-run checked <span>→</span> recorded <span>→</span> rerun on the next release</p>
@@ -472,7 +472,7 @@ section > *:not(.shead) { grid-column: 1; }
   <section id="found">
     <div class="shead">
       <h2>The bugs a test suite cannot see</h2>
-      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. Watching checks all of them at once.</p>
+      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. A recording puts the whole screen in front of you.</p>
     </div>
     <div class="found">
       <h3>One recording, made for a launch video. Nobody was looking for these.</h3>
@@ -483,7 +483,7 @@ section > *:not(.shead) { grid-column: 1; }
         <li>A <b>squashed logo</b>, on a page nobody had opened in months.</li>
         <li>An email subject line with a <b>machine timestamp</b> in it.</li>
       </ul>
-      <p class="tail">A test can only check what somebody thought to check. Watching catches the rest — and because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
+      <p class="tail">A test can only check what somebody thought to check. A recording shows the rest, and the optional checks surface things nobody wrote down — you decide what matters. Because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
     </div>
   </section>
   <div class="movement" data-move="who">
@@ -597,6 +597,30 @@ const CANDIDATES = [
     '</div>'
   )).join('');
 })();
+
+// The hero button said Copy and only scrolled — five thousand pixels down to
+// a second Copy button that did the real thing. A button that names an action
+// has to perform it.
+const hero = document.getElementById('heroCopy');
+if (hero) hero.onclick = async (ev) => {
+  const el = document.getElementById('pasteline');
+  if (!el) return;                       // let the link do its ordinary thing
+  // Stop the jump BEFORE awaiting anything: by the time a promise resolves the
+  // browser has already followed the anchor, and the visitor has lost their
+  // place for a button that was supposed to copy something.
+  ev.preventDefault();
+  const text = el.textContent.replace(/^“|”$/g, '');
+  try {
+    await navigator.clipboard.writeText(text);
+    const was = hero.textContent;
+    hero.textContent = 'Copied — paste it to your agent';
+    setTimeout(() => (hero.textContent = was), 2200);
+  } catch {
+    // No clipboard permission — take them to the prompt and its own button,
+    // which is what the link did before and still works.
+    document.getElementById('start')?.scrollIntoView({ behavior: 'smooth' });
+  }
+};
 
 for (const b of document.querySelectorAll('.copybtn')) b.onclick = async () => {
   const t = document.getElementById(b.dataset.copy).textContent.replace(/^“|”$/g, '');
