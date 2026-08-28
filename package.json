@@ -49,7 +49,7 @@
     "prepublishOnly": "npm run typecheck && npm test",
     "retake": "tsx src/cli.ts",
     "ui": "tsx src/cli.ts ui",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {

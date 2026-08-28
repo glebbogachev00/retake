@@ -141,7 +141,11 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     // failures that are really a race.
     await gateOnApp(page, m, shotDir);
     layoutWidth = await page.evaluate(() => document.documentElement.clientWidth).catch(() => null);
-    for (const s of [...(m.auth?.setup ?? []), ...m.setup]) await run(s, true);
+    // Exactly what the recorder does: sign-in steps run only when there is no
+    // fresh session to reuse. Running them unconditionally made `dry` sign in
+    // again every time — slower than it needed to be, and a different sequence
+    // from the one it is supposed to be predicting.
+    for (const s of [...(auth.fresh ? [] : (m.auth?.setup ?? [])), ...m.setup]) await run(s, true);
     for (const [i, s] of m.steps.entries()) await run(s, false, i);
   } finally {
     await context.close().catch(() => {});

@@ -17,3 +17,19 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: node dist/cli.js validate demos/example.yaml
+      # The package is an operational file too: `retake init` copies the
+      # template out of it, and the template was once listed in package.json
+      # and absent from the repository — so a fresh install produced a broken
+      # workspace and nothing said so.
+      - name: the package contains what it promises
+        run: |
+          npm pack --dry-run 2>&1 | tee /tmp/pack.txt
+          for f in demos/example.yaml skill/SKILL.md AGENTS.md; do
+            grep -q "$f" /tmp/pack.txt || { echo "missing from the tarball: $f"; exit 1; }
+          done
+      - name: retake init makes a working workspace
+        run: |
+          d=$(mktemp -d); cd "$d"
+          node "$GITHUB_WORKSPACE/dist/cli.js" init
+          test -f demos/example.yaml
+          node "$GITHUB_WORKSPACE/dist/cli.js" validate demos/example.yaml

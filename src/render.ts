@@ -755,10 +755,16 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
       // `-i` decodes sequentially to every timestamp and is far slower (it
       // turned 3s of stills into 18s — measured, then reverted). The launches
       // are independent, so they run at once instead of in a queue.
+      // Bounded. `Promise.all` over the shots launched one ffmpeg per scene
+      // all at once: a sixty-five scene demo started sixty-five decoders on a
+      // laptop that was already recording something. Each launch is cheap and
+      // independent, so a small pool keeps the parallelism that made this fast
+      // without letting the count follow the manifest.
       const bin = ffmpegBin();
-      await Promise.all(shots.map((s) => new Promise<void>((done) => {
+      const grab = (s: { at: number; file: string }) => new Promise<void>((done) => {
         execFile(bin, ["-hide_banner", "-loglevel", "error", "-y", "-ss", s.at.toFixed(2), "-i", mp4, "-frames:v", "1", s.file], () => done());
-      })));
+      });
+      await inBatches(shots, STILL_WORKERS, grab);
       stills = stills.filter((f) => fs.existsSync(f));
     }
     if (sc.length) mark(`stills ×${sc.length}`);
@@ -844,6 +850,35 @@ export function makeGif(outDir: string, width = 900, fps = 18, log?: (l: string)
 export type Check = { ok: boolean; lines: string[] };
 
 /** Did the folder come out post-worthy? Pass/fail per fact, no opinions. */
+/**
+ * How many frame grabs run at once.
+ *
+ * Measured on a real 65-scene demo, on an eight-core machine:
+ *
+ *     65 at once (what it did before)  13.1s
+ *     16                                6.9s
+ *      8                                5.5s
+ *      4                                6.1s
+ *      2                                9.8s
+ *
+ * So the unbounded version was not merely reckless, it was two and a half
+ * times SLOWER — sixty-five decoders fighting over one file and eight cores.
+ * The floor is at the core count, which is where this sits.
+ */
+export const STILL_WORKERS = 8;
+
+/** Run `fn` over everything, at most `limit` at a time, in order. */
+export async function inBatches<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      await fn(items[i]);
+    }
+  }));
+}
+
 export function check(outDir: string, m?: Manifest): Check {
   const lines: string[] = [];
   let ok = true;
