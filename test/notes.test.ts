@@ -84,6 +84,18 @@ test("re-recorded with no expect anywhere → the note the watcher exists for, w
   assert.doesNotMatch(ns[0].policy!, /not finished until|called finished/);
 });
 
+test("a demo with SOME expects is not called unchecked", () => {
+  // It said "nothing has ever checked how it looks" about a demo carrying
+  // seventeen expectations that verify had just answered.
+  const rt = root();
+  run(rt, "mixed", {}, { steps: [
+    { action: "scene", label: "a", expect: "something" },
+    { action: "scene", label: "b" },
+    { action: "scene", label: "c" },
+  ] }, 2);
+  assert.doesNotMatch(flat(rt), /no `expect:` on any scene/);
+});
+
 test("scenes that DO carry expect are silent", () => {
   const rt = root();
   run(rt, "checked", {}, { steps: [{ action: "scene", label: "a", expect: "a board" }, { action: "scene", label: "b", expect: "two items" }] }, 2);

@@ -63,10 +63,19 @@ function readRun(dir: string): Run | null {
   return { name, dir, take, used, priors, when, checks: readChecks(dir) };
 }
 
-/** Every scene label in a used manifest that carries no `expect:`. */
-function scenesWithoutExpect(used: Record<string, unknown> | null): number {
+/**
+ * How many scenes carry an `expect:`, and how many do not.
+ *
+ * The note below used to fire on any demo with two bare scenes and say
+ * "nothing has ever checked how it looks". It said that about a demo carrying
+ * seventeen expectations that `verify` had just answered thirty-nine questions
+ * from. A watcher that says something plainly untrue about the workspace it is
+ * watching is worse than one that says nothing.
+ */
+function expectCounts(used: Record<string, unknown> | null): { with: number; without: number } {
   const steps = (used?.steps as { action?: string; expect?: unknown }[] | undefined) ?? [];
-  return steps.filter((s) => s.action === "scene" && !s.expect).length;
+  const scenes = steps.filter((s) => s.action === "scene");
+  return { with: scenes.filter((s) => s.expect).length, without: scenes.filter((s) => !s.expect).length };
 }
 
 /** The selector a failed step was reaching for, when it named one. */
@@ -180,7 +189,9 @@ export function collect(root: string, sinceDays = 14): { runs: Run[]; notes: Not
   // for: a demo recorded repeatedly with no `expect:` anywhere is one nobody
   // is verifying, and every visual bug this project has shipped got through
   // exactly that gap.
-  const unchecked = runs.filter((r) => r.priors >= 1 && scenesWithoutExpect(r.used) >= 2).map((r) => r.name);
+  // Only when there is not a single expectation anywhere: a demo with some
+  // is a demo somebody is already checking.
+  const unchecked = runs.filter((r) => r.priors >= 1 && expectCounts(r.used).with === 0 && expectCounts(r.used).without >= 2).map((r) => r.name);
   add({
     kind: "habit",
     demos: unchecked,

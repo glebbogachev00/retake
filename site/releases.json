@@ -2,6 +2,15 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.13.1",
+      "date": "2026-08-28",
+      "headline": "The help page explains the checks, and the watcher stops saying something untrue",
+      "notes": [
+        "The How it works page inside Retake never mentioned any of the checks. It now explains them in a paragraph each, and says plainly that a recording is finished when it records — everything else is optional and runs afterwards on a take you already have.",
+        "Fixed: the workspace summary told you a demo had never been checked when that demo carried seventeen written expectations, all of which had just been answered. It only says that now when there is genuinely not one."
+      ]
+    },
+    {
       "version": "0.13.0",
       "date": "2026-08-28",
       "headline": "You can now measure how much the picture checks are worth",
