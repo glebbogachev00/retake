@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import { createHash } from "node:crypto";
+import { beginProgress, setPhase } from "./progress.js";
 import path from "node:path";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import YAML from "yaml";
@@ -407,6 +408,9 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // The caller (cli run) holds the folder lock across record + render; if it
   // did not, take it here for the recording at least.
   const ownLock = !opts.locked && acquireLock(opts.outDir);
+  // Where this run is, on disk, for anything that wants to watch — including
+  // a person who started it from a terminal and a window that was never told.
+  beginProgress(opts.outDir, m.name);
 
   // Playwright writes its in-progress .webm to a private per-run dir, never to
   // the shared output dir, so nothing else can delete it mid-take.
@@ -415,6 +419,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   log(`preset ${q.name} · canvas ${q.width}×${q.height} · viewport ${q.viewport.width}×${q.viewport.height} @ ${q.fps}fps · page scale ${q.scale}×`);
 
   if (!opts.skipSeed) {
+    setPhase(opts.outDir, { phase: "seeding", label: "putting the app in a known state" });
     if (m.lock) releaseNamed = await acquireNamedLock(path.dirname(opts.outDir), m.lock, log);
     for (const s of m.seed) await runFileOrCommandSeed(s, opts.manifestDir, log);
   }
@@ -519,6 +524,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     layoutWidth = await page.evaluate(() => document.documentElement.clientWidth).catch(() => undefined);
     contentWidth = Math.round((q.viewport.width) / q.scale);
     if (!opts.skipSeed) {
+    setPhase(opts.outDir, { phase: "seeding", label: "putting the app in a known state" });
       for (const s of m.seed) {
         if (s.kind === "evaluate") await runEvaluateSeed(page, s, opts.manifestDir, log);
       }
@@ -656,6 +662,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
       log(`[${String(i).padStart(2, "0")}] ${entry.summary}${entry.camera ? ` · camera ${entry.camera.zoom}× on ${entry.camera.focus}` : ""}`);
       lastStepAt = Date.now();
       opts.onProgress?.({ phase: "recording", step: i + 1, total: m.steps.length, label: entry.summary });
+      setPhase(opts.outDir, { phase: "recording", step: i + 1, of: m.steps.length, label: entry.summary });
       // A resume point on disk, so a take that dies is not a take lost. It
       // survives a kill because it is written as it goes, not at the end —
       // and `--from <that scene>` re-records only what came after it.

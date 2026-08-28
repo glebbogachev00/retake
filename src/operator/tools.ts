@@ -42,6 +42,17 @@ const DEMOS = path.join(ROOT, "demos");
 const OUT = process.env.RETAKE_OUT ? path.resolve(process.env.RETAKE_OUT.replace(/^~/, os.homedir())) : path.join(ROOT, "outputs");
 let LAST_DEMO = "";                                // what the agent is working on
 const UI = process.env.RETAKE_UI || "";           // e.g. http://localhost:4310
+/** The window's per-process token, from the file only local processes can
+    read. Re-read each time: the window may have restarted since this server
+    started, and a stale token is a silent loss of every progress report. */
+function uiHeaders(): Record<string, string> {
+  const h: Record<string, string> = { "content-type": "application/json" };
+  try {
+    const t = fs.readFileSync(path.join(ROOT, ".drafts", "ui-token"), "utf8").trim();
+    if (t) h["x-retake-token"] = t;
+  } catch { /* no window running */ }
+  return h;
+}
 const SESSION = process.env.RETAKE_SESSION || ""; // operator session id
 const PROJECT = process.env.RETAKE_PROJECT || "";
 
@@ -57,8 +68,8 @@ async function tell(line: string) {
   if (!UI) { process.stderr.write(line + "\n"); return; }
   // Driven from somebody else's agent there is no session, but the app is
   // still open on the desk — report to the activity feed so it can be watched.
-  if (!SESSION) { await fetch(`${UI}/api/activity`, { method: "POST", body: JSON.stringify({ line, who: process.env.RETAKE_WHO || "your agent", demo: LAST_DEMO || undefined }) }).catch(() => {}); return; }
-  await fetch(`${UI}/api/operator/${SESSION}/log`, { method: "POST", body: JSON.stringify({ line }) }).catch(() => {});
+  if (!SESSION) { await fetch(`${UI}/api/activity`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ line, who: process.env.RETAKE_WHO || "your agent", demo: LAST_DEMO || undefined }) }).catch(() => {}); return; }
+  await fetch(`${UI}/api/operator/${SESSION}/log`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ line }) }).catch(() => {});
 }
 
 /** Block until the person answers in the UI. `kind` = question | approve.
@@ -67,7 +78,7 @@ async function tell(line: string) {
 export class NoUI extends Error {}
 async function waitForHuman(kind: "question" | "approve", text: string, detail?: string): Promise<string> {
   if (!UI || !SESSION) throw new NoUI(kind);
-  const r = await fetch(`${UI}/api/operator/${SESSION}/pending`, { method: "POST", body: JSON.stringify({ kind, text, detail }) });
+  const r = await fetch(`${UI}/api/operator/${SESSION}/pending`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ kind, text, detail }) });
   const { id } = (await r.json()) as { id: string };
   for (;;) {
     await new Promise((ok) => setTimeout(ok, 1200));
@@ -215,7 +226,7 @@ server.registerTool("secrets", {
       return text(`Not yet — ${missing.join(", ")} still empty. The form is still open in the Retake window. Tell them again, with the link: “Open ${link} — there is a form waiting for ${list}. Type the demo account's values, press Save to .env, and tell me when it's done.” Then call secrets again.`);
     }
     try {
-      const r = await fetch(`${UI}/api/secrets/request`, { method: "POST", body: JSON.stringify({ names: missing, why }) });
+      const r = await fetch(`${UI}/api/secrets/request`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ names: missing, why }) });
       if (!r.ok) throw new Error(String(r.status));
       await tell(`Waiting for you: ${missing.join(", ")} — a form is open in the window.`);
       return text(`A form is now open in the Retake window. Tell the person this, including the link: “Open ${link} in your browser — a form is waiting there for ${list}. Use a demo account for the app (the result is a video). What you type is saved to one local file on your computer and never sent to me or anywhere else. Press Save to .env, then tell me it's done.” When they say done, call secrets again with the same names.`);
@@ -626,8 +637,8 @@ server.registerTool("heal", {
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {
   await tell(`Done: ${summary}`);
-  if (UI && !SESSION) await fetch(`${UI}/api/activity`, { method: "POST", body: JSON.stringify({ line: summary, demo, done: true }) }).catch(() => {});
-  if (UI && SESSION) await fetch(`${UI}/api/operator/${SESSION}/done`, { method: "POST", body: JSON.stringify({ summary, demo }) }).catch(() => {});
+  if (UI && !SESSION) await fetch(`${UI}/api/activity`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ line: summary, demo, done: true }) }).catch(() => {});
+  if (UI && SESSION) await fetch(`${UI}/api/operator/${SESSION}/done`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ summary, demo }) }).catch(() => {});
   return text("ok");
 });
 

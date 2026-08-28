@@ -35,6 +35,7 @@ import { Command } from "commander";
 import { loadManifest, resolve, warnings, type Manifest } from "./manifest.js";
 import { acquireLock, canReuse, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, unchangedUpTo, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
 import { check, render } from "./render.js";
+import { endProgress, setPhase } from "./progress.js";
 import { presetNames } from "./presets.js";
 import { applyTidy, mb, planTidy } from "./tidy.js";
 import { verify } from "./ext/verify.js";
@@ -162,6 +163,7 @@ program
         take = await record(manifest, { until: opts.until, from: opts.from, brisk: opts.brisk, outDir, headed: opts.headed, skipSeed: opts.skipSeed, manifestDir: dir, log: say, locked: true });
       } catch (e) {
         if (restorePrevious(outDir)) say("↩ recording failed — your previous take has been put back");
+        endProgress(outDir);
         releaseLock(outDir);
         throw e;
       }
@@ -172,6 +174,7 @@ program
     try {
       if (opts.render) {
         say(`[stage] render start`);
+        setPhase(outDir, { phase: "rendering", label: "encoding the video" });
         const tr = Date.now();
         const a = await render(manifest, take, outDir, { noMaster: opts.master === false, log: (l) => { if (!l.startsWith("$")) say(l); } });
         if (!opts.keepRaw) cleanRaw(outDir, take, a.mp4);
@@ -180,8 +183,10 @@ program
         const c = check(outDir, manifest);
         say(c.ok ? "check: pass" : "check: FAIL\n  " + c.lines.filter((l) => l.startsWith("FAIL")).join("\n  "));
       }
+      setPhase(outDir, { phase: "checking", label: "checking the result" });
       say(`[stage] done`);
     } finally {
+      endProgress(outDir);
       releaseLock(outDir);
     }
     if (take.partial) say(`⚠ partial take — ${take.partial}`);
@@ -221,6 +226,7 @@ program
       const a = await render(manifest, take, outDir, { log: (l) => { if (!l.startsWith("$")) say(l); } });
       for (const f of [a.master, a.mp4, a.thumbnail, a.proofLog]) if (f) say(`✓ ${path.relative(process.cwd(), f)}`);
     } finally {
+      endProgress(outDir);
       releaseLock(outDir);
     }
   });

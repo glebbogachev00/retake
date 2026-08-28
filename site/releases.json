@@ -4,6 +4,18 @@
     {
       "version": "0.11.0",
       "date": "2026-08-28",
+      "headline": "You can see what it is doing — and the window is no longer open to the internet",
+      "notes": [
+        "New: the window shows what is happening while it happens. Which demo, which phase — putting the app in a known state, opening the browser, recording, rendering, checking — a progress bar, the step it is on, and how long it has been going. It works whether an agent started the recording or you typed the command yourself, because the run writes it down rather than having to tell anyone.",
+        "Security: the window had no lock on its door. Any website you happened to have open could tell it to run any command on your machine. It now needs a key that only programs on your own computer can read, refuses anything coming from another site, and no longer takes a command from whoever asked — it looks up your project's own start script instead.",
+        "New: record a demo without waiting for its pauses. All the steps, none of the holding still. On a real demo that is 81 seconds instead of 156. It is for while you are working — Retake marks it and refuses to call it finished, so it can never be handed over by mistake.",
+        "Fixed: installing Retake fresh was broken. The starter demo it promised to create was missing from the package, so a new workspace came out incomplete. It is there now, and there is a test that installs into an empty folder and checks.",
+        "Fixed: a half-finished recording could be reported as ready to ship."
+      ]
+    },
+    {
+      "version": "0.11.0",
+      "date": "2026-08-28",
       "headline": "Record a demo without waiting for its pauses",
       "notes": [
         "A demo that is nice to watch spends a lot of its time holding still — a beat after a click so you can see what happened, a moment on the result before moving on. On one real recording that was 317 of 509 seconds. Sixty-two per cent of the take was pausing.",

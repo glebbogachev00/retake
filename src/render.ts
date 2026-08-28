@@ -970,6 +970,11 @@ export function check(outDir: string, m?: Manifest): Check {
   // A fragment recorded on purpose (--from / --until) is not a defect. Saying
   // FAIL about work that did exactly what was asked is how people learn to
   // skim past checks, including the ones that matter.
+  // A brisk take has every step and none of the pacing. It is correct and it
+  // is not shippable, and the only thing standing between it and being handed
+  // over as final is this line. `check: pass` on one would be the tool lying
+  // about the one thing it exists to be trusted on.
+  if (take.brisk) say(false, "brisk — recorded without its pacing, for iterating. Record it again without --brisk before this goes anywhere.");
   if (fragment) say(true, `fragment — ${take.partial}`);
   else say(!take.partial, take.partial ? `partial: ${take.partial}` : "polished render (not fallback)");
   if (take.partial && /NO CURSOR/.test(take.partial)) say(false, "cursor overlay failed — the video has no cursor (split the demo or set cursor: false)");

@@ -65,3 +65,32 @@ test("no previous take at all is not an error", () => {
   assert.equal(canReuse(null, m), false);
   assert.equal(canReuse(undefined, m), false);
 });
+
+test("check FAILS a brisk take — it is correct and it is not shippable", async () => {
+  // The audit caught this within hours of the feature landing: all the steps,
+  // none of the pacing, and `check: pass`. The one line between an iteration
+  // take and something being handed over as final.
+  const { check } = await import("../src/render.js");
+  const { ffmpeg } = await import("../src/ext/clip.js");
+  const { execFileSync } = await import("node:child_process");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "brisk-check-"));
+  fs.mkdirSync(path.join(dir, "stills"));
+  // A real (tiny) video, so `check` reaches its verdict instead of stopping
+  // at "demo.mp4 missing" — the brisk line is near the end of the report.
+  execFileSync(ffmpeg(), ["-y", "-f", "lavfi", "-i", "color=c=black:s=1920x1080:d=20:r=30", "-c:v", "libx264", "-pix_fmt", "yuv420p", path.join(dir, "demo.mp4")], { stdio: ["ignore", "ignore", "pipe"] });
+  fs.writeFileSync(path.join(dir, "stills", "01-a-end.png"), "");
+  fs.writeFileSync(path.join(dir, "proof-log.md"), "#");
+  fs.writeFileSync(path.join(dir, "thumbnail.png"), "");
+  const base = {
+    timeline: [{ index: 0, action: "scene", label: "a", start: 0, end: 0.1, ok: true, summary: "scene: a" }],
+    duration: 20, trimBefore: 0, ok: true, screenshots: [], startedAt: "", finishedAt: "",
+    quality: { preset: "post-landscape", width: 1920, height: 1080, scale: 2, fps: 30 },
+  };
+  fs.writeFileSync(path.join(dir, "take.json"), JSON.stringify({ ...base, brisk: true }));
+  const brisk = check(dir);
+  assert.equal(brisk.ok, false);
+  assert.match(brisk.lines.join("\n"), /brisk/);
+
+  fs.writeFileSync(path.join(dir, "take.json"), JSON.stringify(base));
+  assert.doesNotMatch(check(dir).lines.join("\n"), /brisk/, "a normal take is never called brisk");
+});

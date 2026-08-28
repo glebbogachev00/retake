@@ -40,6 +40,8 @@ import { digest } from "../digest.js";
 import { readFlags } from "../ext/flags.js";
 import { findOrphans } from "../ext/heal.js";
 import { readChecks } from "../ext/checked.js";
+import { running } from "../progress.js";
+import { MAX_BODY, checkRequest, clearToken, newToken, readBodyLimited, writeToken } from "./guard.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
@@ -107,12 +109,7 @@ const json = (res: http.ServerResponse, code: number, body: unknown) => {
   res.writeHead(code, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
 };
-const readBody = (req: http.IncomingMessage) =>
-  new Promise<string>((ok) => {
-    let b = "";
-    req.on("data", (c) => (b += c));
-    req.on("end", () => ok(b));
-  });
+const readBody = (req: http.IncomingMessage) => readBodyLimited(req, MAX_BODY);
 const safeName = (s: string) => /^[a-z0-9-]+$/.test(s);
 const MIME: Record<string, string> = { ".mp4": "video/mp4", ".gif": "image/gif", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
 
@@ -421,12 +418,25 @@ function noteActivity(b: { line?: string; demo?: string; done?: boolean; who?: s
 
 export function serve(port: number) {
   loadDotenv(ROOT);
-  const chatPage = fs.readFileSync(path.join(HERE, "chat.html"), "utf8");
+  // One random token per window. Written where a local process can read it —
+  // the MCP servers post progress in from outside — and inlined into the page
+  // so the browser has it. A site on the open web can do neither.
+  const TOKEN = newToken();
+  writeToken(ROOT, TOKEN);
+  for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) process.on(sig, () => { clearToken(ROOT); if (sig !== "exit") process.exit(0); });
+  const chatPage = fs.readFileSync(path.join(HERE, "chat.html"), "utf8")
+    .replace("</head>", `<script>window.__retakeToken=${JSON.stringify(TOKEN)}</script></head>`);
   const guidePage = fs.readFileSync(path.join(HERE, "guide.html"), "utf8");
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://x");
       const p = url.pathname;
+      // One boundary, checked before any route runs. Adding a per-route
+      // exception here is how a guard stops being one.
+      if (p.startsWith("/api/")) {
+        const no = checkRequest(req, { token: TOKEN, port, write: req.method !== "GET", maxBody: MAX_BODY });
+        if (no) return json(res, no.status, { error: no.error });
+      }
       if (p === "/" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/html" });
         return res.end(chatPage);
@@ -698,6 +708,9 @@ export function serve(port: number) {
         noteActivity(b);
         return json(res, 200, { ok: true });
       }
+      // What is happening right now, read off disk rather than reported. A
+      // `retake run` in a terminal shows up here exactly like an agent's.
+      if (p === "/api/running" && req.method === "GET") return json(res, 200, { running: running(outRoot()) });
       if (p === "/api/activity" && req.method === "GET") return json(res, 200, withStaleness(activity));
 
       // ---------- secrets: asked for by name, typed into the window, written here ----------
@@ -792,9 +805,12 @@ export function serve(port: number) {
         return json(res, 200, { ideas, file: path.relative(ROOT, file) });
       }
       if (p === "/api/start" && req.method === "POST") {
-        const b = JSON.parse(await readBody(req)) as { dir: string; command?: string; url?: string };
+        const b = JSON.parse(await readBody(req)) as { dir: string; url?: string };
+        // The command is resolved from the project's own package scripts, on
+        // this side. It used to be taken from the request body and handed to
+        // `/bin/sh -lc`, which made any page in any tab able to run anything.
         const off = startOffer(b.dir);
-        const command = b.command?.trim() || off?.command;
+        const command = off?.command;
         if (!command) return json(res, 400, { error: "No dev, start, serve, or preview script was found. Add a running app URL instead." });
         const r = await startApp({ dir: b.dir, command, expectUrl: b.url });
         return json(res, r.ok ? 200 : 400, r.ok ? { ok: true, url: r.url, pid: r.pid } : { error: r.why ?? "could not start", log: r.log.slice(-1200) });

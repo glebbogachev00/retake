@@ -1,0 +1,43 @@
+# The demo Retake writes for you on `retake init`.
+#
+# It records this page — the Retake window's own guide — because it is the one
+# app that is definitely running when you have just installed Retake. Change
+# `url` to your own app and rewrite the steps; everything here is the shape of
+# a real manifest, not a toy.
+#
+#   retake dry demos/example.yaml     # seconds, no camera: does every step resolve?
+#   retake run demos/example.yaml     # record it
+#   retake verify outputs/example     # did it LOOK right
+
+name: example
+title: Your first demo
+url: http://localhost:4310/guide
+
+# Landscape for a post or a doc. `retake presets` lists the rest — and any
+# take renders at any preset later, so this is never worth re-recording for.
+preset: post-landscape
+
+# Wait for something real before the camera rolls, never a fixed sleep: this
+# is the difference between a demo and a demo that works on a slow morning.
+waitForSelector: h1
+
+steps:
+  - action: scene
+    label: open
+    # What a person should be able to SEE here, in plain words. `retake verify`
+    # puts this question to a reader that can look at the frame.
+    expect: "a page with a heading, readable against its background"
+
+  - action: wait
+    ms: 1200
+
+  - action: scroll
+    to: bottom
+    pauseAfter: 900
+
+  - action: scene
+    label: end
+    expect: "the page has scrolled — different content is on screen than at the start"
+
+  - action: wait
+    ms: 1200

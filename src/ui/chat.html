@@ -282,7 +282,19 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 let current = null, demos = [], settings = null;
-async function api(u, o) { const r = await fetch(u, o); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j; }
+// Every call carries the window's own token, inlined into this page when it
+// was served. Without it the server answers 401 — which is what stops a page
+// on the open web from driving this API, since it can make requests but
+// cannot read the token file.
+async function api(u, o) {
+  const opt = { ...(o || {}) };
+  opt.headers = { ...(opt.headers || {}), 'x-retake-token': window.__retakeToken || '' };
+  if (opt.body && !opt.headers['content-type']) opt.headers['content-type'] = 'application/json';
+  const r = await fetch(u, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
 
 const REPO = 'https://github.com/glebbogachev00/retake';
 async function setCover(body, marked) {
@@ -807,6 +819,7 @@ function drawProgress(a) {
   const box = $('liveProg'); if (!box) return;
   if (a) lastActivity = a;
   const p = a && a.progress;
+  if (liveFromDisk) return;   // disk state is the truth; do not fight it
   if (!a || !a.active) { box.style.display = 'none'; stopLiveTickers(); return; }
   // Nothing has reported in five minutes: the run is over, or whatever was
   // running is gone. Either way the bar is lying, so stop showing it.
@@ -825,13 +838,13 @@ function drawProgress(a) {
   // it is: a slow app is not a broken one, and only the person watching can
   // tell which this is.
   if (p && p.phase === 'stuck') {
-    box.style.display = '';
+    box.style.display = 'block';
     $('liveQuip').textContent = 'Nothing has moved for a bit.';
     $('liveCount').textContent = `no step finished in ${p.quietSec}s`;
     return;
   }
   if (p && p.phase === 'rendering') {
-    box.style.display = '';
+    box.style.display = 'block';
     const eta = (p.etaSec || 0) * 1000;
     const gone = Date.now() - (p.since || Date.now());
     $('liveBar').style.width = (eta ? Math.min(95, Math.round((gone / eta) * 100)) : 0) + '%';
@@ -843,12 +856,12 @@ function drawProgress(a) {
   }
   if (!p || !p.total) {
     // Working, but nothing countable yet — show the clock, not a fake bar.
-    box.style.display = '';
+    box.style.display = 'block';
     $('liveBar').style.width = '0%';
     $('liveCount').textContent = '';
     return;
   }
-  box.style.display = '';
+  box.style.display = 'block';
   // The last STEP is not the end of the take: the final hold still has to
   // play, the video still has to be finalised and its dead tail trimmed. A
   // bar sitting at 100% while the thing is visibly still going is the kind
@@ -858,7 +871,62 @@ function drawProgress(a) {
   $('liveCount').textContent = `step ${p.step} of ${p.total}`;
 }
 
-  const es = new EventSource('/api/activity/stream');
+
+// What is actually happening, read from disk rather than reported.
+//
+// The panel above only ever knew what something chose to tell it, so a
+// `retake run` in a terminal was invisible — seventeen minutes of recording
+// and a blank window. Every run now writes its phase into its own folder, and
+// this reads it. An agent's work and a person's look the same here, because
+// they are the same thing.
+const PHASE_WORDS = {
+  seeding:   'putting the app in a known state',
+  opening:   'opening the browser',
+  recording: 'recording',
+  rendering: 'rendering the video',
+  checking:  'checking the result',
+};
+let liveFromDisk = false;
+function drawRunning(job) {
+  const box = $('live');
+  box.style.display = 'block';
+  liveFromDisk = true;
+  startLiveTickers(Date.parse(job.startedAt));
+  $('liveWho').textContent = job.demo;
+  $('liveWhat').textContent = ' · ' + (PHASE_WORDS[job.phase] || job.phase);
+  $('liveProg').style.display = '';
+  $('liveElapsed').textContent = fmtElapsed(Date.now() - runStart);
+  if (job.phase === 'recording' && job.of) {
+    // Capped below 100: the last step is not the end of the take, and a bar
+    // claiming finished while the thing is visibly still going is how a
+    // person stops believing the rest of the window.
+    $('liveBar').style.width = Math.min(96, Math.round((job.step / job.of) * 96)) + '%';
+    $('liveCount').textContent = `step ${job.step} of ${job.of}`;
+  } else if (job.phase === 'rendering' || job.phase === 'checking') {
+    // The heading already says which phase this is; repeating it in the
+    // counter just makes the same words appear twice on one line.
+    $('liveBar').style.width = '96%';
+    $('liveCount').textContent = '';
+  } else {
+    $('liveBar').style.width = '0%';
+    $('liveCount').textContent = '';
+  }
+  // The step it is on, or nothing — never a leftover from a previous phase.
+  $('liveQuip').textContent = job.phase === 'recording' && job.label ? String(job.label).slice(0, 70) : '';
+}
+async function pollRunning() {
+  let r = null;
+  try { r = await api('/api/running'); } catch { return; }
+  const job = r && r.running && r.running[0];
+  if (job) return drawRunning(job);
+  // Nothing on disk. Only hide if we were the one showing it — an agent
+  // reporting over the feed still owns the panel.
+  if (liveFromDisk) { liveFromDisk = false; $('live').style.display = 'none'; stopLiveTickers(); }
+}
+pollRunning();
+setInterval(pollRunning, 2000);
+
+  const es = new EventSource('/api/activity/stream?t=' + encodeURIComponent(window.__retakeToken || ''));
   const apply = (a) => {
     if (!a || (!a.active && !a.lines?.length)) return;
     $('live').classList.add('show');
