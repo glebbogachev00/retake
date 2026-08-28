@@ -367,13 +367,13 @@ program
         const take = await record(v.manifest, { outDir: dir, manifestDir: loaded.dir, headed: false, log: () => {} });
         await render(v.manifest, take, dir, { log: () => {}, noMaster: true });
         const s = await sweep(v.manifest, dir, () => {}, { demosDir: path.resolve("demos") });
-        const took = !v.defect || landed(path.join(plan.root, "control"), dir);
+        const took = true;   // the seed proved itself in the page, or the take threw
         const kinds = s.frames.flatMap((f) => f.issues.map((i) => i.kind));
         const found = !v.defect ? false : kinds.some((k) => k.toUpperCase().startsWith(v.defect!.expect.split(" ")[0]));
         results.push({ variant: v.name, defect: v.defect, kinds, found: found && took, seeded: took, other: v.defect ? kinds.filter((k) => !k.toUpperCase().startsWith(v.defect!.expect.split(" ")[0])).length : 0 });
         say(`  → ${kinds.join(", ") || "nothing"}${v.defect && !took ? "   (the seed did not land — nothing was asked of the check)" : ""}`);
       } catch (e) {
-        results.push({ variant: v.name, defect: v.defect, kinds: [], found: false, seeded: true, other: 0, error: String((e as Error).message).split("\n")[0].slice(0, 90) });
+        results.push({ variant: v.name, defect: v.defect, kinds: [], found: false, seeded: !/seed did not take/.test(String((e as Error).message)), other: 0, error: String((e as Error).message).split("\n")[0].slice(0, 90) });
         say(`  → could not run: ${String((e as Error).message).split("\n")[0].slice(0, 90)}`);
       }
     }

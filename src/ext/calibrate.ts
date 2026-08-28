@@ -17,6 +17,24 @@
  *   false positives what was reported on the control, where nothing is wrong
  *   stability       whether the same frame gives the same answer twice
  *
+ * WHERE THIS WORKS, AND WHERE IT DOES NOT.
+ *
+ * On a page that is served and then left alone — a document, a landing page,
+ * Retake's own guide — injection is reliable and the numbers mean something:
+ * eight of eight seeded faults found, nothing reported on the control.
+ *
+ * On a live single-page app it is not. Against Capture, seeds provably present
+ * in the DOM after hydration were provably absent from every recorded frame,
+ * four different ways of injecting them, for reasons not isolated. A harness
+ * built on injection therefore measures the injection as much as the check,
+ * and a low recall on such an app is not evidence about the check at all.
+ *
+ * So: use this to calibrate against static pages, and take the control result
+ * — findings where nothing is wrong — from anywhere, because that half needs
+ * no injection and is the half that matters most for trust. To calibrate a
+ * real app, label real recordings and have a person adjudicate them. That is
+ * slower, and it is the only thing that answers the question honestly.
+ *
  * Two honest limits, stated rather than buried. The person writing the seeds
  * is not blind to the checklist, so recall here is an upper bound — a defect
  * nobody thought to seed is still not measured. And CSS-injected faults are
@@ -40,6 +58,17 @@ export type Defect = {
   css: string;
   /** For faults CSS cannot make plainly enough. Runs in the page, once. */
   js?: string;
+  /**
+   * Run in the page after the seed, and must return true.
+   *
+   * Comparing a variant's frames to the control's cannot tell whether a seed
+   * landed on an app whose content changes between runs — Capture's board has
+   * timestamps and counts, so every variant differed from the control whether
+   * or not anything was injected, and eight seeds "landed" when at least one
+   * plainly had not. A seed that proves itself in the page needs no
+   * comparison and works on any app.
+   */
+  proof: string;
 };
 
 /**
@@ -57,30 +86,35 @@ export type Defect = {
 export const DEFECTS: Defect[] = [
   {
     name: "clipped-text",
+    proof: "[...document.querySelectorAll('p,li,h1,h2,h3')].some(e => e.scrollHeight > e.clientHeight + 4)",
     expect: "CLIPPED",
     looks: "headings cut off mid-letter by a box too short for them",
     css: "h1,h2,h3,li,p{max-height:14px!important;overflow:hidden!important;display:block!important}",
   },
   {
     name: "overlapping-text",
+    proof: "[...document.querySelectorAll('p,li')].some(e => parseFloat(getComputedStyle(e).marginBottom) < -10)",
     expect: "OVERLAP",
     looks: "paragraphs sitting on top of each other",
     css: "p,li{margin-bottom:-26px!important;position:relative!important;z-index:2!important}",
   },
   {
     name: "unreadable-contrast",
+    proof: "getComputedStyle(document.body).color.replace(/\\\\s/g,'') === 'rgb(233,235,228)'",
     expect: "CONTRAST",
     looks: "body text almost the same colour as the page behind it",
     css: "body,p,li,span{color:#e9ebe4!important}",
   },
   {
     name: "runs-off-the-edge",
+    proof: 'document.documentElement.scrollWidth > document.documentElement.clientWidth + 40',
     expect: "CUT OFF",
     looks: "content pushed off the right-hand side of the frame",
     css: "main,body>*{margin-left:62%!important;white-space:nowrap!important}",
   },
   {
     name: "doubled-heading",
+    proof: "!!document.querySelector('[data-retake-dup]')",
     expect: "DOUBLED",
     looks: "every heading rendered twice, one under the other",
     // The first version targeted h2 and used attr(data-x), which is empty —
@@ -93,25 +127,31 @@ export const DEFECTS: Defect[] = [
     // temptation to keep tuning it until the number improves is exactly how a
     // calibration harness starts lying. So it clones the real node instead.
     css: "",
-    js: "for (const h of document.querySelectorAll('h1,h2,h3,p,li')) { if (h.textContent && h.textContent.trim().length > 8) { h.after(h.cloneNode(true)); } }",
+    js: "for (const h of [...document.querySelectorAll('h1,h2,h3,p,li')]) { if (h.textContent && h.textContent.trim().length > 8) { const c = h.cloneNode(true); c.setAttribute('data-retake-dup',''); h.after(c); } }",
   },
   {
     name: "stuck-spinner",
+    proof: "!!document.getElementById('retake-seed-spinner')",
     expect: "UNFINISHED",
     looks: "a loading spinner sitting on the page that never resolves",
-    css: "body::before{content:'Loading…';position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #ccc;border-radius:999px;padding:6px 16px;font:14px sans-serif;z-index:99}",
+    css: "",
+    js: "const d=document.createElement('div');d.id='retake-seed-spinner';d.textContent='Loading…';d.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #ccc;border-radius:999px;padding:6px 16px;font:14px sans-serif;z-index:2147483647';document.body.appendChild(d);",
   },
   {
     name: "broken-image",
+    proof: "!!document.getElementById('retake-seed-img')",
     expect: "BROKEN MEDIA",
     looks: "an image that failed to load, showing its alt text instead",
-    css: "body::after{content:url('/definitely-not-here.png');display:block;width:120px;height:80px;border:1px solid #ccc;margin:20px}",
+    css: "",
+    js: "const i=document.createElement('img');i.id='retake-seed-img';i.src='/definitely-not-here-'+'x'.repeat(4)+'.png';i.alt='product photograph';i.style.cssText='position:fixed;top:90px;left:24px;width:150px;height:100px;border:1px solid #ccc;background:#fff;z-index:2147483647';document.body.appendChild(i);",
   },
   {
     name: "debug-badge",
+    proof: "!!document.getElementById('retake-seed-badge')",
     expect: "NOT FOR THE CAMERA",
     looks: "a development badge left in the corner of the screen",
-    css: "html::after{content:'DEV BUILD · staging';position:fixed;bottom:12px;left:12px;background:#111;color:#0f0;font:12px monospace;padding:5px 10px;border-radius:5px;z-index:99}",
+    css: "",
+    js: "const b=document.createElement('div');b.id='retake-seed-badge';b.textContent='DEV BUILD · staging';b.style.cssText='position:fixed;bottom:12px;left:12px;background:#111;color:#0f0;font:12px monospace;padding:5px 10px;border-radius:5px;z-index:2147483647';document.body.appendChild(b);",
   },
 ];
 
@@ -139,8 +179,22 @@ export function planCalibration(m: Manifest, outRoot: string, opts: { only?: str
       // Before anything is recorded, so every frame carries the fault.
       clone.setup = [
         ...(clone.setup ?? []),
-        ...(defect.css ? [{ action: "evaluate", script: `{const s=document.createElement('style');s.textContent=${JSON.stringify(defect.css)};document.head.appendChild(s);}` }] : []),
-        ...(defect.js ? [{ action: "evaluate", script: defect.js }] : []),
+        // A stylesheet in <head> survives re-render; the elements below may not.
+        ...(defect.css ? [{ action: "evaluate", script: `{const s=document.createElement('style');s.id='retake-seed-css';s.textContent=${JSON.stringify(defect.css)};document.head.appendChild(s);setInterval(()=>{if(!document.getElementById('retake-seed-css'))document.head.appendChild(s);},250);}` }] : []),
+        // Re-applied on a timer, because a React app hydrates and re-renders
+        // after the seed runs and takes anything appended to the body with it.
+        // Capture did exactly that: the element passed its own proof at seed
+        // time and was gone from every recorded frame, which looked identical
+        // to the check missing it.
+        ...(defect.js ? [{ action: "evaluate", script: `{ const seed = () => { try { ${defect.js} } catch {} }; seed(); setInterval(() => { if (!(${defect.proof})) seed(); }, 250); }` }] : []),
+        // The seed proves itself, in the page, before anything is recorded.
+        // A seed that did not render must fail the take rather than produce
+        // frames that look exactly like a check missing something.
+        { action: "wait", ms: 1200 },
+        // Checked after the app has had time to hydrate and re-render, not at
+        // the instant of injection — that was the difference between a seed
+        // that exists and a seed that is in the picture.
+        { action: "evaluate", script: `{ if (!(${defect.proof})) throw new Error("the ${defect.name} seed did not take on this app"); }` },
         { action: "wait", ms: 300 },
       ] as Manifest["setup"];
     }
@@ -168,6 +222,15 @@ export function planCalibration(m: Manifest, outRoot: string, opts: { only?: str
  * mistake, and it happened on the very first run: a doubled-heading seed that
  * targeted the wrong element reported 7 of 8 when the honest answer was 7 of
  * 7 and one seed that never landed.
+ */
+/**
+ * @deprecated Seeds prove themselves in the page now — see `Defect.proof`.
+ *
+ * Kept only as a record of why: this compares a variant's frames to the
+ * control's, which cannot work on an app whose content changes between runs.
+ * Capture's board carries timestamps and counts, so every variant differed
+ * from its control whether or not anything had been injected, and this
+ * reported eight seeds as landed when at least one plainly had not.
  */
 export function landed(controlDir: string, variantDir: string): boolean {
   // NOTE what this does and does not prove: that the frames differ from the
