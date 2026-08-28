@@ -237,6 +237,17 @@ export function unchangedUpTo(m: Manifest, outDir: string): { scene: string; ste
   return null;
 }
 
+/**
+ * The app never reached the state the demo starts from.
+ *
+ * Distinct from every other failure because it must not become a take. The
+ * catch-all below turns anything that goes wrong into a `partial` and keeps
+ * whatever video exists — right for a step that failed halfway through a real
+ * recording, wrong here, where nothing worth keeping was ever recorded and
+ * the honest answer is "this did not run".
+ */
+export class SetupFailed extends Error {}
+
 export type RecordOptions = {
   /** Record up to the end of this scene label, then stop. */
   until?: string;
@@ -568,7 +579,30 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         await runStep(rec, page, step.st, m, ctx);
       } catch (e) {
         if (step.auth) authOk = false;
-        log(`setup step failed: ${describe(step.st)} — ${(e as Error).message}`);
+        const why = (e as Error).message.split("\n")[0];
+        log(`setup step failed: ${describe(step.st)} — ${why}`);
+
+        // Evidence, at the instant, not reconstructed afterwards: what the
+        // page was showing when the app failed to reach its starting state.
+        let shot = "";
+        try {
+          shot = path.join(opts.outDir, step.auth ? "auth-failed.png" : "setup-failed.png");
+          await page.screenshot({ path: shot, fullPage: true });
+          log(`  picture of it: ${path.relative(process.cwd(), shot)}`);
+        } catch { shot = ""; }
+        try { log(`  url: ${page.url()}`); } catch { /* page gone */ }
+
+        // And it stops. This used to be logged and then ignored — the take
+        // went on to record an app that had never reached the screen the demo
+        // is about, and reported `ok: true` for it. A sign-in failure is
+        // always fatal; anything else obeys `onFail`, which defaults to stop.
+        if (step.auth) {
+          throw new SetupFailed(`signing in failed: ${describe(step.st)} — ${why}. Nothing was recorded, and no session was saved.${shot ? ` See ${path.basename(shot)}.` : ""}`);
+        }
+        if (m.onFail !== "continue") {
+          throw new SetupFailed(`setup failed: ${describe(step.st)} — ${why}. The app never reached its starting state, so nothing was recorded.${shot ? ` See ${path.basename(shot)}.` : ""} Set \`onFail: continue\` if this step is genuinely optional.`);
+        }
+        log("  onFail: continue — carrying on with an app that may not be where the demo expects it");
       }
     }
     // Persist the signed-in session so later takes skip the login entirely —
@@ -752,6 +786,8 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
       process.stdout.write = origOut; process.stderr.write = origErr;
     }
   } catch (e) {
+    // A setup failure is not a partial take, it is no take. Let it out.
+    if (e instanceof SetupFailed) { await context.close().catch(noop); await browser.close().catch(noop); throw e; }
     ok = false;
     partial = `run aborted: ${(e as Error).message.split("\n")[0]}`;
     log(`✗ ${partial}`);
