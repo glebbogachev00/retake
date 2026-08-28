@@ -802,6 +802,10 @@ const QUIPS = [
   'Getting it right the first time, on purpose.',
 ];
 let quipAt = 0, quipTimer = null, elapsedTimer = null, runStart = 0, lastActivity = null;
+// Is the panel being driven by what is on disk? Declared out here because the
+// quip ticker and the feed renderer both have to see it, and they live in a
+// different scope from the poller.
+let liveFromDisk = false;
 
 function fmtElapsed(ms) {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -909,7 +913,6 @@ const PHASE_WORDS = {
   verifying: 'answering what the scenes ask',
   sensing:   'checking whether the run adds up',
 };
-let liveFromDisk = false;
 function drawRunning(job, others) {
   const box = $('live');
   box.style.display = 'block';
@@ -919,12 +922,12 @@ function drawRunning(job, others) {
   $('liveWhat').textContent = ' · ' + (PHASE_WORDS[job.phase] || job.phase);
   $('liveProg').style.display = '';
   $('liveElapsed').textContent = fmtElapsed(Date.now() - runStart);
-  if (job.phase === 'recording' && job.of) {
+  if (job.of) {
     // Capped below 100: the last step is not the end of the take, and a bar
     // claiming finished while the thing is visibly still going is how a
     // person stops believing the rest of the window.
     $('liveBar').style.width = Math.min(96, Math.round((job.step / job.of) * 96)) + '%';
-    $('liveCount').textContent = `step ${job.step} of ${job.of}`;
+    $('liveCount').textContent = job.phase === 'recording' ? `step ${job.step} of ${job.of}` : `${job.step} of ${job.of}`;
   } else if (job.phase === 'rendering' || job.phase === 'checking') {
     // The heading already says which phase this is; repeating it in the
     // counter just makes the same words appear twice on one line.
@@ -935,7 +938,7 @@ function drawRunning(job, others) {
     $('liveCount').textContent = '';
   }
   // The step it is on, or nothing — never a leftover from a previous phase.
-  $('liveQuip').textContent = job.phase === 'recording' && job.label ? String(job.label).slice(0, 70) : '';
+  $('liveQuip').textContent = job.label ? String(job.label).slice(0, 70) : '';
   // Everything else happening at the same time, named rather than hidden.
   const rest = (others || []).map((o) => `${o.demo} · ${PHASE_SHORT[o.phase] || o.phase}`).join('   ');
   $('liveLines').textContent = rest ? 'also: ' + rest : '';
