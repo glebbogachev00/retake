@@ -271,8 +271,14 @@ Most real demos start behind a sign-in. The agent never sees a password:
   it.**
 - Every check leaves a receipt in `outputs/<name>/checks.json` — which check
   ran, against which take, and what it said. The window shows it as one line,
-  and `retake notes` names every demo that was recorded and never looked at.
-  Whether you checked is not something anyone has to take your word for.
+  and `retake notes` names every demo nobody has inspected. Whether you checked
+  is not something anyone has to take your word for.
+- **None of the checks are required for a recording to be complete.** `check`
+  is the core's own verdict on a take and consults none of them. verify, sweep,
+  sense, destroy and fixed are optional services run against a take that
+  already exists, and their results are advisory unless a person promotes one.
+  Recommend them for the claim that the APP is right; never imply a demo is
+  unfinished without them.
 - `retake notes` — the watcher. Reads every take in `outputs/` back and says
   the few things a person would say after looking through them: a stub that
   answered nothing (the demo is showing live data), the same selector failing

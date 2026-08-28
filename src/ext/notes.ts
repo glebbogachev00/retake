@@ -161,9 +161,10 @@ export function collect(root: string, sinceDays = 14): { runs: Run[]; notes: Not
 
   // --- habits: the ones worth a policy -------------------------------------
 
-  // Recorded and never looked at. This is the workspace-level version of the
-  // question "did the agent actually check it, or just say so" — and unlike
-  // the answer an agent gives, this one is on disk.
+  // Which takes nobody has LOOKED at. Deliberately worded as a fact about the
+  // checking, not about the recording: a demo with no `verify` or `sweep` is a
+  // finished recording that nobody has inspected, and it was this note that
+  // once told people otherwise.
   const unlooked = runs.filter((r) => {
     const t = r.take?.finishedAt;
     return !isCurrent(r.checks.verify, t) && !isCurrent(r.checks.sweep, t);
@@ -171,8 +172,8 @@ export function collect(root: string, sinceDays = 14): { runs: Run[]; notes: Not
   add({
     kind: "habit",
     demos: unlooked,
-    line: `${list(unlooked)} ${unlooked.length === 1 ? "was" : "were"} recorded and never looked at — no \`verify\` and no \`sweep\` has run against the take that is there now.`,
-    policy: "A demo is not finished until `verify` and `sweep` have run against the take that exists — a recording nobody has looked at is a recording, not a result.",
+    line: `nobody has looked at how ${list(unlooked)} came out — no \`verify\` or \`sweep\` has run against the take that is there now. The recordings are finished; this is about whether anyone has inspected them.`,
+    policy: "Before telling somebody an app works, look at the frames — `verify` for what you thought to ask, `sweep` for what you did not. A rule about the claim, not about the recording: a take with no checks against it is a finished demo nobody has inspected.",
   });
 
   // Nobody is checking the picture. This is the note the whole watcher exists
@@ -184,7 +185,7 @@ export function collect(root: string, sinceDays = 14): { runs: Run[]; notes: Not
     kind: "habit",
     demos: unchecked,
     line: `${list(unchecked)} ${unchecked.length === 1 ? "has" : "have"} been recorded more than once with no \`expect:\` on any scene — so nothing has ever checked how ${unchecked.length === 1 ? "it looks" : "they look"}, only that the steps ran.`,
-    policy: "Every scene that shows something worth showing carries an `expect:` sentence, and `retake verify` runs before a demo is called finished.",
+    policy: "Every scene that shows something worth showing carries an `expect:` sentence, so `verify` has something to answer when somebody wants to know whether the app looked right.",
   });
 
   // (There was a note here about captions being turned back on. It was cut:

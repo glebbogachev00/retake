@@ -482,9 +482,11 @@ const CHECKS = [
 function drawChecked(checks, take) {
   const box = $('checked');
   const now = take && take.finishedAt;
-  box.innerHTML = CHECKS.map(([key, label, title]) => {
+  // Labelled, because four bare dashes read as four things missing. They are
+  // optional checks against a finished recording, not parts of it.
+  box.innerHTML = `<span class="c none" title="These are optional checks you can run against this take. The recording is complete without them.">checked:</span>` + CHECKS.map(([key, label, title]) => {
     const r = checks && checks[key];
-    if (!r) return `<span class="c none" title="${esc(title)} — never run on this demo">${label} <b>—</b></span>`;
+    if (!r) return `<span class="c none" title="${esc(title)} — not run on this take. Optional; the recording is complete without it.">${label} <b>—</b></span>`;
     const stale = !now || r.takeFinishedAt !== now;
     const mark = r.ok === false ? '✗' : r.ok === true ? '✓' : '·';
     const cls = 'c' + (stale ? ' old' : '') + (r.ok === false ? ' bad' : '');

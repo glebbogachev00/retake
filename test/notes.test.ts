@@ -78,7 +78,10 @@ test("re-recorded with no expect anywhere → the note the watcher exists for, w
   const ns = collect(rt).notes.filter((n) => /no `expect:` on any scene/.test(n.line));
   assert.equal(ns.length, 1);
   assert.equal(ns[0].kind, "habit");
-  assert.match(ns[0].policy!, /retake verify/);
+  assert.match(ns[0].policy!, /verify/);
+  // And it must not tell somebody their recording is unfinished. The checks
+  // are optional services run against a take that already exists.
+  assert.doesNotMatch(ns[0].policy!, /not finished until|called finished/);
 });
 
 test("scenes that DO carry expect are silent", () => {
@@ -92,7 +95,7 @@ test("a take nobody has verified or swept is said out loud", () => {
   // the agent's own answer, this one is on disk.
   const rt = root();
   run(rt, "unlooked", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
-  assert.match(flat(rt), /recorded and never looked at/);
+  assert.match(flat(rt), /nobody has looked at how/);
 });
 
 test("a take that HAS been looked at is not nagged about", () => {
@@ -101,7 +104,7 @@ test("a take that HAS been looked at is not nagged about", () => {
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
     verify: { at: "now", takeFinishedAt: "2026-08-27T10:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
   }));
-  assert.doesNotMatch(flat(rt), /recorded and never looked at/);
+  assert.doesNotMatch(flat(rt), /nobody has looked at how/);
 });
 
 test("a check answering an OLDER take does not count as looked at", () => {
@@ -112,7 +115,7 @@ test("a check answering an OLDER take does not count as looked at", () => {
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
     verify: { at: "then", takeFinishedAt: "2026-08-26T09:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
   }));
-  assert.match(flat(rt), /recorded and never looked at/);
+  assert.match(flat(rt), /nobody has looked at how/);
 });
 
 test("a fresh lock is left alone; an hour-old one is a dead run holding the folder", () => {

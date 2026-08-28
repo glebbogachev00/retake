@@ -219,12 +219,20 @@ visual passes it. That is what `verify` is for.
 `verify`, then `sweep`.** `verify` answers what you thought to ask; `sweep`
 finds what you did not.
 
+**That is a rule about the claim, not about the recording.** A demo that
+records cleanly is finished — Retake's job is done, the video is the video,
+and `check` says so without consulting any of these. The checks are for the
+separate and larger claim that the APP is right, which nobody asked Retake to
+make and which is worth much more when it is made honestly. A take with no
+checks against it is not an unfinished demo. It is a finished demo nobody has
+inspected.
+
 **Whether you ran them is visible.** Each check writes a line into the demo's
 own folder when it finishes, and the window shows it — `verify ✓ 32 of 34
 answered yes · sweep — · sense — · fixed ✗`. A check against an older
 recording is shown as answering an older recording. So "did you actually look
 at it" is not a question anybody has to take your word for, and `retake notes`
-lists every demo that was recorded and never looked at.
+lists every demo nobody has inspected — which is a fact about the looking, not a defect in the take.
 
 Which means: say what the checks said. Do not summarise a run as fine when the
 line will say `sweep —`. `sense` on anything with numbers or a summary in it. `destroy`
