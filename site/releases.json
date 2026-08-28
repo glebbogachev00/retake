@@ -2,6 +2,16 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.12.1",
+      "date": "2026-08-28",
+      "headline": "The extra checks are optional, and nothing pretends otherwise",
+      "notes": [
+        "Recording a demo is the whole job. The checks that look at how it came out are extras you run against a recording you already have, and a few places had started to word that as though a demo were unfinished without them. It isn't, and now nothing says so.",
+        "In the window, the row of checks is labelled — it reads as things you can run, not as things that are missing.",
+        "Retake still recommends looking at the frames before telling somebody an app works. That is about the claim, not about the recording."
+      ]
+    },
+    {
       "version": "0.12.0",
       "date": "2026-08-28",
       "headline": "Retake now knows what your product is for — and says how it knows",
