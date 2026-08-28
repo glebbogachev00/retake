@@ -60,6 +60,9 @@
   section { margin-top:92px; }
   h2 { font-size:27px; letter-spacing:-.02em; font-weight:600; margin:0 0 10px; }
   .sub { color:var(--muted); margin:0 0 30px; max-width:560px; font-size:16.5px; }
+  /* One section, not two: the second header made a continuous explanation read
+     as a fresh argument starting over. */
+  .boxhead { margin:26px 0 12px; font-size:13px; letter-spacing:.03em; text-transform:uppercase; color:var(--muted); }
   .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; }
   .cell { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:18px 20px; }
   .cell b { display:block; margin-bottom:6px; font-size:15px; }
@@ -388,6 +391,24 @@ section > *:not(.shead) { grid-column: 1; }
   <p class="arrow" style="font-size:13.5px">one line changed · <code>retake run</code> · a new take of the same demo ↓</p>
   <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
 
+  <section id="found">
+    <div class="shead">
+      <h2>The bugs a test suite cannot see</h2>
+      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. A recording puts the whole screen in front of you.</p>
+    </div>
+    <div class="found">
+      <h3>One recording, made for a launch video. Nobody was looking for these.</h3>
+      <ul>
+        <li>A form still said a step was <b>optional</b>. It had been required for weeks.</li>
+        <li>A customer was shown a <b>raw timezone code</b> where the name of a city should have been.</li>
+        <li><b>Radio buttons</b> stretched across the entire width of the form.</li>
+        <li>A <b>squashed logo</b>, on a page nobody had opened in months.</li>
+        <li>An email subject line with a <b>machine timestamp</b> in it.</li>
+      </ul>
+      <p class="tail">A test can only check what somebody thought to check. A recording shows the rest, and the optional checks surface things nobody wrote down — you decide what matters. Because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
+    </div>
+  </section>
+
 
 
 
@@ -412,12 +433,8 @@ section > *:not(.shead) { grid-column: 1; }
       <div class="step"><div><b>Retake records the real interaction</b><p>Real typing, real clicks, real waits. The result is demo.mp4, a still for each scene, and a proof log of what happened.</p></div></div>
       <div class="step"><div><b>You revise without starting over</b><p>Change captions, zoom, layout, or format in seconds. When the UI changes, rerun the same flow instead of recording by hand.</p></div></div>
     </div>
-  </section>
-  <section>
-    <div class="shead">
-      <h2>What's in the box</h2>
-      <p class="sub">Everything required to produce the same clean take again.</p>
-    </div>
+  
+      <div class="boxhead">Everything required to produce the same clean take again</div>
     <div class="grid">
       <div class="cell"><b>Scenes with captions</b><p>Captions timed from the actual run, placed under the app — never over it. Every scene also yields a crisp still.</p></div>
       <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
@@ -446,7 +463,7 @@ section > *:not(.shead) { grid-column: 1; }
   <section>
     <div class="shead">
       <h2>Built against three real workflows</h2>
-      <p class="sub" style="max-width:640px">Retake was built inside these, not for a landing page. All three are mine — there are no customer quotes here yet, and this page is not going to pretend otherwise.</p>
+      <p class="sub" style="max-width:640px">Retake was built inside these, not for a landing page.</p>
     </div>
     <div class="cases">
       <div class="case">
@@ -467,23 +484,6 @@ section > *:not(.shead) { grid-column: 1; }
         <p class="meta">Coding school for young learners · <a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
         <p class="watch"><span class="k">WATCH</span><span><a href="media/scratch-mini-project.mp4">The take, 19 seconds</a> — four blocks dragged into one script, and the cat runs it.</span></p>
       </div>
-    </div>
-  </section>
-  <section id="found">
-    <div class="shead">
-      <h2>The bugs a test suite cannot see</h2>
-      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. A recording puts the whole screen in front of you.</p>
-    </div>
-    <div class="found">
-      <h3>One recording, made for a launch video. Nobody was looking for these.</h3>
-      <ul>
-        <li>A form still said a step was <b>optional</b>. It had been required for weeks.</li>
-        <li>A customer was shown a <b>raw timezone code</b> where the name of a city should have been.</li>
-        <li><b>Radio buttons</b> stretched across the entire width of the form.</li>
-        <li>A <b>squashed logo</b>, on a page nobody had opened in months.</li>
-        <li>An email subject line with a <b>machine timestamp</b> in it.</li>
-      </ul>
-      <p class="tail">A test can only check what somebody thought to check. A recording shows the rest, and the optional checks surface things nobody wrote down — you decide what matters. Because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
     </div>
   </section>
   <div class="movement" data-move="who">

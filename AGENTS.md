@@ -226,6 +226,10 @@ Most real demos start behind a sign-in. The agent never sees a password:
   and cuts the few seconds of video that show each one, so a long demo does not
   have to be re-watched to learn whether one thing changed. Exit 3 while
   anything flagged is still wrong. `retake unflag` stops watching one.
+- **Name things so a person can find them.** The window groups demos by
+  whatever it can work out — which, with no product note, means folders called
+  `localhost:3200`. The first heading of a product note names that folder.
+  Writing one is part of setting a demo up, not an afterthought.
 - `retake intent` — what the product IS, in the builder's words: what it does,
   who uses it, and what about it is deliberate. Every visual check reads it.
   Without it they judge the app as a generic web page — measured on a real

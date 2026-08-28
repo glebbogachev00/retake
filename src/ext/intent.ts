@@ -91,10 +91,31 @@ export function writeIntent(demosDir: string, text: string, demo?: string): stri
   return f;
 }
 
-/** The starter, so nobody has to guess what belongs in it. */
-export const TEMPLATE = `# What this product is
+/**
+ * The product's name, from the first heading of its note.
+ *
+ * The window groups demos by URL, so a workspace of real products showed
+ * folders called "localhost:3200" and "localhost:4990" — accurate and
+ * meaningless. Naming the product once, for the checks, names its folder too.
+ * Returns null for the starter's own placeholder, so an unfilled note never
+ * becomes a folder called "What this product is".
+ */
+export function productName(demosDir: string, demo?: string): string | null {
+  const t = readIntent(demosDir, demo);
+  if (!t) return null;
+  const h = /^#\s+(.+?)\s*$/m.exec(t);
+  const name = h?.[1]?.trim();
+  if (!name || /^what this product is$/i.test(name)) return null;
+  return name.slice(0, 32);
+}
 
-<!-- One or two sentences. What it does, and for whom. -->
+/** The starter, so nobody has to guess what belongs in it. */
+export const TEMPLATE = `# Name this product
+
+<!-- Replace the heading above with what this product is CALLED — that name
+     becomes its folder in the Retake window, which otherwise says something
+     like "localhost:3200". Then, below: one or two sentences on what it does
+     and for whom. -->
 
 ## Who uses it
 

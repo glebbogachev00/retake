@@ -40,6 +40,7 @@ import { digest } from "../digest.js";
 import { readFlags } from "../ext/flags.js";
 import { findOrphans } from "../ext/heal.js";
 import { readChecks } from "../ext/checked.js";
+import { productName } from "../ext/intent.js";
 import { running } from "../progress.js";
 import { MAX_BODY, checkRequest, clearToken, newToken, readBodyLimited, writeToken } from "./guard.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
@@ -204,7 +205,10 @@ function listDemos(project?: string) {
       // that points at the same app — otherwise an agent's new draft for
       // Capture lands in a second "localhost:3100" fold next to "capture".
       const assigned = assignments[name] ?? (url ? byUrl.get(url) : undefined);
-      const group = assigned ? path.basename(assigned) : shortGroup(url);
+      // A product that has said what it is called is filed under that name.
+      // Grouping by URL gave folders like "localhost:3200" — true, and no help
+      // to anybody looking for their charter demos.
+      const group = assigned ? path.basename(assigned) : (productName(DEMOS, name) ?? shortGroup(url));
       // Heal a folder whose run was killed mid-recording: the previous take is
       // in its stash and nothing has put it back yet. The window must never
       // show someone an empty demo when their recording is safe on disk.
@@ -240,7 +244,7 @@ function orphanedRecordings(known: string[]) {
     // rows that look like failed demos and are not demos at all.
     .filter((o) => o.rendered && !o.fragment && !known.includes(o.name))
     .map((o) => ({
-      name: o.name, file: "", title: o.title, url: o.url, group: shortGroup(o.url),
+      name: o.name, file: "", title: o.title, url: o.url, group: productName(DEMOS, o.name) ?? shortGroup(o.url),
       valid: true, settings: {} as Record<string, unknown>,
       lastTake: o.finishedAt ? { finishedAt: o.finishedAt, ok: true, partial: null, duration: o.seconds ?? 0 } : null,
       needsRecord: true,

@@ -167,6 +167,12 @@ left in the navigation of a customer-facing recording.
 Same number of findings. Better findings.
 
 - `intent` with no text **reads** it. Do this before you report anything.
+- **The first heading names the product, and that name becomes its folder in
+  the window.** Without one the window files demos by URL — real workspaces
+  end up with folders called `localhost:3200` and `localhost:4990`, which is
+  accurate and no help to anybody looking for their charter demos. Naming the
+  product once, for the checks, names its folder too. That part is your job:
+  the person should not have to tidy up after you.
 - `intent` with text **writes** it — the first time the person explains what
   their product does, who uses it, or why something unusual is on purpose.
   Use `demo` to write it for one app; a workspace with three products cannot

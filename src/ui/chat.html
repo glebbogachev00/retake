@@ -374,19 +374,28 @@ $('newsBtn').onclick = async () => {
   const fmt = (d) => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? '' : x.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }); };
   const veil = document.createElement('div');
   veil.className = 'veil';
-  veil.innerHTML = '<div class="modal wide"><h3>What\'s new</h3>' +
-    '<div class="scroll">' + rs.map((r, i) =>
+  // The newest release, and a way to the rest. Every release at once made the
+  // one thing that changed today compete with everything that ever changed.
+  let showAll = false;
+  const body = () => (showAll ? rs : rs.slice(0, 1)).map((r, i) =>
       '<div class="rel' + (i ? '' : ' latest') + '">' +
         '<div class="relhead"><b>' + esc(r.headline) + '</b><span class="relmeta">' + esc(r.version) + (r.date ? ' · ' + fmt(r.date) : '') + '</span></div>' +
         '<ul>' + (r.notes || []).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' +
-      '</div>').join('') + '</div>' +
-    '<div class="row" style="margin-top:18px"><button class="btn" id="newsClose">Close</button></div></div>';
+      '</div>').join('');
+  const render = () => {
+    veil.innerHTML = '<div class="modal wide"><h3>What\'s new</h3><div class="scroll">' + body() + '</div>' +
+      '<div class="row" style="margin-top:18px">' +
+      (showAll || rs.length < 2 ? '' : '<button class="btn" id="newsAll">All ' + rs.length + ' releases</button>') +
+      '<span class="sp"></span><button class="btn" id="newsClose">Close</button></div></div>';
+    const all = veil.querySelector('#newsAll');
+    if (all) all.onclick = () => { showAll = true; render(); };
+    veil.querySelector('#newsClose').onclick = () => veil.remove();
+  };
+  render();
   document.body.appendChild(veil);
   localStorage.setItem(SEEN_KEY, rs[0].version);
   $('newsBtn').querySelector('.ndot')?.remove();
-  const shut = () => veil.remove();
-  veil.querySelector('#newsClose').onclick = shut;
-  veil.onclick = (e) => { if (e.target === veil) shut(); };
+  veil.onclick = (e) => { if (e.target === veil) veil.remove(); };
   document.addEventListener('keydown', function esc2(e) { if (e.key === 'Escape') { shut(); document.removeEventListener('keydown', esc2); } });
 };
 

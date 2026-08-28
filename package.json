@@ -1,6 +1,6 @@
 {
   "name": "retake-demos",
-  "version": "0.12.3",
+  "version": "0.12.4",
   "description": "Demo-as-code for coding agents: a YAML manifest in, a product walkthrough video out. Rerun the demo instead of re-recording it.",
   "keywords": [
     "demo",

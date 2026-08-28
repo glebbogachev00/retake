@@ -2,6 +2,17 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.12.4",
+      "date": "2026-08-28",
+      "headline": "Your demos get filed under your product's name",
+      "notes": [
+        "The window used to file demos under whatever it could work out from the address — so real products ended up in folders called localhost:3200 and localhost:4990. True, and no help to anyone looking for their charter demos.",
+        "Name your product in its note and that name becomes its folder. One thing to write, two things fixed: the checks stop judging your app as a generic web page, and your library reads like your work instead of a list of ports.",
+        "What's new now opens on the newest release, with a way to the rest — instead of every release you have ever had, all at once.",
+        "On the website: the five bugs a recording found now sit directly under the first video instead of most of the way down the page, and two sections that explained the same thing twice are one."
+      ]
+    },
+    {
       "version": "0.12.3",
       "date": "2026-08-28",
       "headline": "A finished recording now looks finished",
