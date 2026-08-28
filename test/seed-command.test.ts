@@ -8,6 +8,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -57,9 +58,19 @@ test("a seed that never exits is killed, and nothing survives it", async () => {
   const cmd = `node -e "require('fs').writeFileSync('pid','' + process.pid); setTimeout(()=>{}, 60000)"`;
   await assert.rejects(() => runSeedCommand(cmd, "hanging seed", dir, 1500), /did not finish within 2s|did not finish/);
   const pid = Number(fs.readFileSync(path.join(dir, "pid"), "utf8"));
-  let alive = true;
-  try { process.kill(pid, 0); } catch { alive = false; }
-  assert.equal(alive, false, `pid ${pid} outlived the seed — the timeout killed the shell but not its child`);
+  // Gone, or a zombie waiting to be reaped. When /bin/sh forks rather than
+  // execs — which dash on Linux does and bash on macOS does not — the killed
+  // process is reparented and `kill(pid, 0)` keeps succeeding until whatever
+  // inherited it gets around to reaping. That is dead, not running, and this
+  // test failed on Linux for two months without anyone seeing it because CI
+  // could not get as far as running it.
+  const gone = () => {
+    try { process.kill(pid, 0); } catch { return true; }
+    try { return /^Z/.test(execFileSync("ps", ["-o", "state=", "-p", String(pid)], { encoding: "utf8" }).trim()); } catch { return true; }
+  };
+  const until = Date.now() + 5000;
+  while (!gone() && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
+  assert.ok(gone(), `pid ${pid} outlived the seed — the timeout killed the shell but not its child`);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

@@ -16,15 +16,48 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { chromium, type Browser } from "playwright";
 
 const PORT = 4403;
-let ui: ChildProcess, browser: Browser, token = "";
+let ui: ChildProcess, browser: Browser, token = "", OUT = "";
+
+/**
+ * A finished recording, planted.
+ *
+ * This ran against whatever happened to be in the developer's own `outputs/`,
+ * so on a machine with real takes it exercised the whole panel and on a fresh
+ * checkout it clicked a demo that had never been recorded and asserted against
+ * an empty string. It passed here and failed the first time CI could run it.
+ */
+function plant(): string {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "smoke-out-"));
+  const dir = path.join(out, "example");
+  fs.mkdirSync(path.join(dir, "stills"), { recursive: true });
+  execFileSync("ffmpeg", ["-y", "-f", "lavfi", "-i", "color=c=#edefe8:s=320x180:d=1", "-pix_fmt", "yuv420p", path.join(dir, "demo.mp4")], { stdio: "ignore" });
+  execFileSync("ffmpeg", ["-y", "-f", "lavfi", "-i", "color=c=#edefe8:s=320x180:d=1", "-frames:v", "1", path.join(dir, "stills", "01-a-end.png")], { stdio: "ignore" });
+  fs.writeFileSync(path.join(dir, "take.json"), JSON.stringify({
+    timeline: [{ index: 1, action: "scene", label: "a", summary: "scene a", ok: true, start: 0, end: 1 }],
+    duration: 1, trimBefore: 0, startedAt: new Date(0).toISOString(), finishedAt: new Date(1000).toISOString(),
+    ok: true, screenshots: ["stills/01-a-end.png"],
+    quality: { preset: "post-landscape", width: 1920, height: 1080, scale: 2, fps: 30 },
+  }));
+  // So the review area has something to say. Its labels are the ones the
+  // contrast test measures.
+  fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
+    verify: { at: new Date(2000).toISOString(), takeFinishedAt: new Date(1000).toISOString(), ok: true, count: 1, summary: "1 answered yes" },
+    sweep: { at: new Date(2000).toISOString(), takeFinishedAt: new Date(1000).toISOString(), ok: null, count: 0, summary: "nothing on 1 frame" },
+  }));
+  return out;
+}
 
 test.before(async () => {
+  OUT = plant();
   ui = spawn(process.execPath, ["dist/cli.js", "ui", "--port", String(PORT)], {
-    cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, RETAKE_OPEN: "0" },
+    cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, RETAKE_OPEN: "0", RETAKE_OUT: OUT },
   });
   // Wait for it to answer rather than sleeping a guessed number of seconds.
   const until = Date.now() + 30_000;
@@ -38,7 +71,7 @@ test.before(async () => {
   browser = await chromium.launch();
 });
 
-test.after(async () => { await browser?.close(); ui?.kill(); });
+test.after(async () => { await browser?.close(); ui?.kill(); if (OUT) fs.rmSync(OUT, { recursive: true, force: true }); });
 
 /** Load the page and hand back everything the browser complained about. */
 async function visit(width: number, run: (p: import("playwright").Page) => Promise<void>) {
@@ -60,7 +93,8 @@ test("the window loads and opens a demo without a single console error", async (
     for (const d of await p.locator("#demos details").all()) await d.evaluate((e) => ((e as HTMLDetailsElement).open = true));
     await p.waitForTimeout(400);
     const rows = p.locator("#demos .nm");
-    if (await rows.count()) {
+    assert.ok(await rows.count(), "the planted recording must be listed");
+    {
       await rows.first().click({ force: true });
       await p.waitForTimeout(2000);
       // The parts most often broken by a scope mistake.
@@ -116,9 +150,8 @@ test("the small print in the review area is readable", async () => {
       }
       return low;
     })()`)) as number;
-    // 99 means the panel was not on screen for this demo; that is not a pass
-    // to assert against, so only judge it when it was actually there.
-    if (worst < 99) assert.ok(worst >= 4.5, `the quietest label measures ${worst.toFixed(2)}:1, under AA`);
+    assert.ok(worst < 99, "the review area was not on screen, so nothing was measured");
+    assert.ok(worst >= 4.5, `the quietest label measures ${worst.toFixed(2)}:1, under AA`);
   });
   assert.deepEqual(errs, []);
 });
