@@ -87,6 +87,15 @@
   .vocab { background:var(--card); border:1px solid var(--rule); border-left:3px solid var(--amber); border-radius:14px; padding:18px 22px; font-size:15px; color:var(--muted); line-height:1.8; }
   .vocab b { color:var(--ink); }
   .cases { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:14px; }
+  /* The proof section showed no proof — three cards of text about recordings
+     you had to leave the page to see. A frame from the actual take, on the
+     card, is the smallest honest version of that. */
+  /* The one case whose recording is not mine to show. An empty gap beside two
+     frames reads as something missing; saying why reads as a decision. */
+  .noshot { margin:14px 0 4px; padding:16px 14px; border:1px dashed var(--rule2); border-radius:10px; font-size:13px; line-height:1.5; color:var(--muted); background:rgba(0,0,0,.012); }
+  .shotlink { display:block; margin:14px 0 4px; border-radius:10px; overflow:hidden; border:1px solid var(--rule2); line-height:0; }
+  .shotlink img { width:100%; height:auto; display:block; transition:transform .3s ease; }
+  .shotlink:hover img { transform:scale(1.02); }
   .case { background:var(--card); border:1px solid var(--rule); border-radius:16px; padding:22px 24px; display:flex; flex-direction:column; box-shadow:0 10px 26px rgba(24,28,24,.06); }
   .wordmark { font-size:24px; font-weight:700; letter-spacing:-.02em; margin-bottom:12px; display:flex; align-items:center; gap:10px; }
   .caselogo { height:28px; width:28px; border-radius:7px; object-fit:contain; }
@@ -470,11 +479,13 @@ section > *:not(.shead) { grid-column: 1; }
         <div class="wordmark"><span class="serif">capture<span style="color:#2F5D3F">.</span></span></div>
         <p class="quote">A five-video launch set, drafted, corrected and re-cut in one afternoon. Re-doing a take stopped being a decision worth having.</p>
         <p class="meta">Thought-sorting app · <a href="https://capture-playground.vercel.app">capture-playground.vercel.app</a></p>
+        <a class="shotlink" href="media/mark-done.mp4"><img src="media/mark-done.jpg" alt="A frame from a Capture demo recorded with Retake" loading="lazy"></a>
         <p class="watch"><span class="k">WATCH</span><span>Three of those videos are live on <a href="https://capture-playground.vercel.app">Capture's own page</a>, which credits Retake by name.</span></p>
       </div>
       <div class="case">
         <div class="wordmark"><img src="logos/avexjets.png" alt="AvexJets" class="caselogo wide"></div>
         <p class="quote">One repeatable flow across three portals, replacing a twenty-minute live walkthrough. The proof log catches a broken step before a client ever sees it.</p>
+        <div class="noshot">Nothing to watch here. That walkthrough is the client's, and it is not mine to publish — which is the honest version of a case study.</div>
         <p class="meta">Private aviation charter · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
         <p class="watch"><span class="k">SITE</span><span>The walkthrough itself is client-facing; <a href="https://www.avex-jets.com">the product it records is public</a>.</span></p>
       </div>
@@ -482,6 +493,7 @@ section > *:not(.shead) { grid-column: 1; }
         <div class="wordmark tbmark"><span style="color:#193b92">Tech</span><span style="color:#2C7A7B">Bash</span></div>
         <p class="quote">An agent operates the real Scratch editor, dragging the actual blocks. When a lesson changes, the same file produces the next walkthrough.</p>
         <p class="meta">Coding school for young learners · <a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
+        <a class="shotlink" href="media/scratch-mini-project.mp4"><img src="media/scratch-mini-project.jpg" alt="A frame from a Scratch lesson recorded with Retake" loading="lazy"></a>
         <p class="watch"><span class="k">WATCH</span><span><a href="media/scratch-mini-project.mp4">The take, 19 seconds</a> — four blocks dragged into one script, and the cat runs it.</span></p>
       </div>
     </div>

@@ -16,6 +16,8 @@
   .top a { display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; }
   .top h1 { font-size:15px; font-weight:600; margin:0; }
   main { max-width:640px; margin:0 auto; padding:28px 22px 80px; }
+  /* The flow needs three columns of room; the prose below stays narrow. */
+  @media (min-width: 900px) { main { max-width:960px; } main > section, main > .lead, main > h2, main > .loop { max-width:640px; } }
   h2 { font-size:22px; letter-spacing:-.01em; margin:0 0 6px; }
   .lead { color:var(--muted); margin:0 0 34px; }
   section { margin-bottom:34px; }
@@ -28,6 +30,24 @@
   .quiet { color:var(--muted); font-size:14px; }
   code { background:var(--card); border:1px solid var(--rule); border-radius:6px; padding:1px 7px; font:14px ui-monospace, Menlo, monospace; }
   hr { border:0; border-top:1px solid var(--rule); margin:34px 0; }
+  /* The first three steps are one loop, not three articles. Prose can say
+     that; only a shape shows it. */
+  .flow { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:14px; align-items:start; margin:10px 0 18px; }
+  .beat { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:16px; }
+  .beat .n { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:999px; background:var(--accent); color:#eceee9; font-size:12px; font-weight:600; }
+  .beat h3 { margin:10px 0 8px; font-size:15px; }
+  .beat p { font-size:13.5px; line-height:1.6; color:var(--muted); margin:10px 0 0; }
+  .beat .say { font-size:13.5px; margin:0; padding:10px 13px; }
+  .thing { display:flex; flex-direction:column; gap:5px; background:var(--paper); border:1px solid var(--rule); border-radius:10px; padding:11px 13px; font-size:14px; }
+  .thing span { color:var(--muted); font-size:13px; }
+  .arrow { color:#c9cec0; font-size:20px; padding-top:56px; }
+  .loop { display:flex; gap:10px; align-items:baseline; font-size:14px; color:var(--muted); background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:12px 16px; }
+  .loop span { color:var(--amber); font-size:16px; }
+  /* Stacked on a phone, with the arrows turned to point down the page. */
+  @media (max-width: 760px) {
+    .flow { grid-template-columns:1fr; gap:10px; }
+    .arrow { padding:0; text-align:center; transform:rotate(90deg); }
+  }
 </style>
 </head>
 <body>
@@ -40,30 +60,29 @@
   <h2>How Retake works</h2>
   <p class="lead">Describe a demo of your app in a sentence. Retake drives a real browser through it and hands you the video. When the app changes, you re-run — nobody re-records anything by hand.</p>
 
-  <section>
-    <h3>1 · Ask for a demo</h3>
-    <p>Talk to the agent you already use — Claude Code or Codex. It has Retake's tools.</p>
-    <div class="say">Record a demo of my app at localhost:3000 showing the sign-up flow.</div>
-    <div class="say">What demos are worth recording for this project? Record the best three.</div>
-    <p class="quiet">The agent reads your app, writes the steps, checks every one of them against the live page, and only then records. You can watch it work on this window's front page.</p>
-  </section>
-
-  <section>
-    <h3>2 · Judge the take</h3>
-    <p>The video lands here — newest on top, one still per scene under it. <b>Download</b> for the file, <b>Show in folder</b> for everything else — the stills, the proof log, the manifest.</p>
-  </section>
-
-  <section>
-    <h3>3 · Direct it like a videographer</h3>
-    <p>Say what you want changed, in plain words:</p>
-    <ul>
-      <li>“No zooms — keep the camera still.”</li>
-      <li>“Hide the cursor.” · “Shorter captions.” · “No captions.”</li>
-      <li>“Hold the ending longer.” · “Cut the first two seconds.”</li>
-      <li>“Make it square for a post.” · “Vertical for a reel.”</li>
-    </ul>
-    <p class="quiet">Say it once — Retake remembers it for the project. Most changes re-render in seconds without re-recording.</p>
-  </section>
+  <div class="flow">
+    <div class="beat">
+      <span class="n">1</span>
+      <h3>You say it</h3>
+      <div class="say">Record a demo of my app at localhost:3000 showing the sign-up flow.</div>
+      <p>To the agent you already use. It reads your app, writes the steps, checks every one against the live page, and only then records.</p>
+    </div>
+    <div class="arrow" aria-hidden="true">&rarr;</div>
+    <div class="beat">
+      <span class="n">2</span>
+      <h3>You watch it</h3>
+      <div class="thing"><b>demo.mp4</b><span>a still for every scene</span><span>a written record of what happened</span></div>
+      <p>It lands in this window, newest on top. <b>Download</b> for the file, <b>Show in folder</b> for the rest.</p>
+    </div>
+    <div class="arrow" aria-hidden="true">&rarr;</div>
+    <div class="beat">
+      <span class="n">3</span>
+      <h3>You change your mind</h3>
+      <div class="say">No zooms. Hide the cursor. Square for a post.</div>
+      <p>In plain words, and most of it comes back in seconds &mdash; the recording is already made. Say it once and Retake keeps it for the project.</p>
+    </div>
+  </div>
+  <p class="loop"><span>&#8634;</span> And when your app changes, you run the same file again. That is the whole idea: the demo outlives the video.</p>
 
   <hr>
 
