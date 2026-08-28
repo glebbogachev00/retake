@@ -438,7 +438,11 @@ export function serve(port: number) {
         if (no) return json(res, no.status, { error: no.error });
       }
       if (p === "/" && req.method === "GET") {
-        res.writeHead(200, { "content-type": "text/html" });
+        // Never cached. The page carries this window's token and whatever the
+        // build says today; a browser holding yesterday's copy is how somebody
+        // ends up staring at a version that no longer exists and concluding
+        // the feature was never built.
+        res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store, must-revalidate", "x-retake-version": VERSION });
         return res.end(chatPage);
       }
       if (p === "/landing" && req.method === "GET") {

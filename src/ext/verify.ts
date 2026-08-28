@@ -27,6 +27,7 @@ import type { Take } from "../record.js";
 import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
 import { readFlags } from "./flags.js";
 import { noteCheck } from "./checked.js";
+import { endProgress, setPhase } from "../progress.js";
 import type { Provider } from "../describe.js";
 
 export type Answer = {
@@ -163,9 +164,12 @@ export async function verify(m: Manifest, outDir: string, log?: (l: string) => v
   // A few at a time. Serially, a demo with thirty-four expectations took six
   // minutes to answer — long enough that an agent skips it, which makes the
   // check worthless however good it is.
+  setPhase(outDir, { demo: m.name, phase: "verifying", step: 0, of: qs.length, label: "answering what the scenes ask" });
+  let asked = 0;
   const answers: Answer[] = await pool(qs, Math.max(1, concurrency), async (q): Promise<Answer> => {
     if (!q.still) return { scene: q.scene, question: q.question, ok: null, why: "no still for that scene — was it recorded?", still: "" };
     const a = await judgeWith(provider, q.still, q.question);
+    setPhase(outDir, { phase: "verifying", step: ++asked, of: qs.length, label: q.scene });
     return { scene: q.scene, question: q.question, ok: a.ok, why: a.why, still: q.still };
   });
   // Printed in manifest order after the fact, so the report reads down the
@@ -181,6 +185,7 @@ export async function verify(m: Manifest, outDir: string, log?: (l: string) => v
   const ok = answers.every((a) => a.ok === true);
   const yes = answers.filter((a) => a.ok === true).length;
   say(ok ? `verify: pass (${answers.length}/${answers.length})` : `verify: FAIL (${yes}/${answers.length} answered yes)`);
+  endProgress(outDir);
   noteCheck(outDir, "verify", { takeFinishedAt: take.finishedAt, ok, count: answers.length, summary: ok ? `${answers.length} answered yes` : `${yes} of ${answers.length} answered yes` });
   return { ok, answers, judge, lines };
 }

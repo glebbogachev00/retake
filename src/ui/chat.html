@@ -46,6 +46,8 @@
   }
 
   /* live activity — what an agent is doing to this library right now */
+  .busy { font-size:11.5px; font-weight:500; color:var(--amber); background:rgba(232,176,75,.14); border-radius:999px; padding:1px 7px; white-space:nowrap; }
+  .dot.live { background:var(--amber); box-shadow:0 0 0 3px rgba(232,176,75,.22); }
   .live { border:1px solid var(--rule); background:var(--card); border-radius:14px; padding:14px 18px; margin-bottom:18px; display:none; }
   .live.show { display:block; }
   .live .head { display:flex; align-items:center; gap:9px; font-size:13px; color:var(--muted); margin-bottom:6px; }
@@ -555,6 +557,14 @@ function drawFlagged(name, f, q) {
   };
 }
 
+// Short enough for a library row; the panel above uses the long ones.
+const PHASE_SHORT = {
+  seeding: 'seeding', opening: 'opening', recording: 'recording',
+  rendering: 'rendering', checking: 'checking',
+  sweeping: 'sweeping', verifying: 'verifying', sensing: 'sensing',
+};
+const RUNNING = new Map();
+
 async function drawDemos() {
   try { demos = await api('/api/demos'); } catch { return; }
   demos.sort((a, b) => (b.lastTake ? new Date(b.lastTake.finishedAt).getTime() : 0) - (a.lastTake ? new Date(a.lastTake.finishedAt).getTime() : 0));
@@ -601,7 +611,14 @@ async function drawDemos() {
       el.className = 'demo' + (p.name === current ? ' on' : '');
       const dot = p.lastTake ? (p.lastTake.ok && !p.lastTake.partial ? 'ok' : 'bad') : '';
       const when = p.lastTake ? new Date(p.lastTake.finishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'no take yet';
-      el.innerHTML = `<input type="checkbox" class="pick"${picked.has(p.name) ? ' checked' : ''}><span class="dot ${dot}"></span><span class="nm">${esc(p.name)}</span><small>${esc(when)}</small><button class="zap" title="Archive this demo">✕</button>`;
+      // What this demo is doing right now, if anything. The library is where
+      // a person looks to answer "what is going on", so the answer belongs on
+      // the row rather than only in a panel at the top.
+      const busy = RUNNING.get(p.name);
+      const badge = busy
+        ? `<span class="busy">${esc(PHASE_SHORT[busy.phase] || busy.phase)}${busy.of ? ` ${busy.step}/${busy.of}` : ''}</span>`
+        : `<small>${esc(when)}</small>`;
+      el.innerHTML = `<input type="checkbox" class="pick"${picked.has(p.name) ? ' checked' : ''}><span class="dot ${busy ? 'live' : dot}"></span><span class="nm">${esc(p.name)}</span>${badge}<button class="zap" title="Archive this demo">✕</button>`;
       const box = el.querySelector('.pick');
       const syncGroup = () => { const gb = det.querySelector('.gpick'); if (gb) gb.checked = items.every((x) => picked.has(x.name)); };
       box.onclick = (ev) => { ev.stopPropagation(); box.checked ? picked.add(p.name) : picked.delete(p.name); syncGroup(); drawSelBar(); };
@@ -798,7 +815,10 @@ function startLiveTickers(startedAt) {
     // Slow enough to read, and it only moves while something is happening.
     quipTimer = setInterval(() => {
       quipAt = (quipAt + 1) % QUIPS.length;
-      const q = $('liveQuip'); if (q) q.textContent = QUIPS[quipAt];
+      // Not while a run is reporting its own step: the quip would paint over
+      // the one line that says what is actually happening.
+      const q = $('liveQuip');
+      if (q && !liveFromDisk) q.textContent = QUIPS[quipAt];
     }, 4200);
   }
   if (!elapsedTimer) {
@@ -885,9 +905,12 @@ const PHASE_WORDS = {
   recording: 'recording',
   rendering: 'rendering the video',
   checking:  'checking the result',
+  sweeping:  'looking at every frame',
+  verifying: 'answering what the scenes ask',
+  sensing:   'checking whether the run adds up',
 };
 let liveFromDisk = false;
-function drawRunning(job) {
+function drawRunning(job, others) {
   const box = $('live');
   box.style.display = 'block';
   liveFromDisk = true;
@@ -913,16 +936,24 @@ function drawRunning(job) {
   }
   // The step it is on, or nothing — never a leftover from a previous phase.
   $('liveQuip').textContent = job.phase === 'recording' && job.label ? String(job.label).slice(0, 70) : '';
+  // Everything else happening at the same time, named rather than hidden.
+  const rest = (others || []).map((o) => `${o.demo} · ${PHASE_SHORT[o.phase] || o.phase}`).join('   ');
+  $('liveLines').textContent = rest ? 'also: ' + rest : '';
 }
 async function pollRunning() {
   let r = null;
   try { r = await api('/api/running'); } catch { return; }
-  const job = r && r.running && r.running[0];
-  if (job) return drawRunning(job);
-  // Nothing on disk. Only hide if we were the one showing it — an agent
-  // reporting over the feed still owns the panel.
+  const jobs = (r && r.running) || [];
+  // Redraw the library only when the set of busy demos actually changes,
+  // so a two-second poll does not rebuild the list forever.
+  const key = jobs.map((j) => `${j.demo}:${j.phase}:${j.step || 0}`).join('|');
+  RUNNING.clear();
+  for (const j of jobs) RUNNING.set(j.demo, j);
+  if (key !== lastRunningKey) { lastRunningKey = key; drawDemos(); }
+  if (jobs.length) return drawRunning(jobs[0], jobs.slice(1));
   if (liveFromDisk) { liveFromDisk = false; $('live').style.display = 'none'; stopLiveTickers(); }
 }
+let lastRunningKey = '';
 pollRunning();
 setInterval(pollRunning, 2000);
 

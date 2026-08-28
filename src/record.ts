@@ -11,6 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import { beginProgress, setPhase } from "./progress.js";
+import { describeWait, waitForStep } from "./waiting.js";
 import path from "node:path";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import YAML from "yaml";
@@ -1165,37 +1166,11 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       catch { await sel.selectOption({ label: step.value }, { timeout }); }
       break;
     }
-    case "waitFor": {
-      const t = step.timeout ?? 30_000;
-      if (step.gone) { await page.waitForSelector(step.selector, { state: "hidden", timeout: t }); break; }
-      await page.waitForSelector(step.selector, { timeout: t });
-      if (step.minChars) {
-        await page.waitForFunction(
-          ([sel, n]) => (document.querySelector(sel as string)?.textContent ?? "").trim().length >= (n as number),
-          [step.selector, step.minChars] as const, { timeout: t },
-        );
-      }
-      if (step.stableMs) {
-        // Quiet for this long, measured in the page: the only honest signal
-        // that a streamed or animating subtree has finished.
-        await page.waitForFunction(
-          ([sel, quiet]) => {
-            const w = window as unknown as { __retakeStable?: Record<string, number> };
-            const el = document.querySelector(sel as string);
-            if (!el) return false;
-            w.__retakeStable ??= {};
-            const key = sel as string;
-            const now = Date.now();
-            const snap = el.innerHTML.length + ":" + (el.textContent ?? "").length;
-            const prev = (w as unknown as { __retakeSnap?: Record<string, string> }).__retakeSnap ??= {};
-            if (prev[key] !== snap) { prev[key] = snap; w.__retakeStable[key] = now; return false; }
-            return now - (w.__retakeStable[key] ?? now) >= (quiet as number);
-          },
-          [step.selector, step.stableMs] as const, { timeout: t, polling: 100 },
-        );
-      }
+    case "waitFor":
+      // Shared with `dry`, so the cheap check waits for the same conditions
+      // the recorder does — see waiting.ts for what used to happen instead.
+      await waitForStep(page, step);
       break;
-    }
     case "evaluate":
       await page.evaluate(step.script);
       break;
@@ -1253,7 +1228,7 @@ export function describe(step: Step): string {
     case "download":
       return `download${step.selector ? ` via ${step.selector}` : ""}${step.saveAs ? ` → ${step.saveAs}` : ""}`;
     case "waitFor":
-      return `wait for ${step.selector}${step.gone ? " to go" : ""}${step.stableMs ? ` to settle (${step.stableMs}ms quiet)` : ""}${step.minChars ? ` to hold ${step.minChars}+ chars` : ""}`;
+      return describeWait(step);
     case "evaluate":
       return `evaluate (${step.script.length} chars)`;
     case "stub":

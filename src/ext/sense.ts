@@ -28,6 +28,7 @@ import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { ask, pickJudge, readJson, why as short } from "./judge.js";
 import { noteCheck } from "./checked.js";
+import { endProgress, setPhase } from "../progress.js";
 
 /** How many frames one judgement is allowed. A 37-scene demo does not get 37
     images; it gets an even spread including the first and last, and is told
@@ -150,6 +151,7 @@ export function sense(m: Manifest, outDir: string, log?: (l: string) => void): S
   const entered = told.reduce((n, s) => n + s.did.length, 0);
   say(`reading ${entered} recorded action${entered === 1 ? "" : "s"} against ${used.length} frame${used.length === 1 ? "" : "s"}${of > used.length ? ` (sampled from ${of} scenes)` : ""} with ${judge}`);
 
+  setPhase(outDir, { demo: m.name, phase: "sensing", label: "checking the run adds up" });
   let raw: Raw | null = null;
   try {
     raw = readJson(ask(provider, prompt(m, told, used, of), used.map((u) => u.file)), isRaw);
@@ -169,6 +171,7 @@ export function sense(m: Manifest, outDir: string, log?: (l: string) => void): S
     concerns.push({ lens: (o.lens ?? "").toString().slice(0, 24) || "—", scene: o.scene?.toString() || undefined, question: o.question.toString(), saw: (o.saw ?? "").toString() });
   }
 
+  endProgress(outDir);
   noteCheck(outDir, "sense", {
     takeFinishedAt: take.finishedAt, ok: null, count: concerns.length,
     summary: concerns.length ? `${concerns.length} question${concerns.length === 1 ? "" : "s"}` : "the run adds up",

@@ -10,7 +10,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { applyPageSetup, authState, dragPoints, gateOnApp, resolvePoint, runEvaluateSeed, runFileOrCommandSeed } from "./record.js";
 import { chromium, type Page, type BrowserContext } from "playwright";
+import { waitForStep } from "./waiting.js";
 import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
+
+/** The longest a dry run will wait for anything. Long enough for a real app
+    to answer, short enough that checking a demo stays a seconds-long job. */
+const DRY_WAIT_CAP = 15_000;
 
 export type DryResult = { ok: boolean; lines: string[]; failures: number };
 
@@ -186,7 +191,11 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
       }
       else switch (step.action) {
         case "navigate": await page.goto(expandEnv(step.url), { waitUntil: "domcontentloaded", timeout: 60000 }); await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {}); break;
-        case "waitFor": await page.waitForSelector(step.selector, { state: step.gone ? "hidden" : "visible", timeout: Math.min(step.timeout ?? 15000, 15000) }); break;
+        // The same wait the recorder performs, capped so a dry run stays
+        // cheap. It used to check only that the selector appeared, ignoring
+        // `minChars` and `stableMs` entirely — so a manifest waiting for a
+        // streamed result passed here and timed out on camera.
+        case "waitFor": await waitForStep(page, step, { cap: DRY_WAIT_CAP }); break;
         // noWaitAfter: a click that submits a form starts a navigation, and
         // waiting for the element to settle afterwards reports a false failure
         // for a click that actually worked.

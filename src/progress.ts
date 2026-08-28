@@ -19,7 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export type Phase = "seeding" | "opening" | "recording" | "rendering" | "checking" | "done" | "failed";
+export type Phase = "seeding" | "opening" | "recording" | "rendering" | "checking" | "sweeping" | "verifying" | "sensing" | "done" | "failed";
 
 export type Progress = {
   demo: string;

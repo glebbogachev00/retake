@@ -28,6 +28,7 @@ import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
 import { noteCheck } from "./checked.js";
+import { endProgress, setPhase } from "../progress.js";
 import { memo } from "./memo.js";
 
 /**
@@ -126,9 +127,14 @@ export async function sweep(
   // thirty, and asking about the other twenty-nine again buys nothing.
   const known = memo<Issue[]>(outDir, { reask: opts.fresh === true });
   let recalled = 0;
+  // Two minutes of work with nothing to see. It reports where it is, the same
+  // way a recording does, so the window can say "sweeping · frame 12 of 30"
+  // instead of nothing at all.
+  setPhase(outDir, { demo: m.name, phase: "sweeping", step: 0, of: shots.length, label: "looking at every frame" });
+  let done = 0;
   const frames: Frame[] = await pool<{ scene: string; still: string }, Frame>(shots, Math.max(1, opts.concurrency ?? 4), async (shot): Promise<Frame> => {
     const seen = known.recall(shot.still, PROMPT);
-    if (seen) { recalled++; return { ...shot, issues: seen }; }
+    if (seen) { recalled++; setPhase(outDir, { phase: "sweeping", step: ++done, of: shots.length, label: shot.scene }); return { ...shot, issues: seen }; }
     try {
       const raw = readJson(await askAsync(provider, PROMPT, [shot.still], 120_000), isRaw);
       if (!raw) return { ...shot, issues: [], error: "no usable answer from the judge" };
@@ -144,6 +150,7 @@ export async function sweep(
         const seenAlready = new Set(was.map((i) => `${i.kind}|${i.what}`));
         return [...was, ...now.filter((i) => !seenAlready.has(`${i.kind}|${i.what}`))];
       });
+      setPhase(outDir, { phase: "sweeping", step: ++done, of: shots.length, label: shot.scene });
       return { ...shot, issues: known.all(shot.still, PROMPT) ?? issues };
     } catch (e) {
       // Never remembered: a failure is not an answer about the frame.
@@ -151,6 +158,7 @@ export async function sweep(
     }
   });
   known.flush();
+  endProgress(outDir);
 
   const hit = frames.filter((f) => f.issues.length);
   const failed = frames.filter((f) => f.error);
