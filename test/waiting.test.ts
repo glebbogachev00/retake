@@ -68,3 +68,32 @@ test("the cap dry passes shortens the wait without changing what is waited for",
   await assert.rejects(() => waitForStep(page, { selector: CSS, minChars: 500, timeout: 30_000 }, { cap: 800 }));
   assert.ok(Date.now() - t0 < 4000, `a capped wait must not run to the manifest's timeout (took ${Date.now() - t0}ms)`);
 });
+
+test("`scroll to: bottom` means the page's end in BOTH dry and run", async () => {
+  // Found by recording Retake's own guide page: dry treated "bottom" as a
+  // selector, looked for an element called bottom, timed out, and failed a
+  // step that records perfectly. The starter demo shipped by `retake init`
+  // uses it, so a new person's first dry run failed on a demo that works.
+  const { dryRun } = await import("../src/dryrun.js");
+  const { loadManifest } = await import("../src/manifest.js");
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const http = await import("node:http");
+
+  const port = 4402;
+  const srv = http.createServer((_q, r) => { r.writeHead(200, { "content-type": "text/html" }); r.end(`<h1 id="top">t</h1><div style="height:3000px"></div>`); });
+  await new Promise<void>((ok) => srv.listen(port, "127.0.0.1", ok));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scroll-"));
+  const f = path.join(dir, "s.yaml");
+  fs.writeFileSync(f, [
+    "name: s", `url: http://127.0.0.1:${port}/`, "preset: draft", 'waitForSelector: "#top"',
+    "steps:", "  - { action: scene, label: a }", "  - { action: scroll, to: bottom }", "  - { action: scroll, to: top }",
+  ].join("\n"));
+  try {
+    const r = await dryRun(loadManifest(f).manifest, dir, () => {}, { outRoot: dir });
+    assert.equal(r.failures, 0, `dry failed a scroll the recorder performs: ${r.lines.filter((l) => l.includes("✗")).join(" | ")}`);
+  } finally {
+    await new Promise<void>((ok) => { srv.close(() => ok()); });
+  }
+});

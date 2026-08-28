@@ -136,6 +136,10 @@ function stillFor(outDir: string, take: Take, label: string): string | null {
  * have to be re-watched.
  */
 export async function checkFlags(manifestFile: string, _m: Manifest, outDir: string, opts: { clips?: boolean; log?: (l: string) => void } = {}): Promise<FixedReport> {
+  // Both derived from the manifest's own path, so `fixed` reads the note that
+  // belongs to this demo's app.
+  const demosDir = path.dirname(manifestFile);
+  const demoName = path.basename(manifestFile).replace(/\.(ya?ml|json)$/i, "");
   const lines: string[] = [];
   const say = (l: string) => { lines.push(l); opts.log?.(l); };
   const flags = readFlags(manifestFile);
@@ -159,7 +163,10 @@ export async function checkFlags(manifestFile: string, _m: Manifest, outDir: str
     let why = "";
     if (!still) why = `no still for scene "${f.scene}" in the newest take — was that scene recorded?`;
     else if (!provider) why = noJudge ?? "nothing available to look at the frame";
-    else ({ ok, why } = await judgeWith(provider, still, f.expect));
+    // The same product context `verify` gets. Without it `fixed` judged the
+    // same frames by a generic standard while `verify` judged them knowing
+    // what the app is — two answers to one question, by design accident.
+    else ({ ok, why } = await judgeWith(provider, still, f.expect, demosDir, demoName));
     let clip: Clip | undefined;
     let clipError: string | undefined;
     if (opts.clips !== false) {

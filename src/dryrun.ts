@@ -220,7 +220,14 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
           catch { await sel.selectOption({ label: step.value }, { timeout: short }); }
           break;
         }
-        case "scroll": if (step.to) await page.locator(step.to).first().boundingBox({ timeout: short }); break;
+        // `to: top` and `to: bottom` are the PAGE's ends, not selectors — the
+        // recorder reads scrollY and scrollHeight for them. Dry was looking for
+        // an element called "bottom", timing out, and failing a step that
+        // records perfectly. The starter demo shipped with `retake init` hits
+        // it, so a new person's first dry run failed on a demo that works.
+        case "scroll":
+          if (step.to && step.to !== "top" && step.to !== "bottom") await page.locator(step.to).first().boundingBox({ timeout: short });
+          break;
         case "upload": await page.locator(step.selector).first().waitFor({ timeout: short }); break;
         case "evaluate": await page.evaluate(step.script); break;
         case "stub": await arm({ url: step.url, method: step.method, status: step.status ?? 200, json: step.json, from: step.from, contentType: "application/json; charset=utf-8" }); break;

@@ -49,20 +49,24 @@ say so in one line and stop.
    selectors, logins under `auth.setup` with `${ENV}` placeholders and
    `secret: true`, `reducedMotion: true` if things animate forever, scrolls
    before anything below the fold.
-5. **`dry`** — ALWAYS before `run`. Seconds, no camera, strict; failures
+5. **`intent`** — read it. One call, and it is what stops the checks judging
+   this app as a generic web page. If there is nothing there and the person
+   has told you what their product is, write it; if they have not, say so
+   when you report, and never invent one.
+6. **`dry`** — ALWAYS before `run`. Seconds, no camera, strict; failures
    include what was on screen. Fix and repeat until it passes. Never record
    a manifest whose dry run fails.
-6. **While iterating, record at `--preset draft`** (CLI) — same layout as the
+7. **While iterating, record at `--preset draft`** (CLI) — same layout as the
    final at a quarter of the pixels, so a take costs ~real time instead of
    real time plus an encoder. Switch to a post preset only for the take you
    intend to keep.
-7. **`run` with `preview=true`**, then read the `receipts` AND `look` at
+8. **`run` with `preview=true`**, then read the `receipts` AND `look` at
    the take. Receipts say what happened; `look` shows how it looks — one
    image per scene. Judge it like a viewer would: is the thing the caption
    names actually on screen? Anything in shot that shouldn't be (dev
    badges, leftover data, cut-off text)? Wrong story or failed step →
    `edit`, run again. More than four rounds → ask the person.
-8. **Before the expensive take, if it is expensive, show them the draft.**
+9. **Before the expensive take, if it is expensive, show them the draft.**
    `run` prints an estimate before capture. If it said this is a long take
    (over ~2.5 minutes), do not go straight to full quality: `ask` them,
    naming the demo and pointing at the draft in the Retake window, and say
@@ -79,7 +83,7 @@ say so in one line and stop.
    - **Nobody there to ask?** Never block and never guess. Leave the draft,
      `done` with what you have and what it would cost, and let them start
      the expensive one when they are back.
-9. When they say go: `run` with `preview=false` once (full quality), then
+10. When they say go: `run` with `preview=false` once (full quality), then
    `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
    scene), `proof-log.md`.
 

@@ -22,6 +22,32 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
+ * A demo name that cannot leave the folder it is meant to be in.
+ *
+ * `intentPath` and `writeIntent` put this straight into `path.join`, so
+ * `--demo ../../escaped` wrote its file outside `demos/` entirely. Measured,
+ * not theorised, and in a released package. Kebab-case is the rule every other
+ * name in Retake already follows; the containment check afterwards is the belt
+ * for anything that rule ever stops catching.
+ */
+export function safeDemo(demo: string): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(demo)) {
+    throw new Error(`"${demo}" is not a demo name — lowercase letters, numbers and hyphens only`);
+  }
+  return demo;
+}
+
+/** Belt for the braces: whatever we built, it has to be inside `dir`. */
+function within(dir: string, file: string): string {
+  const root = path.resolve(dir);
+  const full = path.resolve(file);
+  if (full !== root && !full.startsWith(root + path.sep)) {
+    throw new Error(`refusing to write outside ${dir}`);
+  }
+  return full;
+}
+
+/**
  * Where a demo's product note lives.
  *
  * Per demo first, workspace second. One workspace here holds demos for three
@@ -31,13 +57,15 @@ import path from "node:path";
  */
 export function intentPath(demosDir: string, demo?: string): string {
   if (demo) {
-    const own = path.join(demosDir, `${demo}.product.md`);
+    const own = within(demosDir, path.join(demosDir, `${safeDemo(demo)}.product.md`));
     if (fs.existsSync(own)) return own;
   }
-  return path.join(demosDir, "product.md");
+  return within(demosDir, path.join(demosDir, "product.md"));
 }
 
 export function readIntent(demosDir: string, demo?: string): string | null {
+  // A bad name is not an error when reading — it is simply no note. Only
+  // writing refuses, because writing is where the damage would be.
   try {
     const t = fs.readFileSync(intentPath(demosDir, demo), "utf8").trim();
     return filled(t) ? t : null;
@@ -57,8 +85,8 @@ export function filled(text: string): boolean {
 }
 
 export function writeIntent(demosDir: string, text: string, demo?: string): string {
+  const f = within(demosDir, path.join(demosDir, demo ? `${safeDemo(demo)}.product.md` : "product.md"));
   fs.mkdirSync(demosDir, { recursive: true });
-  const f = demo ? path.join(demosDir, `${demo}.product.md`) : path.join(demosDir, "product.md");
   fs.writeFileSync(f, text.trim() + "\n");
   return f;
 }

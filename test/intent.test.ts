@@ -82,3 +82,29 @@ test("each check declares which kind of evidence it produces", async () => {
   assert.equal(SENSE_EVIDENCE, "read-from-the-run");
   assert.equal(DESTROY_EVIDENCE, "reproduced", "destroy performs the flow, so what it reports it did");
 });
+
+test("a demo name cannot escape the demos folder", async () => {
+  // Shipped in 0.12.0 and found by review: `--demo ../../escaped` wrote its
+  // file outside demos/ entirely. Path traversal, in the one tool that had
+  // just been through a security pass.
+  const { safeDemo } = await import("../src/ext/intent.js");
+  const d = demos();
+  for (const bad of ["../../escaped", "../x", "a/b", "/etc/passwd", "..", "Name", "a b", "a.b", "-lead"]) {
+    assert.throws(() => writeIntent(d, "owned", bad), /not a demo name|refusing to write/, `accepted ${JSON.stringify(bad)}`);
+  }
+  assert.equal(safeDemo("avex-usecases"), "avex-usecases");
+  assert.equal(safeDemo("one-thought"), "one-thought");
+  // Nothing was created anywhere.
+  assert.deepEqual(fs.readdirSync(d), []);
+  // An empty name is not an attack, it is "no demo" — pinned so the leniency
+  // is a decision rather than an accident.
+  assert.match(writeIntent(d, "workspace note", ""), /product\.md$/);
+  assert.deepEqual(fs.readdirSync(d), ["product.md"]);
+});
+
+test("reading with a bad name is simply no note, not a crash", () => {
+  // Only writing refuses. A read that throws would take a check down with it.
+  const d = demos();
+  assert.equal(readIntent(d, "../../etc/passwd"), null);
+  assert.equal(intentBlock(d, "../../etc/passwd"), "");
+});
