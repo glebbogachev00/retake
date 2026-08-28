@@ -26,6 +26,8 @@ import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
 import { readFlags } from "./flags.js";
+import { NO_INTENT_NOTE, intentBlock } from "./intent.js";
+import { tag, type Evidence } from "./evidence.js";
 import { noteCheck } from "./checked.js";
 import { endProgress, setPhase } from "../progress.js";
 import type { Provider } from "../describe.js";
@@ -38,6 +40,9 @@ export type Answer = {
   why: string;
   still: string;
 };
+/** Every answer verify gives was read off a frame this run produced. */
+export const VERIFY_EVIDENCE: Evidence = "seen-in-a-frame";
+
 export type Verdict = { ok: boolean; answers: Answer[]; judge: string; lines: string[] };
 
 /** The still to ask about: a scene's END frame, because "did it happen" is
@@ -87,7 +92,8 @@ export function questions(m: Manifest, outDir: string): { scene: string; questio
  * So the answer has to carry what was actually seen at that spot BEFORE the
  * verdict, which forces looking rather than agreeing.
  */
-const PROMPT = (question: string) =>
+const PROMPT = (question: string, demosDir = "demos", demo?: string) =>
+  intentBlock(demosDir, demo) +
   `Look at this screenshot of a web app and answer one question about it.\n\n` +
   `QUESTION: ${question}\n\n` +
   `First describe, in one sentence, exactly what is at the place the question is about — the real text, and how it sits against the things around it. Then answer.\n\n` +
@@ -99,9 +105,9 @@ const PROMPT = (question: string) =>
   `it is as likely to be describing something that is broken. Do not assume it ` +
   `is fine because it probably is. Do not be generous.`;
 
-export async function judgeWith(p: Provider, still: string, question: string): Promise<{ ok: boolean | null; why: string }> {
+export async function judgeWith(p: Provider, still: string, question: string, demosDir = "demos", demo?: string): Promise<{ ok: boolean | null; why: string }> {
   try {
-    return readAnswer(await askAsync(p, PROMPT(question), [still], 120_000), p.name);
+    return readAnswer(await askAsync(p, PROMPT(question, demosDir, demo), [still], 120_000), p.name);
   } catch (e) {
     return { ok: null, why: `judge failed: ${short(e)}` };
   }
@@ -160,6 +166,7 @@ export async function verify(m: Manifest, outDir: string, log?: (l: string) => v
     return { ok: false, answers: qs.map((q) => ({ scene: q.scene, question: q.question, ok: null, why: "no judge available", still: q.still ?? "" })), judge, lines };
   }
 
+  if (!intentBlock("demos", m.name)) say(`  ${NO_INTENT_NOTE}`);
   say(`judging ${qs.length} question(s) with ${judge}`);
   // A few at a time. Serially, a demo with thirty-four expectations took six
   // minutes to answer — long enough that an agent skips it, which makes the
@@ -168,7 +175,7 @@ export async function verify(m: Manifest, outDir: string, log?: (l: string) => v
   let asked = 0;
   const answers: Answer[] = await pool(qs, Math.max(1, concurrency), async (q): Promise<Answer> => {
     if (!q.still) return { scene: q.scene, question: q.question, ok: null, why: "no still for that scene — was it recorded?", still: "" };
-    const a = await judgeWith(provider, q.still, q.question);
+    const a = await judgeWith(provider, q.still, q.question, "demos", m.name);
     setPhase(outDir, { phase: "verifying", step: ++asked, of: qs.length, label: q.scene });
     return { scene: q.scene, question: q.question, ok: a.ok, why: a.why, still: q.still };
   });
@@ -176,7 +183,7 @@ export async function verify(m: Manifest, outDir: string, log?: (l: string) => v
   // demo rather than in whatever order the answers came back.
   for (const a of answers) {
     const mark = a.ok === true ? "pass" : "FAIL";
-    say(`${mark}  [${a.scene}] ${a.question}\n      ${a.why}${a.ok !== true ? `\n      look: ${a.still ? path.relative(process.cwd(), a.still) : "(no still)"}` : ""}`);
+    say(`${mark}  ${tag(VERIFY_EVIDENCE)} [${a.scene}] ${a.question}\n      ${a.why}${a.ok !== true ? `\n      look: ${a.still ? path.relative(process.cwd(), a.still) : "(no still)"}` : ""}`);
   }
 
   // null counts as failure, deliberately: a question nobody could answer has

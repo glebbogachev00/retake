@@ -28,6 +28,8 @@ import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { ask, pickJudge, readJson, why as short } from "./judge.js";
 import { noteCheck } from "./checked.js";
+import { NO_INTENT_NOTE, intentBlock } from "./intent.js";
+import { tag, type Evidence } from "./evidence.js";
 import { endProgress, setPhase } from "../progress.js";
 
 /** How many frames one judgement is allowed. A 37-scene demo does not get 37
@@ -46,6 +48,9 @@ export type Concern = {
   /** What in the run made it ask — an input, a frame, a number. */
   saw: string;
 };
+/** sense reads what the run recorded against the frames it produced. */
+export const SENSE_EVIDENCE: Evidence = "read-from-the-run";
+
 export type Sense = { concerns: Concern[]; judge: string; lines: string[]; sampled: { used: number; of: number } };
 
 const INPUT_ACTIONS = new Set(["type", "fill", "select", "upload", "click", "keyboard", "drag"]);
@@ -98,8 +103,9 @@ const LENSES = [
   "DEAD ENDS — a step that produced nothing visible, or a final screen with nowhere to go from.",
 ];
 
-function prompt(m: Manifest, told: { scene: string; did: string[] }[], shots: { scene: string; file: string }[], of: number): string {
+function prompt(m: Manifest, told: { scene: string; did: string[] }[], shots: { scene: string; file: string }[], of: number, demosDir: string): string {
   return [
+    intentBlock(demosDir, m.name),
     `A browser recording of a web app called "${m.title ?? m.name}" was made. You are checking whether the run ADDS UP — not whether it looked pretty, and not whether the steps ran (they did).`,
     "",
     "EVERYTHING THE RUN ENTERED, CHOSE AND CLICKED, in order:",
@@ -122,7 +128,7 @@ function prompt(m: Manifest, told: { scene: string; did: string[] }[], shots: { 
 type Raw = { concerns: unknown[] };
 const isRaw = (v: unknown): v is Raw => !!v && typeof v === "object" && Array.isArray((v as Raw).concerns);
 
-export function sense(m: Manifest, outDir: string, log?: (l: string) => void): Sense {
+export function sense(m: Manifest, outDir: string, log?: (l: string) => void, demosDir = "demos"): Sense {
   const lines: string[] = [];
   const say = (l: string) => { lines.push(l); log?.(l); };
 
@@ -149,12 +155,13 @@ export function sense(m: Manifest, outDir: string, log?: (l: string) => void): S
   }
 
   const entered = told.reduce((n, s) => n + s.did.length, 0);
+  if (!intentBlock(demosDir, m.name)) say(`  ${NO_INTENT_NOTE}`);
   say(`reading ${entered} recorded action${entered === 1 ? "" : "s"} against ${used.length} frame${used.length === 1 ? "" : "s"}${of > used.length ? ` (sampled from ${of} scenes)` : ""} with ${judge}`);
 
   setPhase(outDir, { demo: m.name, phase: "sensing", label: "checking the run adds up" });
   let raw: Raw | null = null;
   try {
-    raw = readJson(ask(provider, prompt(m, told, used, of), used.map((u) => u.file)), isRaw);
+    raw = readJson(ask(provider, prompt(m, told, used, of, demosDir), used.map((u) => u.file)), isRaw);
   } catch (e) {
     say(`could not check: the judge failed — ${short(e)}`);
     return { concerns: [], judge, lines, sampled: { used: used.length, of } };
@@ -184,7 +191,7 @@ export function sense(m: Manifest, outDir: string, log?: (l: string) => void): S
 
   say("");
   for (const c of concerns) {
-    say(`?  ${c.lens}${c.scene ? ` · ${c.scene}` : ""}`);
+    say(`?  ${tag(SENSE_EVIDENCE)} ${c.lens}${c.scene ? ` · ${c.scene}` : ""}`);
     say(`   ${c.question}`);
     if (c.saw) say(`   saw: ${c.saw}`);
   }

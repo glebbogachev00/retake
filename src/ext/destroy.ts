@@ -27,6 +27,7 @@ import YAML from "yaml";
 import type { Manifest } from "../manifest.js";
 import { dryRun } from "../dryrun.js";
 import { record, type Take } from "../record.js";
+import { tag, type Evidence } from "./evidence.js";
 
 export type Shape = {
   name: string;
@@ -47,6 +48,9 @@ export type Shape = {
    */
   read: (failed: boolean, why: string[]) => Reading;
 };
+
+/** destroy performs the flow. Whatever it reports, it did. */
+export const DESTROY_EVIDENCE: Evidence = "reproduced";
 
 export type Reading = { verdict: Verdict; note: string };
 /** `look` is the honest third answer: something happened that a person has to
@@ -400,7 +404,7 @@ export function describeTrials(trials: Trial[], mode: "dry" | "run"): string[] {
   const broke = of("broke"), look = of("look"), held = of("held"), dud = of("unrunnable");
   const out: string[] = [""];
   const show = (t: Trial) => {
-    out.push(`  ${MARK[t.verdict]} ${t.shape} — ${t.note}`);
+    out.push(`  ${MARK[t.verdict]} ${tag(DESTROY_EVIDENCE)} ${t.shape} — ${t.note}`);
     for (const w of t.why.slice(0, 3)) out.push(`      ${w}`);
     if (t.dir) out.push(`      ${path.relative(process.cwd(), t.dir)}/`);
   };

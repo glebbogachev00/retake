@@ -11,6 +11,7 @@
  *   retake render outputs/x                       re-render from the existing take (--preset to switch)
  *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
  *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
+ *   retake intent                                 what this product IS — context every visual check needs
  *   retake sweep outputs/x                        look at every frame as a whole — what nobody thought to ask about
  *   retake sense outputs/x                        does the run ADD UP — what went in vs what came out
  *   retake destroy demos/x.yaml                   the flows nobody wrote down — abuse this demo nine ways
@@ -42,6 +43,7 @@ import { verify } from "./ext/verify.js";
 import { notes } from "./ext/notes.js";
 import { sense } from "./ext/sense.js";
 import { sweep } from "./ext/sweep.js";
+import { TEMPLATE, readIntent, writeIntent } from "./ext/intent.js";
 import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "./ext/heal.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
@@ -338,6 +340,25 @@ program
     if (trials.some((t) => t.verdict === "broke")) process.exitCode = 3;
   });
 
+
+
+program
+  .command("intent")
+  .description("what this product IS — the context every visual check is missing without it")
+  .argument("[text]", "the note to save; omit to read what is there")
+  .option("--demo <name>", "a note for one demo's app, rather than the whole workspace")
+  .option("--starter", "write a starter file to fill in", false)
+  .action((text: string | undefined, opts: { starter: boolean; demo?: string }) => {
+    const demos = path.resolve("demos");
+    if (opts.starter || (!text && !readIntent(demos, opts.demo))) {
+      if (readIntent(demos, opts.demo) && !text) { say(readIntent(demos, opts.demo)!); return; }
+      say(`wrote ${path.relative(process.cwd(), writeIntent(demos, TEMPLATE, opts.demo))} — fill it in.`);
+      say("Without it, every check judges your app as a generic web page: anything deliberate about it can come back as a defect.");
+      return;
+    }
+    if (!text) { say(readIntent(demos, opts.demo) ?? ""); return; }
+    say(`saved to ${path.relative(process.cwd(), writeIntent(demos, text, opts.demo))}`);
+  });
 
 program
   .command("sweep")

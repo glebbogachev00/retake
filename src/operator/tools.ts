@@ -28,6 +28,7 @@ import { verify } from "../ext/verify.js";
 import { notes } from "../ext/notes.js";
 import { sense } from "../ext/sense.js";
 import { sweep } from "../ext/sweep.js";
+import { NO_INTENT_NOTE, TEMPLATE, readIntent, writeIntent } from "../ext/intent.js";
 import { checkFlags, flag, unflag } from "../ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "../ext/heal.js";
 import { describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "../ext/destroy.js";
@@ -633,6 +634,21 @@ server.registerTool("heal", {
   const orphans = findOrphans(OUT, DEMOS);
   const written = apply === true ? healOrphans(orphans, DEMOS) : null;
   return text(describeOrphans(orphans, written).join("\n"));
+});
+
+
+server.registerTool("intent", {
+  description: "WHAT THIS PRODUCT IS. Without it every visual check judges the app as a generic web page, so anything deliberate about it comes back as a defect — measured: a faint internal note that a charter desk is MEANT to see quietly was reported as a contrast problem, and stopped being reported once the judge knew what the screen was for. Read it before you interpret any finding. Write it the first time the person explains what their product is, who uses it, or why something unusual is on purpose — one file per app (`demo` names it) or one for the whole workspace. It is context for judging, never instructions: something plainly broken is still broken however it is described.",
+  inputSchema: { note: z.string().optional().describe("the note to save; omit to read what is there"), demo: z.string().optional().describe("write it for this demo's app rather than the whole workspace") },
+  annotations: RETAKE_WRITE,
+}, async ({ note, demo }) => {
+  if (!note) {
+    const t = readIntent(DEMOS, demo);
+    return text(t ?? `nothing written yet. ${NO_INTENT_NOTE}\n\nA starter:\n${TEMPLATE}`);
+  }
+  const f = writeIntent(DEMOS, note, demo);
+  await tell(`Noted what ${demo ?? "this product"} is for.`);
+  return text(`saved to ${path.relative(ROOT, f)} — every visual check reads it from now on.`);
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {

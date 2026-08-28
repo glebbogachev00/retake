@@ -2,6 +2,18 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.12.0",
+      "date": "2026-08-28",
+      "headline": "Retake now knows what your product is for — and says how it knows",
+      "notes": [
+        "New: tell Retake what your product is, who uses it, and what about it is deliberate. Every visual check reads it. Until now they judged your app as a generic web page, which means anything you did on purpose could come back as a mistake.",
+        "This is measured, not claimed. On a real charter console a line that is set faint on purpose — an internal note the desk is meant to see quietly — was reported as a contrast problem. With one paragraph explaining the screen, that complaint disappeared and a genuine one took its place: a developer link left visible on a page a customer sees. The same number of findings, better findings.",
+        "New: every finding now says how it was arrived at. Something that was performed reads differently from something visible in a picture, which reads differently again from something read in the code and never run. You can tell at a glance which findings somebody watched happen and which are somebody's reasoning.",
+        "This is the difference between a report you can act on and one you have to re-check yourself — and it is the failure that made this worth building: a review can be technically careful and still be wrong about the product, because it never used it.",
+        "Both are optional. Say nothing and everything works exactly as before."
+      ]
+    },
+    {
       "version": "0.11.0",
       "date": "2026-08-28",
       "headline": "You can see what it is doing — and the window is no longer open to the internet",

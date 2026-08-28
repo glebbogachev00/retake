@@ -30,6 +30,8 @@ import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
 import { noteCheck } from "./checked.js";
 import { endProgress, setPhase } from "../progress.js";
 import { memo } from "./memo.js";
+import { NO_INTENT_NOTE, intentBlock } from "./intent.js";
+import { tag, type Evidence } from "./evidence.js";
 
 /**
  * The list. Closed on purpose — no "anything else that looks wrong" slot,
@@ -50,10 +52,12 @@ export const LOOK_FOR = [
 ];
 
 export type Issue = { kind: string; what: string; where: string };
+/** Everything sweep reports was looked at in a frame this run produced. */
+export const SWEEP_EVIDENCE: Evidence = "seen-in-a-frame";
 export type Frame = { scene: string; still: string; issues: Issue[]; error?: string };
 export type Sweep = { frames: Frame[]; judge: string; lines: string[]; looked: number; recalled: number };
 
-const PROMPT = [
+const promptFor = (demosDir: string, demo: string) => [
   "Look at this one screenshot of a web app and inspect it as a whole.",
   "",
   "You are NOT checking whether some particular feature works. You are looking at the picture the way a person would if they had never seen this app and were asked whether anything about it looks wrong.",
@@ -71,6 +75,7 @@ const PROMPT = [
   "One thing in these frames is NOT part of the app: Retake draws a mouse cursor, and a soft circular ring around it at the moment of a click. Never report the cursor or that ring — not as a spinner, not as an overlap, not as anything. Only report what the app itself is drawing.",
   "",
   "Rules. Report only what is visible in THIS image — never what you assume, and never what might be true elsewhere in the app. Quote the real words you can see. A clean frame is the expected answer for a healthy app: return {\"findings\":[]} and do not manufacture something to say. Do not comment on taste, wording, colour choices, spacing you merely dislike, or what the app ought to do differently. At most five findings.",
+  intentBlock(demosDir, demo),
 ].join("\n");
 
 type Raw = { findings: unknown[] };
@@ -100,7 +105,7 @@ export async function sweep(
   m: Manifest,
   outDir: string,
   log?: (l: string) => void,
-  opts: { all?: boolean; concurrency?: number; fresh?: boolean } = {},
+  opts: { all?: boolean; concurrency?: number; fresh?: boolean; demosDir?: string } = {},
 ): Promise<Sweep> {
   const lines: string[] = [];
   const say = (l: string) => { lines.push(l); log?.(l); };
@@ -126,7 +131,10 @@ export async function sweep(
 
   // Every frame. Never a sample — sampling is how the method fails in the
   // first place, and the cost is honest: one question per frame.
+  const demosDir = opts.demosDir ?? "demos";
+  const PROMPT = promptFor(demosDir, m.name);
   say(`looking at all ${shots.length} frame${shots.length === 1 ? "" : "s"} of ${m.name}, one at a time, with ${judge}`);
+  if (!intentBlock(demosDir, m.name)) say(`  ${NO_INTENT_NOTE}`);
 
   // Frames that have not changed since they were last looked at are answered
   // from what is already known. A re-record usually moves one screen, not
@@ -176,7 +184,7 @@ export async function sweep(
     say("");
     for (const f of hit) {
       say(`  ${f.scene}`);
-      for (const i of f.issues) say(`    ${i.kind.padEnd(16)} ${i.what}${i.where ? ` (${i.where})` : ""}`);
+      for (const i of f.issues) say(`    ${tag(SWEEP_EVIDENCE)} ${i.kind.padEnd(16)} ${i.what}${i.where ? ` (${i.where})` : ""}`);
       say(`    → ${path.relative(process.cwd(), f.still)}`);
     }
   }

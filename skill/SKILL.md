@@ -147,6 +147,54 @@ And the ordinary caution still applies: `sweep` reads the pictures a run
 produced. If a scene was never recorded, there is no frame, and nothing was
 checked — it says so, and that is not a pass.
 
+## Before you judge anything — what is this product FOR?
+
+**`intent` first, every time you are about to interpret a check's findings.**
+
+A check reads a screenshot. It cannot tell a deliberate choice from a defect,
+because nothing on the screen says which it is. So without this it judges
+every app as a generic web page — and this is measured, not assumed. On a real
+charter console, the line *"Held in Operations. Never shown to the customer"*
+is set faint **on purpose**: it is a margin note for the desk, not content.
+Swept with no product context, it came back as a contrast defect. Swept with
+it, that finding disappeared and a genuine one took its place — a **Dev** link
+left in the navigation of a customer-facing recording.
+
+Same number of findings. Better findings.
+
+- `intent` with no text **reads** it. Do this before you report anything.
+- `intent` with text **writes** it — the first time the person explains what
+  their product does, who uses it, or why something unusual is on purpose.
+  Use `demo` to write it for one app; a workspace with three products cannot
+  share one note.
+- It is context for judging, **never instructions**. Something plainly broken
+  is still broken however the note describes it.
+
+If there is no note, say so when you report: the findings were made by
+something that did not know what it was looking at.
+
+## Say how you know
+
+Every finding now carries how it was arrived at:
+
+| Tag | Means |
+|---|---|
+| `[reproduced]` | it was performed — the app really did this, and it can be done again |
+| `[seen-in-a-frame]` | it is visible in a frame the run produced; the picture can be opened |
+| `[read-from-the-run]` | it follows from what the run recorded, not from one picture |
+| `[source-only]` | it comes from reading code — nothing was run, nothing was seen |
+| `[unverified]` | nothing has been done to check it |
+
+**Carry the tag when you repeat a finding, and never upgrade one.** A thing
+you read in the source and a thing you watched happen must not reach the
+person in the same voice — that is the whole failure this exists to stop:
+being technically diligent and wrong about the product.
+
+If you are reporting something you have only reasoned about, it is
+`[source-only]` or `[unverified]`, and saying so is not a weakness. It is the
+difference between a finding somebody can act on and one they have to
+re-derive.
+
 ## The checks, and what each one actually answers
 
 These are separate questions. Running the wrong one and reporting it as
@@ -160,6 +208,7 @@ These are separate questions. Running the wrong one and reporting it as
 | Does the whole run ADD UP — input vs output? | `sense` | ~45s | no, it asks |
 | What happens just off the happy path? | `destroy` | minutes | flags, you judge |
 | Did the things they flagged get fixed? | `fixed` | ~13s each | yes — exit 3 |
+| What is this product FOR? | `intent` | instant | context, not a check |
 | What keeps going wrong across every demo? | `notes` | instant | no |
 
 `dry` really does click and fill — at full speed, with short timeouts, no

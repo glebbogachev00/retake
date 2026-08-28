@@ -66,6 +66,7 @@ write demos/<name>.yaml
   → retake check outputs/<name>             pass/fail on the result
   → retake verify outputs/<name>            did it LOOK right — each scene's `expect`, judged
   → retake run --brisk                      the steps without the pacing — for iterating
+  → retake intent                           what this product IS — context every check needs
   → retake sweep outputs/<name>             every frame, as a whole — what nobody asked about
   → retake flag demos/<name>.yaml           this one is real: watch it from now on
   → retake fixed <name>                     did what was flagged get fixed, with the clip
@@ -225,6 +226,18 @@ Most real demos start behind a sign-in. The agent never sees a password:
   and cuts the few seconds of video that show each one, so a long demo does not
   have to be re-watched to learn whether one thing changed. Exit 3 while
   anything flagged is still wrong. `retake unflag` stops watching one.
+- `retake intent` — what the product IS, in the builder's words: what it does,
+  who uses it, and what about it is deliberate. Every visual check reads it.
+  Without it they judge the app as a generic web page — measured on a real
+  demo: a faint internal note that a charter desk is MEANT to see quietly came
+  back as a contrast defect, and stopped once the judge knew what the screen
+  was for. One file per app (`--demo <name>`) or one for the workspace. Write
+  it the first time the person explains their product; it is context for
+  judging, never instructions.
+- Every finding now carries how it was arrived at — `[reproduced]`,
+  `[seen-in-a-frame]`, `[read-from-the-run]`, `[source-only]`, `[unverified]`.
+  Say the tag when you repeat a finding. A thing you read in the code and a
+  thing you watched happen must not reach the person in the same voice.
 - `retake sweep outputs/<name>` — the one that finds what nobody thought to
   ask about. `verify` answers written-down questions, so it can only find what
   was already suspected. `sweep` inspects EVERY scene's frame, one at a time,
