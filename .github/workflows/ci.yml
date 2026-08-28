@@ -13,6 +13,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Twenty tests drive a real browser, and CI never installed one. Every
+      # run on main since the suite gained them has been red at this step,
+      # which meant the build, package and init gates below never ran at all.
+      - name: cache the browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

@@ -82,6 +82,43 @@ test("what's new opens, expands, and closes", async () => {
     await p.locator("#newsClose").click();
     await p.waitForTimeout(200);
     assert.equal(await p.locator(".veil").count(), 0, "closing must remove it");
+    // And with the key. The Escape handler called a `shut()` that does not
+    // exist in that scope — copied from a dialog that had one — so the key
+    // threw and left the modal sitting there. The button was tested; the key
+    // was not.
+    await p.locator("#newsBtn").click();
+    await p.waitForTimeout(400);
+    assert.equal(await p.locator(".veil").count(), 1);
+    await p.keyboard.press("Escape");
+    await p.waitForTimeout(200);
+    assert.equal(await p.locator(".veil").count(), 0, "Escape must close it too");
+  });
+  assert.deepEqual(errs, []);
+});
+
+test("the small print in the review area is readable", async () => {
+  // Every label here is 11.5-12.5px, which WCAG calls normal text and wants at
+  // 4.5:1. They sat between 3.62 and 4.19 — the part of the window that says
+  // what has and has not been checked was the hardest part of it to read.
+  const { errs } = await visit(1440, async (p) => {
+    // Passed as source, not a function: tsx compiles named inner functions
+    // with a `__name` helper that does not exist inside the page, so an
+    // ordinary arrow const here throws a ReferenceError in the browser.
+    const worst = (await p.evaluate(`(() => {
+      const lum = (c) => { const ch = (c.match(/\\d+/g) || []).slice(0,3).map((n) => { const x = Number(n)/255; return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); }); return 0.2126*ch[0] + 0.7152*ch[1] + 0.0722*ch[2]; };
+      const bg = (el) => { let n = el; while (n) { const b = getComputedStyle(n).backgroundColor; if (b && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(b)) return b; n = n.parentElement; } return 'rgb(255,255,255)'; };
+      let low = 99;
+      for (const sel of ['.rhead', '.rhint', '.checked', '.checked .why', '.checked .c']) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        const a = lum(getComputedStyle(el).color), b = lum(bg(el));
+        low = Math.min(low, (Math.max(a,b) + 0.05) / (Math.min(a,b) + 0.05));
+      }
+      return low;
+    })()`)) as number;
+    // 99 means the panel was not on screen for this demo; that is not a pass
+    // to assert against, so only judge it when it was actually there.
+    if (worst < 99) assert.ok(worst >= 4.5, `the quietest label measures ${worst.toFixed(2)}:1, under AA`);
   });
   assert.deepEqual(errs, []);
 });

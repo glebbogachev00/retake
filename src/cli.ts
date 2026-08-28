@@ -45,7 +45,7 @@ import { notes } from "./ext/notes.js";
 import { sense } from "./ext/sense.js";
 import { sweep } from "./ext/sweep.js";
 import { TEMPLATE, readIntent, writeIntent } from "./ext/intent.js";
-import { landed, planCalibration, report, type Result } from "./ext/calibrate.js";
+import { planCalibration, report, usable, type Result, type Stability } from "./ext/calibrate.js";
 import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "./ext/heal.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
@@ -360,25 +360,52 @@ program
     if (opts.plan) return;
 
     const results: Result[] = [];
+    /** Sweep once, and give back what it said. */
+    const look = async (m: typeof loaded.manifest, dir: string, fresh: boolean) =>
+      (await sweep(m, dir, () => {}, { demosDir: path.resolve("demos"), fresh })).frames.flatMap((f) => f.issues.map((i) => i.kind));
+
+    let stability: Stability = null;
     for (const v of plan.variants) {
       const dir = path.join(plan.root, v.name);
       say(`\n${v.name}${v.defect ? ` — ${v.defect.looks}` : ""}`);
       try {
         const take = await record(v.manifest, { outDir: dir, manifestDir: loaded.dir, headed: false, log: () => {} });
         await render(v.manifest, take, dir, { log: () => {}, noMaster: true });
-        const s = await sweep(v.manifest, dir, () => {}, { demosDir: path.resolve("demos") });
-        const took = true;   // the seed proved itself in the page, or the take threw
-        const kinds = s.frames.flatMap((f) => f.issues.map((i) => i.kind));
+        // A recording that fell over, recorded nothing, or produced no frames
+        // measures nothing — whichever end of it broke. Asking sweep about it
+        // and reporting the empty answer is how a run against an app that was
+        // not even running came back reading "none on the control".
+        const fit = usable(dir, take);
+        if (!fit.ok) {
+          results.push({ variant: v.name, defect: v.defect, kinds: [], found: false, seeded: false, why: fit.why, other: 0 });
+          say(`  → not measured: ${fit.why}`);
+          continue;
+        }
+        const kinds = await look(v.manifest, dir, false);
         const found = !v.defect ? false : kinds.some((k) => k.toUpperCase().startsWith(v.defect!.expect.split(" ")[0]));
-        results.push({ variant: v.name, defect: v.defect, kinds, found: found && took, seeded: took, other: v.defect ? kinds.filter((k) => !k.toUpperCase().startsWith(v.defect!.expect.split(" ")[0])).length : 0 });
-        say(`  → ${kinds.join(", ") || "nothing"}${v.defect && !took ? "   (the seed did not land — nothing was asked of the check)" : ""}`);
+        results.push({ variant: v.name, defect: v.defect, kinds, found, seeded: true, other: v.defect ? kinds.filter((k) => !k.toUpperCase().startsWith(v.defect!.expect.split(" ")[0])).length : 0 });
+        say(`  → ${kinds.join(", ") || "nothing"}`);
+        // The control, asked the same question about the same frames a second
+        // time. Judges are not deterministic, and a harness that never checks
+        // this cannot tell a real finding from a coin landing heads.
+        if (!v.defect) {
+          say("  asking the control again, to see whether the answer holds");
+          stability = { first: kinds, again: await look(v.manifest, dir, true) };
+          say(`  → ${stability.again.join(", ") || "nothing"}`);
+        }
       } catch (e) {
-        results.push({ variant: v.name, defect: v.defect, kinds: [], found: false, seeded: !/seed did not take/.test(String((e as Error).message)), other: 0, error: String((e as Error).message).split("\n")[0].slice(0, 90) });
-        say(`  → could not run: ${String((e as Error).message).split("\n")[0].slice(0, 90)}`);
+        const msg = String((e as Error).message).split("\n")[0].slice(0, 90);
+        results.push({ variant: v.name, defect: v.defect, kinds: [], found: false, seeded: false, why: `the run threw — ${msg}`, other: 0, error: msg });
+        say(`  → could not run: ${msg}`);
       }
     }
-    for (const l of report(results)) say(l);
-    fs.writeFileSync(path.join(plan.root, "report.json"), JSON.stringify({ at: new Date().toISOString(), demo: loaded.manifest.name, results }, null, 2) + "\n");
+    for (const l of report(results, stability)) say(l);
+    fs.writeFileSync(path.join(plan.root, "report.json"), JSON.stringify({ at: new Date().toISOString(), demo: loaded.manifest.name, results, stability }, null, 2) + "\n");
+    // The false-positive rate is the number people act on. If the control did
+    // not record, this run produced no number at all, and exiting 0 says the
+    // opposite.
+    const control = results.find((r) => !r.defect);
+    if (!control?.seeded) { process.exitCode = 3; say("\nnothing was measured — fix the run before quoting any of this."); }
   });
 
 program

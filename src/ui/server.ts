@@ -173,10 +173,28 @@ function listDemos(project?: string) {
   if (!fs.existsSync(DEMOS)) return [];
   const wanted = project?.trim() ? projectKey(project) : null;
   const assignments = demoProjects();
+  // The precedence for what a demo's folder is called, in one place, because
+  // it was three places and the release note described a fourth:
+  //
+  //   1. a folder you assigned by hand
+  //   2. a folder assigned by hand to another demo of the same app
+  //   3. the name in this demo's own product note
+  //   4. the name in a product note written for another demo of the same app
+  //   5. the app's address, which is where this started and helps nobody
+  //
+  // Four is new. Writing `retake intent --demo checkout "# Acme"` named the
+  // checkout folder and left the other six Acme demos in a fold called
+  // "localhost:3200", which is the exact complaint the naming was added to
+  // answer.
   const byUrl = new Map<string, string>();
+  const namedByUrl = new Map<string, string>();
   for (const f of fs.readdirSync(DEMOS).filter((x) => /\.ya?ml$/.test(x))) {
     const mm = cachedManifest(path.join(DEMOS, f));
-    if (mm) { const asg = assignments[mm.name]; if (asg && mm.url && !byUrl.has(mm.url)) byUrl.set(mm.url, asg); }
+    if (!mm) continue;
+    const asg = assignments[mm.name];
+    if (asg && mm.url && !byUrl.has(mm.url)) byUrl.set(mm.url, asg);
+    const named = productName(DEMOS, mm.name);
+    if (named && mm.url && !namedByUrl.has(mm.url)) namedByUrl.set(mm.url, named);
   }
   const listed = fs
     .readdirSync(DEMOS)
@@ -208,7 +226,7 @@ function listDemos(project?: string) {
       // A product that has said what it is called is filed under that name.
       // Grouping by URL gave folders like "localhost:3200" — true, and no help
       // to anybody looking for their charter demos.
-      const group = assigned ? path.basename(assigned) : (productName(DEMOS, name) ?? shortGroup(url));
+      const group = assigned ? path.basename(assigned) : (productName(DEMOS, name) ?? (url ? namedByUrl.get(url) : undefined) ?? shortGroup(url));
       // Heal a folder whose run was killed mid-recording: the previous take is
       // in its stash and nothing has put it back yet. The window must never
       // show someone an empty demo when their recording is safe on disk.

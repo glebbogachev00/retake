@@ -46,6 +46,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { createHash } from "node:crypto";
 import type { Manifest } from "../manifest.js";
+import { LOOK_FOR } from "./sweep.js";
 
 /** One seeded fault: what it does to the page, and what should catch it. */
 export type Defect = {
@@ -100,7 +101,12 @@ export const DEFECTS: Defect[] = [
   },
   {
     name: "unreadable-contrast",
-    proof: "getComputedStyle(document.body).color.replace(/\\\\s/g,'') === 'rgb(233,235,228)'",
+    // Was `.replace(/\\s/g,'')`, which after string escaping built a regex for
+    // a literal backslash followed by "s" — so the spaces in "rgb(233, 235,
+    // 228)" were never stripped, the proof was never true, and this seed
+    // reported "did not land" on every app it was ever run against. It was
+    // counted as one of eight for two releases. No regex now.
+    proof: "getComputedStyle(document.body).color.split(' ').join('') === 'rgb(233,235,228)'",
     expect: "CONTRAST",
     looks: "body text almost the same colour as the page behind it",
     css: "body,p,li,span{color:#e9ebe4!important}",
@@ -169,6 +175,11 @@ export const lab = (outRoot: string, demo: string) => path.join(outRoot, ".calib
 export function planCalibration(m: Manifest, outRoot: string, opts: { only?: string[] } = {}): { root: string; variants: Variant[] } {
   const root = lab(outRoot, m.name);
   fs.mkdirSync(root, { recursive: true });
+  // `--only typo` used to match nothing and run a control alone, then print a
+  // recall line reading "0 of 0" — which is not a failure, it is a measurement
+  // of nothing wearing the clothes of one.
+  const unknown = (opts.only ?? []).filter((n) => !DEFECTS.some((d) => d.name === n));
+  if (unknown.length) throw new Error(`no such defect: ${unknown.join(", ")} — try ${DEFECTS.map((d) => d.name).join(", ")}`);
   const want = opts.only?.length ? DEFECTS.filter((d) => opts.only!.includes(d.name)) : DEFECTS;
   const variants: Variant[] = [];
 
@@ -197,6 +208,17 @@ export function planCalibration(m: Manifest, outRoot: string, opts: { only?: str
         { action: "evaluate", script: `{ if (!(${defect.proof})) throw new Error("the ${defect.name} seed did not take on this app"); }` },
         { action: "wait", ms: 300 },
       ] as Manifest["setup"];
+      // And again at the END. The setup proof says the seed was on the page
+      // before the camera rolled; it says nothing about whether it was still
+      // there for the frames that were actually judged. A single-page app that
+      // navigates or re-renders can drop it halfway through, and every frame
+      // after that point asks the check to find something that is not there.
+      // Failing the step is right: a run that lost its seed is not a miss, it
+      // is not a measurement.
+      clone.steps = [
+        ...clone.steps,
+        { action: "evaluate", script: `{ if (!(${defect.proof})) throw new Error("the ${defect.name} seed was gone by the end of the run"); }` },
+      ] as Manifest["steps"];
     }
     const file = path.join(root, `${name}.yaml`);
     fs.writeFileSync(file, [
@@ -249,14 +271,43 @@ export function landed(controlDir: string, variantDir: string): boolean {
   return a.join() !== b.join();
 }
 
+/**
+ * Is this recording fit to measure anything at all?
+ *
+ * It was not asked. A control recorded against an app that was not running
+ * came back with an empty timeline, `ok: false` and no frames — and the report
+ * said "FALSE POSITIVES none on the control", which is the single number this
+ * harness exists to produce. Nothing was wrong with the control because
+ * nothing had happened in it. A blank measurement that reads as a clean one is
+ * worse than no measurement, and it exited 0.
+ */
+export function usable(dir: string, take: { ok?: boolean; timeline?: unknown[] } | null): { ok: boolean; why: string } {
+  if (!take) return { ok: false, why: "nothing was recorded" };
+  if (!take.timeline?.length) return { ok: false, why: "the run recorded no steps at all" };
+  if (take.ok === false) return { ok: false, why: "the run did not finish cleanly" };
+  let stills = 0;
+  try { stills = fs.readdirSync(path.join(dir, "stills")).filter((f) => /\.(png|jpe?g)$/i.test(f)).length; } catch { /* none */ }
+  if (!stills) return { ok: false, why: "the run produced no frames to look at" };
+  return { ok: true, why: "" };
+}
+
+/** The `sweep` items nothing here seeds, named rather than left to arithmetic. */
+export function uncovered(): string[] {
+  const seeded = new Set(DEFECTS.map((d) => d.expect.toUpperCase()));
+  return LOOK_FOR.map((l) => l.split(" — ")[0].trim())
+    .filter((kind) => !seeded.has(kind.toUpperCase()));
+}
+
 export type Result = {
   variant: string;
   defect: Defect | null;
   /** Kinds sweep reported, across every frame. */
   kinds: string[];
   found: boolean;
-  /** False when the injection produced no visible change at all. */
+  /** False when the recording, or the seed in it, was not fit to measure. */
   seeded: boolean;
+  /** Why not, when not — so a broken harness never reads as a failed check. */
+  why?: string;
   /** Findings that are not the seeded fault. On the control, all of them are
       false positives; on a variant they may be a real second effect of the
       injection, so they are counted separately and never silently. */
@@ -264,8 +315,11 @@ export type Result = {
   error?: string;
 };
 
+/** The control, looked at a second time. Same frames, same question. */
+export type Stability = { first: string[]; again: string[] } | null;
+
 /** Recall, false positives, and the sentence that says what they mean. */
-export function report(rs: Result[]): string[] {
+export function report(rs: Result[], stability: Stability = null): string[] {
   const all = rs.filter((r) => r.defect);
   const seeded = all.filter((r) => r.seeded);
   const unseeded = all.filter((r) => !r.seeded);
@@ -276,24 +330,50 @@ export function report(rs: Result[]): string[] {
   out.push("");
   out.push(`RECALL   ${found} of ${seeded.length} defects that actually appeared were found`);
   for (const r of seeded) {
-    out.push(`  ${r.found ? "✓" : "✗"} ${r.variant.padEnd(20)} wanted ${String(r.defect!.expect).padEnd(19)} got ${r.kinds.join(", ") || (r.error ? `— ${r.error}` : "nothing")}`);
+    out.push(`  ${r.found ? "\u2713" : "\u2717"} ${r.variant.padEnd(20)} wanted ${String(r.defect!.expect).padEnd(19)} got ${r.kinds.join(", ") || (r.error ? `\u2014 ${r.error}` : "nothing")}`);
   }
   if (unseeded.length) {
     out.push("");
-    out.push(`NOT MEASURED   ${unseeded.length} seed(s) produced no visible change, so nothing was asked of the check:`);
-    for (const r of unseeded) out.push(`  — ${r.variant.padEnd(20)} the injection did not land. Fix the seed, not the checklist.`);
+    out.push(`NOT MEASURED   ${unseeded.length} of ${all.length} seeded runs asked the check nothing:`);
+    for (const r of unseeded) out.push(`  \u2014 ${r.variant.padEnd(20)} ${r.why ?? r.error ?? "the injection did not land"}. Fix the harness, not the checklist.`);
   }
+
   out.push("");
-  if (control) {
+  // The control is the half that needs no injection, so it is the half that
+  // travels — and the only one that can speak to false positives. If it did
+  // not record, nothing here may be claimed, in either direction.
+  if (!control) {
+    out.push("FALSE POSITIVES   not measured \u2014 no control was run, so no rate can be claimed");
+  } else if (!control.seeded) {
+    out.push(`FALSE POSITIVES   NOT MEASURED \u2014 the control ${control.why ?? control.error ?? "did not record"}. No rate can be claimed from this run, and neither can the recall above: every variant recorded under the same conditions.`);
+  } else {
     out.push(control.kinds.length
       ? `FALSE POSITIVES   ${control.kinds.length} finding(s) on the control, where nothing is wrong: ${control.kinds.join(", ")}`
       : "FALSE POSITIVES   none on the control");
-  } else {
-    out.push("FALSE POSITIVES   not measured — no control was run, so no rate can be claimed");
   }
   const noise = seeded.reduce((n, r) => n + r.other, 0);
   if (noise) out.push(`                  and ${noise} extra finding(s) across the variants, beyond the fault seeded in each`);
+
   out.push("");
-  out.push("What this is and is not: the seeds were written by someone who has read the checklist, so recall here is an upper bound — a fault nobody thought to seed is still unmeasured. Injected faults are also cleaner than the ones real apps produce. Treat it as a floor for trust, not a score.");
+  // Promised in this file's own header for two releases and never produced.
+  // A number nobody measures is a claim, and this harness exists because
+  // claims about the checks were not good enough.
+  if (!stability) {
+    out.push("STABILITY   not measured this run \u2014 the control was asked once, so nothing here says whether the same frames give the same answer twice.");
+  } else {
+    const a = [...stability.first].sort().join(", ") || "nothing";
+    const b = [...stability.again].sort().join(", ") || "nothing";
+    out.push(a === b
+      ? `STABILITY   the control gave the same answer twice: ${a}`
+      : `STABILITY   the control gave DIFFERENT answers to the same frames \u2014 first ${a}, then ${b}. Treat single sweep results on this app as one opinion, not a reading.`);
+  }
+
+  out.push("");
+  const gaps = uncovered();
+  if (gaps.length) {
+    out.push(`NOT COVERED   ${DEFECTS.length} seeds against a ${LOOK_FOR.length}-item checklist. Nothing here measures ${gaps.join(" or ")} at all, so the recall above says nothing about ${gaps.length === 1 ? "it" : "them"}.`);
+    out.push("");
+  }
+  out.push("What this is and is not: the seeds were written by someone who has read the checklist, so recall here is an upper bound \u2014 a fault nobody thought to seed is still unmeasured. Injected faults are also cleaner than the ones real apps produce. Treat it as a floor for trust, not a score.");
   return out;
 }

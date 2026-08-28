@@ -134,13 +134,18 @@ Three things about reading what it says:
 - **A clean sweep is a floor, not a ceiling.** A closed checklist cannot find
   what is not on it. It catches the ten things that go wrong in every app; it
   does not certify the frame.
-- **Say what it is worth, if anybody has measured.** `calibrate` seeds each
-  defect on the checklist into a real recording of the app and counts what
-  `sweep` finds. On Retake's own guide page: seven or eight of eight found,
-  and no false positives on the control across repeated runs. Read the report
-  before telling somebody how much a finding is worth, and repeat its limits
-  — the seeds were written by somebody who had read the checklist, so recall
-  is an upper bound. Never run it unasked: nine takes, about ten minutes.
+- **Say what it is worth, if anybody has measured.** `calibrate` seeds known
+  defects into a real recording of the app and counts what `sweep` finds. Read
+  the report before telling somebody how much a finding is worth, and quote its
+  limits rather than only its number: the seeds were written by somebody who
+  had read the checklist, so recall is an upper bound; two of the ten checklist
+  items have no seed at all, so the number says nothing about them; and a run
+  whose control did not record cleanly measured nothing. Earlier versions of
+  this file quoted "seven or eight of eight, no false positives" — one of those
+  eight seeds could never have landed, because its proof was broken, so the
+  denominator was wrong and the claim about repeated runs had never been
+  measured. Quote the report you have, not a remembered figure. Never run it
+  unasked: nine takes, about ten minutes, and only from a terminal.
 - **One pass is not reliable, and this is measured.** On a frame with a real
   overlap on it, three consecutive sweeps missed it and a fourth found it. The
   judge is not deterministic. So a frame that has already been looked at is

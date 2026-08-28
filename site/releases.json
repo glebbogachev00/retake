@@ -2,6 +2,20 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.13.2",
+      "date": "2026-08-28",
+      "headline": "The thing that measures the checks was not measuring",
+      "notes": [
+        "Calibration is the number that says how much a visual finding is worth. Run against an app that was not even running, it used to print \"no false positives on the control\" and finish happily — because nothing had happened, so nothing was wrong. It now refuses: a run that fell over, recorded no steps, or produced no frames measures nothing, says which, and does not pretend otherwise.",
+        "One of its eight seeded faults could never have worked. A typo in the unreadable-contrast seed meant its own self-check could never be true, so that fault reported \"did not land\" on every app it was ever tried on. Fixed, and every seed is now tested in a real browser so a silently dead one cannot happen again.",
+        "Two more honest things it now says out loud: that two of the ten things it looks for have no seeded test at all, so the score says nothing about them; and whether asking the same question about the same pictures twice gives the same answer. That second one was promised in the code for two releases and never actually measured.",
+        "The checks run in a browser, and the browser was never installed on the build server — so every automated run since those tests were written failed before it started, and the build and packaging checks after them never ran. Installed now.",
+        "Fixed: pressing Escape on the What's New window did nothing. Fixed: a quick take whose steps failed showed a neutral \"Brisk take\" and never said it had failed. Fixed: the small print in the review area was too faint to meet the readability standard for text that size. Fixed: naming one demo's product now names the folder for every demo of the same app, not just that one. Fixed: a dry run now really scrolls when the demo says to scroll.",
+        "The agent tool for calibration used to advertise a setting that would run a fresh measurement, and always answered by telling you to go and run it yourself. That setting is gone.",
+        "And the landing page said \"nothing uploaded\", which was true of recording and not of the optional visual checks — those send the frames they look at to whichever model you point them at. It now says so."
+      ]
+    },
+    {
       "version": "0.13.1",
       "date": "2026-08-28",
       "headline": "The help page explains the checks, and the watcher stops saying something untrue",

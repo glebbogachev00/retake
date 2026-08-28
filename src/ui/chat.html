@@ -11,7 +11,7 @@
   /* The review surface. Retake is driven from an agent (or the workshop);
      this page is where a person watches, judges, and collects the output.
      It accepts no prose on purpose. */
-  :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#767e74; --rule:#dbdfd3; --rule2:#c9cec0; --accent:#1a1c1e; --amber:#e8b04b; --ok:#2f5d3f; --bad:#a23b2c; }
+  :root { --paper:#edefe8; --card:#f8f9f5; --ink:#191d19; --muted:#656c63; --rule:#dbdfd3; --rule2:#c9cec0; --accent:#1a1c1e; --amber:#e8b04b; --ok:#2f5d3f; --bad:#a23b2c; }
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font:15px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
   button, input { font:inherit; color:inherit; }
@@ -105,7 +105,9 @@
      the recording that were missing; they are optional services you can run. */
   .review { margin-top:14px; border:1px solid var(--rule); border-radius:12px; padding:10px 14px 12px; background:var(--card); }
   .rhead { font-size:11.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
-  .rhint { text-transform:none; letter-spacing:0; font-size:12px; opacity:.85; }
+  /* No opacity. It took a colour already at the AA line and pushed it under.
+     Case and letter-spacing separate this from the label beside it already. */
+  .rhint { text-transform:none; letter-spacing:0; font-size:12px; }
   .checked { margin-top:8px; font-size:12.5px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:baseline; }
   /* One per row on a phone: four of these side by side break into fragments
      that read as unrelated words. */
@@ -116,7 +118,6 @@
   .checked .c { display:inline-flex; gap:5px; align-items:baseline; }
   .checked .c b { font-weight:500; color:var(--ink); }
   .checked .c.none b { color:var(--muted); }
-  .checked .c.old { opacity:.6; }
   .checked .c.bad b { color:var(--bad); }
   .checked .why { font-size:12px; }
   .flagged { margin-top:16px; border:1px solid var(--rule); background:var(--card); border-radius:16px; padding:14px 16px; }
@@ -396,7 +397,9 @@ $('newsBtn').onclick = async () => {
   localStorage.setItem(SEEN_KEY, rs[0].version);
   $('newsBtn').querySelector('.ndot')?.remove();
   veil.onclick = (e) => { if (e.target === veil) veil.remove(); };
-  document.addEventListener('keydown', function esc2(e) { if (e.key === 'Escape') { shut(); document.removeEventListener('keydown', esc2); } });
+  // `shut()` does not exist here — Escape threw a ReferenceError and left the
+  // modal sitting there. Copied from a dialog that had one.
+  document.addEventListener('keydown', function esc2(e) { if (e.key === 'Escape') { veil.remove(); document.removeEventListener('keydown', esc2); } });
 };
 
 document.getElementById('gremlinBtn').onclick = async () => {
@@ -480,9 +483,12 @@ async function pin(name) {
   $('vidName').textContent = name;
   // What the RECORDING did — separate from anything optional that looked at it.
   const stateEl = $('vidState');
-  if (t.brisk) { stateEl.className = 'vstate part'; stateEl.textContent = 'Brisk take'; stateEl.title = 'All the steps, none of the pacing. For iterating, not for keeping.'; }
+  // Failure first, always. `brisk` was tested before `ok`, so a brisk take
+  // whose steps fell over displayed the neutral "Brisk take" and nothing said
+  // it had failed — on the one path people use while iterating fast.
+  if (t.ok === false) { stateEl.className = 'vstate bad'; stateEl.textContent = t.brisk ? 'Brisk take — steps failed' : 'Steps failed'; stateEl.title = 'Some steps did not pass — see the proof log.'; }
+  else if (t.brisk) { stateEl.className = 'vstate part'; stateEl.textContent = 'Brisk take'; stateEl.title = 'All the steps, none of the pacing. For iterating, not for keeping.'; }
   else if (t.partial) { stateEl.className = 'vstate part'; stateEl.textContent = 'Partial'; stateEl.title = t.partial; }
-  else if (t.ok === false) { stateEl.className = 'vstate bad'; stateEl.textContent = 'Steps failed'; stateEl.title = 'Some steps did not pass — see the proof log.'; }
   else { stateEl.className = 'vstate done'; stateEl.textContent = 'Recording complete'; stateEl.title = 'The take is sound: every step passed and the artifacts check out.'; }
   $('vidMeta').textContent = `${(t.duration - t.trimBefore).toFixed(0)}s · ${t.ok ? 'all steps passed' : failed ? `stopped at step ${failed.index}: ${failed.summary}` : 'some steps failed'}${d.facts ? ` · ${d.facts.width}×${d.facts.height}` : ''}`;
   $('vidMeta').title = failed?.screen ? 'On screen at that moment: ' + failed.screen : '';

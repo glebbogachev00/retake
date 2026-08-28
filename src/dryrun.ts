@@ -226,7 +226,12 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         // records perfectly. The starter demo shipped with `retake init` hits
         // it, so a new person's first dry run failed on a demo that works.
         case "scroll":
-          if (step.to && step.to !== "top" && step.to !== "bottom") await page.locator(step.to).first().boundingBox({ timeout: short });
+          // And actually scroll. Skipping it left the page at the top while
+          // every later step ran, so a dry run rehearsed a different page from
+          // the one the recording would see.
+          if (step.to === "top") await page.evaluate(() => window.scrollTo(0, 0));
+          else if (step.to === "bottom") await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+          else if (step.to) { await page.locator(step.to).first().boundingBox({ timeout: short }); await page.locator(step.to).first().scrollIntoViewIfNeeded({ timeout: short }); }
           break;
         case "upload": await page.locator(step.selector).first().waitFor({ timeout: short }); break;
         case "evaluate": await page.evaluate(step.script); break;
