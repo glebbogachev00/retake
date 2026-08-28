@@ -76,3 +76,13 @@ test("the checklist is closed — no catch-all item", () => {
   }
   assert.equal(new Set(LOOK_FOR.map((l) => l.split(" — ")[0])).size, LOOK_FOR.length, "kinds must be distinct");
 });
+
+test("the judge is told which pixels are Retake's own", async () => {
+  // A real recording made sweep file Retake's click ring as an application
+  // spinner. A tool that reports its own overlay as somebody's bug is worse
+  // than one that reports nothing.
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../src/ext/sweep.ts", import.meta.url), "utf8");
+  assert.match(src, /Retake draws a mouse cursor/);
+  assert.match(src, /Never report the cursor or that ring/);
+});

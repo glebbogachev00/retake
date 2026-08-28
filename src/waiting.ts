@@ -45,33 +45,54 @@ export async function waitForStep(page: Page, step: WaitStep, opts: { cap?: numb
   }
   await page.waitForSelector(step.selector, { timeout: t });
 
+  // `minChars` and `stableMs` used to run `document.querySelector(sel)` inside
+  // the page. That parses the string as CSS — and a manifest is allowed to use
+  // Playwright's own selectors, so `button:has-text("Buy now")` THREW inside
+  // the browser rather than matching. Found by recording a real app, not by a
+  // test: dry passed and the take fell over.
+  //
+  // Resolving through the locator and reading from Node costs a poll every
+  // hundred milliseconds — which is what the in-page version did anyway — and
+  // works for every selector form Retake accepts.
+  const el = page.locator(step.selector).first();
+  const deadline = Date.now() + t;
+  const left = () => Math.max(0, deadline - Date.now());
+
+  // Read with a real timeout, never the sliver left on the last pass: a read
+  // that times out reports nothing, and "it had 0 characters" about an element
+  // plainly holding five is a message that sends somebody looking in the wrong
+  // place.
+  const readWindow = () => Math.max(250, Math.min(1000, left()));
+
   if (step.minChars) {
-    await page.waitForFunction(
-      ([sel, n]) => (document.querySelector(sel as string)?.textContent ?? "").trim().length >= (n as number),
-      [step.selector, step.minChars] as const,
-      { timeout: t },
-    );
+    let seen = -1;
+    while (left() > 0) {
+      const text = await el.innerText({ timeout: readWindow() }).catch(() => null);
+      if (text !== null) { seen = text.trim().length; if (seen >= step.minChars) return; }
+      await page.waitForTimeout(Math.min(100, left()));
+    }
+    throw new Error(seen >= 0
+      ? `waited ${Math.round(t / 1000)}s for ${step.selector} to hold ${step.minChars}+ characters; it had ${seen}`
+      : `waited ${Math.round(t / 1000)}s for ${step.selector} to hold ${step.minChars}+ characters; it never became readable`);
   }
 
   if (step.stableMs) {
-    // Quiet for this long, measured in the page: the only honest signal that
-    // a streamed or animating subtree has finished.
-    await page.waitForFunction(
-      ([sel, quiet]) => {
-        const w = window as unknown as { __retakeStable?: Record<string, number>; __retakeSnap?: Record<string, string> };
-        const el = document.querySelector(sel as string);
-        if (!el) return false;
-        w.__retakeStable ??= {};
-        const key = sel as string;
-        const now = Date.now();
-        const snap = el.innerHTML.length + ":" + (el.textContent ?? "").length;
-        const prev = (w.__retakeSnap ??= {});
-        if (prev[key] !== snap) { prev[key] = snap; w.__retakeStable[key] = now; return false; }
-        return now - (w.__retakeStable[key] ?? now) >= (quiet as number);
-      },
-      [step.selector, step.stableMs] as const,
-      { timeout: t, polling: 100 },
-    );
+    // Quiet for this long: the only honest signal that a streamed or
+    // animating subtree has finished.
+    const shape = (n: Element) => `${(n as HTMLElement).innerHTML.length}:${(n.textContent ?? "").length}`;
+    let snap: string | null = null, since = Date.now(), everSeen = false, changes = 0;
+    while (left() > 0) {
+      const now = await el.evaluate(shape, undefined, { timeout: readWindow() }).catch(() => null);
+      if (now !== null) {
+        everSeen = true;
+        if (now !== snap) { snap = now; since = Date.now(); changes++; }
+        else if (Date.now() - since >= step.stableMs) return;
+      }
+      await page.waitForTimeout(Math.min(100, left()));
+    }
+    throw new Error(everSeen
+      ? `waited ${Math.round(t / 1000)}s for ${step.selector} to be quiet for ${step.stableMs}ms; it kept changing (${changes} times)`
+      : `waited ${Math.round(t / 1000)}s for ${step.selector} to settle; it never appeared`);
   }
 }
 

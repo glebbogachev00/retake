@@ -64,6 +64,12 @@ const PROMPT = [
   "Answer with one line of JSON and nothing else:",
   '{"findings":[{"kind":"OVERLAP","what":"<what you can see, naming the actual text or element>","where":"<roughly where in the frame>"}]}',
   "",
+  // Retake draws a cursor and a ring on the frames it renders. sweep read the
+  // ring as an application spinner and filed it as a defect in the app being
+  // recorded. A tool that reports its own overlay as somebody's bug is worse
+  // than a tool that reports nothing.
+  "One thing in these frames is NOT part of the app: Retake draws a mouse cursor, and a soft circular ring around it at the moment of a click. Never report the cursor or that ring — not as a spinner, not as an overlap, not as anything. Only report what the app itself is drawing.",
+  "",
   "Rules. Report only what is visible in THIS image — never what you assume, and never what might be true elsewhere in the app. Quote the real words you can see. A clean frame is the expected answer for a healthy app: return {\"findings\":[]} and do not manufacture something to say. Do not comment on taste, wording, colour choices, spacing you merely dislike, or what the app ought to do differently. At most five findings.",
 ].join("\n");
 
