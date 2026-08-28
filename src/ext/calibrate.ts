@@ -345,7 +345,7 @@ export function report(rs: Result[], stability: Stability = null): string[] {
   if (!control) {
     out.push("FALSE POSITIVES   not measured \u2014 no control was run, so no rate can be claimed");
   } else if (!control.seeded) {
-    out.push(`FALSE POSITIVES   NOT MEASURED \u2014 the control ${control.why ?? control.error ?? "did not record"}. No rate can be claimed from this run, and neither can the recall above: every variant recorded under the same conditions.`);
+    out.push(`FALSE POSITIVES   NOT MEASURED \u2014 on the control, ${control.why ?? control.error ?? "the run did not record"}. No rate can be claimed from this run, and neither can the recall above: every variant recorded under the same conditions.`);
   } else {
     out.push(control.kinds.length
       ? `FALSE POSITIVES   ${control.kinds.length} finding(s) on the control, where nothing is wrong: ${control.kinds.join(", ")}`
@@ -371,7 +371,11 @@ export function report(rs: Result[], stability: Stability = null): string[] {
   out.push("");
   const gaps = uncovered();
   if (gaps.length) {
-    out.push(`NOT COVERED   ${DEFECTS.length} seeds against a ${LOOK_FOR.length}-item checklist. Nothing here measures ${gaps.join(" or ")} at all, so the recall above says nothing about ${gaps.length === 1 ? "it" : "them"}.`);
+    // The count is of what this run attempted, not of the catalogue — `--only`
+    // makes those different numbers, and printing the catalogue's would
+    // overstate a narrow run.
+    const tried = all.length || DEFECTS.length;
+    out.push(`NOT COVERED   ${tried} seed${tried === 1 ? "" : "s"} against a ${LOOK_FOR.length}-item checklist. Nothing here measures ${gaps.join(" or ")} at all, so the recall above says nothing about ${gaps.length === 1 ? "it" : "them"}.`);
     out.push("");
   }
   out.push("What this is and is not: the seeds were written by someone who has read the checklist, so recall here is an upper bound \u2014 a fault nobody thought to seed is still unmeasured. Injected faults are also cleaner than the ones real apps produce. Treat it as a floor for trust, not a score.");
