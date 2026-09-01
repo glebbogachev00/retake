@@ -183,6 +183,23 @@ test("nothing scrolls sideways on a phone, and the pills keep their shape", asyn
   await p.close();
 });
 
+test("one bad video seek does not take the window down", async () => {
+  // The crash that read as "Retake keeps disconnecting": a player asking for
+  // bytes past the end of a video — a seek in a demo just re-recorded shorter
+  // — made createReadStream throw AFTER the 206 head was sent. The catch-all
+  // then tried to answer 500 on top of it, and that second writeHead was the
+  // uncaught throw that killed the whole process. Twice in one evening.
+  const bad = await fetch(`http://127.0.0.1:${PORT}/out/example/demo.mp4`, { headers: { range: "bytes=99999999-" } });
+  assert.equal(bad.status, 416, "an unsatisfiable range is refused, not served");
+  // The window must still be alive — this is the assertion that matters.
+  const alive = await fetch(`http://127.0.0.1:${PORT}/`);
+  assert.equal(alive.status, 200, "the server died answering a bad range");
+  // And an ordinary seek still works.
+  const good = await fetch(`http://127.0.0.1:${PORT}/out/example/demo.mp4`, { headers: { range: "bytes=0-99" } });
+  assert.equal(good.status, 206);
+  assert.equal((await good.arrayBuffer()).byteLength, 100);
+});
+
 test("the API still refuses what it should, on the real routes", async () => {
   const call = (h: Record<string, string>, body = "{}") =>
     fetch(`http://127.0.0.1:${PORT}/api/start`, { method: "POST", headers: h, body }).then((r) => r.status);

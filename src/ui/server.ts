@@ -106,7 +106,26 @@ function autoRepair(yamlText: string, failures: string[]): { yaml: string; fixes
 }
 const runs = new Map<string, Run>();
 
+/** Stream a file out without ever letting it take the process with it.
+    A read stream that fails mid-pipe — the file tidied away between stat and
+    read, disk trouble, a video request abandoned half-way — emits 'error'
+    with no listener, and an unhandled 'error' event is fatal to the whole
+    window. Same failure family as the double writeHead below. */
+const stream = (f: string, res: http.ServerResponse, opts?: { start: number; end: number }) => {
+  const r = opts ? fs.createReadStream(f, opts) : fs.createReadStream(f);
+  r.on("error", () => { if (!res.headersSent) res.writeHead(500); res.end(); });
+  return r.pipe(res);
+};
+
 const json = (res: http.ServerResponse, code: number, body: unknown) => {
+  // The catch-all funnels every route error here — including errors thrown
+  // AFTER a route has started answering (a stream that broke mid-pipe, a
+  // range request that went wrong). Writing a second head there is itself a
+  // throw, and that one is outside any catch: one bad request took the whole
+  // window down, which read as "Retake keeps disconnecting". If the head is
+  // out, the answer is already decided — end the connection, never the
+  // process.
+  if (res.headersSent) { res.end(); return; }
   res.writeHead(code, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
 };
@@ -490,7 +509,7 @@ export function serve(port: number) {
         if (!fs.existsSync(f)) { /* not ours — keep going */ } else {
         res.writeHead(200, { "content-type": MIME[path.extname(f)] ?? "application/octet-stream", "content-length": fs.statSync(f).size });
         if (req.method === "HEAD") return res.end();
-        return fs.createReadStream(f).pipe(res);
+        return stream(f, res);
         }
       }
       const msite = /^(?:\/landing)?\/(media|logos)\/([A-Za-z0-9._-]+)$/.exec(p);
@@ -499,7 +518,7 @@ export function serve(port: number) {
         if (!fs.existsSync(f)) return json(res, 404, { error: "not found" });
         res.writeHead(200, { "content-type": MIME[path.extname(f)] ?? "application/octet-stream", "content-length": fs.statSync(f).size });
         if (req.method === "HEAD") return res.end();
-        return fs.createReadStream(f).pipe(res);
+        return stream(f, res);
       }
       if (p === "/guide" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/html" });
@@ -1071,12 +1090,23 @@ export function serve(port: number) {
         const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range ?? "");
         if (range && type === "video/mp4") {
           const start = Number(range[1] || 0);
-          const end = range[2] ? Number(range[2]) : stat.size - 1;
+          const end = Math.min(range[2] ? Number(range[2]) : stat.size - 1, stat.size - 1);
+          // A range the file cannot satisfy — a player seeking in a video
+          // that was just re-recorded shorter, or a stale tab asking for
+          // bytes past the end. This used to writeHead(206) FIRST, then let
+          // createReadStream throw on the impossible range; the catch-all
+          // tried to answer 500 on top of the sent 206, and THAT throw was
+          // outside every catch. One bad seek took the whole window down,
+          // which read from the outside as "Retake keeps disconnecting".
+          if (start > end || start >= stat.size) {
+            res.writeHead(416, { "content-range": `bytes */${stat.size}` });
+            return res.end();
+          }
           res.writeHead(206, { "content-type": type, "content-range": `bytes ${start}-${end}/${stat.size}`, "accept-ranges": "bytes", "content-length": end - start + 1 });
-          return fs.createReadStream(f, { start, end }).pipe(res);
+          return stream(f, res, { start, end });
         }
         res.writeHead(200, { "content-type": type, "content-length": stat.size, "cache-control": "no-store" });
-        return fs.createReadStream(f).pipe(res);
+        return stream(f, res);
       }
       json(res, 404, { error: "not found" });
     } catch (e) {
