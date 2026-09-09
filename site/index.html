@@ -4,640 +4,338 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Retake — demos that re-record themselves</title>
-<!-- Social card. The domain is stamped by scripts/site-domain.mjs; until
-     then these point at the placeholder and a shared link shows no card. -->
+<meta name="description" content="Give Retake to your coding agent. It records a reusable product demo, then reruns it when your app changes." />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Retake" />
 <meta property="og:title" content="Retake — demos that re-record themselves" />
-<meta property="og:description" content="A demo is a small file your coding agent writes. When the UI changes, change one line and run it again." />
+<meta property="og:description" content="Your coding agent records the flow. You review the finished take locally." />
 <meta property="og:url" content="https://www.useretake.app/" />
 <meta property="og:image" content="https://www.useretake.app/og.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Retake local video library with a finished product demo" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Retake — demos that re-record themselves" />
-<meta name="twitter:description" content="A demo is a small file your coding agent writes. When the UI changes, change one line and run it again." />
+<meta name="twitter:description" content="Your coding agent records the flow. You review the finished take locally." />
 <meta name="twitter:image" content="https://www.useretake.app/og.png" />
+<meta name="twitter:image:alt" content="Retake local video library with a finished product demo" />
 <link rel="canonical" href="https://www.useretake.app/" />
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJSZXRha2UiPiA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iIzFhMWMxZSIvPiA8ZyBmaWxsPSIjZWNlZWU5Ij4gPHJlY3QgeD0iMTMyIiB5PSIxMTIiIHdpZHRoPSI5NiIgaGVpZ2h0PSI0NiIgcng9IjIzIiBvcGFjaXR5PSIwLjU1Ii8+IDxyZWN0IHg9IjEzMiIgeT0iMTgwIiB3aWR0aD0iMTkyIiBoZWlnaHQ9IjQ2IiByeD0iMjMiIG9wYWNpdHk9IjAuOCIvPiA8cmVjdCB4PSIxMzIiIHk9IjI0OCIgd2lkdGg9IjI4OCIgaGVpZ2h0PSI0NiIgcng9IjIzIiBmaWxsPSIjZThiMDRiIi8+IDxyZWN0IHg9IjEzMiIgeT0iMzE2IiB3aWR0aD0iMTkyIiBoZWlnaHQ9IjQ2IiByeD0iMjMiIG9wYWNpdHk9IjAuOCIvPiA8cmVjdCB4PSIxMzIiIHk9IjM4NCIgd2lkdGg9Ijk2IiBoZWlnaHQ9IjQ2IiByeD0iMjMiIG9wYWNpdHk9IjAuNTUiLz4gPC9nPiA8L3N2Zz4=" />
-<meta name="description" content="A demo is a small file your coding agent writes. When the UI changes, run the file again — nobody re-records anything by hand." />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJSZXRha2UiPiA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iIzFhMWMxZSIvPiA8ZyBmaWxsPSIjZWNlZWU5Ij4gPHJlY3QgeD0iMTMyIiB5PSIxMTIiIHdpZHRoPSI5NiIgaGVpZ2h0PSI0NiIgcng9IjIzIiBvcGFjaXR5PSIwLjU1Ii8+IDxyZWN0IHg9IjEzMiIgeT0iMTgwIiB3aWR0aD0iMTkyIiBoZWlnaHQ9IjQ2IiByeD0iMjMiIG9wYWNpdHk9IjAuOCIvPiA8cmVjdCB4PSIxMzIiIHk9IjI0OCIgd2lkdGg9IjI4OCIgaGVpZ2h0PSI0NiIgcng9IjIzIiBmaWxsPSIjZThiMDRiIi8+IDxyZWN0IHg9IjEzMiIgeT0iMzE2IiB3aWR0aD0iMTkyIiBoZWlnaHQ9IjQ2IiByeD0iMjMiIG9wYWNpdHk9IjAuOCIvPiA8cmVjdCB4PSIxMzIiIHk9IjM4NCIgd2lkdGg9Ijk2IiBoZWlaHQ9IjQ2IiByeD0iMjMiIG9wYWNpdHk9IjAuNTUiLz4gPC9nPiA8L3N2Zz4=" />
 <style>
-  :root { --paper:#f2efe6; --card:#fbf9f3; --ink:#191d19; --muted:#575e54; --rule:#e2ddcf; --rule2:#d3cdbb; --accent:#1a1c1e; --amber:#e8b04b; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; -webkit-font-smoothing:antialiased; }
-  .top { display:flex; align-items:center; gap:10px; padding:18px 26px; max-width:880px; margin:0 auto; }
-  .mark { width:26px; height:26px; border-radius:8px; background:var(--accent); position:relative; flex:none; }
-  .mark i { position:absolute; left:6.5px; height:3px; border-radius:2px; background:#eceee9; }
-  .mark i:nth-child(1){top:5px;width:5px;opacity:.55} .mark i:nth-child(2){top:10px;width:8px;opacity:.8} .mark i:nth-child(3){top:15px;width:13px;background:var(--amber)} .mark i:nth-child(4){top:20px;width:8px;opacity:.8}
-  .top b { font-size:17px; letter-spacing:-.01em; }
-  .top .sp { flex:1; }
-  .top a { color:var(--muted); text-decoration:none; font-size:14px; margin-left:18px; }
-  .top a:hover { color:var(--ink); }
-  main { max-width:880px; margin:0 auto; padding:30px 26px 90px; }
-  .hero { padding:52px 0 34px; }
-  .flow { margin:26px 0 0; font:13px ui-monospace, Menlo, monospace; color:var(--muted); letter-spacing:.02em; }
-  .flow span { color:var(--rule2); padding:0 2px; }
-  .terms { margin:10px 0 0; font-size:12.5px; color:var(--muted); }
-  .kicker { font:12px ui-monospace, Menlo, monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 14px; }
-  h1 { font-size:clamp(34px, 6vw, 54px); line-height:1.08; letter-spacing:-.025em; margin:0 0 18px; }
-  h1 em { font-style:normal; color:#bf8324; }
-  .lede { font-size:19px; color:var(--muted); max-width:620px; margin:0 0 28px; }
-  .actions { display:flex; gap:10px; flex-wrap:wrap; }
-  .btn { display:inline-block; text-decoration:none; border-radius:14px; padding:13px 24px; font-size:15px; letter-spacing:-.01em; }
-  .btn.dark { background:var(--accent); color:#eceee9; }
-  .btn.dark:hover { opacity:.9; }
-  .btn.light { border:1px solid var(--rule2); color:var(--ink); background:#fff; }
-  .btn.light:hover { border-color:var(--ink); }
-  .say { background:var(--card); border:0; border-radius:16px; padding:20px 24px; margin:46px 0 10px; font-size:16.5px; }
-  .say .who { font:11px ui-monospace, Menlo, monospace; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:6px; }
-  .say i { font-style:normal; }
-  .arrow { text-align:center; color:var(--muted); margin:8px 0; }
-  .videos { display:grid; gap:26px; margin:14px 0 0; }
-  .shot { border:1px solid var(--rule2); border-radius:14px; overflow:hidden; background:#111; box-shadow:0 14px 40px rgba(24,28,24,.12); }
-  .shot video { width:100%; height:auto; display:block; }
-  .shot figcaption { background:var(--card); padding:12px 18px 14px; font-size:14px; color:var(--muted); }
-  .shot figcaption b { color:var(--ink); font-weight:600; }
-  section { margin-top:92px; }
-  h2 { font-size:27px; letter-spacing:-.02em; font-weight:600; margin:0 0 10px; }
-  .sub { color:var(--muted); margin:0 0 30px; max-width:560px; font-size:16.5px; }
-  /* One section, not two: the second header made a continuous explanation read
-     as a fresh argument starting over. */
-  .boxhead { margin:26px 0 12px; font-size:13px; letter-spacing:.03em; text-transform:uppercase; color:var(--muted); }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; }
-  .cell { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:18px 20px; }
-  .cell b { display:block; margin-bottom:6px; font-size:15px; }
-  .cell p { margin:0; font-size:14px; color:var(--muted); line-height:1.6; }
-  .how { counter-reset:step; }
-  .step { display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--rule); }
-  .step:last-child { border-bottom:0; }
-  .step::before { counter-increment:step; content:counter(step); flex:none; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#eceee9; display:flex; align-items:center; justify-content:center; font-size:13px; margin-top:2px; }
-  .step b { display:block; }
-  .step p { margin:2px 0 0; color:var(--muted); font-size:14.5px; }
-  pre { background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:16px 20px; overflow-x:auto; font:14px/1.8 ui-monospace, Menlo, monospace; }
-  pre .c { color:var(--muted); }
-  .diff { font:13.5px/1.9 ui-monospace, Menlo, monospace; overflow-x:auto; }
-  .diff div { white-space:pre; }
-  .diff .del { color:#9a4238; } .diff .del::before { content:"−  "; opacity:.55; }
-  .diff .add { color:#33613f; } .diff .add::before { content:"+  "; opacity:.55; }
-  .diff .ctx { color:var(--muted); font-size:12px; margin-bottom:4px; }
-  .copyline { display:flex; gap:10px; align-items:stretch; margin-top:0; }
-  .copyline .say { flex:1; margin:0; }
-  .copybtn { flex:none; border:0; background:var(--ink); color:var(--paper); border-radius:16px; padding:0 22px; font:14px/1 inherit; font-weight:500; cursor:pointer; transition:opacity .15s; }
-  .copybtn:hover { opacity:.86; }
-  .vocab { background:var(--card); border:1px solid var(--rule); border-left:3px solid var(--amber); border-radius:14px; padding:18px 22px; font-size:15px; color:var(--muted); line-height:1.8; }
-  .vocab b { color:var(--ink); }
-  .cases { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:14px; }
-  /* The proof section showed no proof — three cards of text about recordings
-     you had to leave the page to see. A frame from the actual take, on the
-     card, is the smallest honest version of that. */
-  /* The one case whose recording is not mine to show. An empty gap beside two
-     frames reads as something missing; saying why reads as a decision. */
-  .noshot { margin:14px 0 4px; padding:16px 14px; border:1px dashed var(--rule2); border-radius:10px; font-size:13px; line-height:1.5; color:var(--muted); background:rgba(0,0,0,.012); }
-  .shotlink { display:block; margin:14px 0 4px; border-radius:10px; overflow:hidden; border:1px solid var(--rule2); line-height:0; }
-  .shotlink img { width:100%; height:auto; display:block; transition:transform .3s ease; }
-  .shotlink:hover img { transform:scale(1.02); }
-  .case { background:var(--card); border:1px solid var(--rule); border-radius:16px; padding:22px 24px; display:flex; flex-direction:column; box-shadow:0 10px 26px rgba(24,28,24,.06); }
-  .wordmark { font-size:24px; font-weight:700; letter-spacing:-.02em; margin-bottom:12px; display:flex; align-items:center; gap:10px; }
-  .caselogo { height:28px; width:28px; border-radius:7px; object-fit:contain; }
-  .caselogo.wide { height:26px; width:auto; max-width:170px; border-radius:0; }
-  .wordmark .serif { font-family:Georgia, "Times New Roman", serif; font-weight:600; letter-spacing:0; }
-  .wordmark.tbmark { font-weight:900; letter-spacing:-.03em; gap:1px; }
-  .wordmark .avex { color:var(--amber); margin-right:2px; }
-  .case .quote { margin:0 0 14px; font-size:14.5px; line-height:1.65; flex:1; }
-  .case .meta { margin:0; font-size:12.5px; color:var(--muted); }
-  .case .watch { margin:12px 0 0; padding-top:10px; border-top:1px solid var(--rule); font-size:13px; display:flex; gap:8px; align-items:baseline; }
-  .case .watch .k { font:10.5px ui-monospace, Menlo, monospace; letter-spacing:.08em; color:var(--muted); flex:none; }
-  .case .watch a { color:var(--ink); }
-  .case .meta a { color:inherit; }
-  @media (max-width: 560px) {
-    /* The diff is the page's best proof, so on a phone it wraps rather than
-       clipping — it stays the real selector line, not a shortened fake, and
-       nothing is hidden off the right edge. */
-    .diff { font-size:11.5px; line-height:1.8; }
-    .diff div { white-space:pre-wrap; word-break:break-word; }
-    /* Keep the − / + markers: colour alone is not a signal everyone gets. */
-    .diff .del, .diff .add { padding-left:18px; text-indent:-18px; }
-    .copyline { flex-direction:column; }
-    .copybtn { padding:12px 20px; }
-  }
-  .foot { margin-top:80px; padding-top:22px; border-top:1px solid var(--rule); color:var(--muted); font-size:13.5px; display:flex; gap:18px; flex-wrap:wrap; }
-  .foot a { color:inherit; }
-
-.rel{border-top:1px solid var(--rule);padding:22px 0}
-.rel:first-child{border-top:0;padding-top:4px}
-.relhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:8px}
-.relhead b{font-size:17px;letter-spacing:-.01em}
-.relmeta{font-size:12.5px;opacity:.55;font-variant-numeric:tabular-nums}
-.rel.latest .relmeta::after{content:"newest";margin-left:8px;padding:2px 7px;border-radius:99px;background:#e8b04b;color:#221f19;font-size:11px;font-weight:600}
-.rel ul{margin:0;padding-left:18px;max-width:660px}
-.rel li{margin:5px 0;line-height:1.55;opacity:.86}
-.rel:not(.latest) ul{opacity:.72}
-
-.found{border:0;border-radius:16px;padding:24px 26px;background:var(--card);max-width:760px}
-.found h3{margin:0 0 4px;font-size:17px;letter-spacing:-.01em}
-.found .lede{margin:0 0 16px;color:var(--muted);font-size:14.5px;line-height:1.6}
-.found ul{margin:0;padding-left:18px}
-.found li{margin:7px 0;font-size:14px;line-height:1.55;color:var(--muted)}
-.found li b{color:var(--ink);font-weight:600}
-.found .tail{margin:16px 0 0;font-size:13px;color:var(--muted);opacity:.85;line-height:1.55}
-
-.news{border-top:1px solid var(--rule);padding-top:26px}
-.news>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:12px;padding:2px 0}
-.news>summary::-webkit-details-marker{display:none}
-.news>summary .lab{font-size:20px;letter-spacing:-.015em;font-weight:600;color:var(--ink)}
-.news>summary .ver{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
-.news>summary .cue{margin-left:auto;font-size:13.5px;color:var(--muted)}
-.news>summary .cue::after{content:" ›";}
-.news[open]>summary .cue::after{content:" ‹";}
-.news>summary:hover .cue{color:var(--ink)}
-.news #releases{margin-top:20px}
-
-/* the version chip — small, live, and proof the thing is moving */
-.ship{margin:14px 0 0;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);
-  background:var(--card);border-radius:99px;padding:6px 14px}
-.ship .dot{width:6px;height:6px;border-radius:99px;background:#6a9c62;flex:none}
-.ship .sep{opacity:.45}
-.ship a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.2)}
-.ship a:hover{color:var(--ink)}
-
-/* a note from a person, not a brochure */
-/* A person, not a wall of text. The shape is borrowed from Capture's own
-   maker note: the face goes first so a reader knows a person is talking
-   before reading a word, the heading names the convention it is breaking,
-   and the day is given as beats you can skim rather than prose you have to
-   work through. Full column width, so it sits on the page's grid. */
-.note{background:#f4f2ea;border-radius:20px;padding:32px 34px 28px;position:relative;overflow:hidden}
-.note::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--amber)}
-.note-who{display:flex;align-items:center;gap:12px;margin-bottom:18px}
-.note-who img{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none}
-.note-who>span{display:flex;flex-direction:column;gap:2px}
-.note-label{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.note-name{font-size:14.5px;font-weight:600;color:var(--ink)}
-.note .note-h{font-size:22px;letter-spacing:-.018em;margin:0 0 10px;font-weight:600}
-.note p{margin:0;font-size:16.5px;line-height:1.68;color:#3b423a;max-width:62ch}
-.note-beats{margin:22px 0 0;padding-top:18px;border-top:1px solid rgba(0,0,0,.08);
-  display:grid;grid-template-columns:1fr 1fr;gap:18px 28px}
-.note-beats div{display:flex;flex-direction:column;gap:3px;min-width:0}
-.note-beats dt{font-size:14.5px;font-weight:600;color:var(--ink)}
-.note-beats dd{margin:0;font-size:13.5px;line-height:1.5;color:var(--muted)}
-.note .sign{margin-top:20px;font-size:14px;color:var(--muted)}
-.note .sign b{color:var(--ink);font-weight:600}
-.note .sign span{opacity:.45;margin:0 6px}
-.note .sign a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.22)}
-.note .sign a:hover{color:var(--ink)}
-@media (max-width:640px){.note{padding:26px 22px 22px}.note-beats{grid-template-columns:1fr;gap:14px}}
-.note .sign span{opacity:.45;margin:0 6px}
-.note .sign a{color:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(0,0,0,.22)}
-.note .sign a:hover{color:var(--ink)}
-
-/* The one section that is only words. On its own it was a heading floating
-   in 112px of nothing above and below — so it uses the width instead of the
-   height: the claim on the left, the argument on the right, which is also
-   the right shape for the strongest thing the page says. */
-.stmt{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:16px 56px;align-items:start;
-  background:#20241f;color:#f2efe6;border-radius:24px;padding:52px 48px;
-  margin-left:-26px;margin-right:-26px}
-.stmt h2{margin:0;font-size:31px;line-height:1.16;letter-spacing:-.022em;color:#fbf9f3}
-.stmt h2 b{color:#e8b04b;font-weight:inherit}
-.stmt p{margin:0 0 14px;font-size:16.5px;line-height:1.72;color:#c3c8bf;max-width:52ch}
-.stmt p.last{margin-bottom:0;color:#fbf9f3}
-@media (max-width:880px){.stmt{margin-left:0;margin-right:0;padding:36px 28px}}
-@media (max-width:760px){
-  .stmt{grid-template-columns:1fr;gap:14px}
-  .stmt h2{font-size:26px}
-  .stmt h2 br{display:none}
+:root {
+  --paper:#f2efe6;
+  --card:#fbf9f3;
+  --ink:#191d19;
+  --muted:#575e54;
+  --rule:#e2ddcf;
+  --rule-strong:#d3cdbb;
+  --accent:#1a1c1e;
+  --amber:#e8b04b;
 }
-
-/* ── The layout that fixes the floating headings ─────────────────────────
-   Every section was a heading alone above a gap, with a 640px column of
-   text inside an 880px page — a permanent void down the right and a title
-   with nothing beside it. Sections are two columns now: what this is on
-   the left, what it shows on the right. The left column sticks while you
-   read the right one, so scrolling a long section still tells you where
-   you are. */
-section{display:grid;grid-template-columns:minmax(0,215px) minmax(0,1fr);gap:4px 54px;
-  align-items:start;margin-top:88px}
-.shead{grid-column:1;position:sticky;top:26px}
-section > *:not(.shead){grid-column:2}
-.shead h2{font-size:21px;line-height:1.22;letter-spacing:-.018em;font-weight:600;margin:0 0 8px}
-.shead .sub{font-size:14px;line-height:1.6;margin:0;color:var(--muted);max-width:none}
-section > .sub{font-size:16.5px;margin:0 0 22px;max-width:60ch}
-
-/* One control, not a box with a button loose beside it. */
-.copyline{display:flex;align-items:stretch;gap:0;background:var(--card);border-radius:16px;
-  overflow:hidden;margin-top:0}
-.copyline .say{flex:1;margin:0;background:transparent;border-radius:0;padding:18px 20px}
-.copybtn{flex:none;border:0;border-left:1px solid var(--rule);background:transparent;
-  color:var(--ink);padding:0 24px;font:14px/1 inherit;font-weight:600;cursor:pointer;
-  transition:background .15s,color .15s}
-.copybtn:hover{background:var(--ink);color:var(--card)}
-
-/* The numbers the page already earned, said out loud. */
-.punch{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}
-.punch b{display:inline-flex;align-items:baseline;gap:7px;background:var(--card);
-  border-radius:99px;padding:7px 15px;font-size:13.5px;font-weight:500;color:var(--muted)}
-.punch b i{font-style:normal;font-weight:700;color:var(--ink);font-size:15px;
-  font-variant-numeric:tabular-nums}
-
-@media (max-width:820px){
-  section{grid-template-columns:1fr;gap:10px}
-  .shead{position:static}
-  section > *:not(.shead){grid-column:1}
-  .shead h2{font-size:24px}
-  .copyline{flex-direction:column}
-  .copybtn{border-left:0;border-top:1px solid var(--rule);padding:14px 20px}
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font:16px/1.62 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Inter,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
 }
-
-/* Wide content does not belong in a 600px column. A section whose payload is
-   a grid of cards goes back to full width, heading above it — three cards
-   squeezed into two thirds of the page was worse than the problem I was
-   fixing. */
-/* Card sections keep their full width; the header above them is the same
-   centred header every other section gets. An earlier two-column version of
-   this put the title and its gloss on different centres. */
-section:has(.cases), section:has(.grid), section:has(.videos){grid-template-columns:1fr}
-section:has(.cases) > *:not(.shead), section:has(.grid) > *:not(.shead),
-section:has(.videos) > *:not(.shead){grid-column:1}
-
-/* Code that runs past the edge is just broken. Scroll it, and let the long
-   comment wrap rather than disappear. */
-pre, .term{overflow-x:auto;max-width:100%}
-pre code, .term code{white-space:pre}
-@media (max-width:820px){
-  section:has(.cases) .shead, section:has(.grid) .shead, section:has(.videos) .shead{
-    grid-template-columns:1fr}
+a { color:inherit; }
+.top {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  max-width:960px;
+  margin:0 auto;
+  padding:18px 26px;
 }
-.note-after{margin:10px 0 0;font-size:13.5px;color:var(--muted)}
-
-/* A section with no left-hand heading has nothing to sit beside, so it must
-   not be pushed into the right column — that is what shoved the maker note
-   and the changelog 270px inward against empty space. */
-section:not(:has(.shead)){grid-template-columns:1fr}
-section:not(:has(.shead)) > *{grid-column:1}
-
-/* ── A desktop layout, which this page did not have ──────────────────────
-   Every media query here was max-width: a phone layout that never stopped
-   applying. At 1440 that left 880px of content between 280px margins — 39%
-   of the screen unused, and the wide view was the narrow view with more
-   air around it.
-   
-   Everything below applies only once there IS width to use, so nothing
-   under 1100 changes. One container width for the whole page: four
-   different edges stacked down a page reads as a mess, however carefully
-   each one is chosen. */
-@media (min-width: 1100px) {
-  main { max-width: 1120px; padding-left: 32px; padding-right: 32px; }
-
-  /* The hero gets to be a hero: centred, and the headline allowed to grow
-     into the room rather than wrapping early at a size chosen for a phone. */
-  .hero { text-align: center; padding: 76px 0 44px; }
-  h1 { font-size: clamp(54px, 5.6vw, 82px); max-width: none; }
-  .hero .lede { max-width: 640px; margin-left: auto; margin-right: auto; }
-  .hero .actions, .hero .flow, .hero .ship { justify-content: center; }
-  .hero .ship { margin-left: auto; margin-right: auto; }
-
-  /* Reading measure belongs to the paragraph, not to its container. Capping
-     the cards instead produces a ragged right edge where full-width blocks
-     alternate with narrow ones. */
-  .sub, .note p, .found p, .stmt p, .rel li { max-width: 66ch; }
-
-  /* Section headings sit beside their content with more room to breathe. */
-  section { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 4px 64px; }
-
-
-  /* Sections match the top: a centred header above its own content, rather
-     than a heading in a left rail — which reads as a different page from the
-     hero above it. Prose inside cards stays left: centring a paragraph makes
-     it harder to read, and the axis is set by the blocks, not the sentences. */
-  section > .shead h2 { font-size: 26px; }
-
-
-  /* A card with a max-width and no auto margins sits left inside a centred
-     section. The bugs card was 188px off the centre of its own heading. */
-  .found, .note { margin-left: auto; margin-right: auto; }
-
-  /* A signpost has just said what this section is. The section saying it
-     again puts four blocks of text on top of each other before any content
-     appears — the signpost's gloss and the section's gloss are the same
-     sentence twice. The section keeps its title, which labels the part; the
-     second gloss goes. */
-  .movement + section > .shead .sub { display: none; }
-  .movement + section > .shead { margin-bottom: 18px; }
-  .movement + section > .shead h2 { font-size: 22px; }
-
-  /* What can pair, pairs. This is where width actually gets used — related
-     things beside each other, not prose stretched wider. */
-  .grid { grid-template-columns: repeat(3, 1fr); }
-  .note-beats { grid-template-columns: repeat(2, 1fr); gap: 22px 40px; }
+.mark {
+  width:26px;
+  height:26px;
+  border-radius:8px;
+  background:var(--accent);
+  position:relative;
+  flex:none;
 }
-
-@media (min-width: 1360px) {
-  main { max-width: 1200px; }
+.mark i { position:absolute;left:6.5px;height:3px;border-radius:2px;background:#eceee9; }
+.mark i:nth-child(1){top:5px;width:5px;opacity:.55}
+.mark i:nth-child(2){top:10px;width:8px;opacity:.8}
+.mark i:nth-child(3){top:15px;width:13px;background:var(--amber)}
+.mark i:nth-child(4){top:20px;width:8px;opacity:.8}
+.top b { font-size:17px;letter-spacing:-.01em; }
+.top .sp { flex:1; }
+.top a { color:var(--muted);text-decoration:none;font-size:14px; }
+.top a:hover { color:var(--ink); }
+main { max-width:960px;margin:0 auto;padding:0 26px 84px; }
+.hero { padding:46px 0 34px; }
+.kicker {
+  margin:0 0 13px;
+  color:var(--muted);
+  font:12px ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.08em;
+  text-transform:uppercase;
 }
-.videos video{width:100%;height:auto;display:block}
-
-/* ── A level above the boxes ─────────────────────────────────────────────
-   Measured on this page before adding it: every heading was 20–24px against
-   13.5px body — all within a few pixels of each other, so none of them read
-   as a level. The page had cards and whitespace and no sections.
-   A signpost sits on the page background, is larger than anything in the
-   boxes beneath it, and says what you are about to look at and why. */
-.movement { margin: 60px 0 22px; }
-.movement h2 { font-size: 27px; line-height: 1.14; letter-spacing: -.022em;
-  font-weight: 600; margin: 0 0 9px; color: var(--ink); }
-.movement p { margin: 0; color: var(--muted); font-size: 15.5px; line-height: 1.55; max-width: 56ch; }
-/* The section under a signpost belongs to it. */
-.movement + section { margin-top: 22px; }
-
-@media (min-width: 1100px) {
-  .movement { margin: 84px 0 26px; text-align: center; }
-  .movement h2 { font-size: 40px; }
-  .movement p { font-size: 17px; margin-left: auto; margin-right: auto; }
-  .movement + section { margin-top: 30px; }
+h1,h2 { letter-spacing:-.025em; }
+h1 { max-width:780px;margin:0 0 18px;font-size:clamp(40px,6.4vw,68px);line-height:1.04; }
+h1 em { color:#bf8324;font-style:normal; }
+.lede { max-width:650px;margin:0;font-size:19px;color:var(--muted); }
+.steps {
+  list-style:none;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  margin:30px 0 26px;
+  padding:0;
 }
-
-/* One layout for every width above a phone: a centred header above its own
-   content. This used to live in the desktop block, which left 821–1099px on
-   the old left-rail layout — headings in a rail while everything else
-   centred, 441px apart. Prose inside cards stays left; centring paragraphs
-   makes them harder to read, and the axis is set by where blocks sit. */
-section { grid-template-columns: 1fr; gap: 0; }
-section > .shead { grid-column: 1; position: static; text-align: center;
-  margin: 0 auto 26px; max-width: 720px; }
-section > .shead .sub { margin-left: auto; margin-right: auto; }
-section > *:not(.shead) { grid-column: 1; }
-.stmt, .note, .found, .cell, .case, .step { text-align: left; }
-.found, .note { margin-left: auto; margin-right: auto; }
+.steps li { border-top:2px solid var(--rule-strong);padding:10px 4px 0; }
+.steps b { display:block;font-size:14px;margin-bottom:2px; }
+.steps span { color:var(--muted);font-size:13.5px;line-height:1.45; }
+.actions { display:flex;flex-wrap:wrap;gap:10px; }
+.btn {
+  display:inline-block;
+  border-radius:14px;
+  padding:12px 20px;
+  text-decoration:none;
+  font-size:15px;
+  font-weight:600;
+}
+.btn.primary { background:var(--accent);color:var(--paper); }
+.btn.secondary { background:var(--card);border:1px solid var(--rule-strong); }
+.btn:hover { opacity:.88; }
+section { margin-top:74px; }
+h2 { margin:0 0 8px;font-size:29px;line-height:1.18; }
+.section-copy { max-width:650px;margin:0 0 20px;color:var(--muted); }
+.frame {
+  margin:0;
+  overflow:hidden;
+  border:1px solid var(--rule-strong);
+  border-radius:16px;
+  background:var(--card);
+  box-shadow:0 14px 40px rgba(24,28,24,.10);
+}
+.frame img,.frame video { display:block;width:100%;height:auto; }
+.frame figcaption { padding:12px 18px 14px;color:var(--muted);font-size:14px; }
+.frame figcaption b { color:var(--ink); }
+.demo video { background:#111; }
+.cases { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }
+.case {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  padding:20px;
+  border:1px solid var(--rule);
+  border-radius:16px;
+  background:var(--card);
+}
+.wordmark { min-height:34px;margin-bottom:10px;font-size:23px;font-weight:700;display:flex;align-items:center; }
+.wordmark .serif { font-family:Georgia,"Times New Roman",serif;font-weight:600; }
+.wordmark.techbash { font-weight:900;letter-spacing:-.03em; }
+.caselogo { width:auto;max-width:155px;height:25px;object-fit:contain;object-position:left center; }
+.case p { margin:0; }
+.case .result { flex:1;font-size:14.5px;line-height:1.56; }
+.case .meta { margin-top:14px;color:var(--muted);font-size:12.5px; }
+.case img.proof { width:100%;height:auto;margin-top:14px;border:1px solid var(--rule);border-radius:10px; }
+.maker {
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:16px 18px;
+  padding:24px;
+  border-radius:18px;
+  background:var(--card);
+  border-left:4px solid var(--amber);
+}
+.maker img { width:48px;height:48px;border-radius:50%;object-fit:cover; }
+.maker h2 { margin:0 0 6px;font-size:23px; }
+.maker p { max-width:700px;margin:0;color:var(--muted); }
+.start {
+  padding:28px;
+  border-radius:18px;
+  background:var(--card);
+  border:1px solid var(--rule);
+}
+.start .section-copy { margin-bottom:18px; }
+.prompt {
+  display:grid;
+  grid-template-columns:1fr auto;
+  overflow:hidden;
+  border:1px solid var(--rule-strong);
+  border-radius:14px;
+  background:var(--paper);
+}
+.prompt blockquote { margin:0;padding:18px;font-size:15px;line-height:1.55;overflow-wrap:anywhere; }
+.copybtn {
+  border:0;
+  border-left:1px solid var(--rule-strong);
+  padding:0 22px;
+  background:transparent;
+  color:var(--ink);
+  font:600 14px inherit;
+  cursor:pointer;
+}
+.copybtn:hover { background:var(--accent);color:var(--paper); }
+.manual { margin:18px 0 0;color:var(--muted);font-size:14px; }
+pre {
+  margin:8px 0 0;
+  padding:14px 17px;
+  overflow-x:auto;
+  border-radius:12px;
+  background:var(--accent);
+  color:#eceee9;
+  font:13.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+.foot {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px 18px;
+  margin-top:64px;
+  padding-top:20px;
+  border-top:1px solid var(--rule);
+  color:var(--muted);
+  font-size:13px;
+}
+.foot span { flex:1 1 520px; }
+@media (max-width:760px) {
+  .steps { grid-template-columns:repeat(2,1fr); }
+  .cases { grid-template-columns:1fr; }
+}
+@media (max-width:560px) {
+  .top { padding:12px 20px; }
+  main { padding:0 20px 64px; }
+  .hero { padding:26px 0 24px; }
+  h1 { font-size:38px;line-height:1.06; }
+  .lede { font-size:17px; }
+  .steps { grid-template-columns:1fr;gap:8px;margin:24px 0 22px; }
+  .steps li { display:grid;grid-template-columns:66px 1fr;gap:8px;padding-top:8px; }
+  .steps b { margin:0; }
+  section { margin-top:52px; }
+  h2 { font-size:25px; }
+  .actions { flex-direction:column; }
+  .btn { text-align:center; }
+  .frame { border-radius:12px; }
+  .maker { grid-template-columns:44px 1fr;padding:20px; }
+  .maker img { width:44px;height:44px; }
+  .start { padding:20px; }
+  .prompt { grid-template-columns:1fr; }
+  .copybtn { border-left:0;border-top:1px solid var(--rule-strong);padding:12px 18px; }
+  pre { white-space:pre-wrap;overflow-wrap:anywhere; }
+}
 </style>
 </head>
 <body>
-<div class="top">
-  <div class="mark"><i></i><i></i><i></i><i></i></div>
+<header class="top">
+  <div class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <b>Retake</b>
   <span class="sp"></span>
   <a href="https://github.com/glebbogachev00/retake">GitHub</a>
-</div>
+</header>
 <main>
   <div class="hero">
-    <p class="kicker">you shipped on Tuesday. your demo is from March.</p>
+    <p class="kicker">A reusable demo your coding agent records</p>
     <h1>Demos that<br><em>re-record themselves.</em></h1>
-    <p class="lede">A demo is a small file your coding agent writes. When the UI changes, change one line and run it again — the client walkthrough on Tuesday and the launch video on Friday, from the same current take.</p>
+    <p class="lede">Describe the walkthrough once. Your agent records the real app, then reruns the same flow after the UI changes.</p>
+    <ol class="steps">
+      <li><b>Describe</b><span>Tell your agent what to show.</span></li>
+      <li><b>Record</b><span>It runs the real app and makes the MP4.</span></li>
+      <li><b>Review</b><span>Watch every take in the local Retake UI.</span></li>
+      <li><b>Correct</b><span>Give notes. Your agent updates and reruns it.</span></li>
+    </ol>
     <div class="actions">
-      <a class="btn dark" href="#start" id="heroCopy">Copy the setup prompt</a>
-      <a class="btn light" href="#proof">Watch the 14-second demo</a>
-    </div>
-    <p class="flow">one prompt <span>→</span> a YAML demo <span>→</span> dry-run checked <span>→</span> recorded <span>→</span> rerun on the next release</p>
-    <p class="ship"><span class="dot"></span><span id="shipVer">v0.4.0</span> <span class="sep">·</span> <span id="shipWhen">out now</span> <span class="sep">·</span> <a href="#whatsnew">what changed</a></p>
-  </div>
-
-  <div class="say"><span class="who">The release renamed a button. This is the whole fix</span>
-    <div class="diff" style="border:0;padding:6px 0 0;background:transparent">
-      <div class="ctx">demos/checkout.yaml</div>
-      <div class="del">{ action: click, selector: "button:has-text('Buy now')" }</div>
-      <div class="add">{ action: click, selector: "button:has-text('Complete purchase')" }</div>
+      <a class="btn primary" href="#start" id="heroCopy">Copy the prompt for your agent</a>
+      <a class="btn secondary" href="#demo">Watch the 14-second demo</a>
     </div>
   </div>
-  <p class="arrow" style="font-size:13.5px">one line changed · <code>retake run</code> · a new take of the same demo ↓</p>
-  <div class="videos" id="proof" style="scroll-margin-top:20px"></div>
 
-  <section id="found">
-    <div class="shead">
-      <h2>The bugs a test suite cannot see</h2>
-      <p class="sub" style="max-width:660px">A test checks one thing somebody thought of in advance. A screen has a hundred things nobody thought of. A recording puts the whole screen in front of you.</p>
-    </div>
-    <div class="found">
-      <h3>One recording, made for a launch video. Nobody was looking for these.</h3>
-      <ul>
-        <li>A form still said a step was <b>optional</b>. It had been required for weeks.</li>
-        <li>A customer was shown a <b>raw timezone code</b> where the name of a city should have been.</li>
-        <li><b>Radio buttons</b> stretched across the entire width of the form.</li>
-        <li>A <b>squashed logo</b>, on a page nobody had opened in months.</li>
-        <li>An email subject line with a <b>machine timestamp</b> in it.</li>
-      </ul>
-      <p class="tail">A test can only check what somebody thought to check. A recording shows the rest, and the optional checks surface things nobody wrote down — you decide what matters. Because the demo is a file, it reruns on your next release and you watch again for nothing.</p>
-    </div>
+  <section aria-labelledby="library-title">
+    <h2 id="library-title">Review every take in one place</h2>
+    <p class="section-copy">Retake opens a private library at <code>localhost:4310</code>. Each demo keeps its MP4, stills, and proof log together in one output folder.</p>
+    <figure class="frame">
+      <img src="retake-ui.png" alt="Retake's local library showing recorded demos, a video player, output details, and frame stills" width="2880" height="1800">
+      <figcaption>Pick a demo, watch the result, then tell your agent what to correct.</figcaption>
+    </figure>
   </section>
 
-
-
-
-
-
-
-
-
-
-  <div class="movement" data-move="how">
-    <h2>How a demo becomes a file</h2>
-    <p>The part that replaces the screen recorder. Two sections: what your agent does, and what you get back.</p>
-  </div>
-  <section id="how">
-    <div class="shead">
-      <h2>How it works</h2>
-      <p class="sub">You provide intent. The agent writes the flow. Retake verifies, records, and renders it.</p>
-    </div>
-    <div class="how">
-      <div class="step"><div><b>You ask</b><p>"Record a demo of checkout." That sentence is the brief for the agent you already use.</p></div></div>
-      <div class="step"><div><b>Your agent builds and checks the flow</b><p>It reads your app, writes a small YAML demo, and dry-runs every selector and wait. Nothing records until the walkthrough works.</p></div></div>
-      <div class="step"><div><b>Retake records the real interaction</b><p>Real typing, real clicks, real waits. The result is demo.mp4, a still for each scene, and a proof log of what happened.</p></div></div>
-      <div class="step"><div><b>You revise without starting over</b><p>Change captions, zoom, layout, or format in seconds. When the UI changes, rerun the same flow instead of recording by hand.</p></div></div>
-    </div>
-  
-      <div class="boxhead">Everything required to produce the same clean take again</div>
-    <div class="grid">
-      <div class="cell"><b>Scenes with captions</b><p>Captions timed from the actual run, placed under the app — never over it. Every scene also yields a crisp still.</p></div>
-      <div class="cell"><b>Render-time camera</b><p>Zoom and framing applied after recording. Change your mind in seconds, no browser involved.</p></div>
-      <div class="cell"><b>Renders you are not waiting on</b>
-        <p>One preset switch re-frames a take for landscape, square or vertical, and <code>--no-master</code> drops the archival copy while you are still iterating — measured at three times faster on an eight-minute demo, and marginally sharper, because the archival path re-encodes a file it already encoded.</p>
-      </div>
-      <div class="cell"><b>Presets that post well</b><p>Landscape, a true square, a true 9:16, docs GIF — the same take, re-rendered. Stubs and seeds keep it repeatable.</p></div>
-      <div class="cell"><b>Behind the login, off camera</b><p>The agent asks for a demo account by name; you type it into the window and it stays in one local file. The sign-in runs before recording and is trimmed off. 2FA included.</p></div>
-      <div class="cell"><b>Plain, or produced</b><p><code>mode: demo</code> keeps everything but your product out of the frame. <code>mode: launch</code> adds a title card, cuts the waiting, and lets you pick the poster. Demo is the default; your agent never upgrades one on its own.</p></div>
-    </div>
-  </section>
-  <section class="stmt">
-    <h2>Not a recorder,<br><b>not a test runner</b></h2>
-    <div>
-      <p>A screen recording is pixels you can never edit. A browser test is a pass/fail nobody can watch.</p>
-      <p>A Retake demo is both halves — a readable file that proves itself like a test and renders like a film, and reruns when the app changes.</p>
-      <p>A scene can also say what should be visible in it, and a reader who is not your agent answers yes or no on the frame. A build passes every test and still shows a card outside its grid.</p>
-      <p class="last">And it refuses to become a video editor. If a take needs editing, the file was wrong. Fix the file, run it again.</p>
-    </div>
+  <section id="demo" class="demo" aria-labelledby="demo-title">
+    <h2 id="demo-title">One file produced this take</h2>
+    <p class="section-copy">When the product changes, the agent reruns the same flow instead of opening a screen recorder.</p>
+    <figure class="frame">
+      <video src="media/capture-two-places.mp4" poster="media/capture-two-places.jpg" width="1920" height="1180" controls muted playsinline preload="metadata"></video>
+      <figcaption><b>Capture, 14 seconds.</b> One rough sentence becomes an action and a continuing thread.</figcaption>
+    </figure>
   </section>
 
-  <div class="movement" data-move="proof">
-    <h2>Where it has earned its place</h2>
-    <p>Three products it was built inside, and the five bugs one recording turned up that a test suite could not.</p>
-  </div>
-  <section>
-    <div class="shead">
-      <h2>Built against three real workflows</h2>
-      <p class="sub" style="max-width:640px">Retake was built inside these, not for a landing page.</p>
-    </div>
+  <section aria-labelledby="cases-title">
+    <h2 id="cases-title">Used inside three real products</h2>
+    <p class="section-copy">Retake was built while recording these workflows, not as a landing-page concept.</p>
     <div class="cases">
-      <div class="case">
-        <div class="wordmark"><span class="serif">capture<span style="color:#2F5D3F">.</span></span></div>
-        <p class="quote">A five-video launch set, drafted, corrected and re-cut in one afternoon. Re-doing a take stopped being a decision worth having.</p>
-        <p class="meta">Thought-sorting app · <a href="https://capture-playground.vercel.app">capture-playground.vercel.app</a></p>
-        <a class="shotlink" href="media/mark-done.mp4"><img src="media/mark-done.jpg" alt="A frame from a Capture demo recorded with Retake" loading="lazy"></a>
-        <p class="watch"><span class="k">WATCH</span><span>Three of those videos are live on <a href="https://capture-playground.vercel.app">Capture's own page</a>, which credits Retake by name.</span></p>
-      </div>
-      <div class="case">
-        <div class="wordmark"><img src="logos/avexjets.png" alt="AvexJets" class="caselogo wide"></div>
-        <p class="quote">One repeatable flow across three portals, replacing a twenty-minute live walkthrough. The proof log catches a broken step before a client ever sees it.</p>
-        <div class="noshot">Nothing to watch here. That walkthrough is the client's, and it is not mine to publish — which is the honest version of a case study.</div>
-        <p class="meta">Private aviation charter · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
-        <p class="watch"><span class="k">SITE</span><span>The walkthrough itself is client-facing; <a href="https://www.avex-jets.com">the product it records is public</a>.</span></p>
-      </div>
-      <div class="case">
-        <div class="wordmark tbmark"><span style="color:#193b92">Tech</span><span style="color:#2C7A7B">Bash</span></div>
-        <p class="quote">An agent operates the real Scratch editor, dragging the actual blocks. When a lesson changes, the same file produces the next walkthrough.</p>
-        <p class="meta">Coding school for young learners · <a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
-        <a class="shotlink" href="media/scratch-mini-project.mp4"><img src="media/scratch-mini-project.jpg" alt="A frame from a Scratch lesson recorded with Retake" loading="lazy"></a>
-        <p class="watch"><span class="k">WATCH</span><span><a href="media/scratch-mini-project.mp4">The take, 19 seconds</a> — four blocks dragged into one script, and the cat runs it.</span></p>
-      </div>
+      <article class="case">
+        <div class="wordmark"><span class="serif">capture<span style="color:#2f5d3f">.</span></span></div>
+        <p class="result">Five launch videos were drafted, corrected, and recut in one afternoon.</p>
+        <img class="proof" src="media/mark-done.jpg" alt="Frame from a Capture demo made with Retake" loading="lazy">
+        <p class="meta"><a href="https://www.trycapture.app">trycapture.app</a></p>
+      </article>
+      <article class="case">
+        <div class="wordmark"><img src="logos/avexjets.png" alt="AvexJets" class="caselogo"></div>
+        <p class="result">One repeatable flow replaced a twenty-minute live walkthrough across three client portals.</p>
+        <p class="meta">Client recording kept private · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
+      </article>
+      <article class="case">
+        <div class="wordmark techbash"><span style="color:#193b92">Tech</span><span style="color:#2c7a7b">Bash</span></div>
+        <p class="result">The same file can repeat a real Scratch lesson when the lesson changes.</p>
+        <img class="proof" src="media/scratch-mini-project.jpg" alt="Frame from a Scratch lesson made with Retake" loading="lazy">
+        <p class="meta"><a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
+      </article>
     </div>
   </section>
-  <div class="movement" data-move="who">
-    <h2>Who made it</h2>
-    <p>One person, using it most days. There are no customer quotes here yet and this page is not going to invent any.</p>
-  </div>
-  <section id="note">
-    <div class="note">
-      <div class="note-who">
-        <img src="gleb.jpg" alt="" width="44" height="44">
-        <span>
-          <span class="note-label">From the person who made it</span>
-          <span class="note-name">Gleb, who records with it most days</span>
-        </span>
-      </div>
-      <h2 class="note-h">This is where the testimonials usually go.</h2>
-      <p>I do not have any yet, so here is the honest version. I kept re-recording the same demo — an afternoon each release, for a video that was wrong again three weeks later. So the demo became a file instead.</p>
-      <dl class="note-beats">
-        <div><dt>Demos</dt><dd>Most of what I use it for. It has saved me real time and real energy.</dd></div>
-        <div><dt>Launch videos</dt><dd>The kind that stay with someone. Still figuring that one out.</dd></div>
-      </dl>
-      <p class="sign"><b>Gleb</b> <span>·</span> <a href="https://github.com/glebbogachev00/retake/issues/new">tell me what broke</a></p>
+
+  <section class="maker" aria-labelledby="maker-title">
+    <img src="gleb.jpg" alt="" width="48" height="48">
+    <div>
+      <h2 id="maker-title">Made because I was tired of recording the same demo again</h2>
+      <p>I do not have customer testimonials yet. I built Retake for my own launches and client walkthroughs, and I use it most days. The three products above are the honest proof so far.</p>
     </div>
   </section>
-  <section id="start">
-    <div class="shead">
-      <h2>Record your first rerunnable demo</h2>
-      <p class="sub">The demo outlives the video: when the next release moves a button the fix is a line in a file, and landscape, square, vertical and the GIF all re-render from the same take. The link is the instruction. The README tells your agent how to install, wire itself up, and open the window for you. You say what to show.</p>
+
+  <section id="start" class="start" aria-labelledby="start-title">
+    <h2 id="start-title">Give Retake to your coding agent</h2>
+    <p class="section-copy">Paste this inside your app project. The agent handles setup, recording, and the local review link.</p>
+    <div class="prompt">
+      <blockquote id="pasteline">Set up Retake from https://github.com/glebbogachev00/retake in this project. Ask me for the app URL and the exact flow to show. Dry-run it, record a preview, start the Retake UI, and give me its localhost link. Tell me where the finished MP4 is. Wait for my review, then update the demo from my corrections and rerun it. Do not deploy, commit, or ask me to paste secrets into chat.</blockquote>
+      <button class="copybtn" type="button" data-copy="pasteline">Copy</button>
     </div>
-    <div class="copyline">
-      <div class="say"><span class="who">In Claude Code, Codex, Cursor — the agent you already use</span><i id="pasteline">“github.com/glebbogachev00/retake — set this up, then record a demo of my app at localhost:3000 showing the checkout flow.”</i></div>
-      <button class="copybtn" data-copy="pasteline">Copy</button>
-    </div>
-    <p class="sub" style="margin:22px 0 10px">Doing it yourself is two commands:</p>
+    <p class="manual">Or install it yourself:</p>
     <pre>npm install -g retake-demos
 mkdir demos && cd demos && retake install</pre>
-    <p class="note-after">Node 20 or newer. ffmpeg comes bundled; Chromium downloads once.</p>
-  </section>
-  <section id="whatsnew">
-    <details class="news">
-      <summary><span class="lab">What's new</span><span class="ver" id="newsVer"></span><span class="cue">See the notes</span></summary>
-      <div id="releases"></div>
-      <p class="sub" style="margin:18px 0 0;font-size:14px">Every release, in plain words. <a style="color:inherit" href="https://github.com/glebbogachev00/retake/releases">Every release</a>.</p>
-    </details>
   </section>
 
-  <div class="foot">
-    <span>MIT licensed · recording runs entirely on your machine. The optional visual checks send the frames they look at to whichever model you point them at, and nothing else ever leaves.</span>
+  <footer class="foot">
+    <span>MIT licensed. Recording runs on your machine. Optional visual checks send only the reviewed frames to the model you choose.</span>
     <a href="https://github.com/glebbogachev00/retake">Source</a>
-    <span>Built on Playwright, testreel, and ffmpeg.</span>
     <a href="https://github.com/glebbogachev00/retake/issues/new?template=bug.md">Report a bug</a>
-  </div>
+  </footer>
 </main>
 <script>
-// The proof section fills itself from whatever clean renders exist in
-// site/media/. Committed pages carry no product footage; media is local.
-const CANDIDATES = [
-  { file: 'capture-two-places', cap: '<b>Capture — the launch pitch.</b> One messy sentence lands as an action and a thread. Drafted, dry-run, recorded, titled and posterised from one YAML file. 14 seconds.', w: 1920, h: 1180 },
-];
-(async () => {
-  const host = document.getElementById('proof');
-  for (const c of CANDIDATES) {
-    const url = (location.pathname.startsWith('/landing') ? '/landing/media/' : 'media/') + c.file + '.mp4';
-    try {
-      const r = await fetch(url, { method: 'HEAD' });
-      if (!r.ok) continue;
-    } catch { continue; }
-    const f = document.createElement('figure');
-    f.className = 'shot'; f.style.margin = 0;
-    // width/height come from the file (scripts/site-media.mjs stamps them),
-    // so the box is reserved at the right shape before metadata loads and a
-    // re-recorded take can never leave a stale ratio behind.
-    const dim = c.w && c.h ? ' width="' + c.w + '" height="' + c.h + '"' : '';
-    f.innerHTML = '<video src="' + url + '"' + dim + ' poster="' + url.replace('.mp4', '.jpg') + '" controls muted playsinline preload="metadata"></video><figcaption>' + c.cap + '</figcaption>';
-    host.appendChild(f);
-  }
-  if (host.children.length) {
-    const more = document.createElement('p');
-    more.className = 'sub'; more.style.cssText = 'margin:14px 0 0;font-size:13.5px';
-    const base = location.pathname.startsWith('/landing') ? '/landing/media/' : 'media/';
-    more.innerHTML = 'Two more launch cuts: <a style="color:inherit" href="' + base + 'scratch-mini-project.mp4">a first Scratch project for TechBash</a> · <a style="color:inherit" href="' + base + 'mark-done.mp4">Capture closing a loop</a>.';
-    host.after(more);
-  }
-  if (!host.children.length) host.innerHTML = '<div class="say" style="margin-top:0"><span class="who">Proof pending</span>Record a demo and drop its render into <code>site/media/</code> — this section fills itself.</div>';
-})();
-
-// What's new — the same site/releases.json the Retake window reads.
-(async () => {
-  const host = document.getElementById('releases');
-  if (!host) return;
-  const base = location.pathname.startsWith('/landing') ? '/landing/' : '';
-  let data;
-  try { data = await (await fetch(base + 'releases.json')).json(); } catch { host.closest('section').remove(); return; }
-  const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
-  const fmt = (d) => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? '' : x.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }); };
-  const chipV = document.getElementById('shipVer'), chipW = document.getElementById('shipWhen');
-  const v = document.getElementById('newsVer');
-  const newest = (data.releases || [])[0];
-  if (v && newest) v.textContent = newest.version + (newest.date ? ' · ' + fmt(newest.date) : '');
-  if (chipV && newest) chipV.textContent = 'v' + newest.version;
-  if (chipW && newest && newest.date) {
-    // floor, not round: 20 hours after midnight is still today, not yesterday
-    const days = Math.floor((Date.now() - new Date(newest.date + 'T00:00:00')) / 864e5);
-    chipW.textContent = days <= 0 ? 'shipped today' : days === 1 ? 'shipped yesterday' : days < 30 ? `shipped ${days} days ago` : 'released ' + fmt(newest.date);
-  }
-  host.innerHTML = (data.releases || []).map((r, i) => (
-    '<div class="rel' + (i ? '' : ' latest') + '">' +
-      '<div class="relhead"><b>' + esc(r.headline) + '</b>' +
-        '<span class="relmeta">' + esc(r.version) + (r.date ? ' · ' + fmt(r.date) : '') + '</span></div>' +
-      '<ul>' + (r.notes || []).map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' +
-    '</div>'
-  )).join('');
-})();
-
-// The hero button said Copy and only scrolled — five thousand pixels down to
-// a second Copy button that did the real thing. A button that names an action
-// has to perform it.
-const hero = document.getElementById('heroCopy');
-if (hero) hero.onclick = async (ev) => {
-  const el = document.getElementById('pasteline');
-  if (!el) return;                       // let the link do its ordinary thing
-  // Stop the jump BEFORE awaiting anything: by the time a promise resolves the
-  // browser has already followed the anchor, and the visitor has lost their
-  // place for a button that was supposed to copy something.
-  ev.preventDefault();
-  const text = el.textContent.replace(/^“|”$/g, '');
+const promptText = () => document.getElementById('pasteline')?.textContent.trim() || '';
+async function copyPrompt(button) {
   try {
-    await navigator.clipboard.writeText(text);
-    const was = hero.textContent;
-    hero.textContent = 'Copied — paste it to your agent';
-    setTimeout(() => (hero.textContent = was), 2200);
+    await navigator.clipboard.writeText(promptText());
+    const previous = button.textContent;
+    button.textContent = 'Copied — paste it to your agent';
+    window.setTimeout(() => { button.textContent = previous; }, 2200);
+    return true;
   } catch {
-    // No clipboard permission — take them to the prompt and its own button,
-    // which is what the link did before and still works.
-    document.getElementById('start')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('start')?.scrollIntoView({ behavior:'smooth' });
+    return false;
   }
-};
-
-for (const b of document.querySelectorAll('.copybtn')) b.onclick = async () => {
-  const t = document.getElementById(b.dataset.copy).textContent.replace(/^“|”$/g, '');
-  try { await navigator.clipboard.writeText(t); b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1600); } catch {}
-};
+}
+const heroCopy = document.getElementById('heroCopy');
+heroCopy?.addEventListener('click', async (event) => {
+  event.preventDefault();
+  await copyPrompt(heroCopy);
+});
+document.querySelectorAll('.copybtn').forEach((button) => {
+  button.addEventListener('click', () => copyPrompt(button));
+});
 </script>
 </body>
 </html>
