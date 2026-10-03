@@ -73,6 +73,7 @@ write demos/<name>.yaml
   → retake sense outputs/<name>             does the run ADD UP — input vs output
   → retake destroy demos/<name>.yaml        what happens just off the happy path
   → retake notes                            what keeps going wrong across every demo
+  → retake compare outputs/<name>           pacing vs the reference it says it is `like:`
   → adjust, then: retake run demos/<name>.yaml          final quality
 ```
 
@@ -80,6 +81,39 @@ Rule of thumb: **never go straight to `run`.** `dry` catches most failures in
 seconds; a failed `run` costs two minutes and a confusing video. When `dry`
 fails it prints the step, the error, and the text that was on screen — read
 that before changing anything.
+
+## Many demos, and demos like the good ones
+
+```
+retake learn capture outputs/two-places outputs/it-learns --about "Capture launch clips"
+                                         # → references/capture.yaml: agreed settings + measured pacing
+like: capture                            # in a manifest: those settings, unless it sets its own
+retake compare outputs/<name>            # the take vs the examples: length, scene holds, first action, final hold, captions
+retake batch --preset draft              # every demo: dry → run → check → compare, ~half the cores at once
+retake batch demos/a.yaml demos/b.yaml -j 2 --dry-only   # does everything still work? no recording
+```
+
+- **References are learned from takes the PERSON says are good.** `learn`
+  refuses takes with failed steps, `--brisk` takes and fragments. It keeps
+  only settings every example agrees on and that differ from Retake's own
+  defaults; never `mode`, `viewport`, cards, music or content. Example paths
+  are stored relative to the reference, so `references/` can be committed.
+- **`like:` fills, never overrides.** Applied to the raw YAML before schema
+  defaults, so "not set" is distinguishable from "set to the default".
+  `validate` lists each override. `manifest.used.yaml` holds the merged result.
+- **`compare` is advisory** (exit 0; `--strict` exits 3). Margins are wide on
+  purpose — a handful of examples is a narrow band, and a check that cries
+  wolf gets skimmed.
+- **`batch` runs each stage as the ordinary CLI in a child process**, so a
+  batch take is byte-for-byte the take `retake run` makes (stash, keep,
+  proof log, exit codes). Demos sharing a `lock:` never overlap — including
+  during dry, which seeds too. Two manifests with the same `name` are
+  refused. The report is `outputs/.batch/<when>/report.md` + `report.json`,
+  with one log per demo; `tidy` never touches dot-folders in outputs/.
+- **Parallelism costs smoothness past half the cores.** Measured on 4 cores
+  (box sliding at 1080p, share of frames that changed): solo 55–56%, two at
+  once 57–58%, four at once 26–31%. The default is `floor(cores/2)`, max 3;
+  `-j` above that warns. Fine for drafts, not for keepers.
 
 ## How to tell Claude Code / Codex to use it
 

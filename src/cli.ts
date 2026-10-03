@@ -8,6 +8,9 @@
  *   retake ui                                     the review window on :4310
  *   retake run demos/x.yaml                       record + render → outputs/x/
  *   retake run demos/x.yaml --headed --no-render  watch the browser, keep only the raw take
+ *   retake batch [demos/*.yaml] -j 3              many demos at once: dry → run → check → compare, one report
+ *   retake learn <name> outputs/a outputs/b       learn a reference from takes you like → references/<name>.yaml
+ *   retake compare outputs/x                      how close a take came to its reference (`like:`)
  *   retake render outputs/x                       re-render from the existing take (--preset to switch)
  *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
  *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
@@ -34,7 +37,10 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { Command } from "commander";
-import { loadManifest, resolve, warnings, type Manifest } from "./manifest.js";
+import os from "node:os";
+import { loadManifest, parseManifest, resolve, warnings, type Manifest } from "./manifest.js";
+import { defaultParallel, discover, runBatch } from "./batch.js";
+import { compareTake, findReference, learn, planNotes, readExample, readReference, referenceDirs, writeReference, type Reference } from "./reference.js";
 import { acquireLock, canReuse, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, unchangedUpTo, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
 import { check, render } from "./render.js";
 import { endProgress, setPhase } from "./progress.js";
@@ -49,7 +55,7 @@ import { planCalibration, report, usable, type Result, type Stability } from "./
 import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "./ext/heal.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
-import { PKG_ROOT, VERSION, entry } from "./paths.js";
+import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "./paths.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
 
 // The manifest may reference ${VARS}; load .env before any command reads one.
@@ -883,7 +889,7 @@ program
   .command("validate")
   .argument("<manifest>")
   .action(async (file: string) => {
-    const { manifest } = loadManifest(file);
+    const { manifest, reference } = loadManifest(file);
     const { resolve } = await import("./manifest.js");
     const q = resolve(manifest);
     // The video is the page area plus the caption band, so say the real number
@@ -895,6 +901,84 @@ program
     say(`ok: ${manifest.name} · ${manifest.steps.length} steps · ${manifest.steps.filter((s) => s.action === "scene").length} scenes`);
     say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? (band ? ` (page ${q.viewport.width}×${q.viewport.height} + a ${band}px caption band)` : " (captions off — the page fills the frame)") : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
+    if (reference) {
+      say(`   like ${reference.ref.name} · ${Object.keys(reference.ref.defaults).length} settings from ${reference.ref.examples.length} example(s) (${path.relative(process.cwd(), reference.file)})`);
+      for (const w of planNotes(manifest, reference.ref)) say(`ℹ like ${reference.ref.name}: ${w}`);
+    }
+  });
+
+program
+  .command("batch")
+  .description("record many demos at once — dry-runs first, a few takes in parallel, demos sharing a `lock` kept apart, one report at the end")
+  .argument("[manifests...]", "demo files (default: every manifest in demos/)")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("-j, --parallel <n>", `takes at once (default ${defaultParallel()} on this machine — about half the cores, at most 3, so the screencast does not drop frames)`)
+  .option("--preset <name>", "record every demo at this preset (draft while iterating)")
+  .option("--no-dry", "skip the dry run (a moved selector then costs a whole take instead of seconds)")
+  .option("--dry-only", "dry-run every demo and record none — does everything still work?", false)
+  .option("--no-master", "skip the archival master on post presets")
+  .option("--brisk", "record without pacing — for iterating, never for keeping", false)
+  .action(async (files: string[], opts: { out: string; parallel?: string; preset?: string; dry: boolean; dryOnly: boolean; master: boolean; brisk: boolean }) => {
+    const list = files.length ? files : discover(path.resolve("demos"));
+    if (!list.length) throw new Error("no manifests — pass some, or run from a workspace with demos/*.yaml");
+    if (opts.preset && !presetNames().includes(opts.preset)) throw new Error(`unknown preset ${opts.preset} — one of ${presetNames().join(", ")}`);
+    const parallel = opts.parallel ? Math.max(1, Math.floor(Number(opts.parallel))) : defaultParallel();
+    if (!Number.isFinite(parallel)) throw new Error("--parallel takes a number");
+    if (parallel > defaultParallel() && !opts.dryOnly) say(`ℹ ${parallel} takes at once on ${os.cpus().length} cores — a saturated CPU makes the browser drop frames, so a take can pass and still stutter. Fine for drafts; record keepers with fewer.`);
+    const r = await runBatch({ files: list, outRoot: path.resolve(opts.out), parallel, preset: opts.preset, noDry: opts.dry === false, dryOnly: opts.dryOnly, noMaster: opts.master === false, brisk: opts.brisk, log: say });
+    const good = r.items.filter((i) => i.ok).length;
+    say(`\n${good} of ${r.items.length} good · report: ${path.relative(process.cwd(), path.join(r.dir, "report.md"))}`);
+    for (const i of r.items.filter((x) => !x.ok)) say(`  ✗ ${i.name}: ${i.result} (log: ${path.relative(process.cwd(), i.log)})`);
+    if (good < r.items.length) process.exitCode = 2;
+  });
+
+program
+  .command("learn")
+  .description("learn a reference from demos you are happy with — the settings they agree on and the pacing they had")
+  .argument("<name>", "kebab-case reference name, e.g. capture")
+  .argument("<examples...>", "outputs/<name> folders of good takes (or manifests, which teach settings but not pacing)")
+  .option("--about <text>", "what these examples are, in your words — read by agents drafting the next one")
+  .option("-d, --dir <dir>", "where references live", "references")
+  .action((name: string, examples: string[], opts: { about?: string; dir: string }) => {
+    const ex = examples.map((p) => readExample(p, parseManifest));
+    const baseline = parseManifest({ name: "baseline", url: "http://localhost/", steps: [{ action: "wait" }] }, "(baseline)") as Record<string, unknown>;
+    const r = learn(name, ex, opts.about, baseline);
+    const file = writeReference(path.resolve(opts.dir), r);
+    say(`✓ ${path.relative(process.cwd(), file)} · from ${ex.map((e) => e.name).join(", ")}`);
+    const d = Object.entries(r.defaults);
+    say(d.length ? `  settings every example agrees on (applied by \`like: ${name}\`): ${d.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(" · ")}` : "  the examples agree on no settings — the reference carries pacing only");
+    if (r.varies.length) say(`  left to each demo (the examples differ): ${r.varies.join(", ")}`);
+    const n = r.norms;
+    if (n.duration) say(`  length ${n.duration.min}–${n.duration.max}s · scenes ${n.sceneSeconds ? `${n.sceneSeconds.median}s typical` : "?"} · first action at ~${n.openingHold?.median ?? "?"}s · result held ~${n.endingHold?.median ?? "?"}s`);
+    else say("  no recorded takes among the examples — pacing not learned; point at outputs/<name> folders for that");
+    say(`\nUse it: add \`like: ${name}\` to a manifest, then \`retake compare outputs/<demo>\` after a take.`);
+  });
+
+program
+  .command("compare")
+  .description("compare a take with its reference (the manifest's `like:`) — length, scene pacing, holds, captions, settings")
+  .argument("<dir>", "an outputs/<name> dir")
+  .option("--like <name>", "compare against this reference instead of the manifest's own `like:`")
+  .option("--strict", "exit 3 when anything is outside the examples' range", false)
+  .action((dir: string, opts: { like?: string; strict: boolean }) => {
+    const outDir = path.resolve(dir);
+    const name = path.basename(outDir);
+    const take = JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take;
+    const file = fs.existsSync(guessManifest(name)) ? guessManifest(name) : path.join(outDir, "manifest.used.yaml");
+    const { manifest, reference } = loadManifest(file);
+    let ref: Reference | undefined = reference?.ref;
+    if (opts.like) {
+      const found = findReference(opts.like, referenceDirs(path.dirname(path.resolve(file)), PROJECT_ROOT));
+      if (!found) throw new Error(`no references/${opts.like}.yaml — \`retake learn ${opts.like} outputs/<a-good-one>\``);
+      ref = readReference(found);
+    }
+    if (!ref) throw new Error(`${name} has no \`like:\` — add one to its manifest, or pass --like <reference>`);
+    if (take.brisk) say("ℹ this take is --brisk: its pacing is deliberately not the real one, so the timings below say little");
+    const v = compareTake(take, manifest, ref);
+    for (const x of v) say(`${x.ok ? "ok " : "off"}  ${x.line}`);
+    const off = v.filter((x) => !x.ok).length;
+    say(off ? `\n${off} thing(s) outside what the "${ref.name}" examples did — advisory: change them if they are not deliberate (pacing is \`wait\`/\`pauseAfter\`/\`holdMs\`; most of it re-renders with \`nudge\`/\`trim\`/\`tempo\`)` : `\nwithin the "${ref.name}" examples on every measure`);
+    if (off && opts.strict) process.exitCode = 3;
   });
 
 program

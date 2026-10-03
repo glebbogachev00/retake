@@ -804,6 +804,66 @@ into several 30–60s demos — each fails fast and re-records in a minute.
 While iterating on one beat, `run` with `until: <scene label>` records only
 up to the end of that scene.
 
+## Record like the good ones — `learn`, `like:`, `compare`
+
+When the person already has demos they are happy with, those are the brief.
+Do not reconstruct their taste from scratch, and do not guess it.
+
+1. **Ask which ones are good.** Never pick examples yourself: "good" is
+   their judgement, not a passing check. Then `learn` with those demo
+   names (`learn capture [capture-two-places, it-learns]`, plus `about:`
+   in their words). It writes `references/<name>.yaml`: the settings every
+   example agrees on (preset, scale, camera, cursor, captions, typing…),
+   what varied, and the pacing the takes actually had — length, how long a
+   scene holds, how soon the first thing happens, how long the result is
+   held, caption length.
+2. **Read the reference before drafting.** Its `examples` list points at
+   each good demo's manifest. Open them with `read_manifest`: match their
+   beat structure, their wait sizes, their caption voice. Copy shapes, not
+   selectors — another app's selectors are not this app's.
+3. **Put `like: <name>` in the new manifest.** Every agreed setting it
+   does not set itself is filled in; anything it does set wins. Set only
+   what this demo genuinely needs to differ on — `validate` names each
+   override so it is a decision, not drift.
+4. **After the preview take, `compare`.** It measures the take against the
+   examples and says which beats are off and by how much ("scene result is
+   on screen 0.6s — examples hold at least 1.9s"). Fix pacing with
+   `wait`/`pauseAfter`/`holdMs`; much of it is a re-render (`nudge`,
+   `trim`, `tempo`), not a re-take. It is advisory: a demo that has to be
+   longer than every example may be — say so instead of padding or cutting
+   to fit a number.
+
+A reference never carries `mode`, `viewport`, cards, music or any content —
+it can make a demo look like the others, never turn it into a launch.
+
+## Many demos at once — `batch`
+
+When the person wants a SET — every flow of an app, a re-record after a
+redesign, the same five demos on a new build — use `batch` instead of
+looping `dry` → `run` yourself. It dry-runs each demo first (a broken one
+stops there, costing seconds), records a few at a time, keeps demos that
+share a `lock` apart, renders and checks each, runs `compare` for any with
+`like:`, and writes one report. It returns at once; `batch_status` gives
+progress and then the report.
+
+- **Draft first.** `preset: draft` for the whole set while anything is
+  still changing; one keeper batch at the real preset once all are green.
+- **Parallel is bounded on purpose.** The default is about half the cores
+  (max 3). More takes at once makes the browser drop frames: the take is
+  correct and visibly stutters — measured at 4-on-4-cores, half the motion
+  frames were lost. Raise `parallel` for drafts if they ask; never for the
+  takes they will keep.
+- **Shared state needs `lock:`.** Two demos that seed the same backend (one
+  hub, one test account) wipe each other's state mid-take. Give both the
+  same `lock: <name>`; batch never runs them together. Demos whose state is
+  per-browser (localStorage, IndexedDB, stubs) need nothing.
+- **`dryOnly: true`** checks the whole set still works after an app change
+  without recording anything — the cheapest answer to "did the redesign
+  break any demo?".
+- Report every failure by its one-line reason from the report, and fix
+  those demos one at a time with the ordinary loop; re-run `batch` with
+  just their names.
+
 ## Rules
 
 - Real interactions read as real: type actual text, scroll to what you use,
@@ -824,3 +884,6 @@ up to the end of that scene.
 | render | `retake render outputs/<name>` |
 | receipts | read `outputs/<name>/proof-log.md` |
 | ideas | `retake ideas <url> -P <folder>` |
+| batch / batch_status | `retake batch [demos/a.yaml …] --preset draft -j 2` → `outputs/.batch/<when>/report.md` |
+| learn | `retake learn <name> outputs/<good> [outputs/<good> …] --about "…"` |
+| compare | `retake compare outputs/<name>` (`--like <name>` to compare with another reference) |

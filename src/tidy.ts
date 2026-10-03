@@ -63,6 +63,8 @@ export function planTidy(outRoot: string, o: TidyOptions): Plan {
   let keptBytes = 0;
 
   for (const name of fs.readdirSync(outRoot)) {
+    // .locks, .batch: Retake's own bookkeeping, not a demo — never an orphan.
+    if (name.startsWith(".")) continue;
     const dir = path.join(outRoot, name);
     if (!fs.statSync(dir).isDirectory()) continue;
     const takePath = path.join(dir, "take.json");

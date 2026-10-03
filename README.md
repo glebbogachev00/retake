@@ -92,6 +92,9 @@ retake heal                   # demo files back for recordings whose manifest we
 retake sense outputs/x        # does the run ADD UP — what went in against what came out
 retake destroy demos/x.yaml   # the flows nobody wrote down: nine ways to abuse this demo
 retake notes                  # read every take back: what keeps going wrong, and what it costs
+retake learn house outputs/a outputs/b   # the demos you like → references/house.yaml
+retake compare outputs/x      # with `like: house` in the manifest: is this take paced like those?
+retake batch --preset draft   # every demo at once: dry → run → check → compare, one report
 retake run demos/x.yaml        # the real one
 retake render outputs/x        # captions/camera/speed changed? re-render, no browser
 ```
@@ -138,6 +141,8 @@ The full template is [`demos/example.yaml`](demos/example.yaml); `retake init` c
 **Scenes** are the spine: `{ action: scene, label, caption }` at each beat. They take their timestamps from the actual run, so captions land on the frames they describe even when the app took 3 seconds this time and 11 the last. **Labels must be unique** — `thumbnail`, `until`, the stills and the proof log all address scenes by label, so two scenes called the same thing make every one of those ambiguous. `validate` rejects it.
 
 **Two kinds of take.** `mode: demo` (the default) proves how something works — a client walkthrough, a PR clip, a lesson — and keeps everything but the product out of the frame. `mode: launch` presents the product in public and may carry a title card, music, emphasis and a branded ending. `validate` warns if a demo is carrying launch furniture. **The launch cut.** `compressIdle: true` shows the app's long waits as ~1.5 s each (your own pacing `wait`s are never touched); `voiceover: true` reads the captions aloud (edge-tts, `pipx install edge-tts` once); `typing: brisk` makes typed text land fast with the pauses carrying the meaning. All render-time except typing. **Music.** `music: track.mp3` (or `{ file, gainDb, fadeOutMs }`) mixes a bed under the video at render time, looped or trimmed to fit and faded out at the end. Bring your own track — it ships inside your video, so it must be one you may use (CC0 or licensed). **Cards and callouts.** `intro:`/`outro:` add a title card in Retake's own look — rendered at render time, so changing a word is a re-render, and the intro's settled frame is written as `cover.png`, the poster. `{ action: callout, selector, label, ms }` draws an animated ring and label around an element while the take holds — recorded coordinates, drawn at render, moving with the camera. Sparingly: the captions carry the story.
+
+**Record like the good ones.** `retake learn <name> outputs/a outputs/b` reads takes you are happy with and writes `references/<name>.yaml`: the settings they all share, and the pacing they actually had — length, how long a scene holds, how soon the first thing happens, how long the result stays up. A manifest with `like: <name>` gets those settings wherever it does not set its own; after a take, `retake compare outputs/x` says which beats ran long or short against the examples. **Many at once:** `retake batch` dry-runs every demo, records a few at a time (about half your cores — beyond that the browser drops frames), keeps demos that share a `lock` apart, and leaves one report in `outputs/.batch/`.
 
 **Seeds** put the app in a known state before the camera: write a JSON file, run JS in the page, or run a shell command. **Setup** is the stuff that runs before recording and is trimmed off the front — logins live there. **`tempo`** speeds the finished video up or down at render time; **`lock`** names a shared resource so two demos that touch the same backend don't record over each other.
 
@@ -212,7 +217,9 @@ src/
   dryrun.ts       every selector and wait, no camera
   render.ts       ffmpeg: camera → layout → captions → demo/master, stills, check
   edits.ts        structural edits agents make to a manifest (comments preserved)
-  operator/       the MCP server: 22 tools, from `scout` and `draft` to `run`, `look` and `done`
+  batch.ts        many demos at once: dry → run → check → compare, bounded, lock-aware
+  reference.ts    learn from good takes; `like:` applies their settings, `compare` their pacing
+  operator/       the MCP server: from `scout` and `draft` to `run`, `batch`, `look` and `done`
   ui/             one http server, three pages, no framework, no build step
 skill/SKILL.md    what the agent is taught: order of operations, failures as text, when to stop
 demos/            manifests; outputs/ is where takes land

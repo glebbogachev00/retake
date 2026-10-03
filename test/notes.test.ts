@@ -9,6 +9,12 @@ import path from "node:path";
 import YAML from "yaml";
 import { collect, notes } from "../src/ext/notes.js";
 
+/* Relative to now, never fixed: notes only reads the last 14 days, so a
+   hard-coded date silently ages out of the window and the tests go red with
+   nothing in the code having changed. */
+const RECENT = new Date(Date.now() - 3_600_000).toISOString();
+const EARLIER = new Date(Date.now() - 2 * 86_400_000).toISOString();
+
 function root() { return fs.mkdtempSync(path.join(os.tmpdir(), "notes-")); }
 
 /** A run on disk, as `record` would leave it. */
@@ -106,15 +112,15 @@ test("a take nobody has verified or swept is said out loud", () => {
   // The workspace-level version of "did the agent actually check it". Unlike
   // the agent's own answer, this one is on disk.
   const rt = root();
-  run(rt, "unlooked", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  run(rt, "unlooked", { finishedAt: RECENT }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
   assert.match(flat(rt), /nobody has looked at how/);
 });
 
 test("a take that HAS been looked at is not nagged about", () => {
   const rt = root();
-  const dir = run(rt, "looked", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  const dir = run(rt, "looked", { finishedAt: RECENT }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
-    verify: { at: "now", takeFinishedAt: "2026-08-27T10:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+    verify: { at: "now", takeFinishedAt: RECENT, ok: true, count: 1, summary: "1 answered yes" },
   }));
   assert.doesNotMatch(flat(rt), /nobody has looked at how/);
 });
@@ -123,9 +129,9 @@ test("a check answering an OLDER take does not count as looked at", () => {
   // A re-record makes every previous answer stale. Treating a stale pass as a
   // pass is the whole failure mode.
   const rt = root();
-  const dir = run(rt, "restale", { finishedAt: "2026-08-27T12:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  const dir = run(rt, "restale", { finishedAt: RECENT }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
-    verify: { at: "then", takeFinishedAt: "2026-08-26T09:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+    verify: { at: "then", takeFinishedAt: EARLIER, ok: true, count: 1, summary: "1 answered yes" },
   }));
   assert.match(flat(rt), /nobody has looked at how/);
 });
@@ -143,9 +149,9 @@ test("a fresh lock is left alone; an hour-old one is a dead run holding the fold
 
 test("nothing to report says so in one line, and never invents a fifth", () => {
   const rt = root();
-  const dir = run(rt, "clean", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "something" }] });
+  const dir = run(rt, "clean", { finishedAt: RECENT }, { steps: [{ action: "scene", label: "a", expect: "something" }] });
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
-    verify: { at: "now", takeFinishedAt: "2026-08-27T10:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+    verify: { at: "now", takeFinishedAt: RECENT, ok: true, count: 1, summary: "1 answered yes" },
   }));
   const out = notes(rt);
   assert.equal(out.notes.length, 0);
