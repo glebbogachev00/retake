@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+**Many demos at once.** `retake batch` (and the `batch` / `batch_status`
+tools) takes every manifest in demos/, or the ones you name, and runs each
+through dry → run → check, a few at a time. A demo that fails its dry run
+stops there and costs seconds; demos sharing a `lock` never overlap; one
+report at the end in `outputs/.batch/<when>/report.md`. The default
+concurrency is half the cores, at most 3 — measured: four takes on four
+cores lost half their motion frames, two lost none.
+
+**Record like the good ones.** `retake learn <name> outputs/a outputs/b`
+(tool: `learn`) reads takes you are happy with and writes
+`references/<name>.yaml` — the settings they share and the pacing they had.
+`like: <name>` in a manifest applies those settings wherever it does not set
+its own. `retake compare outputs/x` (tool: `compare`) measures a take against
+the examples: length, how long each scene holds, how soon the first thing
+happens, how long the result is held, caption length. `validate` names every
+override of a reference. `batch` compares automatically.
+
+`tidy` no longer treats outputs/.locks or outputs/.batch as orphaned demos.
+
 ## 0.4.0 — 2026-08-25
 
 Sizes stop moving, failures explain themselves, and a cut can be reviewed.

@@ -19,7 +19,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import YAML from "yaml";
-import { loadManifest, resolve } from "../manifest.js";
+import { loadManifest, parseManifest, resolve } from "../manifest.js";
+import { renderReport, type BatchReport } from "../batch.js";
+import { compareTake, findReference, learn as learnReference, readExample, readReference, referenceDirs, writeReference } from "../reference.js";
+import { entry } from "../paths.js";
 import { record, captureHash, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, unchangedUpTo, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
 import { render, check, ffmpegBin } from "../render.js";
 import { execFileSync } from "node:child_process";
@@ -667,6 +670,96 @@ server.registerTool("calibrate", {
   if (!fs.existsSync(file)) return text(`${name} has never been calibrated, so there is no measured answer to how much its sweep results are worth. \`retake calibrate demos/${name}.yaml\` produces one — at a terminal, not from here.`);
   const r = JSON.parse(fs.readFileSync(file, "utf8")) as { at: string; results: Parameters<typeof describeCalibration>[0]; stability?: Stability };
   return text([...describeCalibration(r.results, r.stability ?? null), "", `measured ${r.at}`].join("\n"));
+});
+
+// --- many at once, and like the good ones ------------------------------------
+
+server.registerTool("batch", {
+  description: "Record several demos at once, in the background: each is dry-run, then recorded, rendered and checked (and compared with its reference when it says `like:`), a few at a time, with demos that share a `lock` kept apart. Returns at once — call `batch_status` for the report. Use it when the person wants a SET of demos (every flow of an app, a re-record after a redesign), not to iterate on one: for one demo, dry → run is faster to reason about. preset: 'draft' while the set is still changing.",
+  inputSchema: {
+    names: z.array(z.string()).optional().describe("demo names; omit for every demo in the workspace"),
+    preset: z.string().optional(),
+    parallel: z.number().int().min(1).max(8).optional().describe("takes at once; default is about half the cores (max 3) — more makes the browser drop frames"),
+    dryOnly: z.boolean().optional().describe("dry-run every demo and record none: does everything still work?"),
+  },
+  annotations: RETAKE_WRITE,
+}, async ({ names, preset, parallel, dryOnly }) => {
+  for (const n of names ?? []) if (!safe(n) || !fs.existsSync(manifestPath(n))) return text(`no demo "${n}"`);
+  const { command, args } = entry("cli");
+  const argv = [...args, "batch", ...(names ?? []).map(manifestPath), "-o", OUT];
+  if (preset) argv.push("--preset", preset);
+  if (parallel) argv.push("-j", String(parallel));
+  if (dryOnly) argv.push("--dry-only");
+  fs.mkdirSync(path.join(OUT, ".batch"), { recursive: true });
+  const log = fs.openSync(path.join(OUT, ".batch", "latest.log"), "w");
+  // Detached: a set of takes outlives any one tool call, and must outlive the
+  // agent's session too — the person comes back to a report, not to nothing.
+  const child = spawn(command, argv, { cwd: ROOT, detached: true, stdio: ["ignore", log, log], env: process.env });
+  child.unref();
+  fs.closeSync(log);
+  await tell(`Recording ${names?.length ? names.length : "every"} demo${names?.length === 1 ? "" : "s"}${dryOnly ? " (dry only)" : ""} in the background…`);
+  return text(`started (pid ${child.pid}). Call batch_status for progress and the report; each demo's own outputs/<name>/proof-log.md is written as it finishes.`);
+});
+
+server.registerTool("batch_status", {
+  description: "Where the latest batch is: each demo's stage or result, and the report once it is done (good / failed and why / off the reference's pacing).",
+  inputSchema: {},
+  annotations: READ_ONLY,
+}, async () => {
+  const root = path.join(OUT, ".batch");
+  const runs = fs.existsSync(root) ? fs.readdirSync(root).filter((d) => fs.existsSync(path.join(root, d, "report.json"))).sort() : [];
+  const latest = path.join(root, "latest.log");
+  const newest = runs.length ? path.join(root, runs[runs.length - 1], "report.json") : "";
+  // A batch the tool just started has a log before it has a report; an older
+  // report must not be passed off as the one that was asked about.
+  if (fs.existsSync(latest) && (!newest || fs.statSync(newest).mtimeMs < fs.statSync(latest).mtimeMs - 1000)) {
+    const tail = fs.readFileSync(latest, "utf8").trim().split("\n").slice(-5).join("\n");
+    return text(`starting — no report yet (still running — call again)${tail ? `\n${tail}` : ""}`);
+  }
+  if (!newest) return text("no batch has run in this workspace");
+  const r = JSON.parse(fs.readFileSync(newest, "utf8")) as BatchReport;
+  return text(renderReport(r) + (r.finishedAt ? "" : "\n(still running — call again)"));
+});
+
+server.registerTool("learn", {
+  description: "Learn a reference from demos the person is HAPPY WITH (recorded, all steps passed): the settings they all agree on and the pacing they actually had. Saved as references/<name>.yaml; a manifest that says `like: <name>` then gets those settings, and `compare` measures its takes against that pacing. Ask which demos are the good ones — never pick them yourself. Read the result: its examples' manifests show how the good ones were written.",
+  inputSchema: {
+    name: z.string().describe("kebab-case, e.g. capture"),
+    examples: z.array(z.string()).min(1).describe("demo names whose latest take is a good example"),
+    about: z.string().optional().describe("what these examples are, in the person's words"),
+  },
+  annotations: RETAKE_WRITE,
+}, async ({ name, examples, about }) => {
+  if (!safe(name)) return text("a reference name is kebab-case");
+  try {
+    const baseline = parseManifest({ name: "baseline", url: "http://localhost/", steps: [{ action: "wait" }] }, "(baseline)") as Record<string, unknown>;
+    const r = learnReference(name, examples.map((e) => readExample(path.join(OUT, e), parseManifest)), about, baseline);
+    const file = writeReference(path.join(ROOT, "references"), r);
+    await tell(`Learned "${name}" from ${examples.join(", ")}`);
+    return text(`${path.relative(ROOT, file)}\n${YAML.stringify({ defaults: r.defaults, varies: r.varies, norms: r.norms })}\nAdd \`like: ${name}\` to a manifest to use it.`);
+  } catch (e) {
+    return text(`could not learn: ${(e as Error).message}`);
+  }
+});
+
+server.registerTool("compare", {
+  description: "How close a demo's latest take came to its reference (`like:` in the manifest, or `like` here): length, how long each scene holds, how soon the first thing happens, how long the result is held, caption length, and which settings it overrides. Advisory — explain anything 'off' to the person, or fix it (pacing is wait/pauseAfter/holdMs; nudge/trim/tempo re-render without a new take).",
+  inputSchema: { name: z.string(), like: z.string().optional() },
+  annotations: READ_ONLY,
+}, async ({ name, like }) => { LAST_DEMO = name;
+  if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
+  const takeFile = path.join(OUT, name, "take.json");
+  if (!fs.existsSync(takeFile)) return text(`${name} has not been recorded yet`);
+  const l = loadManifest(manifestPath(name));
+  let ref = l.reference?.ref;
+  if (like) {
+    const f = findReference(like, referenceDirs(DEMOS, ROOT));
+    if (!f) return text(`no references/${like}.yaml — \`learn\` it first`);
+    ref = readReference(f);
+  }
+  if (!ref) return text(`${name} has no \`like:\` — add one, or pass like`);
+  const v = compareTake(JSON.parse(fs.readFileSync(takeFile, "utf8")) as Take, l.manifest, ref);
+  return text(v.map((x) => `${x.ok ? "ok " : "off"}  ${x.line}`).join("\n"));
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {

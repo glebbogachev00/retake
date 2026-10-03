@@ -82,6 +82,13 @@ transitions, filters, stock intros — the video-editor line stays drawn.
 
 ## Shipped
 
+- **`retake batch` and references** (unreleased). Many demos at once with a
+  bounded, lock-aware pool; `learn` / `like:` / `compare` record new demos
+  like the ones a person already likes. Next on this line: a batch panel in
+  the window (one row per demo, live stage from progress.json, the report
+  when done), and a frame-freshness number in `check` so a stuttering take
+  fails instead of passing quietly.
+
 - **Render-time scene markers** (2026-08-25). `nudge: <ms>` on a scene moves
   its marker in the finished video — caption, still and thumbnail follow it,
   clamped so it can never cross a neighbouring scene. Measured on a two-scene

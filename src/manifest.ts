@@ -13,6 +13,8 @@ import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
 import { DEFAULT_PRESET, PRESETS, type Layout, type Preset } from "./presets.js";
+import { PROJECT_ROOT } from "./paths.js";
+import { applyReference, findReference, readReference, referenceDirs, type Reference } from "./reference.js";
 
 const Selector = z.string().min(1);
 
@@ -229,6 +231,12 @@ const ManifestShape = z.object({
   name: z.string().regex(/^[a-z0-9-]+$/, "kebab-case only"),
   title: z.string().optional(),
   url: z.string().url(),
+  /** Record like these: the name of a reference learned from demos the
+      person is already happy with (`retake learn <name> outputs/…`, kept in
+      references/<name>.yaml). Its agreed settings fill in whatever this
+      manifest does not set; its pacing is what `retake compare` measures
+      the take against. This manifest's own values always win. */
+  like: z.string().regex(/^[a-z0-9-]+$/, "kebab-case only").optional(),
   /** Quality preset — the publishing format. Fields below override it. */
   preset: z.enum(Object.keys(PRESETS) as [string, ...string[]]).default(DEFAULT_PRESET),
   /** Recording viewport (video pixels). Default = the preset's canvas. Give a
@@ -410,7 +418,7 @@ export const Manifest = ManifestShape.superRefine((m, ctx) => {
 });
 export type Manifest = z.infer<typeof Manifest>;
 
-export type LoadedManifest = { manifest: Manifest; file: string; dir: string };
+export type LoadedManifest = { manifest: Manifest; file: string; dir: string; reference?: { file: string; ref: Reference } };
 
 export function loadManifest(file: string): LoadedManifest {
   const abs = path.resolve(file);
@@ -428,6 +436,29 @@ export function loadManifest(file: string): LoadedManifest {
     const hint = /\bscript:/.test(src) || /compact mappings/.test(err.message) ? "\n  hint: a one-line script with braces parses as YAML, not JS — write it as a block:\n    script: |\n      window.scrollTo({ top: 0 })" : "";
     throw new Error(`Could not parse ${file}: ${err.message.split("\n")[0]}${hint}`);
   }
+  const dir = path.dirname(abs);
+  // `like:` is applied to the raw document, before the schema fills in its
+  // defaults — afterwards, "not set" and "set to the default" look the same,
+  // and the reference could never fill anything in.
+  let reference: LoadedManifest["reference"];
+  if (data && typeof data === "object" && typeof (data as { like?: unknown }).like === "string") {
+    const like = (data as { like: string }).like;
+    const found = findReference(like, referenceDirs(dir, PROJECT_ROOT));
+    if (!found) throw new Error(`${file} says \`like: ${like}\` but there is no references/${like}.yaml — learn it from demos you are happy with: retake learn ${like} outputs/<a-good-one> [outputs/<another>]`);
+    const ref = readReference(found);
+    data = applyReference(data as Record<string, unknown>, ref);
+    reference = { file: found, ref };
+  }
+  const m = parseManifest(data, file);
+  // A fixture page can live next to its manifest: `url: file://./page.html`
+  // resolves against the manifest's folder, so a cloned repo's demos work.
+  const rel = /^file:\/\/(\.{1,2}\/.*)$/.exec(m.url);
+  if (rel) m.url = "file://" + path.resolve(dir, rel[1]);
+  return { manifest: m, file: abs, dir, ...(reference ? { reference } : {}) };
+}
+
+/** Schema validation alone, with the errors worded for a person. */
+export function parseManifest(data: unknown, file: string): Manifest {
   const parsed = Manifest.safeParse(data);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => {
@@ -439,13 +470,7 @@ export function loadManifest(file: string): LoadedManifest {
     }).join("\n");
     throw new Error(`Invalid manifest ${file}:\n${issues}`);
   }
-  const dir = path.dirname(abs);
-  // A fixture page can live next to its manifest: `url: file://./page.html`
-  // resolves against the manifest's folder, so a cloned repo's demos work.
-  const m = parsed.data;
-  const rel = /^file:\/\/(\.{1,2}\/.*)$/.exec(m.url);
-  if (rel) m.url = "file://" + path.resolve(dir, rel[1]);
-  return { manifest: m, file: abs, dir };
+  return parsed.data;
 }
 
 /** Things worth saying out loud before a run. Not errors — the run proceeds. */
