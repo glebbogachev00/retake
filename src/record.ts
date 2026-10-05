@@ -19,6 +19,7 @@ import { chromium, type BrowserContext, type Page } from "playwright";
 import { recordPage, moveCursorToPoint, type PageRecorder } from "testreel";
 import { expandEnv, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
 import { ffmpegBin, videoDuration } from "./render.js";
+import { assessActionProof, proofMatches, snapshotActionProof, waitForActionProof } from "./action-proof.js";
 
 export type TimelineEntry = {
   index: number;
@@ -40,7 +41,7 @@ export type TimelineEntry = {
   /** Where the browser actually was when it failed. */
   url?: string;
   /** Where the camera looks (video-pixel box) and how far in. */
-  camera?: { zoom: number; box: { x: number; y: number; width: number; height: number }; focus: string };
+  camera?: { zoom: number; box: { x: number; y: number; width: number; height: number }; focus: string; holdMs?: number; easeMs?: number };
   /** Callout-only: the box the ring is drawn around (video px) and its label. */
   callout?: { box: { x: number; y: number; width: number; height: number }; label?: string; ms: number };
 };
@@ -93,7 +94,34 @@ export type Take = {
     A scene's caption, hold and camera zoom are render-time, so editing them must
     not cost a new take; its label and camera focus are not, because the focus
     box is measured live while recording. */
-export function captureHash(m: Manifest): string {
+function captureInputFiles(m: Manifest): string[] {
+  const files: string[] = [];
+  for (const seed of m.seed) if ("from" in seed && seed.from) files.push(seed.from);
+  for (const stub of m.stub) if (stub.from) files.push(stub.from);
+  const steps = [...(m.auth?.setup ?? []), ...m.setup, ...m.steps];
+  for (const step of steps) {
+    if (step.action !== "upload") continue;
+    files.push(...(Array.isArray(step.files) ? step.files : [step.files]));
+  }
+  return [...new Set(files)].sort();
+}
+
+function captureInputFingerprints(m: Manifest, manifestDir: string): Record<string, string> | undefined {
+  const files = captureInputFiles(m);
+  if (!files.length) return undefined;
+  return Object.fromEntries(files.map((file) => {
+    let expanded = file;
+    try { expanded = expandEnv(file); } catch { /* unresolved env belongs in the hash by name */ }
+    const absolute = path.resolve(manifestDir, expanded.replace(/^~/, os.homedir()));
+    try {
+      return [file, createHash("sha256").update(fs.readFileSync(absolute)).digest("hex")];
+    } catch {
+      return [file, "missing"];
+    }
+  }));
+}
+
+export function captureHash(m: Manifest, manifestDir = process.cwd()): string {
   const q = resolve(m);
   const steps = m.steps.map((s) => {
     if (s.action !== "scene") return s;
@@ -102,7 +130,7 @@ export function captureHash(m: Manifest): string {
     return { action: "scene", label: s.label, focus };
   });
   const h = createHash("sha1");
-  h.update(JSON.stringify({ url: m.url, viewport: q.viewport, scale: q.scale, cursor: q.cursor, wait: m.waitForSelector, reduced: m.reducedMotion, auth: m.auth, seed: m.seed, stub: m.stub, setup: m.setup, steps, speed: m.speed, camera: m.camera, colorScheme: m.colorScheme }));
+  h.update(JSON.stringify({ geometry: GEOMETRY_VERSION, url: m.url, viewport: q.viewport, scale: q.scale, cursor: q.cursor, wait: m.waitForSelector, reduced: m.reducedMotion, persistentCss: m.persistentCss, determinism: m.determinism, auth: m.auth, seed: m.seed, stub: m.stub, setup: m.setup, steps, speed: m.speed, camera: m.camera, colorScheme: m.colorScheme, inputs: captureInputFingerprints(m, manifestDir) }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -116,13 +144,42 @@ export function captureHash(m: Manifest): string {
  * quietly hand back a take with no pacing in it, or a fragment, as if it were
  * the finished thing.
  */
-export function canReuse(prev: Take | null | undefined, m: Manifest): boolean {
-  if (!prev) return false;
-  if (!prev.captureHash || prev.captureHash !== captureHash(m)) return false;
+export function canReuse(prev: Take | null | undefined, m: Manifest, manifestDir = process.cwd()): boolean {
+  if (!prev || !prev.ok) return false;
+  if (!prev.captureHash || prev.captureHash !== captureHash(m, manifestDir)) return false;
   if (!prev.video || !fs.existsSync(prev.video)) return false;
   if (prev.partial) return false;   // a --from/--until fragment, or a run that fell over
   if (prev.brisk) return false;     // all the steps, none of the pacing
   return true;
+}
+
+export function determinismScript(determinism: NonNullable<Manifest["determinism"]>): string {
+  const freeze = determinism.freezeTime ? Date.parse(determinism.freezeTime) : null;
+  const seed = determinism.randomSeed;
+  return `(() => {
+    globalThis.__retakeDeterminism = true;
+    ${freeze === null ? "" : `const fixed = ${freeze}; const RealDate = Date; class RetakeDate extends RealDate { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } } Object.setPrototypeOf(RetakeDate, RealDate); globalThis.Date = RetakeDate;`}
+    ${seed === undefined ? "" : `let state = ${seed >>> 0}; Math.random = () => { state = (state + 0x6D2B79F5) >>> 0; let t = state; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };`}
+  })();`;
+}
+
+export function persistentCssScript(css: string): string {
+  return `(() => {
+    const install = () => {
+      if (document.getElementById("retake-persistent-css")) return true;
+      const root = document.head || document.documentElement;
+      if (!root) return false;
+      const style = document.createElement("style");
+      style.id = "retake-persistent-css";
+      style.textContent = ${JSON.stringify(css)};
+      root.appendChild(style);
+      return true;
+    };
+    if (!install()) {
+      const observer = new MutationObserver(() => { if (install()) observer.disconnect(); });
+      observer.observe(document, { childList: true, subtree: true });
+    }
+  })();`;
 }
 
 /** The session a take should start from, and whether it is still good.
@@ -143,13 +200,15 @@ export function authState(m: Manifest, manifestDir: string): { path: string | nu
  * different app than run would film. A knob added here reaches both by
  * construction; a knob added to one call site is the bug this replaces. */
 export async function applyPageSetup(context: BrowserContext, m: Manifest, q: Resolved): Promise<void> {
+  if (m.determinism) await context.addInitScript(determinismScript(m.determinism));
+  if (m.persistentCss) await context.addInitScript(persistentCssScript(m.persistentCss));
   // The page lays out at `scale`× (CSS zoom): the app sees a smaller viewport
   // and renders crisp into the full canvas. Coordinates testreel/Playwright
   // see are already video pixels, so cursor and clicks line up.
   // Scale via a <style> tag, not an inline attribute: React hydration diffs
   // element attributes against the server HTML, so style.zoom on <html> made
   // every React app report a hydration mismatch — with a dev badge in shot.
-  if (q.scale !== 1) await context.addInitScript(`document.addEventListener("DOMContentLoaded",()=>{const st=document.createElement("style");st.textContent="html{zoom:${q.scale}}";document.head.appendChild(st)})`);
+  // Page scale is the browser's device pixel ratio now — see pageGeometry().
   // One page is what gets recorded, so keep the flow in it: window.open
   // navigates in place, and target=_blank is stripped as it appears. A demo
   // that spawned a second tab used to simply lose its subject.
@@ -247,6 +306,57 @@ export function unchangedUpTo(m: Manifest, outDir: string): { scene: string; ste
  * the honest answer is "this did not run".
  */
 export class SetupFailed extends Error {}
+
+/**
+ * Headless Chromium defaults to SwiftShader on macOS, which makes WebGL demos
+ * render at only a few frames per second. Keep Playwright's defaults elsewhere,
+ * but explicitly use ANGLE's Metal backend for headless recording on a Mac.
+ */
+/**
+ * How the page is drawn bigger than it lays out.
+ *
+ * This used to be `html{zoom}`. Zoom enlarges the picture, but it leaves the
+ * page with two units: CSS lengths in one, and everything the page measures —
+ * getBoundingClientRect, scroll offsets, mouse positions, innerWidth — in the
+ * other. Any app that measures an element and writes the number back as a
+ * style is off by the scale: Capture's intention showcase sized its box from
+ * its card and came out 1.7× too tall, with the empty space visible in the
+ * video and nowhere in the real app. Media queries saw the unzoomed width too,
+ * so responsive apps rendered their desktop layout squeezed into half the room.
+ *
+ * The browser rendering at a real device pixel ratio has none of that: the app
+ * lays out at canvas÷scale, every measurement agrees with every style, and the
+ * pixels are genuinely there. Playwright's own deviceScaleFactor does not reach
+ * the video recorder — frames come out at CSS size — but the browser-level
+ * flag does, as long as the context agrees with it (otherwise Playwright
+ * emulates DPR 1 over the top). Measured: identical framing and sharpness to
+ * zoom, correct layout.
+ *
+ * Page coordinates are now canvas÷scale; video coordinates are the canvas.
+ * Every place a page box becomes a video box multiplies by `scale` — the
+ * drawn cursor, the camera focus and callouts.
+ */
+export const GEOMETRY_VERSION = "native-dpr-v1";
+export function pageGeometry(q: { viewport: { width: number; height: number }; scale: number }) {
+  const s = q.scale;
+  return {
+    args: s !== 1 ? [`--force-device-scale-factor=${s}`] : [],
+    viewport: { width: Math.round(q.viewport.width / s), height: Math.round(q.viewport.height / s) },
+    deviceScaleFactor: s,
+    video: { width: q.viewport.width, height: q.viewport.height },
+  };
+}
+
+export function browserLaunchOptions(platform: NodeJS.Platform, headed = false, extraArgs: string[] = []) {
+  const headless = !headed;
+  if (platform === "darwin" && headless) {
+    return {
+      headless,
+      args: ["--use-angle=metal", "--enable-gpu-rasterization", "--ignore-gpu-blocklist", ...extraArgs],
+    };
+  }
+  return { headless, ...(extraArgs.length ? { args: extraArgs } : {}) };
+}
 
 export type RecordOptions = {
   /** Record up to the end of this scene label, then stop. */
@@ -372,7 +482,7 @@ export async function dragPoints(page: Page, from: { x: number; y: number }, to:
 async function performDrag(page: Page, step: Extract<Step, { action: "drag" }>, q: Resolved, timeout: number) {
   const from = await resolvePoint(page, step.from, timeout);
   const to = await resolvePoint(page, step.to, timeout);
-  const opts = q.cursor === false ? undefined : { style: q.cursor.style, size: q.cursor.size };
+  const opts = q.cursor === false ? undefined : { style: q.cursor.style, size: q.cursor.size, transitionMs: q.cursor.transitionMs };
   if (opts) await moveCursorToPoint(page, from.x, from.y, opts);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
@@ -436,7 +546,8 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     for (const s of m.seed) await runFileOrCommandSeed(s, opts.manifestDir, log);
   }
 
-  const browser = await chromium.launch({ headless: !opts.headed });
+  const geo = pageGeometry(q);
+  const browser = await chromium.launch(browserLaunchOptions(process.platform, opts.headed, geo.args));
   const size = { ...q.viewport };
   // A saved session (auth.storageState) means the login already happened on an
   // earlier run: load it and the setup login steps can be skipped.
@@ -446,10 +557,11 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // a logged-out take that passes every check.
   if (statePath && !stateFresh && !(m.auth?.setup?.length)) throw new Error(`no fresh session at ${path.relative(process.cwd(), statePath)} and no auth.setup to sign in with — run \`retake signin ${path.relative(process.cwd(), path.join(opts.manifestDir, m.name + ".yaml"))}\` and log in once by hand, or add the sign-in steps under auth.setup`);
   const context = await browser.newContext({
-    viewport: size,
+    viewport: geo.viewport,
+    deviceScaleFactor: geo.deviceScaleFactor,
     colorScheme: m.colorScheme,
     ...(m.reducedMotion ? { reducedMotion: "reduce" as const } : {}),
-    recordVideo: { dir: rawDir, size },
+    recordVideo: { dir: rawDir, size: geo.video },
     ...(stateFresh && statePath ? { storageState: statePath } : {}),
   });
   await applyPageSetup(context, m, q);
@@ -523,7 +635,9 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // Document first; idle only if it comes quickly. Busy public sites never
     // go network-idle, and the manifest's waitForSelector is the real gate.
     await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
+    // The manifest's readiness selectors are authoritative. Busy public apps
+    // may never become network-idle; paying a fixed 8s before every take made
+    // a passed dry run slower without proving the page was usable.
     // Two different widths, and the difference is the whole trap.
     //
     // Measured, on a real navigation: under `html{zoom:2}` a width:100%
@@ -549,25 +663,30 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     const videoStartedAt = await firstPaintWallClock(page);
     t0 = videoStartedAt;
 
-    if (q.scale !== 1) await page.evaluate((z) => { document.documentElement.style.zoom = String(z); }, q.scale);
+
 
     // Idle-hide fades are nested if()s in testreel's ffmpeg alpha expression;
     // past roughly sixty steps the nesting exceeds ffmpeg's parser and the
     // composite fails. Long demos get an always-visible cursor unless told
     // otherwise — the fade was never the point of the video.
     const cursorIdleHide = q.cursor === false ? undefined : q.cursor.idleHide;
-    const rec = await recordPage(page, {
+    // coordinateScale is Retake's addition, applied by patch-testreel.mjs.
+    const recOptions: NonNullable<Parameters<typeof recordPage>[1]> & { coordinateScale?: number } = {
       outputDir: opts.outDir,
       name: m.name,
       clean: false,
-      cursor: q.cursor === false ? false : { style: q.cursor.style, size: q.cursor.size, idleHideMs: q.cursor.idleHideMs, idleHide: cursorIdleHide },
+      cursor: q.cursor === false ? false : { style: q.cursor.style, size: q.cursor.size, rippleColor: q.cursor.rippleColor, rippleSize: q.cursor.rippleSize, transitionMs: q.cursor.transitionMs, idleHideMs: q.cursor.idleHideMs, idleHide: cursorIdleHide },
       chrome: false,
       background: false,
       speed: m.speed,
       // webm: skip testreel's own H.264 pass — render.ts does the one clean encode.
       outputFormat: "webm",
       videoStartedAt,
-    });
+      // Cursor events are recorded in page coordinates (canvas÷scale); the
+      // overlay is drawn on the video. patch-testreel multiplies them through.
+      coordinateScale: q.scale,
+    };
+    const rec = await recordPage(page, recOptions);
 
     // Sign-in steps run only when there is no fresh session to reuse; the rest
     // of `setup` always runs. (They were once the same list, which meant a
@@ -686,7 +805,8 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
         const half = typeof target === "string" || !("x" in (target as object))
           ? await page.locator((typeof target === "string" ? target : (target as { selector: string }).selector)).first().evaluate((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height }; }).catch(() => ({ w: 48, h: 48 }))
           : { w: 48, h: 48 };
-        entry.callout = { box: { x: c.x - half.w / 2, y: c.y - half.h / 2, width: half.w, height: half.h }, label: step.label, ms: step.ms };
+        const k = resolve(m).scale; // page coordinates → video coordinates
+        entry.callout = { box: { x: (c.x - half.w / 2) * k, y: (c.y - half.h / 2) * k, width: half.w * k, height: half.h * k }, label: step.label, ms: step.ms };
       }
       if (step.action === "scene") {
         entry.label = step.label;
@@ -847,7 +967,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     downloads: ctx.downloads,
     stubbed,
     stubHits: Object.fromEntries(stubHits),
-    captureHash: captureHash(m),
+    captureHash: captureHash(m, opts.manifestDir),
     captureSec: Math.round((Date.parse(finishedAt) - Date.parse(startedAt)) / 100) / 10,
   };
   releaseNamed?.();
@@ -862,9 +982,13 @@ async function resolveCamera(page: Page, m: Manifest, q: Resolved, step: Extract
   if (policy === "static") return undefined;
   let focus: string | undefined;
   let zoom = q.cameraZoom;
+  let holdMs: number | undefined;
+  let easeMs: number | undefined;
   if (typeof policy === "object" && !("focus" in policy && policy.focus === undefined && policy.zoom === undefined)) {
     if ("focus" in policy && policy.focus) focus = policy.focus;
     if (policy.zoom) zoom = policy.zoom;
+    holdMs = "holdMs" in policy ? policy.holdMs : undefined;
+    easeMs = "easeMs" in policy ? policy.easeMs : undefined;
   }
   if (!focus) {
     // auto: walk back to the last step with a selector (a waitFor result beats a click target).
@@ -879,9 +1003,12 @@ async function resolveCamera(page: Page, m: Manifest, q: Resolved, step: Extract
   }
   if (!focus) return undefined;
   try {
-    const box = await page.locator(focus).first().boundingBox({ timeout: 1500 });
-    if (!box || box.width < 4 || box.height < 4) return undefined;
-    return { zoom, box, focus };
+    const raw = await page.locator(focus).first().boundingBox({ timeout: 1500 });
+    if (!raw || raw.width < 4 || raw.height < 4) return undefined;
+    // Page coordinates are canvas÷scale; the camera works on the video.
+    const k = q.scale;
+    const box = { x: raw.x * k, y: raw.y * k, width: raw.width * k, height: raw.height * k };
+    return { zoom, box, focus, holdMs, easeMs };
   } catch {
     return undefined;
   }
@@ -1030,15 +1157,37 @@ export function restoreKept(outDir: string, id: string): boolean {
 export function acquireLock(outDir: string): true {
   fs.mkdirSync(outDir, { recursive: true });
   const lock = path.join(outDir, ".retake-lock");
-  if (fs.existsSync(lock)) {
-    const pid = Number(fs.readFileSync(lock, "utf8"));
-    if (pid && pid !== process.pid && isAlive(pid)) throw new Error(`another retake run (pid ${pid}) is using ${path.relative(process.cwd(), outDir)} — wait for it to finish`);
+  for (;;) {
+    try {
+      const fd = fs.openSync(lock, "wx", 0o600);
+      try { fs.writeFileSync(fd, String(process.pid)); }
+      finally { fs.closeSync(fd); }
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      let pid = 0;
+      try { pid = Number(fs.readFileSync(lock, "utf8")); }
+      catch (readError) {
+        if ((readError as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw readError;
+      }
+      if (pid && isAlive(pid)) {
+        throw new Error(`another retake run (pid ${pid}) is using ${path.relative(process.cwd(), outDir)} — wait for it to finish`);
+      }
+      // Do not remove a stale file here. Two processes can observe the same
+      // dead owner, then one can delete the fresh lock that the other created.
+      // Fail closed and make cleanup an explicit action instead.
+      throw new Error(`a stale Retake lock is blocking ${path.relative(process.cwd(), outDir)} — if nothing is recording, delete ${path.relative(process.cwd(), lock)} and retry`);
+    }
   }
-  fs.writeFileSync(lock, String(process.pid));
-  return true;
 }
 export function releaseLock(outDir: string) {
-  fs.rmSync(path.join(outDir, ".retake-lock"), { force: true });
+  const lock = path.join(outDir, ".retake-lock");
+  try {
+    if (Number(fs.readFileSync(lock, "utf8")) === process.pid) fs.rmSync(lock, { force: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
 }
 
 function isAlive(pid: number): boolean {
@@ -1059,6 +1208,17 @@ type StepCtx = {
   fast?: boolean;
 };
 
+/** Log several short cursor segments instead of one start/end teleport. The
+ * route is explicit in the manifest, so it stays deterministic across takes. */
+async function moveCursorVia(page: Page, via: Point[] | undefined, target: { x: number; y: number }, q: Resolved, timeout: number) {
+  if (q.cursor === false) return;
+  const points = await Promise.all([...(via ?? []).map((p) => resolvePoint(page, p, timeout)), Promise.resolve(target)]);
+  const transitionMs = Math.max(90, Math.round((q.cursor.transitionMs ?? 420) / points.length));
+  for (const point of points) {
+    await moveCursorToPoint(page, point.x, point.y, { style: q.cursor.style, size: q.cursor.size, transitionMs });
+  }
+}
+
 /** testreel clicks and types at *screen* coordinates and never scrolls first,
     so anything below the fold gets a click on empty air. Bring it into view
     ourselves — centred, so the viewer sees the target and the cursor lands on it. */
@@ -1077,20 +1237,51 @@ async function bringIntoView(page: Page, selector: string, timeout: number) {
   }
 }
 
-async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, ctx: StepCtx): Promise<void> {
+export async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, ctx: StepCtx): Promise<void> {
   const timeout = step.timeout ?? 8000;
   if (step.waitFor) await page.waitForSelector(step.waitFor, { timeout });
   if ((step.action === "click" || step.action === "type" || step.action === "fill" || step.action === "hover") && "selector" in step && step.selector) {
     await bringIntoView(page, step.selector, timeout);
   }
+  const proof = step.action === "click" ? step.proof : undefined;
+  const beforeProof = proof ? await snapshotActionProof(page, proof) : undefined;
+  if (proof && beforeProof && proof.change && proofMatches(proof, beforeProof)) {
+    throw new Error(`proof already satisfied before the action: ${proof.selector} is ${proof.state}; choose an action that visibly changes state`);
+  }
+  const verifyProof = async () => {
+    if (!proof || !beforeProof) return;
+    const after = await waitForActionProof(page, proof);
+    const result = assessActionProof(proof, beforeProof, after);
+    if (!result.ok) throw new Error(result.reason);
+  };
+
+  /* A selector passed through `at:` is still an ordinary DOM target. Route it
+     through the PageRecorder so the cursor move and click ripple are written
+     into the SAME tracker that rec.stop() composites. The old point path used
+     testreel's module-level helper; it changed the page but left the recorder's
+     cursor event list empty, producing videos with invisible clicks. Keep the
+     coordinate path only for true coordinate/offset targets that Playwright
+     cannot action reliably (canvas editors, intercepted elements). */
+  if ((step.action === "click" || step.action === "hover") && typeof step.at === "string" && (step.via ?? []).every((point) => typeof point === "string")) {
+    for (const waypoint of step.via ?? []) await rec.hover(waypoint as string, { timeout });
+    if (step.action === "click") {
+      await rec.click(step.at, { timeout, zoom: step.zoom });
+      await verifyProof();
+    } else {
+      await rec.hover(step.at, { timeout });
+    }
+    if (step.pauseAfter && !ctx.fast) await page.waitForTimeout(step.pauseAfter);
+    return;
+  }
+
   const q = resolve(m);
   if ((step.action === "click" || step.action === "hover") && step.at) {
     // A point click: the cursor travels there on camera, then the real
     // pointer does the same. For canvases, and for elements whose own
     // handlers make Playwright's actionability checks time out.
     const pt = await resolvePoint(page, step.at, timeout);
-    if (q.cursor !== false) await moveCursorToPoint(page, pt.x, pt.y, { style: q.cursor.style, size: q.cursor.size });
-    if (step.action === "click") await page.mouse.click(pt.x, pt.y);
+    await moveCursorVia(page, step.via, pt, q, timeout);
+    if (step.action === "click") { await page.mouse.click(pt.x, pt.y); await verifyProof(); }
     if (step.pauseAfter && !ctx.fast) await page.waitForTimeout(step.pauseAfter);
     return;
   }
@@ -1226,6 +1417,7 @@ async function runStep(rec: PageRecorder, page: Page, step: Step, m: Manifest, c
       throw new Error(`unknown step ${JSON.stringify(never)}`);
     }
   }
+  if (step.action === "click" && !step.at) await verifyProof();
   if (pause) await page.waitForTimeout(pause / m.speed);
 }
 

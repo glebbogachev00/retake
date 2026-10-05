@@ -42,15 +42,26 @@ mkdir my-demos && cd my-demos
 retake install
 ```
 
-`retake install` makes the folder a workspace (`demos/`, `outputs/`, `.env`, the `.gitignore` lines), downloads Chromium, registers the tools with Claude Code and installs its *recording-product-demos* skill, and prints the config for Codex. Restart your agent afterwards — agents load tools at the start of a session.
+`retake install` makes the folder a workspace (`demos/`, `outputs/`, `.env`, and the `.gitignore` lines), downloads Chromium, registers the tools with Claude Code, installs its *recording-product-demos* skill, and prints the config for Codex. Restart your agent afterwards because agents load tools at the start of a session.
 
-Prefer not to install globally? `npx retake-demos install` works the same. Don't use Claude Code? `retake agent` prints the MCP config for Codex, Cursor, or anything else.
+Start `retake ui` and open http://localhost:4310. On an empty workspace, Retake asks only for:
 
-Then, in your agent:
+1. the public or localhost URL;
+2. the result the viewer should see;
+3. the final sound: silent, Edge, local Aiden, or local Kokoro;
+4. confirmation of the request.
+
+The first draft is always silent. Choosing a local voice plays a packaged sample and asks for consent, but it does not download a model or generate speech. Narration starts only after you approve the recording and its continuous script.
+
+Prefer not to install globally? `npx retake-demos install` works the same. Don't use Claude Code? `retake agent` prints the MCP config for Codex, Cursor, or another MCP client.
+
+If you already have demos, ask your agent directly:
 
 > Record a demo of my app at localhost:3000 showing a new user creating their first project.
 
 and in another terminal, `retake ui` → http://localhost:4310 to watch it happen. The agent reports its plan and progress there; the video, stills and receipts land there when it's done.
+
+Not sure what to request? Use [How to prompt an agent to use Retake](docs/prompting-retake.md) to choose the recording type, format, voice, music, camera, branding, privacy rules, and delivery checks.
 
 `retake doctor` tells you if anything is missing.
 
@@ -82,6 +93,10 @@ retake validate demos/x.yaml   # schema + warnings, instant
 retake dry demos/x.yaml        # every selector and wait, no camera (~30s)
 retake run demos/x.yaml --preset draft   # first take, quarter-size, fast
 retake check outputs/x         # resolution, fps, duration, files: pass/fail
+retake golden approve finished.mp4 --id short-landscape --title "Short landscape" --approved-by "Your name" --rubric story=pass,framing=pass,timing=pass,text=pass,motion=pass  # interactive human approval
+retake golden add finished.mp4 --approval-receipt goldens/.approvals/short-landscape-<hash>.json  # store evidence; never copies the MP4
+retake golden verify           # integrity plus the required 5–8 visual families
+retake golden score candidate.mp4 --against short-landscape  # cheap deterministic media scorecard
 retake verify outputs/x        # did it LOOK right: each scene's `expect`, judged (exit 3 on failure)
 retake run demos/x.yaml --brisk  # the steps without the pacing — for iterating, not for keeping
 retake intent                 # what your product IS — context every visual check needs
@@ -99,6 +114,149 @@ retake render outputs/x        # captions/camera/speed changed? re-render, no br
 The expensive step comes last on purpose. `dry` catches most failures in seconds and prints the step, the error, and the text that was on screen; a failed `run` costs a minute and a confusing video. When a step fails during `run`, Retake stops, keeps what it has, and the proof log says which step and why — an agent fixes it from that text, never from watching the video.
 
 Exit codes: `0` good · `2` a step failed or the video is a raw fallback · `3` `dry`/`check` failed.
+
+To join separate recordings, use [`retake stitch`](docs/stitch.md). Supply existing output folders or video files, a new MP4 path, and one transition style.
+
+## The recording environment — what has to be true before the camera
+
+Six takes in one session were lost to the environment and not one to the
+recorder: an app pointed at the owner's real cloud store, a browser tab still
+attached that pushed the owner's board back into the "isolated" instance, a dev
+server caching its board so the seed only applied at boot, and two runs racing
+one output folder. Every one is cheap to assert and expensive to read off a
+frame.
+
+```bash
+retake env up        # restart it clean, clear its state, then PROVE it
+retake env check     # prove the running one without restarting
+retake env down
+```
+
+`demos/environment.yaml` declares it:
+
+```yaml
+name: capture-local
+start:
+  command: npm run dev -- --port 3179
+  cwd: ~/capture-local
+  port: 3179
+  env:
+    # Blanked, not unset: .env files are read AFTER the process environment,
+    # so "" is what stops a real token reaching a real account.
+    UPSTASH_REDIS_REST_URL: ""
+    APP_PASSWORD: ""
+reset:
+  restart: true            # the app caches state; without this, take two
+  clear: [".retake/sync"]  # inherits whatever take one left behind
+expect:
+  path: /app
+  present: ["button.tab:has-text('Intentions')"]
+  absent:  ["text=a real note of mine"]   # name what must NOT be there
+```
+
+`absent` is the one that earns its place. A present-only check cannot see real
+data leaking in, and you cannot assert the absence of something you did not
+think of — so name it. `retake routine run` picks the file up automatically and
+**refuses to record** if the environment is not what it claims.
+
+## Routines — the settings nobody should decide twice
+
+`demos/style.md` is taste an agent reads while drafting, so every draft is a
+fresh interpretation of it. That is how one video comes back narrated too fast,
+the next too slow, and a third in a voice nobody asked for.
+
+A routine is the other half: format, captions, voice, speaking rate and music
+held as data and **stamped onto the manifest after it is drafted**. The model
+writes the story; the routine writes the settings; they never argue.
+
+**Start by reading, not by guessing.** The first routine used to be Retake's
+defaults — an opinion wearing the clothes of a standard, which `apply` then
+stamps over everything with confidence. Read it off demos you already shipped:
+
+```bash
+retake routine learn                 # what your existing manifests actually agree on
+retake routine learn --write         # make that the standard
+```
+
+It reports what did *not* agree rather than quietly picking, so a split shows up
+as a question instead of a silent decision.
+
+```bash
+retake routine init                  # or start from Retake's defaults instead
+retake routine voices                # hear the named voices once, then stop discussing speed
+retake routine set voice neutral
+retake routine set rate -8           # too fast, once, for every video that follows
+retake routine                       # what every recording here will look and sound like
+```
+
+Three styles, because a style is a shape and not a theme:
+
+| Style | Output | Captions |
+|---|---|---|
+| `showcase` | 1920×1080 | the app inset on your own colour, with a shadow |
+| `fullscreen` | 1920×1080 | the app fills the frame, nothing around it |
+| `mobile` | 1080×1920 | inset the same way, for shorts and reels |
+
+**Proving they match.** A standard nobody measures is a hope.
+
+```bash
+retake routine check          # measures the finished files, not the manifests
+```
+
+It reads back size, frame rate, whether there is a voice and how loud it is, and
+judges each video against the standard *and* against the others — because two
+videos can agree with each other and both be wrong (a batch whose final render
+failed leaves matching previews at the wrong frame rate).
+
+Three things it cannot see, which the earlier steps catch instead: a key Retake
+does not know (strict manifests reject it), a script copied from another demo
+(`validate` compares the narration against that demo's own captions), and data
+the app repopulated mid-take (stub the sync so nothing outside the demo can
+change what is on screen).
+
+**Start from a north star.** One approved video that every cut is held to:
+
+```bash
+retake routine reference "~/Videos/the-one-we-liked.mp4"
+```
+
+Before anything records, it says what this routine cannot reproduce — "the
+reference is narrated, the routine is silent", "the routine uses Retake's own
+card, not a branded one" — so a take is never the thing that discovers it.
+After, `retake routine check` scores each cut against it: the opening card, the
+closing card and the frame around the app, as structural similarity, plus
+size, frame rate and how loud the voice is.
+
+Two pieces exist so a north star *can* be reproduced: a branded `card` (the
+product's mark, typeface, ground, ink and corner circles, drawn by Retake
+instead of added afterwards), and narration with `align: scenes` — the script
+read once so it sounds like a person, then each paragraph placed on its
+narrated scene. A line that would run into the next scene is reported, never
+sped up.
+
+**Recording a batch.** `demos/plan.json` is the queue — names and one-sentence
+stories, written by whoever has the ideas. A routine never invents one.
+
+```bash
+retake routine run              # everything not done yet
+retake routine run -n 3         # three videos, then stop
+retake routine run --only hero  # re-record one
+```
+
+Each item is stamped, dry-run, recorded as a preview and finished at full
+quality, with progress written to `plan.json` as it goes — so an interrupted
+batch resumes where it stopped, and one broken selector does not cost the other
+four videos. Two failures in a row stops the batch and asks whether the app is
+actually running.
+
+**Two standards, two products.** `retake routine new techtutor-vn`, then
+`retake routine set voice vi-VN-HoaiMyNeural --as techtutor-vn`. The language
+rides on the voice, so there is no second setting that could disagree with the
+first. `retake routine use <name>` switches; `--as <name>` is a one-off.
+
+**What a routine will not do:** turn narration on. That needs a script and a
+person who has heard it — the routine only says which voice reads it, and how
+fast, once somebody has written one.
 
 ## Demo-as-code
 
@@ -129,7 +287,7 @@ outputs:
   thumbnail: { scene: result }
 ```
 
-The full template is [`demos/example.yaml`](demos/example.yaml); `retake init` copies it into a new workspace.
+On a new workspace, `retake ui` opens the first-demo flow and writes the manifest from your answers.
 
 **Steps** — `click`, `type`, `fill`, `select`, `hover`, `drag`, `scroll`, `keyboard`, `navigate`, `wait`, `waitFor`, `evaluate`, `upload`, `download`, `screenshot`, `scene`. Every step takes `pauseAfter`, `waitFor`, `timeout`, `secret`. Targets are a selector, or a point — `{x, y}` or `{selector, dx, dy}` — for canvases and SVG editors. `${VAR}` expands from `.env` and fails loudly when unset.
 

@@ -4,6 +4,8 @@
  *
  *   retake install                                set up Claude Code / Codex + this folder as the workspace
  *   retake init                                   just the workspace: demos/, outputs/, .env, .gitignore
+ *   retake routine                                the house standard — format, captions, voice, music
+ *   retake routine run                            work demos/plan.json: stamp, dry, record, finish
  *   retake doctor                                 is everything in place?
  *   retake ui                                     the review window on :4310
  *   retake run demos/x.yaml                       record + render → outputs/x/
@@ -24,6 +26,7 @@
  *   retake validate demos/x.yaml                  schema check only
  *   retake presets                                list quality presets
  *   retake list                                   manifests in ./demos
+ *   retake golden add|list|score                  approved visual references and deterministic scorecards
  *   retake describe <name> <url> "<what>"         scout + model → demos/<name>.yaml
  *
  * Run from a clone, the `.ts` source goes through tsx (`npm run retake -- …`);
@@ -33,10 +36,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
 import { loadManifest, resolve, warnings, type Manifest } from "./manifest.js";
 import { acquireLock, canReuse, captureHash, EXPENSIVE_TAKE_SECONDS, keepPrevious, keptTakes, lastCaptureSeconds, unchangedUpTo, record, releaseLock, restoreKept, restorePrevious, stashPrevious, type Take } from "./record.js";
-import { check, render } from "./render.js";
+import { check, contactSheetFile, render } from "./render.js";
 import { endProgress, setPhase } from "./progress.js";
 import { presetNames } from "./presets.js";
 import { applyTidy, mb, planTidy } from "./tidy.js";
@@ -49,8 +53,12 @@ import { planCalibration, report, usable, type Result, type Stability } from "./
 import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "./ext/heal.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
+import { addGolden, assertGoldenApproval, goldenSetStatus, inspectMedia, loadGoldenLedger, scoreGolden, verifyGoldenIntegrity, writeGoldenScorecard, type GoldenRubric } from "./ext/golden.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
+import { bringUp, loadEnvSpec, stopEnvironment, verify as verifyEnv } from "./recording-env.js";
+import { STYLES, VOICES, RoutineSchema, applyToManifest, compare as compareRoutine, compareToReference, preflightAgainst, learnFrom, measure as measureOutputs, readPlan, describe as describeRoutine, pick as pickRoutine, readRoutines, runRoutine, routineFile, starter, voiceId, writeRoutines, type Routine } from "./routine.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
+import { captureMatchesTake, notePreviewCapture, notePreviewRender, readPreviewReceipt } from "./preview.js";
 
 // The manifest may reference ${VARS}; load .env before any command reads one.
 // (`describe` and the UI used to do this individually, so a plain `run` from
@@ -70,6 +78,42 @@ program.name("retake").description("Rerun the demo instead of re-recording it.")
 process.stdout.on("error", (e: NodeJS.ErrnoException) => { if (e.code === "EPIPE") process.exit(0); throw e; });
 
 const say = (l: string) => process.stdout.write(l + "\n");
+
+function parseGoldenRubric(value?: string): GoldenRubric {
+  const out: Record<string, string> = {};
+  for (const part of (value ?? "").split(",").filter(Boolean)) {
+    const [name, rating] = part.split("=").map((item) => item.trim());
+    if (name && rating) out[name] = rating;
+  }
+  const names = ["story", "framing", "timing", "text", "motion"] as const;
+  if (names.some((name) => !["pass", "watch", "fail"].includes(out[name]))) {
+    throw new Error("--rubric must rate story, framing, timing, text, and motion as pass, watch, or fail");
+  }
+  return Object.fromEntries(names.map((name) => [name, out[name]])) as GoldenRubric;
+}
+
+type GoldenApprovalReceipt = {
+  version: 1;
+  kind: "retake-human-golden-approval";
+  id: string;
+  title: string;
+  approvedBy: string;
+  approvedAt: string;
+  sourceContainerSha256: string;
+  rubric: GoldenRubric;
+};
+
+function readGoldenApprovalReceipt(root: string, file: string, source: string): GoldenApprovalReceipt {
+  const approvals = path.join(path.resolve(root), ".approvals");
+  const absolute = path.resolve(file);
+  const relative = path.relative(approvals, absolute);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("approval receipt must come from the golden root's .approvals directory");
+  const receipt = JSON.parse(fs.readFileSync(absolute, "utf8")) as GoldenApprovalReceipt;
+  if (receipt.version !== 1 || receipt.kind !== "retake-human-golden-approval") throw new Error("unsupported golden approval receipt");
+  assertGoldenApproval(receipt);
+  if (inspectMedia(source).containerSha256 !== receipt.sourceContainerSha256) throw new Error("approval receipt belongs to different video bytes");
+  return receipt;
+}
 
 
 /** Said once, before the camera rolls, when a take is long enough that the
@@ -107,6 +151,8 @@ program
   .option("--no-render", "stop after the raw take")
   .option("--keep-raw", "keep testreel's intermediate files", false)
   .option("--preset <name>", `override the manifest's preset (${presetNames().join(", ")})`)
+  .option("--preview", "start the one-capture fast path at preview-fast quality", false)
+  .option("--fresh", "discard preview reuse and start a new capture cycle", false)
   .option("--reuse", "reuse the last raw recording if nothing that shapes it changed (re-render only)", false)
   .option("--gif", "also produce a GIF (overrides the manifest)", false)
   .option("--no-master", "skip the archival CRF-14 master — roughly halves render on a long take, and the deliverable is marginally better for it (one encode instead of an encode of an encode)")
@@ -114,7 +160,7 @@ program
   .option("--brisk", "record the whole thing without its pacing — every pause skipped, every wait capped. All the steps, none of the holding still: on a long demo that is minutes instead of many. For iterating; record the real one without it.", false)
   .option("--from <scene>", "start the take at this scene — earlier steps still run, at full speed and off camera, so a demo whose ENDING changed stops costing its beginning")
   .option("--name <name>", "write to outputs/<name> instead of the manifest's name — revise a cut without overwriting the published one")
-  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; reuse: boolean; gif: boolean; master: boolean; until?: string; from?: string; name?: string; brisk: boolean }) => {
+  .action(async (file: string, opts: { out: string; headed: boolean; skipSeed: boolean; render: boolean; keepRaw: boolean; preset?: string; preview: boolean; fresh: boolean; reuse: boolean; gif: boolean; master: boolean; until?: string; from?: string; name?: string; brisk: boolean }) => {
     const loaded = loadManifest(file);
     // Asking for a preset means asking for its SHAPE. A manifest that pins its
     // own `viewport` used to win silently, so `--preset draft` recorded at
@@ -122,26 +168,55 @@ program
     // mattered most, and with a failing "matches draft" check as the only
     // hint. An explicit --preset now drops the pin.
     let manifest = loaded.manifest;
-    if (opts.preset) {
+    if (opts.preview) {
+      const { viewport: pinned, ...rest } = loaded.manifest;
+      manifest = { ...rest, preset: "preview-fast" };
+      if (pinned) say(`ℹ --preview overrides this manifest's viewport (${pinned.width}×${pinned.height})`);
+    } else if (opts.preset) {
       const { viewport: pinned, ...rest } = loaded.manifest;
       manifest = { ...rest, preset: opts.preset };
       if (pinned) say(`ℹ --preset ${opts.preset} overrides this manifest's viewport (${pinned.width}×${pinned.height}); recording at the preset's own size`);
     }
     if (opts.gif) manifest = { ...manifest, outputs: { ...manifest.outputs, gif: true } };
     if (opts.preset && !presetNames().includes(opts.preset)) throw new Error(`unknown preset ${opts.preset} — one of ${presetNames().join(", ")}`);
+    if (opts.preview && opts.preset && opts.preset !== "preview-fast") throw new Error("--preview cannot be combined with a non-preview preset");
     const dir = loaded.dir;
     if (opts.name && !/^[a-z0-9-]+$/.test(opts.name)) throw new Error("--name must be kebab-case");
     const outDir = path.resolve(opts.out, opts.name ?? manifest.name);
     acquireLock(outDir); // throws if another run owns this folder
 
-    // Reuse: same capture hash + raw video present → skip the browser.
+    // Reuse: same capture inputs + raw video present → skip the browser.
+    // The preview path is stricter: a take is reusable only when its receipt
+    // proves it belongs to this one-capture cycle.
     let take: Take | undefined;
     const takePath = path.join(outDir, "take.json");
-    if (opts.reuse && fs.existsSync(takePath)) {
-      try {
-        const prev = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take;
-        if (canReuse(prev, manifest)) take = prev;
-      } catch { /* record fresh */ }
+    const previous = fs.existsSync(takePath)
+      ? (() => { try { return JSON.parse(fs.readFileSync(takePath, "utf8")) as Take; } catch { return undefined; } })()
+      : undefined;
+    const previewReceipt = readPreviewReceipt(outDir);
+    const receiptMatches = !!previous
+      && previewReceipt?.takeFinishedAt === previous.finishedAt
+      && previewReceipt.captureHash === (previous.captureHash ?? null)
+      && previewReceipt.rawVideo === previous.video;
+
+    if (!opts.preview && !opts.fresh && previous && receiptMatches && captureMatchesTake(previous, manifest, dir)) {
+      releaseLock(outDir);
+      throw new Error(`this demo already has a reusable preview capture; final quality must not record again. Run: retake render ${path.relative(process.cwd(), outDir)} ${path.relative(process.cwd(), file)} --final --preset post-landscape --no-master`);
+    }
+    if (opts.preview && !opts.fresh && previous && receiptMatches && captureMatchesTake(previous, manifest, dir)) {
+      if (previewReceipt?.finalizedAt) {
+        releaseLock(outDir);
+        throw new Error("this preview cycle is already finalized; keep it or pass --fresh to start a genuinely new capture");
+      }
+      if ((previewReceipt?.renderCount ?? 0) > 0) {
+        say(`✓ preview already exists: ${path.relative(process.cwd(), path.join(outDir, "demo.mp4"))}`);
+        say(`  1 capture · ${previewReceipt?.renderCount} render${previewReceipt?.renderCount === 1 ? "" : "s"} · ${previewReceipt?.totalSec.toFixed(1)}s total`);
+        releaseLock(outDir);
+        return;
+      }
+      take = previous;
+    } else if (!opts.fresh && opts.reuse && previous && canReuse(previous, manifest, dir)) {
+      take = previous;
     }
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
     if (!take) for (const l of costHints(manifest, outDir, opts)) say(l);
@@ -172,6 +247,9 @@ program
         throw e;
       }
       keepPrevious(outDir, say);
+      if (opts.preview && take.ok && !take.partial && !take.brisk && take.video) {
+        notePreviewCapture(outDir, take, take.captureSec ?? (Date.now() - t0) / 1000, "preview-fast");
+      }
     }
     say(`■ take done in ${((Date.now() - t0) / 1000).toFixed(1)}s · ${take.ok ? "all steps ok" : "SOME STEPS FAILED"} · ${take.video ?? "no video"}`);
 
@@ -181,11 +259,16 @@ program
         setPhase(outDir, { phase: "rendering", label: "encoding the video" });
         const tr = Date.now();
         const a = await render(manifest, take, outDir, { noMaster: opts.master === false, log: (l) => { if (!l.startsWith("$")) say(l); } });
+        const renderSec = (Date.now() - tr) / 1000;
         if (!opts.keepRaw) cleanRaw(outDir, take, a.mp4);
         for (const f of [a.master, a.mp4, a.gif, a.thumbnail, a.proofLog]) if (f) say(`✓ ${path.relative(process.cwd(), f)}`);
-        if (a.facts) say(`  ${a.facts.width}×${a.facts.height} @ ${a.facts.fps}fps · ${a.facts.duration.toFixed(1)}s · ${a.facts.encoder} · mp4 ${(a.facts.sizes["demo.mp4"] / 1e6).toFixed(1)} MB${a.gif ? ` · gif ${(a.facts.sizes["demo.gif"] / 1e6).toFixed(1)} MB (${a.facts.gifTool})` : ""} · camera on ${a.facts.cameraScenes} scenes${a.facts.cached ? " · cached" : ""} · render ${((Date.now() - tr) / 1000).toFixed(1)}s`);
+        if (a.facts) say(`  ${a.facts.width}×${a.facts.height} @ ${a.facts.fps}fps · ${a.facts.duration.toFixed(1)}s · ${a.facts.encoder} · mp4 ${(a.facts.sizes["demo.mp4"] / 1e6).toFixed(1)} MB${a.gif ? ` · gif ${(a.facts.sizes["demo.gif"] / 1e6).toFixed(1)} MB (${a.facts.gifTool})` : ""} · camera on ${a.facts.cameraScenes} scenes${a.facts.cached ? " · cached" : ""} · render ${renderSec.toFixed(1)}s`);
         const c = check(outDir, manifest);
         say(c.ok ? "check: pass" : "check: FAIL\n  " + c.lines.filter((l) => l.startsWith("FAIL")).join("\n  "));
+        if (opts.preview && c.ok) {
+          const receipt = notePreviewRender(outDir, take, { preset: "preview-fast", seconds: renderSec, kind: "initial" });
+          say(`preview receipt: 1 capture · ${receipt.renderCount} render · ${receipt.totalSec.toFixed(1)}s total · ${receipt.withinTarget ? "within" : "over"} 180s target`);
+        }
       }
       setPhase(outDir, { phase: "checking", label: "checking the result" });
       say(`[stage] done`);
@@ -501,9 +584,13 @@ program
   .option("--scene <label>", "render just one scene to scene-<label>.mp4 (fast, hardware encode)")
   .option("--gif", "also produce a GIF", false)
   .option("--force", "ignore the render cache", false)
+  .option("--final", "finish a one-capture preview cycle from the existing raw take", false)
   .option("--no-master", "skip the archival CRF-14 master — halves render on a long take")
+  .option("--with-master", "also create the archival master during a final render", false)
   .option("--out <dir>", "write the render into a NEW directory, leaving the original untouched")
-  .action(async (dir: string, manifestFile: string | undefined, opts: { preset?: string; scene?: string; gif: boolean; force: boolean; master: boolean; out?: string }) => {
+  .action(async (dir: string, manifestFile: string | undefined, opts: { preset?: string; scene?: string; gif: boolean; force: boolean; final: boolean; master: boolean; withMaster: boolean; out?: string }) => {
+    if (opts.final && opts.scene) throw new Error("--final cannot render only one scene");
+    if (opts.final && opts.out) throw new Error("--final must close the preview cycle in its original output directory");
     const takePath = path.join(dir, "take.json");
     const take = JSON.parse(fs.readFileSync(takePath, "utf8")) as Take;
     // Revising a published cut should not destroy it. Copy the take (and the
@@ -532,17 +619,72 @@ program
     const name = path.basename(path.resolve(dir));
     const mf = manifestFile ?? guessManifest(name);
     const loaded = loadManifest(mf);
-    let manifest = opts.preset ? { ...loaded.manifest, preset: opts.preset } : loaded.manifest;
+    const chosenPreset = opts.preset ?? (opts.final ? "post-landscape" : undefined);
+    if (opts.final && chosenPreset !== "post-landscape") throw new Error("--final requires --preset post-landscape");
+    let manifest = chosenPreset ? { ...loaded.manifest, preset: chosenPreset } : loaded.manifest;
     if (opts.gif) manifest = { ...manifest, outputs: { ...manifest.outputs, gif: true } };
     acquireLock(path.resolve(dir));
     try {
-      const a = await render(manifest, take, path.resolve(dir), { log: say, force: opts.force, scene: opts.scene, noMaster: opts.master === false });
+      if (opts.final && !captureMatchesTake(take, manifest, loaded.dir)) {
+        throw new Error("the preview take no longer matches the manifest's capture-relevant steps; record a new preview");
+      }
+      const before = readPreviewReceipt(path.resolve(dir));
+      const receiptMatchesTake = !!before
+        && before.takeFinishedAt === take.finishedAt
+        && before.captureHash === (take.captureHash ?? null)
+        && before.rawVideo === take.video;
+      if (opts.final && !receiptMatchesTake) {
+        throw new Error("final render requires a current preview capture receipt; run with --preview first");
+      }
+      if (receiptMatchesTake) {
+        if (before.finalizedAt) throw new Error(`preview workflow is already finalized as ${before.finalPreset}; start a fresh preview cycle to change it`);
+        if (!before.renders.some((event) => event.kind === "initial")) {
+          throw new Error("preview workflow requires its initial preview render before a correction or final");
+        }
+        if (!opts.final && before.correctionsUsed >= 1) {
+          throw new Error("preview correction budget is spent; make the final render or record a fresh preview");
+        }
+      }
+      const renderStart = Date.now();
+      const a = await render(manifest, take, path.resolve(dir), {
+        log: say,
+        force: opts.force,
+        scene: opts.scene,
+        noMaster: opts.final ? !opts.withMaster : opts.master === false,
+      });
       for (const f of [a.master, a.mp4, a.gif, a.thumbnail]) if (f) say(`✓ ${path.relative(process.cwd(), f)}`);
       if (a.facts) say(`  ${Object.entries(a.facts.timings).map(([k, v]) => `${k} ${v}s`).join(" · ")}${a.facts.cached ? " (cached)" : ""}`);
-      if (!opts.scene) say(check(path.resolve(dir), manifest).lines.join("\n"));
+      if (!opts.scene) {
+        const result = check(path.resolve(dir), manifest);
+        say(result.lines.join("\n"));
+        if (opts.final && !result.ok) throw new Error("final render failed check; preview workflow was not finalized");
+        if (result.ok && receiptMatchesTake) {
+          const kind = opts.final ? "final" : "correction";
+          const receipt = notePreviewRender(path.resolve(dir), take, {
+            preset: manifest.preset,
+            seconds: (Date.now() - renderStart) / 1000,
+            kind,
+          });
+          say(`preview receipt: 1 capture · ${receipt.renderCount} renders · ${receipt.totalSec.toFixed(1)}s total · ${receipt.withinTarget ? "within" : `${receipt.overTargetSec.toFixed(1)}s over`} 180s target${receipt.finalPreset ? ` · final ${receipt.finalPreset}` : ""}`);
+        }
+      }
     } finally {
       releaseLock(path.resolve(dir));
     }
+  });
+
+program
+  .command("stitch")
+  .description("join existing output dirs (demo.mp4) or video files in order; fit to the first clip's canvas/fps")
+  .argument("<inputs...>", "two or more output dirs or video files, in playback order")
+  .requiredOption("-o, --out <file>", "new MP4 file; never overwrites an existing file")
+  .option("--transition <style>", "cut, fade, dissolve, wipeleft, wiperight, slideleft, slideup, circleopen", "cut")
+  .option("--transition-ms <ms>", "overlap per join, 120–1200ms (ignored for cut)", "400")
+  .option("--no-audio", "explicitly discard source audio (default: preserve first stream, crossfade with video)")
+  .action(async (inputs: string[], opts: { out: string; transition: string; transitionMs: string; audio: boolean }) => {
+    const { stitch } = await import("./render.js");
+    const file = stitch(inputs, opts.out, { transition: { style: opts.transition, ms: Number(opts.transitionMs) }, audio: opts.audio, log: say });
+    say(`✓ ${path.relative(process.cwd(), file)}`);
   });
 
 program
@@ -559,11 +701,6 @@ function initWorkspace(root: string, say: (l: string) => void): void {
   for (const d of ["demos", "outputs"]) {
     const p = path.join(root, d);
     if (!fs.existsSync(p)) { fs.mkdirSync(p, { recursive: true }); made.push(d + "/"); }
-  }
-  const example = path.join(root, "demos", "example.yaml");
-  if (!fs.existsSync(example) && fs.readdirSync(path.join(root, "demos")).length === 0) {
-    fs.copyFileSync(path.join(PKG_ROOT, "demos", "example.yaml"), example);
-    made.push("demos/example.yaml");
   }
   const env = path.join(root, ".env");
   if (!fs.existsSync(env)) { fs.copyFileSync(path.join(PKG_ROOT, ".env.example"), env); made.push(".env"); }
@@ -853,6 +990,98 @@ program
   });
 
 program
+  .command("golden")
+  .argument("<action>", "approve, add, list, verify, or score")
+  .argument("[target]", "source MP4 for approve/add; candidate MP4 for score")
+  .option("--root <dir>", "approved reference directory", "goldens")
+  .option("--id <id>", "reference family id for approval")
+  .option("--title <title>", "human-readable reference title")
+  .option("--variant <name>", "voice or delivery variant label")
+  .option("--approved-by <name>", "person approving this finished video")
+  .option("--rubric <ratings>", "story=pass,framing=pass,timing=pass,text=pass,motion=pass")
+  .option("--approval-receipt <file>", "interactive human approval receipt for add")
+  .option("--against <id>", "reference family to score against")
+  .description("human-approved visual references: approve interactively, store evidence, verify readiness, or score media facts")
+  .action(async (action: string, target: string | undefined, opts: { root: string; id?: string; title?: string; variant?: string; approvedBy?: string; rubric?: string; approvalReceipt?: string; against?: string }) => {
+    const root = path.resolve(opts.root);
+    if (action === "approve") {
+      if (!target || !opts.id || !opts.title || !opts.approvedBy || !opts.rubric) throw new Error("golden approve requires <mp4>, --id, --title, --approved-by, and --rubric");
+      if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("golden approval requires an interactive human terminal");
+      const source = path.resolve(target);
+      const rubric = parseGoldenRubric(opts.rubric);
+      assertGoldenApproval({ id: opts.id, title: opts.title, approvedBy: opts.approvedBy, rubric });
+      const media = inspectMedia(source);
+      say(`Review: ${path.basename(source)} · ${media.width}×${media.height} · ${media.duration.toFixed(2)}s`);
+      const prompt = createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await prompt.question(`Type APPROVE ${opts.id} to issue a one-use receipt: `);
+      prompt.close();
+      if (answer.trim() !== `APPROVE ${opts.id}`) throw new Error("approval cancelled");
+      const receipt: GoldenApprovalReceipt = {
+        version: 1,
+        kind: "retake-human-golden-approval",
+        id: opts.id,
+        title: opts.title.trim(),
+        approvedBy: opts.approvedBy.trim(),
+        approvedAt: new Date().toISOString(),
+        sourceContainerSha256: media.containerSha256,
+        rubric,
+      };
+      const approvals = path.join(root, ".approvals");
+      fs.mkdirSync(approvals, { recursive: true });
+      const file = path.join(approvals, `${receipt.id}-${receipt.sourceContainerSha256.slice(0, 12)}.json`);
+      fs.writeFileSync(file, JSON.stringify(receipt, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+      say(`✓ approval receipt: ${path.relative(process.cwd(), file)}`);
+      return;
+    }
+    if (action === "add") {
+      if (!target || !opts.approvalReceipt) throw new Error("golden add requires <mp4> and --approval-receipt from an interactive golden approve");
+      const source = path.resolve(target);
+      const receiptFile = path.resolve(opts.approvalReceipt);
+      const receipt = readGoldenApprovalReceipt(root, receiptFile, source);
+      const existing = loadGoldenLedger(root).references.find((reference) => reference.id === receipt.id);
+      let pending: string | undefined;
+      let contact: string | undefined;
+      try {
+        if (!existing) {
+          fs.mkdirSync(root, { recursive: true });
+          pending = fs.mkdtempSync(path.join(root, ".pending-"));
+          contact = path.join(pending, "contact.png");
+          contactSheetFile(source, contact, 2, 420, say);
+        }
+        const reference = addGolden(root, source, { id: receipt.id, title: receipt.title, approvedBy: receipt.approvedBy, approvedAt: receipt.approvedAt, rubric: receipt.rubric, variant: opts.variant, contact });
+        fs.rmSync(receiptFile, { force: true });
+        say(`✓ ${reference.id}: ${reference.variants.length} variant${reference.variants.length === 1 ? "" : "s"} · approved by ${reference.approvedBy}`);
+        say(`  ledger: ${path.relative(process.cwd(), path.join(root, "index.json"))}`);
+      } finally {
+        if (pending) fs.rmSync(pending, { recursive: true, force: true });
+      }
+      return;
+    }
+    if (action === "list" || action === "verify") {
+      const ledger = loadGoldenLedger(root);
+      const integrity = verifyGoldenIntegrity(root);
+      for (const reference of ledger.references) say(`${reference.id.padEnd(32)} ${reference.variants.length} variant${reference.variants.length === 1 ? " " : "s"} · ${reference.title} · ${reference.approvedBy}`);
+      if (!ledger.references.length) say("no approved references");
+      for (const line of integrity.lines.filter((line) => line.startsWith("FAIL"))) say(line);
+      const status = goldenSetStatus(root);
+      say(`${status.complete && integrity.ok ? "pass" : "INCOMPLETE"}  ${status.message}`);
+      if (!integrity.ok || (action === "verify" && !status.complete)) process.exitCode = 3;
+      return;
+    }
+    if (action === "score") {
+      if (!target || !opts.against) throw new Error("golden score requires <candidate.mp4> and --against <id>");
+      const score = scoreGolden(root, path.resolve(target), opts.against);
+      const scorecard = writeGoldenScorecard(root, score);
+      for (const row of score.rows) say(`${row.status.padEnd(4)}  ${row.name}: ${row.actual}${row.status === "fail" ? ` (expected ${row.expected})` : ""}`);
+      say(score.ok ? "scorecard: pass" : "scorecard: FAIL");
+      say(`  ${path.relative(process.cwd(), scorecard)}`);
+      if (!score.ok) process.exitCode = 3;
+      return;
+    }
+    throw new Error(`unknown golden action ${action} — use approve, add, list, verify, or score`);
+  });
+
+program
   .command("gif")
   .argument("<dir>", "an outputs/<name> dir")
   .option("-w, --width <px>", "width", "900")
@@ -961,6 +1190,405 @@ function cleanRaw(outDir: string, take: Take, finalMp4?: string) {
     if (/cursor.*\.json$/.test(f) || /^debug-filter\.txt$/.test(f) || /-final\.png$/.test(f)) fs.rmSync(p, { force: true });
   }
 }
+
+/* ───────────────────────── routines ─────────────────────────────────────────
+   The settings nobody should be asked about twice. `style.md` is taste a model
+   reads; a routine is data the machine stamps. Everything here exists so that
+   "record these five" comes back five times the same. */
+
+const DEMOS_DIR = () => path.resolve("demos");
+
+/* ───────────────────────── the recording environment ────────────────────────
+   Six takes in one session were lost to the environment, not the recorder.
+   Declaring it is cheap; discovering it from a frame is not. */
+
+const ENV_FILE = () => path.resolve("demos", "environment.yaml");
+
+const env = program
+  .command("env")
+  .description("the app under test: bring it up isolated, reset it, and PROVE it before recording");
+
+env
+  .command("up", { isDefault: true })
+  .option("-f, --file <path>", "environment file", "demos/environment.yaml")
+  .option("--no-verify", "skip the proof (you will find out from a frame instead)")
+  .description("start it clean and check it is what it claims")
+  .action(async (opts: { file: string; verify: boolean }) => {
+    const spec = loadEnvSpec(path.resolve(opts.file));
+    say(`environment ${spec.name}`);
+    const up = await bringUp(spec, say);
+    say(`  up at ${up.url}${up.restarted ? " (restarted)" : ""}`);
+    if (!opts.verify) { say("  not verified — you asked."); return; }
+    const v = await verifyEnv(spec, say);
+    if (!v.ok) { say(`\n✗ the environment is not what it claims. Recording now would cost a take to learn this.`); process.exitCode = 2; return; }
+    say(`\n✓ ready — ${spec.name} is isolated, reset, and proven.`);
+  });
+
+env
+  .command("check")
+  .option("-f, --file <path>", "environment file", "demos/environment.yaml")
+  .description("prove the running app without restarting it")
+  .action(async (opts: { file: string }) => {
+    const spec = loadEnvSpec(path.resolve(opts.file));
+    say(`environment ${spec.name}`);
+    const v = await verifyEnv(spec, say);
+    if (!v.ok) process.exitCode = 2;
+    else say(`\n✓ proven.`);
+  });
+
+env
+  .command("down")
+  .option("-f, --file <path>", "environment file", "demos/environment.yaml")
+  .description("stop it")
+  .action((opts: { file: string }) => {
+    const spec = loadEnvSpec(path.resolve(opts.file));
+    stopEnvironment(spec, say);
+    say("stopped.");
+  });
+
+
+
+
+/* A routine is the standing answer; these are the one-off exceptions to it —
+   "this batch in Andrew, everything else as usual". They never touch
+   demos/routine.json, so the standard cannot drift by being borrowed. */
+function overrideRoutine(r: Routine, o: { voice?: string; style?: string; rate?: string; captions?: string }): { routine: Routine; said: string[] } {
+  const patch: Record<string, unknown> = {};
+  const said: string[] = [];
+  if (o.style) {
+    if (!(o.style in STYLES)) throw new Error(`--style is one of ${Object.keys(STYLES).join(", ")}`);
+    patch.style = o.style; said.push(`style ${o.style}`);
+  }
+  if (o.voice) { patch.voice = o.voice; said.push(`voice ${o.voice === "silent" ? "silent" : voiceId(o.voice)}`); }
+  if (o.rate !== undefined) {
+    if (!/^-?\d+$/.test(o.rate)) throw new Error("--rate is a whole percent, -50 to 50");
+    patch.rate = Number(o.rate); said.push(`rate ${Number(o.rate) >= 0 ? "+" : ""}${Number(o.rate)}%`);
+  }
+  if (o.captions) {
+    if (!/^(on|off|true|false)$/i.test(o.captions)) throw new Error("--captions is on or off");
+    patch.captions = /^(on|true)$/i.test(o.captions); said.push(`captions ${patch.captions ? "on" : "off"}`);
+  }
+  if (!said.length) return { routine: r, said };
+  const parsed = RoutineSchema.safeParse({ ...r, ...patch });
+  if (!parsed.success) throw new Error(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+  return { routine: parsed.data, said };
+}
+
+const routine = program
+  .command("routine")
+  .description("the house standard — format, captions, voice, music — applied to every demo this workspace records");
+
+routine
+  .command("show", { isDefault: true })
+  .argument("[name]", "which routine (default: the one in use)")
+  .description("what every recording will look and sound like")
+  .action((name?: string) => {
+    const file = readRoutines(DEMOS_DIR());
+    if (!file) { say("no routine yet.\n\n  retake routine init    write the house standard\n"); return; }
+    const which = name ?? file.use;
+    const r = file.routines[which];
+    if (!r) throw new Error(`no routine called "${which}" — have: ${Object.keys(file.routines).join(", ")}`);
+    say(describeRoutine(which, r));
+    const others = Object.keys(file.routines).filter((n) => n !== which);
+    if (others.length) say(`\n  also here: ${others.join(", ")} — \`retake routine use <name>\` to switch.`);
+  });
+
+routine
+  .command("init")
+  .description("write demos/routine.json with the house standard: showcase, captions on, silent")
+  .action(() => {
+    const f = routineFile(DEMOS_DIR());
+    if (fs.existsSync(f)) throw new Error(`${path.relative(process.cwd(), f)} already exists — \`retake routine set\` changes it`);
+    const data = starter();
+    writeRoutines(DEMOS_DIR(), data);
+    say(`✓ ${path.relative(process.cwd(), f)}\n`);
+    say(describeRoutine("default", data.routines.default));
+    say(`\n  Silent on purpose: the first video should exist before anyone is asked`);
+    say(`  about narration. \`retake routine voices\` when you want one.`);
+  });
+
+routine
+  .command("learn")
+  .argument("[manifests...]", "default: every manifest in demos/")
+  .option("--as <name>", "write it to this routine (default: the one in use)")
+  .option("--write", "save it; without this it only shows you what it found", false)
+  .description("read the standard off demos you have already recorded, instead of taking Retake's defaults")
+  .action((files: string[], opts: { as?: string; write: boolean }) => {
+    const targets = files.length
+      ? files.map((f) => path.resolve(f))
+      : fs.readdirSync(DEMOS_DIR()).filter((f) => /\.ya?ml$/.test(f)).map((f) => path.join(DEMOS_DIR(), f));
+    const { routine: learned, from, notes } = learnFrom(targets);
+    say(`read ${from.length} manifest${from.length === 1 ? "" : "s"}: ${from.slice(0, 6).join(", ")}${from.length > 6 ? `, +${from.length - 6} more` : ""}\n`);
+    const file = readRoutines(DEMOS_DIR());
+    const name = opts.as ?? file?.use ?? "default";
+    say(describeRoutine(name, learned));
+    if (notes.length) {
+      say(`\n  Not everything agreed:`);
+      for (const n of notes) say(`  · ${n}`);
+    }
+    if (!opts.write) { say(`\n  Nothing saved. \`retake routine learn --write\` to make this the standard.`); return; }
+    const data = file ?? starter();
+    data.routines[name] = learned;
+    data.use = name;
+    writeRoutines(DEMOS_DIR(), data);
+    say(`\n✓ routine ${name} — read from your own work, not from Retake's defaults.`);
+  });
+
+routine
+  .command("new")
+  .argument("<name>", "kebab-case name, e.g. techtutor-vn")
+  .description("a second standard — a different product, or a different language")
+  .action((name: string) => {
+    if (!/^[a-z0-9-]+$/.test(name)) throw new Error("name must be kebab-case");
+    const file = readRoutines(DEMOS_DIR()) ?? starter();
+    if (file.routines[name]) throw new Error(`"${name}" already exists`);
+    file.routines[name] = RoutineSchema.parse({});
+    writeRoutines(DEMOS_DIR(), file);
+    say(`✓ routine ${name} — \`retake routine set <key> <value> --as ${name}\` to shape it`);
+  });
+
+routine
+  .command("use")
+  .argument("<name>")
+  .description("make this the standard new recordings get")
+  .action((name: string) => {
+    const file = readRoutines(DEMOS_DIR());
+    if (!file) throw new Error("no routine yet — `retake routine init`");
+    if (!file.routines[name]) throw new Error(`no routine called "${name}" — have: ${Object.keys(file.routines).join(", ")}`);
+    file.use = name;
+    writeRoutines(DEMOS_DIR(), file);
+    say(`✓ using ${name}`);
+  });
+
+routine
+  .command("set")
+  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | note")
+  .argument("<value>")
+  .option("--as <name>", "which routine to change (default: the one in use)")
+  .description("change the standard once, for every recording that follows")
+  .action((key: string, value: string, opts: { as?: string }) => {
+    const file = readRoutines(DEMOS_DIR());
+    if (!file) throw new Error("no routine yet — `retake routine init`");
+    const which = opts.as ?? file.use;
+    const current = file.routines[which];
+    if (!current) throw new Error(`no routine called "${which}" — have: ${Object.keys(file.routines).join(", ")}`);
+
+    const next: Record<string, unknown> = { ...current };
+    switch (key.toLowerCase()) {
+      case "style":
+        if (!(value in STYLES)) throw new Error(`style is one of ${Object.keys(STYLES).join(", ")}`);
+        next.style = value; break;
+      case "voice":
+        // A pace belongs to a voice. -34% suited Ryan and dragged on Andrew,
+        // who starts slower — carrying the number across is how a routine
+        // ended up sounding sluggish after a voice change.
+        if (value !== current.voice && current.rate !== 0) {
+          say(`ℹ pace reset from ${current.rate > 0 ? "+" : ""}${current.rate}% to natural — a pace set for ${current.voice} does not carry to ${value}. \`retake routine voices --rate <n>\` to hear and choose.`);
+          next.rate = 0;
+        }
+        next.voice = value; break;
+      case "rate":
+        if (!/^-?\d+$/.test(value)) throw new Error("rate is a whole percent, -50 to 50 (0 is the voice's own pace)");
+        next.rate = Number(value); break;
+      case "music":
+        next.music = /^(none|off|false)$/i.test(value) ? false : value; break;
+      case "captions":
+        if (!/^(on|off|true|false)$/i.test(value)) throw new Error("captions is on or off");
+        next.captions = /^(on|true)$/i.test(value); break;
+      case "mode":
+        if (!/^(demo|launch)$/.test(value)) throw new Error("mode is demo or launch");
+        next.mode = value; break;
+      case "typing":
+        if (!/^(natural|brisk)$/.test(value)) throw new Error("typing is natural or brisk");
+        next.typing = value; break;
+      case "compressidle":
+        next.compressIdle = /^(on|true)$/i.test(value); break;
+      case "theme": {
+        const m = /^(#[0-9a-f]{3,8})\s*(?:,|\s)\s*(#[0-9a-f]{3,8})$/i.exec(value.trim());
+        if (!m) throw new Error("theme is two hex colours: background,ink — e.g. \"#2f5d3f,#f7f4ea\"");
+        next.theme = { background: m[1], ink: m[2] }; break;
+      }
+      case "note":
+        next.note = value; break;
+      default:
+        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, note`);
+    }
+
+    const parsed = RoutineSchema.safeParse(next);
+    if (!parsed.success) throw new Error(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+    if (key === "voice" && value !== "silent" && !VOICES[value] && !/^[a-z]{2}-[A-Z]{2}-/.test(value)) {
+      say(`ℹ "${value}" is not one of ${Object.keys(VOICES).join(", ")} and does not look like an edge-tts id (en-US-AriaNeural). \`retake routine voices\` lists what is here.`);
+    }
+    if (typeof parsed.data.music === "string" && !fs.existsSync(path.resolve(parsed.data.music))) {
+      say(`ℹ ${parsed.data.music} is not there yet — the render will fail until it is. It ships inside your video, so it must be a track you may use.`);
+    }
+    file.routines[which] = parsed.data;
+    writeRoutines(DEMOS_DIR(), file);
+    say(describeRoutine(which, parsed.data));
+  });
+
+routine
+  .command("voices")
+  .description("hear the named voices once, then never discuss speed again")
+  .option("--line <text>", "what they should say", "This is the voice your demos will use, at the pace they will use it.")
+  .option("--rate <percent>", "try a speed", "0")
+  .action(async (opts: { line: string; rate: string }) => {
+    const { synthesize } = await import("./voice.js");
+    const dir = path.resolve("outputs", ".voices");
+    fs.mkdirSync(dir, { recursive: true });
+    const rate = Number(opts.rate);
+    if (!Number.isInteger(rate) || rate < -50 || rate > 50) throw new Error("--rate is a whole percent, -50 to 50");
+    for (const [name, v] of Object.entries(VOICES)) {
+      const out = path.join(dir, `${name}.mp3`);
+      process.stdout.write(`  ${name.padEnd(14)} ${v.id} … `);
+      try { synthesize(opts.line, v.id, out, rate); process.stdout.write(`${path.relative(process.cwd(), out)}\n`); }
+      catch (e) { process.stdout.write(`✗ ${(e as Error).message}\n`); break; }
+    }
+    say(`\n  Listen, then lock it in:  retake routine set voice <name>`);
+    say(`  Too fast or too slow is a rate, set once:  retake routine set rate -8`);
+  });
+
+routine
+  .command("apply")
+  .argument("[manifests...]", "default: every manifest in demos/")
+  .option("--as <name>", "which routine to apply (default: the one in use)")
+  .option("--voice <name>", "just this once: a different voice (a name, an edge-tts id, or silent)")
+  .option("--style <name>", "just this once: showcase | fullscreen | mobile")
+  .option("--rate <percent>", "just this once: a different pace")
+  .option("--captions <on|off>", "just this once")
+  .description("stamp the standard onto manifests that already exist")
+  .action((files: string[], opts: { as?: string; voice?: string; style?: string; rate?: string; captions?: string }) => {
+    const { name, routine: base } = pickRoutine(DEMOS_DIR(), opts.as);
+    const { routine: r, said } = overrideRoutine(base, opts);
+    if (said.length) say(`routine ${name}, just this once: ${said.join(" · ")}`);
+    const targets = files.length
+      ? files.map((f) => path.resolve(f))
+      : fs.readdirSync(DEMOS_DIR()).filter((f) => /\.ya?ml$/.test(f)).map((f) => path.join(DEMOS_DIR(), f));
+    if (!targets.length) throw new Error("no manifests in demos/");
+    let touched = 0;
+    for (const t of targets) {
+      const { changed, skipped } = applyToManifest(t, r);
+      if (changed.length) { touched++; say(`${path.relative(process.cwd(), t)}\n  ${changed.join("\n  ")}`); }
+      for (const s of skipped) say(`${path.relative(process.cwd(), t)}\n  ℹ ${s}`);
+    }
+    say(`\n${touched}/${targets.length} changed to match routine ${name}. Re-render to see it: nothing here needs the browser again except a format change.`);
+  });
+
+routine
+  .command("reference")
+  .argument("[video]", "the north-star video — omit to see the current one")
+  .option("--as <name>", "which routine (default: the one in use)")
+  .description("set the one approved video every cut is held to, and hear up front what this routine cannot reproduce")
+  .action(async (video: string | undefined, opts: { as?: string }) => {
+    const file = readRoutines(DEMOS_DIR());
+    if (!file) throw new Error("no routine yet — `retake routine init`");
+    const name = opts.as ?? file.use;
+    const r = file.routines[name];
+    if (!r) throw new Error(`no routine called "${name}"`);
+    const target = video ? path.resolve(video.replace(/^~/, process.env.HOME ?? "~")) : r.reference;
+    if (!target) { say(`routine ${name} has no reference. \`retake routine reference <video>\` — the one cut you would be happy to get every time.`); return; }
+    if (!fs.existsSync(target)) throw new Error(`no such video: ${target}`);
+    const { ffmpegBin } = await import("./media-bin.js");
+    const [facts] = await measureOutputs([{ name: path.basename(target), file: target }], ffmpegBin());
+    say(`reference  ${target}`);
+    say(`           ${facts.width}×${facts.height} · ${facts.fps}fps · ${facts.seconds.toFixed(1)}s · ${facts.hasAudio ? `narrated${facts.lufs !== null ? ` at ${facts.lufs.toFixed(1)} LUFS` : ""}` : "silent"}`);
+    const gaps = preflightAgainst(facts, r);
+    if (gaps.length) {
+      say(`\n✗ before you record — routine ${name} cannot reproduce this yet:`);
+      for (const g of gaps) say(`  · ${g}`);
+    } else {
+      say(`\n✓ nothing in the routine contradicts the reference. \`retake routine check\` scores each cut against it.`);
+    }
+    if (video) {
+      file.routines[name] = { ...r, reference: target };
+      writeRoutines(DEMOS_DIR(), file);
+      say(`\nsaved as routine ${name}'s reference.`);
+    }
+  });
+
+routine
+  .command("check")
+  .option("--as <name>", "which routine to judge against (default: the one in use)")
+  .option("-o, --out <dir>", "output root", "outputs")
+  .description("would a viewer see ONE set of videos? measures the finished files, not the manifests")
+  .action(async (opts: { as?: string; out: string }) => {
+    const { name, routine: r } = pickRoutine(DEMOS_DIR(), opts.as);
+    const outRoot = path.resolve(opts.out);
+    const done = readPlan(DEMOS_DIR()).filter((i) => i.status === "final" || i.status === "recorded");
+    const files = done
+      .map((i) => ({ name: i.name, file: path.join(outRoot, i.name, "demo.mp4") }))
+      .filter((f) => fs.existsSync(f.file));
+    if (!files.length) throw new Error(`nothing recorded yet under ${path.relative(process.cwd(), outRoot)} — \`retake routine run\` first`);
+
+    const { ffmpegBin } = await import("./media-bin.js");
+    say(`routine ${name} · measuring ${files.length} finished video${files.length === 1 ? "" : "s"}…\n`);
+    const measured = await measureOutputs(files, ffmpegBin());
+    for (const m of measured) {
+      say(`  ${m.name.padEnd(26)} ${m.width}×${m.height} · ${m.fps}fps · ${m.seconds.toFixed(1)}s · ${m.hasAudio ? `voice${m.lufs !== null ? ` ${m.lufs.toFixed(1)} LUFS` : ""}` : "silent"}`);
+    }
+    const { PRESETS } = await import("./presets.js");
+    const want = PRESETS[STYLES[r.style].preset];
+    const { problems } = compareRoutine(measured, r, { width: want.width, height: want.height, fps: want.fps });
+
+    // Against the north star: the cards, the frame, the sound — what a person
+    // would otherwise only find by watching.
+    if (r.reference && fs.existsSync(r.reference)) {
+      const [ref] = await measureOutputs([{ name: "reference", file: r.reference }], ffmpegBin());
+      say(`\nagainst the reference (${path.basename(r.reference)}):`);
+      for (const f of files) {
+        const work = path.join(outRoot, f.name, ".reference");
+        const scores = await compareToReference(ffmpegBin(), r.reference, f.file, r, work);
+        const m = measured.find((x) => x.name === f.name)!;
+        if (ref.hasAudio !== m.hasAudio) problems.push(`${f.name}: ${ref.hasAudio ? "silent, the reference is narrated" : "narrated, the reference is silent"}`);
+        if (ref.lufs !== null && m.lufs !== null && Math.abs(ref.lufs - m.lufs) > 2) problems.push(`${f.name}: voice at ${m.lufs.toFixed(1)} LUFS, the reference at ${ref.lufs.toFixed(1)} — a viewer reaches for the volume`);
+        for (const sc of scores) {
+          say(`  ${f.name.padEnd(26)} ${sc.label.padEnd(22)} ${(sc.score * 100).toFixed(1)}%  ${sc.pass ? "✓" : "✗"} ${sc.note}`);
+          if (!sc.pass) problems.push(`${f.name}: ${sc.label} — ${sc.note} (${(sc.score * 100).toFixed(1)}% alike); compare ${path.relative(process.cwd(), work)}`);
+        }
+      }
+    }
+    if (!problems.length) {
+      say(`\n✓ one set. Every video matches the ${name} standard${r.reference ? ", the reference," : ""} and each other.`);
+      return;
+    }
+    say(`\n✗ these would not read as one set:`);
+    for (const p of problems) say(`  · ${p}`);
+    say(`\n  Size and frame rate are a re-render, not a re-record: \`retake render outputs/<name> --preset ${STYLES[r.style].preset}\`.`);
+    process.exitCode = 2;
+  });
+
+routine
+  .command("run")
+  .option("--as <name>", "which routine to record with (default: the one in use)")
+  .option("--only <names>", "just these plan items, comma-separated — re-records them whatever their status")
+  .option("-n, --limit <count>", "stop after this many")
+  .option("--preview", "stop at the preview capture; do not close the cycle at full quality", false)
+  .option("-o, --out <dir>", "output root", "outputs")
+  .option("--voice <name>", "just this batch: a different voice (a name, an edge-tts id, or silent)")
+  .option("--style <name>", "just this batch: showcase | fullscreen | mobile")
+  .option("--rate <percent>", "just this batch: a different pace")
+  .option("--captions <on|off>", "just this batch")
+  .option("-e, --env <path>", "environment file — bring the app up clean and prove it before recording")
+  .description("work the plan: stamp, dry-run, record and finish each demo that is not done")
+  .action(async (opts: { as?: string; only?: string; limit?: string; preview: boolean; out: string; voice?: string; style?: string; rate?: string; captions?: string; env?: string }) => {
+    const { name, routine: base } = pickRoutine(DEMOS_DIR(), opts.as);
+    const { routine: r, said } = overrideRoutine(base, opts);
+    if (said.length) say(`just this batch: ${said.join(" · ")} (demos/routine.json is unchanged)`);
+    const limit = opts.limit === undefined ? undefined : Number(opts.limit);
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) throw new Error("--limit is a whole number of videos");
+    say(`routine ${name}`);
+    const results = await runRoutine({
+      demosDir: DEMOS_DIR(),
+      outRoot: path.resolve(opts.out),
+      routine: r,
+      only: opts.only?.split(",").map((s) => s.trim()).filter(Boolean),
+      limit,
+      previewOnly: opts.preview,
+      envFile: opts.env ? path.resolve(opts.env) : fs.existsSync(ENV_FILE()) ? ENV_FILE() : undefined,
+      log: say,
+    });
+    if (results.some((x) => x.status === "failed")) process.exitCode = 2;
+  });
 
 program.parseAsync(process.argv).catch((e) => {
   process.stderr.write(`✗ ${(e as Error).message}\n`);

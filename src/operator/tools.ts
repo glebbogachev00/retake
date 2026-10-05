@@ -19,9 +19,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import YAML from "yaml";
-import { loadManifest, resolve } from "../manifest.js";
-import { record, captureHash, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, unchangedUpTo, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
-import { render, check, ffmpegBin } from "../render.js";
+import { loadManifest, resolve, Manifest } from "../manifest.js";
+import { record, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, unchangedUpTo, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
+import { render, check, ffmpegBin, stitch } from "../render.js";
 import { execFileSync } from "node:child_process";
 import { dryRun } from "../dryrun.js";
 import { verify } from "../ext/verify.js";
@@ -33,11 +33,14 @@ import { report as describeCalibration, type Stability } from "../ext/calibrate.
 import { checkFlags, flag, unflag } from "../ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "../ext/heal.js";
 import { describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "../ext/destroy.js";
+import { applyToManifest, describe as describeRoutine, manifestFor, pick as pickRoutine } from "../routine.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
 import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
 import { applyEdits, receiptsFor } from "../edits.js";
 import { SECRET_NAME, missingSecrets, readEnvFile } from "../env.js";
+import { presetNames } from "../presets.js";
+import { assertFinalReceipt, captureMatchesTake, notePreviewCapture, notePreviewRender, readPreviewReceipt } from "../preview.js";
 
 const ROOT = process.env.RETAKE_ROOT || process.cwd();
 const DEMOS = path.join(ROOT, "demos");
@@ -126,6 +129,7 @@ function stalenessNote(): string {
 }
 
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s + stalenessNote() }] });
+const errorText = (s: string) => ({ ...text(s), isError: true });
 const safe = (s: string) => /^[a-z0-9-]+$/.test(s);
 const manifestPath = (name: string) => path.join(DEMOS, `${name}.yaml`);
 
@@ -260,6 +264,57 @@ server.registerTool("style", {
   return text("saved to demos/style.md");
 });
 
+server.registerTool("env", {
+  description: "Is the app under test actually what it claims? Reads demos/environment.yaml and checks the RUNNING app: that the screens you need are there, and — the one that matters — that real data has NOT leaked into the demo instance. Call it before the first take of a session. It only looks; bringing the app up or restarting it is the person's `retake env up`, because it starts processes and rewrites their state.",
+  inputSchema: {},
+  annotations: READ_ONLY,
+}, async () => {
+  const file = path.join(DEMOS, "environment.yaml");
+  if (!fs.existsSync(file)) return text("No demos/environment.yaml — nothing is declared, so nothing can be proven. Whatever is on screen is what gets recorded.");
+  try {
+    const { loadEnvSpec, verify } = await import("../recording-env.js");
+    const spec = loadEnvSpec(file);
+    const lines: string[] = [];
+    const v = await verify(spec, (l) => lines.push(l));
+    return text(`environment ${spec.name}\n${lines.join("\n")}\n\n${v.ok ? "Proven — safe to record." : "NOT what it claims. Do not record; tell the person to run `retake env up`."}`);
+  } catch (e) {
+    return text(`Could not check the environment: ${(e as Error).message}`);
+  }
+});
+
+server.registerTool("routine", {
+  description: "Call this FIRST in any session. The workspace's locked standard — output format, captions, voice and speaking rate, music — and, when the product has one, its full recording brief: where the app runs, how to seed it, the selectors that hold, and what breaks. READ THIS BEFORE DRAFTING and do not set `preset`, `layout`, `captions`, `viewport`, `scale`, `voiceover.voice`, `voiceover.ratePercent` or `music` yourself — they are not yours to choose, and choosing them is how two videos from the same workspace come back looking and sounding different. Write the steps and the captions; call routine_apply when the manifest exists.",
+  inputSchema: {},
+  annotations: READ_ONLY,
+}, async () => {
+  try {
+    const { name, routine } = pickRoutine(DEMOS, undefined);
+    // The brief is the product knowledge a new agent would otherwise rebuild
+    // by losing takes: where the app runs, what to seed, which selectors hold,
+    // what breaks. Returned in full — the first call is the onboarding.
+    const briefPath = routine.brief ? path.resolve(ROOT, routine.brief) : null;
+    const brief = briefPath && fs.existsSync(briefPath) ? fs.readFileSync(briefPath, "utf8") : null;
+    return text(describeRoutine(name, routine) + (brief ? `\n\n────────── ${routine.brief} — read all of it before writing a step ──────────\n\n${brief}` : ""));
+  } catch (e) {
+    return text(`${(e as Error).message}\n\nUntil there is one, the defaults apply and nothing is locked.`);
+  }
+});
+
+server.registerTool("routine_apply", {
+  description: "Stamp the locked standard onto a manifest you just drafted or edited. Call it after `draft` and before `dry`. It fixes format, captions, voice and rate, and strips any `viewport`/`scale` pin — it never turns narration on, because that still needs a script and a person who has heard it.",
+  inputSchema: { name: z.string().describe("the demo name (demos/<name>.yaml)") },
+  annotations: RETAKE_WRITE,
+}, async ({ name }) => {
+  const { name: which, routine } = pickRoutine(DEMOS, undefined);
+  const file = manifestFor(DEMOS, name);
+  const { changed, skipped } = applyToManifest(file, routine);
+  await tell(changed.length ? `${name}: ${changed.length} setting${changed.length === 1 ? "" : "s"} set to the ${which} standard.` : `${name} already matches the ${which} standard.`);
+  return text([
+    changed.length ? `Applied routine ${which}:\n  ${changed.join("\n  ")}` : `Already matches routine ${which}.`,
+    ...skipped.map((x) => `\n${x}`),
+  ].join("\n"));
+});
+
 server.registerTool("ideas", {
   description: "What is worth recording. Reads the live page (and the source folder if given) and returns a short list of demo ideas, each a title and a one-sentence story. Use this when the person asks what demos to make — do not invent ideas yourself. Saves the list to demos/ideas.md.",
   inputSchema: { url: z.string().url(), project: z.string().optional() },
@@ -381,7 +436,7 @@ server.registerTool("dry", { description: "Run a demo with no camera: every sele
   return text(r.ok ? `ok: all ${manifest.steps.length} steps resolve` : r.lines.join("\n"));
 });
 
-server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story — ALWAYS start there, and on a long demo show that draft to the person before spending the full take. Returns the receipts. SIZE IS NOT RECORDED: any take renders at any preset later (`render` with a preset), so never re-record to change the shape and never set `viewport` in a manifest — the preset owns the size and every take at a preset is identical. `check: pass` and healthy audio prove the FILE is sound, not that the demo is good — call `look` at the payoff scene and judge it: can a stranger state the promise from that frame, is the result legible at playback size, is any beat longer than what it tells you? If you cannot answer yes, fix the cut before calling done.", inputSchema: { name: z.string(), preview: z.boolean().default(true), brisk: z.boolean().optional().describe("Record without the pacing: every pauseAfter skipped and every wait capped. All the steps run and all of them are in the video; only the holding still is gone. On a real demo 62% of the recording was pauses, so this is minutes instead of many while you are still changing things. Never for the take they keep — the result is correct but unwatchable."), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo"), from: z.string().optional().describe("RECORD ONLY WHAT CHANGED. Start the take at this scene; every earlier step still runs so the app reaches the right state, but at full speed and off camera. When you have edited part of a demo you already recorded, this tool TELLS you which scene to pass here — it diffs your manifest against the one the last take used. On a 251-step demo with the last third edited that is ~103s instead of ~469s. The result is a FRAGMENT for checking your fix, not a shippable video: watch it, and when the fix is right take one full recording to produce the deliverable") }, annotations: RETAKE_WRITE }, async ({ name, preview, until, from, brisk }) => { LAST_DEMO = name;
+server.registerTool("run", { description: "Record the demo and render it. Slow (the demo is performed in real time). preview=true for a fast low-cost render to check the story — ALWAYS start there, and on a long demo show that draft to the person before spending the full take. Returns the receipts. SIZE IS NOT RECORDED: any take renders at any preset later (`render` with a preset), so never re-record to change the shape and never set `viewport` in a manifest — the preset owns the size and every take at a preset is identical. `check: pass` and healthy audio prove the FILE is sound, not that the demo is good — call `look` at the payoff scene and judge it: can a stranger state the promise from that frame, is the result legible at playback size, is any beat longer than what it tells you? If you cannot answer yes, fix the cut before calling done.", inputSchema: { name: z.string(), preview: z.boolean().default(true), fresh: z.boolean().optional().describe("start a genuinely new preview capture even when an unchanged take exists"), brisk: z.boolean().optional().describe("Record without the pacing: every pauseAfter skipped and every wait capped. All the steps run and all of them are in the video; only the holding still is gone. On a real demo 62% of the recording was pauses, so this is minutes instead of many while you are still changing things. Never for the take they keep — the result is correct but unwatchable."), until: z.string().optional().describe("record up to the end of this scene label, then stop — for iterating on one beat of a long demo"), from: z.string().optional().describe("RECORD ONLY WHAT CHANGED. Start the take at this scene; every earlier step still runs so the app reaches the right state, but at full speed and off camera. When you have edited part of a demo you already recorded, this tool TELLS you which scene to pass here — it diffs your manifest against the one the last take used. On a 251-step demo with the last third edited that is ~103s instead of ~469s. The result is a FRAGMENT for checking your fix, not a shippable video: watch it, and when the fix is right take one full recording to produce the deliverable") }, annotations: RETAKE_WRITE }, async ({ name, preview, fresh, until, from, brisk }) => { LAST_DEMO = name;
   if (!safe(name) || !fs.existsSync(manifestPath(name))) return text(`no demo "${name}"`);
   const loaded = loadManifest(manifestPath(name));
   // preview means "the fast shape", so a manifest that pins its own viewport
@@ -391,12 +446,43 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   const manifest = preview ? { ...rest, preset: "preview-fast" } : loaded.manifest;
   if (preview && pinned) await tell(`preview overrides the pinned ${pinned.width}×${pinned.height} viewport`);
   const outDir = path.join(OUT, name);
+  if (!preview) {
+    try {
+      const previous = JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take;
+      const receipt = readPreviewReceipt(outDir);
+      if (receipt?.takeFinishedAt === previous.finishedAt
+        && receipt.captureHash === (previous.captureHash ?? null)
+        && receipt.rawVideo === previous.video
+        && captureMatchesTake(previous, loaded.manifest, loaded.dir)) {
+        return text("Final quality is render-only. Call render with preset=post-landscape; the existing raw take will be reused and the browser will not open.");
+      }
+    } catch { /* no valid preview cycle */ }
+    return text("run preview=false is disabled because it records the browser again. Start with run preview=true, then use render for final quality.");
+  }
   acquireLock(outDir);
   return await holdOpen(async () => {
   try {
+    let take: Take | undefined;
+    const fastEligible = !brisk && !until && !from;
+    if (!fresh && fastEligible) {
+      try {
+        const previous = JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take;
+        const receipt = readPreviewReceipt(outDir);
+        if (receipt?.takeFinishedAt === previous.finishedAt
+          && receipt.captureHash === (previous.captureHash ?? null)
+          && receipt.rawVideo === previous.video
+          && !receipt.finalizedAt
+          && captureMatchesTake(previous, manifest, loaded.dir)) {
+          if (receipt.renderCount > 0) {
+            return text(`preview already exists: ${path.join(outDir, "demo.mp4")}\npreview receipt: 1 capture · ${receipt.renderCount} render${receipt.renderCount === 1 ? "" : "s"} · ${receipt.totalSec.toFixed(1)}s total`);
+          }
+          take = previous;
+        }
+      } catch { /* no reusable preview cycle */ }
+    }
     // Moved aside, not deleted: a failed recording must not cost the person
     // the take they already had.
-    stashPrevious(outDir);
+    if (!take) stashPrevious(outDir);
     // The clock has to measure THIS run. It used to count from whenever the
     // activity feed first went active, which on a long-lived window meant
     // hours: someone watched a four-minute take report 529 minutes.
@@ -409,21 +495,27 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
       }
     }
     const runStart = Date.now();
-    void progress({ phase: "recording", step: 0, total: manifest.steps.length, label: "starting", runStart });
-    await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);
-    let take: Take;
-    try {
-      take = await record(manifest, {
-        outDir, manifestDir: DEMOS, locked: true, until, from, brisk: brisk === true, log: () => {},
-        // Throttled: a 251-step demo would otherwise be 251 posts, and the
-        // window only needs to know roughly how far along this is.
-        onProgress: (pr) => { if (pr.phase === "stuck" || pr.step === 1 || pr.step === pr.total || pr.step % 2 === 0) void progress({ ...pr, runStart }); },
-      });
-    } catch (e) {
-      if (restorePrevious(outDir)) await tell("Recording failed — your previous take has been put back.");
-      throw e;
+    if (!take) {
+      void progress({ phase: "recording", step: 0, total: manifest.steps.length, label: "starting", runStart });
+      await tell(`Recording ${name}${preview ? " (preview)" : ""}…`);
+      try {
+        take = await record(manifest, {
+          outDir, manifestDir: DEMOS, locked: true, until, from, brisk: brisk === true, log: () => {},
+          // Throttled: a 251-step demo would otherwise be 251 posts, and the
+          // window only needs to know roughly how far along this is.
+          onProgress: (pr) => { if (pr.phase === "stuck" || pr.step === 1 || pr.step === pr.total || pr.step % 2 === 0) void progress({ ...pr, runStart }); },
+        });
+      } catch (e) {
+        if (restorePrevious(outDir)) await tell("Recording failed — your previous take has been put back.");
+        throw e;
+      }
+      keepPrevious(outDir, (l) => void tell(l));
+      if (fastEligible && take.ok && take.video) {
+        notePreviewCapture(outDir, take, take.captureSec ?? (Date.now() - runStart) / 1000, "preview-fast");
+      }
+    } else {
+      await tell(`Reusing ${name}'s existing raw take — no browser recording.`);
     }
-    keepPrevious(outDir, (l) => void tell(l));
     // Render has no per-stage hook, but the last render of THIS demo measured
     // itself into facts.json — so the bar can run on a real number rather
     // than a spinner. It is an estimate and is labelled as one.
@@ -434,8 +526,13 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     } catch { /* first render of this demo: no estimate to give */ }
     void progress({ phase: "rendering", step: 0, total: 0, label: "rendering", etaSec, runStart });
     await tell(`Rendering…`);
-    const a = await render(manifest, take, outDir, {});
+    const renderStart = Date.now();
+    const a = await render(manifest, take, outDir, { noMaster: true });
+    const renderSec = (Date.now() - renderStart) / 1000;
     const c = check(outDir, manifest);
+    const updated = fastEligible && c.ok
+      ? notePreviewRender(outDir, take, { preset: "preview-fast", seconds: renderSec, kind: "initial" })
+      : null;
     const failed = take.timeline.find((e) => e.ok === false);
     await tell(failed ? `Stopped at step ${failed.index}: ${failed.summary}` : `Take done — all steps ok · ${(take.duration - take.trimBefore).toFixed(0)}s`);
     // A failed take is a finding, not a result: say exactly where and what
@@ -452,7 +549,10 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
     const gate = preview && took >= EXPENSIVE_TAKE_SECONDS && c.ok
       ? `\n\nTHIS DRAFT TOOK ${mins} TO RECORD, and the full take costs about the same again. Do not run it at full quality yet. Show this draft to the person — \`ask\` them, say how long it is and what it shows, and point them at the Retake window. Their answer is the one thing no check here can give you: whether this is the right video. If they cannot be reached, stop and say what is ready and what the full take would cost; do not spend it on their behalf.`
       : "";
-    return text(`${summariseTake(take)}\nvideo: ${a.mp4 ?? "none"}\ncheck: ${c.ok ? "pass" : "FAIL"}\n${c.lines.filter((l) => l.startsWith("FAIL")).join("\n")}${gate}`);
+    const receiptLine = updated
+      ? `\npreview receipt: 1 capture · ${updated.renderCount} render · ${updated.totalSec.toFixed(1)}s total · ${updated.withinTarget ? "within" : `${updated.overTargetSec.toFixed(1)}s over`} 180s target`
+      : "";
+    return text(`${summariseTake(take)}\nvideo: ${a.mp4 ?? "none"}\ncheck: ${c.ok ? "pass" : "FAIL"}\n${c.lines.filter((l) => l.startsWith("FAIL")).join("\n")}${receiptLine}${gate}`);
   } finally {
     releaseLock(outDir);
     // The run is over. `done` is a separate tool the agent may never call, so
@@ -462,24 +562,86 @@ server.registerTool("run", { description: "Record the demo and render it. Slow (
   });
 });
 
-server.registerTool("render", { description: "Re-render the last recording with the current manifest. No browser, seconds. THIS, NOT `run`, IS THE ANSWER TO ALMOST EVERY CHANGE: size and shape and format, a caption's words, speed, zoom, cards, music, the poster, and WHERE a caption sits (`nudge: <ms>` on the scene moves its marker, and the still and thumbnail follow). Only a change to what the demo DOES needs the camera again — and even then, `run` with `from`/`until` records one end of it rather than all of it.", inputSchema: { name: z.string(), no_master: z.boolean().default(false).describe("skip the archival CRF-14 master. On a long take this is roughly 3x faster (measured: 495s of encoding became 147s on an 8-minute demo) and the deliverable is marginally BETTER for it, because the master path re-encodes an already-encoded file. Use it for every render except the one you are publishing") }, annotations: RETAKE_WRITE }, async ({ name, no_master }) => { LAST_DEMO = name;
+/** Workspace containment, also through symlinks and not-yet-created parents. */
+function stitchPath(input: string): string {
+  const full = path.resolve(ROOT, input);
+  const inside = (root: string, file: string) => file === root || file.startsWith(root + path.sep);
+  const canonical = (file: string): string => {
+    if (fs.lstatSync(file, { throwIfNoEntry: false })) return fs.realpathSync(file);
+    return path.join(canonical(path.dirname(file)), path.basename(file));
+  };
+  if (![ROOT, OUT].some((root) => inside(path.resolve(root), full) && inside(canonical(path.resolve(root)), canonical(full)))) {
+    throw new Error("stitch: path must stay inside the workspace or configured output directory");
+  }
+  return full;
+}
+
+server.registerTool("stitch", {
+  description: "Join existing video files or output folders in playback order into a NEW MP4. Render-only: no browser, recording, library entry, voice synthesis, or narration approval. The first clip sets the canvas and fps; all pictures fit without cropping. Audio stays video-aligned, silence fills missing tracks, and non-cut joins crossfade audio. Set audio=false to mute. Paths must stay inside the workspace or configured output directory; existing outputs are never overwritten.",
+  inputSchema: {
+    inputs: z.array(z.string().min(1)).min(2).describe("ordered video paths or folders containing demo.mp4; relative to workspace, or absolute inside it"),
+    out: z.string().min(1).describe("new .mp4 path, relative to workspace or absolute inside its output roots"),
+    transition: Manifest.shape.transition.unwrap().shape.style,
+    transition_ms: Manifest.shape.transition.unwrap().shape.ms,
+    audio: z.boolean().default(true).describe("preserve source audio; false explicitly mutes"),
+  },
+  annotations: RETAKE_WRITE,
+}, async ({ inputs, out, transition, transition_ms, audio }) => {
+  const files = inputs.map((input) => {
+    const file = stitchPath(input);
+    // A safe folder can still contain a demo.mp4 symlink pointing outside it.
+    return fs.existsSync(file) && fs.statSync(file).isDirectory() ? stitchPath(path.join(file, "demo.mp4")) : file;
+  });
+  const target = stitchPath(out);
+  const output = stitch(files, target, { transition: { style: transition, ms: transition_ms }, audio });
+  await tell(`Joined ${files.length} existing clips: ${output}`);
+  return text(`stitched: ${output}`);
+});
+
+server.registerTool("render", { description: "Re-render the last recording with the current manifest. No browser, seconds. THIS, NOT `run`, IS THE ANSWER TO ALMOST EVERY CHANGE: size and shape and format, a caption's words, speed, zoom, cards, music, the poster, and WHERE a caption sits (`nudge: <ms>` on the scene moves its marker, and the still and thumbnail follow). Set preset to post-landscape for the final-quality render from the same preview take. The preview workflow permits one preview correction before the final render, so combine render-only changes whenever possible.", inputSchema: { name: z.string(), preset: z.string().optional().describe("preview-fast for the one allowed correction; post-landscape for the final"), no_master: z.boolean().default(true).describe("skip the archival CRF-14 master. This is the fast default and produces the deliverable directly; set false only when an archival master is explicitly required") }, annotations: RETAKE_WRITE }, async ({ name, preset, no_master }) => { LAST_DEMO = name;
   const outDir = path.join(OUT, name);
   const tp = path.join(outDir, "take.json");
   if (!fs.existsSync(tp)) return text("no recording yet — run first");
-  const { manifest } = loadManifest(manifestPath(name));
+  const loaded = loadManifest(manifestPath(name));
+  if (preset && !presetNames().includes(preset)) return text(`unknown preset ${preset} — one of ${presetNames().join(", ")}`);
+  const manifest = preset ? { ...loaded.manifest, preset } as Manifest : loaded.manifest;
+  if (manifest.preset !== "preview-fast" && manifest.preset !== "post-landscape") {
+    return errorText("render preset must be preview-fast for the correction or post-landscape for the final");
+  }
   const take = JSON.parse(fs.readFileSync(tp, "utf8")) as Take;
-  if (take.captureHash && take.captureHash !== captureHash(manifest)) return text("the recording no longer matches the manifest's steps — use run, not render");
-  await tell(`Re-rendering ${name}…`);
-  const a = await render(manifest, take, outDir, { force: true, noMaster: no_master });
-  return text(`rendered: ${a.mp4}`);
+  if (!captureMatchesTake(take, manifest, loaded.dir)) return text("the recording no longer matches the manifest's capture-relevant steps — record a new preview");
+  acquireLock(outDir);
+  try {
+    const receipt = readPreviewReceipt(outDir);
+    if (!receipt || receipt.takeFinishedAt !== take.finishedAt || receipt.captureHash !== (take.captureHash ?? null) || receipt.rawVideo !== take.video) {
+      return text("render requires a current preview receipt — run once with preview=true first");
+    }
+    if (receipt.finalizedAt) return text(`already finalized as ${receipt.finalPreset}; start a fresh preview cycle to change it`);
+    const kind = manifest.preset === "preview-fast" ? "correction" : "final";
+    if (kind === "correction" && receipt.correctionsUsed >= 1) return text("Preview correction budget spent: make the final render or record a fresh preview.");
+    await tell(`Re-rendering ${name} from the existing capture…`);
+    const renderStart = Date.now();
+    const a = await render(manifest, take, outDir, { force: true, noMaster: no_master });
+    const c = check(outDir, manifest);
+    if (!c.ok) return errorText(`rendered but check failed; receipt was not advanced\n${c.lines.filter((line) => line.startsWith("FAIL")).join("\n")}`);
+    const updated = notePreviewRender(outDir, take, { preset: manifest.preset, seconds: (Date.now() - renderStart) / 1000, kind });
+    return text(`rendered: ${a.mp4}\ncheck: pass\npreview receipt: ${updated.captureCount} capture · ${updated.renderCount} renders · ${updated.totalSec.toFixed(1)}s total · ${updated.withinTarget ? "within" : `${updated.overTargetSec.toFixed(1)}s over`} 180s target${updated.finalPreset ? ` · final ${updated.finalPreset}` : ""}`);
+  } finally {
+    releaseLock(outDir);
+  }
 });
 
 server.registerTool("receipts", { description: "What happened in the last take of a demo: per-step pass/fail with timings, scene times, stubs. Read this before deciding what to change.", inputSchema: { name: z.string() }, annotations: READ_ONLY }, async ({ name }) => { LAST_DEMO = name;
-  const tp = path.join(OUT, name, "take.json");
+  const outDir = path.join(OUT, name);
+  const tp = path.join(outDir, "take.json");
   if (!fs.existsSync(tp) || !fs.existsSync(manifestPath(name))) return text("no take yet");
   const take = JSON.parse(fs.readFileSync(tp, "utf8")) as Take;
   const { manifest } = loadManifest(manifestPath(name));
-  return text(receiptsFor(take, manifest.steps as never));
+  const preview = readPreviewReceipt(outDir);
+  const fast = preview
+    ? `\n\nfast path: ${preview.captureCount} capture · ${preview.renderCount} renders · ${preview.totalSec.toFixed(1)}s · ${preview.withinTarget ? "within" : `${preview.overTargetSec.toFixed(1)}s over`} 180s${preview.finalPreset ? ` · final ${preview.finalPreset}` : " · not finalized"}`
+    : "\n\nfast path: no valid preview receipt";
+  return text(receiptsFor(take, manifest.steps as never) + fast);
 });
 
 // "All steps passed" is not "looks right". The stills are how a reader with
@@ -670,9 +832,22 @@ server.registerTool("calibrate", {
 });
 
 server.registerTool("done", { description: "Call when the demo is recorded and acceptable (or when you are stopping). One sentence for the person.", inputSchema: { summary: z.string(), demo: z.string().optional() }, annotations: RETAKE_WRITE }, async ({ summary, demo }) => {
+  const target = demo ?? LAST_DEMO;
+  if (!target) return errorText("cannot mark work done: no demo is selected");
+  {
+    const outDir = path.join(OUT, target);
+    const takePath = path.join(outDir, "take.json");
+    const video = path.join(outDir, "demo.mp4");
+    if (!fs.existsSync(takePath) || !fs.existsSync(video)) return errorText(`cannot mark ${target} done: the final take or video is missing`);
+    try {
+      assertFinalReceipt(outDir, JSON.parse(fs.readFileSync(takePath, "utf8")) as Take);
+    } catch (error) {
+      return errorText(`cannot mark ${target} done: ${(error as Error).message}. Render preset=post-landscape with no_master=true first.`);
+    }
+  }
   await tell(`Done: ${summary}`);
-  if (UI && !SESSION) await fetch(`${UI}/api/activity`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ line: summary, demo, done: true }) }).catch(() => {});
-  if (UI && SESSION) await fetch(`${UI}/api/operator/${SESSION}/done`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ summary, demo }) }).catch(() => {});
+  if (UI && !SESSION) await fetch(`${UI}/api/activity`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ line: summary, demo: target, done: true }) }).catch(() => {});
+  if (UI && SESSION) await fetch(`${UI}/api/operator/${SESSION}/done`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ summary, demo: target }) }).catch(() => {});
   return text("ok");
 });
 

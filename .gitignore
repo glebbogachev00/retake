@@ -40,3 +40,4 @@ dist/
 *.tgz
 .vercel
 .env*
+.retake/

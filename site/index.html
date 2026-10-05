@@ -229,6 +229,38 @@ pre {
   .copybtn { border-left:0;border-top:1px solid var(--rule-strong);padding:12px 18px; }
   pre { white-space:pre-wrap;overflow-wrap:anywhere; }
 }
+/* Enhancements leave the original reading order and static content intact. */
+:focus-visible { outline:3px solid #bf8324;outline-offset:4px; }
+.steps li { position:relative; }
+.step-trigger { display:block;width:100%;min-height:44px;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer; }
+.steps li:has([aria-pressed="true"]) { border-color:#bf8324; }
+.step-trigger[aria-pressed="true"] b { color:#986514; }
+.step-example { margin:-10px 0 22px;padding:10px 14px;border-left:3px solid var(--amber);background:var(--card);color:var(--muted);font-size:13.5px;text-align:left;min-height:64px; }
+.steps li.step-pulse::before { content:'';position:absolute;top:-2px;left:0;height:2px;width:100%;background:var(--amber);transform-origin:left;animation:step-connect .55s ease-out; }
+@keyframes step-connect { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@media (max-width:560px) { .steps li { display:block; } .step-trigger { display:grid;grid-template-columns:66px 1fr;gap:8px;align-items:start; } }
+.mark-button { display:grid;place-items:center;flex:none;width:44px;height:44px;margin:-9px;border:0;padding:0;border-radius:10px;background:none;cursor:pointer; }
+.mark.replay i { animation:mark-replay .48s ease-in-out;transform-origin:left; }
+.mark.replay i:nth-child(2) { animation-delay:.06s; }
+.mark.replay i:nth-child(3) { animation-delay:.12s; }
+.mark.replay i:nth-child(4) { animation-delay:.18s; }
+@keyframes mark-replay { 0%,100% { transform:scaleX(1); } 40% { transform:scaleX(.4) translateX(2px); } 70% { transform:scaleX(1.15); } }
+.cases { align-items:start; }
+.case details { width:100%;margin-top:12px;border-top:1px solid var(--rule);text-align:left;font-size:13.5px; }
+.case summary { cursor:pointer;min-height:44px;padding:12px 0 8px;font-weight:600; }
+.case summary::marker { color:#986514; }
+.case details p { padding:0 0 8px;color:var(--muted); }
+.case:has(details[open]) { border-color:var(--rule-strong); }
+.btn,.copybtn { transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease; }
+@media (hover:hover) { .btn:hover { transform:translateY(-2px);box-shadow:0 5px 12px #191d1918; } }
+.btn:active,.copybtn:active { transform:translateY(1px);box-shadow:none; }
+.copybtn { min-width:100px;min-height:44px;font-family:inherit;font-size:14px;font-weight:600; }
+.copy-status { min-height:22px;margin:8px 0 0;font-size:13.5px;color:var(--muted); }
+@media (prefers-reduced-motion:reduce) { .btn,.copybtn { transform:none !important; } }
+main > section { transition:opacity .32s ease,transform .32s ease; }
+main > section.reveal-pending { opacity:.65;transform:translateY(8px); }
+@media print, (prefers-reduced-motion:reduce) { main > section.reveal-pending { opacity:1;transform:none; } }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { animation:none !important;transition:none !important; } }
 </style>
 </head>
 <body>
@@ -281,18 +313,21 @@ pre {
         <div class="wordmark"><span class="serif">capture<span style="color:#2f5d3f">.</span></span></div>
         <p class="result">Five launch videos were drafted, corrected, and recut in one afternoon.</p>
         <img class="proof" src="media/mark-done.jpg" alt="Frame from a Capture demo made with Retake" loading="lazy">
+        <details><summary>Capture workflow</summary><p>One rough sentence becomes an action and a continuing thread. Watch that flow in the 14-second take above.</p></details>
         <p class="meta"><a href="https://www.trycapture.app">trycapture.app</a></p>
       </article>
       <article class="case">
         <div class="wordmark"><img src="logos/avexjets.png" alt="AvexJets" class="caselogo"></div>
         <p class="result">One repeatable flow replaced a twenty-minute live walkthrough across three client portals.</p>
         <img class="proof" src="media/avex-public.jpg" alt="Public AvexJets charter request page recorded with Retake" loading="lazy">
+        <details><summary>AvexJets workflow</summary><p>The repeatable flow covers three client portals. The image shows the public charter request page, not the private client recording.</p></details>
         <p class="meta">Client recording kept private · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
       </article>
       <article class="case">
         <div class="wordmark techbash"><span style="color:#193b92">Tech</span><span style="color:#2c7a7b">Bash</span></div>
         <p class="result">The same file can repeat a real Scratch lesson when the lesson changes.</p>
         <img class="proof" src="media/scratch-mini-project.jpg" alt="Frame from a Scratch lesson made with Retake" loading="lazy">
+        <details><summary>TechBash workflow</summary><p>Record a real Scratch lesson. When the lesson changes, use the same file to repeat the walkthrough.</p></details>
         <p class="meta"><a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
       </article>
     </div>
@@ -308,11 +343,12 @@ pre {
 
   <section id="start" class="start" aria-labelledby="start-title">
     <h2 id="start-title">Give Retake to your coding agent</h2>
-    <p class="section-copy">Paste this inside your app project. The agent handles setup, recording, and the local review link.</p>
+    <p class="section-copy">Paste this inside your app project. The agent installs Retake and opens its local first-run flow.</p>
     <div class="prompt">
-      <blockquote id="pasteline">Set up Retake from https://github.com/glebbogachev00/retake in this project. Ask me for the app URL and the exact flow to show. Dry-run it, record a preview, start the Retake UI, and give me its localhost link. Tell me where the finished MP4 is. Wait for my review, then update the demo from my corrections and rerun it. Do not deploy, commit, or ask me to paste secrets into chat.</blockquote>
-      <button class="copybtn" type="button" data-copy="pasteline">Copy</button>
+      <blockquote id="pasteline">Set up Retake from https://github.com/glebbogachev00/retake in this project and open its local UI. Let the first-run questions collect the app URL, workflow, and sound preference; use those answers instead of asking me twice. Dry-run the workflow, record a silent preview, and show it in the Retake UI. Wait for my review, then apply my corrections and rerun it. Add voiceover only after I approve both the recording and narration script. Tell me where the finished MP4 is. Do not deploy, commit, or ask me to paste secrets into chat.</blockquote>
+      <button class="copybtn" type="button" data-copy="pasteline" hidden>Copy</button>
     </div>
+    <noscript><p class="manual">Select the prompt and copy it into your coding agent.</p></noscript>
     <p class="manual">Or install it yourself:</p>
     <pre>npm install -g retake-demos
 mkdir demos && cd demos && retake install</pre>
@@ -325,17 +361,90 @@ mkdir demos && cd demos && retake install</pre>
   </footer>
 </main>
 <script>
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const mark = document.querySelector('.mark');
+const replayMark = document.createElement('button');
+replayMark.type = 'button';
+replayMark.className = 'mark-button';
+replayMark.setAttribute('aria-label', 'Replay the Retake mark');
+mark.before(replayMark);
+replayMark.append(mark);
+replayMark.addEventListener('click', () => {
+  mark.classList.remove('replay');
+  if (reducedMotion.matches) return;
+  void mark.offsetWidth;
+  mark.classList.add('replay');
+});
+const examples = [
+  'Describe: Ask your agent to show one rough sentence becoming an action in Capture.',
+  'Record: Run the real workflow and save the result as an MP4.',
+  'Review: Watch the take in the local library, then check its stills and proof log.',
+  'Correct: Give your agent notes, then rerun the same flow. Return to Describe for a different walkthrough.'
+];
+const stepExample = document.createElement('p');
+stepExample.id = 'step-example';
+stepExample.className = 'step-example';
+stepExample.setAttribute('aria-live', 'polite');
+stepExample.setAttribute('aria-atomic', 'true');
+stepExample.textContent = examples[0];
+document.querySelector('.steps').after(stepExample);
+const stepButtons = [];
+document.querySelectorAll('.steps li').forEach((item, index) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'step-trigger';
+  button.setAttribute('aria-pressed', String(index === 0));
+  button.setAttribute('aria-controls', 'step-example');
+  button.append(...item.childNodes);
+  item.append(button);
+  stepButtons.push(button);
+  const select = () => {
+    stepButtons.forEach(step => {
+      step.setAttribute('aria-pressed', String(step === button));
+      step.parentElement.classList.remove('step-pulse');
+    });
+    stepExample.textContent = examples[index];
+    if (!reducedMotion.matches) {
+      void item.offsetWidth;
+      item.classList.add('step-pulse');
+    }
+  };
+  button.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') select(); });
+  button.addEventListener('focus', select);
+  button.addEventListener('click', select);
+});
 const promptText = () => document.getElementById('pasteline')?.textContent.trim() || '';
+const copyStatus = document.createElement('p');
+copyStatus.id = 'copy-status';
+copyStatus.className = 'copy-status';
+copyStatus.setAttribute('role', 'status');
+copyStatus.setAttribute('aria-atomic', 'true');
+document.querySelector('.prompt').after(copyStatus);
+const copyTimers = new WeakMap();
 async function copyPrompt(button) {
+  if (button.getAttribute('aria-busy') === 'true') return false;
+  const previous = button.dataset.label || button.textContent;
+  button.dataset.label = previous;
+  clearTimeout(copyTimers.get(button));
+  button.setAttribute('aria-busy', 'true');
+  button.textContent = 'Copying…';
+  copyStatus.textContent = '';
   try {
     await navigator.clipboard.writeText(promptText());
-    const previous = button.textContent;
     button.textContent = 'Copied — paste it to your agent';
-    window.setTimeout(() => { button.textContent = previous; }, 2200);
+    copyStatus.textContent = 'Copied. Paste the prompt into your coding agent.';
+    copyTimers.set(button, window.setTimeout(() => { button.textContent = previous; }, 2200));
     return true;
   } catch {
-    document.getElementById('start')?.scrollIntoView({ behavior:'smooth' });
+    button.textContent = previous;
+    copyStatus.textContent = 'Could not copy. Select the prompt and copy it manually.';
+    const prompt = document.getElementById('pasteline');
+    prompt.setAttribute('tabindex', '-1');
+    prompt.focus({ preventScroll:true });
+    document.getElementById('start').scrollIntoView({ behavior:reducedMotion.matches ? 'instant' : 'smooth' });
     return false;
+  } finally {
+    button.removeAttribute('aria-busy');
   }
 }
 const heroCopy = document.getElementById('heroCopy');
@@ -344,8 +453,30 @@ heroCopy?.addEventListener('click', async (event) => {
   await copyPrompt(heroCopy);
 });
 document.querySelectorAll('.copybtn').forEach((button) => {
+  button.hidden = false;
   button.addEventListener('click', () => copyPrompt(button));
 });
+if ('IntersectionObserver' in window && !reducedMotion.matches) {
+  const reveal = section => section.classList.remove('reveal-pending');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) { reveal(entry.target); observer.unobserve(entry.target); }
+    });
+  }, { threshold:0, rootMargin:'0px 0px -24px 0px' });
+  document.querySelectorAll('main > section').forEach(section => {
+    if (section.getBoundingClientRect().top > window.innerHeight) {
+      section.classList.add('reveal-pending');
+      observer.observe(section);
+    }
+    section.addEventListener('focusin', () => { reveal(section); observer.unobserve(section); });
+  });
+  reducedMotion.addEventListener('change', () => {
+    if (reducedMotion.matches) {
+      observer.disconnect();
+      document.querySelectorAll('.reveal-pending').forEach(reveal);
+    }
+  });
+}
 </script>
 </body>
 </html>

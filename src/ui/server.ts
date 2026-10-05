@@ -35,7 +35,7 @@ import { applyEdits, receiptsFor } from "../edits.js";
 import { dryRun } from "../dryrun.js";
 import { startOperator, getSession, addPending, answerPending, markDone, stopSession } from "../operator/run.js";
 import { ffmpegBin, gifskiBin, makeGif } from "../render.js";
-import { captureHash, restorePrevious } from "../record.js";
+import { restorePrevious, type Take } from "../record.js";
 import { digest } from "../digest.js";
 import { readFlags } from "../ext/flags.js";
 import { findOrphans } from "../ext/heal.js";
@@ -46,6 +46,9 @@ import { MAX_BODY, checkRequest, clearToken, newToken, readBodyLimited, writeTok
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
+import { captureMatchesTake, readPreviewReceipt } from "../preview.js";
+import { STYLES, VOICES, RoutineSchema, readRoutines, starter, voiceId, writeRoutines } from "../routine.js";
+import { synthesize, voiceCachePath } from "../voice.js";
 
 const ROOT = PROJECT_ROOT;
 const DEMOS = path.join(ROOT, "demos");
@@ -257,10 +260,10 @@ function listDemos(project?: string) {
       let needsRecord = true;
       if (fs.existsSync(take)) {
         try {
-          const t = JSON.parse(fs.readFileSync(take, "utf8"));
+          const t = JSON.parse(fs.readFileSync(take, "utf8")) as Take;
           lastTake = { finishedAt: t.finishedAt, ok: t.ok, partial: t.partial ?? null, duration: Math.round((t.duration - t.trimBefore) * 10) / 10 };
           const m = loadManifest(file).manifest;
-          needsRecord = !t.captureHash || t.captureHash !== captureHash(m) || !!t.partial || !t.video || !fs.existsSync(t.video);
+          needsRecord = !captureMatchesTake(t, m, path.dirname(file));
         } catch { /* ignore */ }
       }
       return { name, file: f, title, url, group, valid, settings, lastTake, needsRecord };
@@ -328,10 +331,10 @@ function startRun(name: string, mode: { preview?: boolean; reuse?: boolean; gif?
   if (!file) throw new Error(`no demos/${name}.yaml`);
   const cli = entry("cli");
   const args = mode.renderOnly
-    ? [...cli.args, "render", path.join(outRoot(), name), ...(mode.gif ? ["--gif"] : [])]
+    ? [...cli.args, "render", path.join(outRoot(), name), "--preset", "preview-fast", "--no-master", ...(mode.gif ? ["--gif"] : [])]
     : [...cli.args, "run", path.join(DEMOS, file), "--out", outRoot()];
   if (!mode.renderOnly) {
-    if (mode.preview) args.push("--preset", "preview-fast", "--reuse");
+    if (mode.preview) args.push("--preview");
     else {
       if (mode.reuse) args.push("--reuse");
       if (mode.gif) args.push("--gif");
@@ -467,7 +470,6 @@ export function serve(port: number) {
   for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) process.on(sig, () => { clearToken(ROOT); if (sig !== "exit") process.exit(0); });
   const chatPage = fs.readFileSync(path.join(HERE, "chat.html"), "utf8")
     .replace("</head>", `<script>window.__retakeToken=${JSON.stringify(TOKEN)}</script></head>`);
-  const guidePage = fs.readFileSync(path.join(HERE, "guide.html"), "utf8");
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://x");
@@ -520,9 +522,13 @@ export function serve(port: number) {
         if (req.method === "HEAD") return res.end();
         return stream(f, res);
       }
-      if (p === "/guide" && req.method === "GET") {
-        res.writeHead(200, { "content-type": "text/html" });
-        return res.end(guidePage);
+      const voiceSample = /^\/voice-samples\/(edge|aiden|kokoro)\.mp4$/.exec(p);
+      if (voiceSample && (req.method === "GET" || req.method === "HEAD")) {
+        const f = path.join(PKG_ROOT, "assets", "voice-samples", `${voiceSample[1]}.mp4`);
+        if (!fs.existsSync(f)) return json(res, 404, { error: "voice sample not found" });
+        res.writeHead(200, { "content-type": "video/mp4", "content-length": fs.statSync(f).size, "cache-control": "public, max-age=86400" });
+        if (req.method === "HEAD") return res.end();
+        return stream(f, res);
       }
       if (p === "/manifest.webmanifest") {
         res.writeHead(200, { "content-type": "application/manifest+json" });
@@ -564,6 +570,54 @@ export function serve(port: number) {
         if (!fs.existsSync(f)) return json(res, 200, { releases: [] });
         try { return json(res, 200, JSON.parse(fs.readFileSync(f, "utf8"))); }
         catch { return json(res, 200, { releases: [] }); }
+      }
+      // ---------- the routine: the standard, where a person can actually see it ----------
+      // These settings were only ever reachable from a terminal or an agent's
+      // tool call, which is the same as not existing for someone opening Retake
+      // for the first time. The window is where they live now.
+      if (p === "/api/routine" && req.method === "GET") {
+        const file = readRoutines(DEMOS);
+        return json(res, 200, {
+          exists: !!file,
+          use: file?.use ?? "default",
+          routines: file?.routines ?? starter().routines,
+          styles: Object.entries(STYLES).map(([name, st]) => ({ name, ...st })),
+          voices: Object.entries(VOICES).map(([name, v]) => ({ name, ...v })),
+        });
+      }
+      if (p === "/api/routine" && req.method === "PUT") {
+        const b = JSON.parse(await readBody(req)) as { name?: string; use?: string; patch?: Record<string, unknown> };
+        const file = readRoutines(DEMOS) ?? starter();
+        const which = b.name ?? b.use ?? file.use;
+        if (b.patch) {
+          const merged = RoutineSchema.safeParse({ ...(file.routines[which] ?? {}), ...b.patch });
+          if (!merged.success) return json(res, 400, { error: merged.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") });
+          file.routines[which] = merged.data;
+        }
+        if (b.use) {
+          if (!file.routines[b.use]) return json(res, 400, { error: `no routine called "${b.use}"` });
+          file.use = b.use;
+        }
+        writeRoutines(DEMOS, file);
+        return json(res, 200, { use: file.use, routines: file.routines });
+      }
+      // Hearing one is the only way to choose one. Synthesized on demand and
+      // cached by text+voice+rate, so the second press is instant.
+      if (p === "/api/routine/sample" && req.method === "GET") {
+        const voice = url.searchParams.get("voice") ?? "";
+        const rate = Number(url.searchParams.get("rate") ?? "0");
+        if (!voice || voice === "silent") return json(res, 400, { error: "pick a voice" });
+        if (!Number.isInteger(rate) || rate < -50 || rate > 50) return json(res, 400, { error: "rate is a whole percent, -50 to 50" });
+        const id = voiceId(voice);
+        const line = "This is the voice your demos will use, at the pace they will use it.";
+        const out = voiceCachePath(line, id, rate);
+        try {
+          if (!fs.existsSync(out)) { fs.mkdirSync(path.dirname(out), { recursive: true }); synthesize(line, id, out, rate); }
+        } catch (e) {
+          return json(res, 400, { error: (e as Error).message });
+        }
+        res.writeHead(200, { "content-type": "audio/mpeg", "content-length": fs.statSync(out).size, "cache-control": "no-store" });
+        return stream(out, res);
       }
       if (p === "/api/presets" && req.method === "GET") return json(res, 200, Object.values(PRESETS));
       if (p === "/api/drafts" && req.method === "GET") return json(res, 200, listDrafts());
@@ -681,7 +735,7 @@ export function serve(port: number) {
         if (!edits.length) return json(res, 200, { applied: [], skipped: [], note: note || "Nothing to change for that.", rerecord: false });
         const a = applyEdits(file, edits);
         const m2 = loadManifest(file).manifest;
-        const rerecord = a.rerecord || !take || !take.captureHash || take.captureHash !== captureHash(m2);
+        const rerecord = a.rerecord || !captureMatchesTake(take, m2, path.dirname(file));
         return json(res, 200, { applied: a.done, skipped: a.skipped, note, rerecord, yaml: a.yaml });
       }
 
@@ -731,7 +785,7 @@ export function serve(port: number) {
             emit(run, `Checked: all ${m.steps.length} steps resolve on the page`);
             setStage(run, "capture");
             emit(run, "Recording a fast preview…");
-            const child = spawn(entry("cli").command, [...entry("cli").args, "run", file, "--preset", "preview-fast", "--out", outRoot()], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+            const child = spawn(entry("cli").command, [...entry("cli").args, "run", file, "--preview", "--out", outRoot()], { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
             run.proc = child;
             const push = (chunk: Buffer) => { for (const raw of chunk.toString().split("\n")) { const l = raw.trimEnd(); if (!l || /^\$ ffmpeg|zoom filter|filter graph|^>/.test(l)) continue; const st = /^\[stage\] (\w+)/.exec(l); if (st) { setStage(run, st[1] === "done" ? "done" : st[1]); continue; } emit(run, l); } };
             child.stdout.on("data", push); child.stderr.on("data", push);
@@ -801,14 +855,23 @@ export function serve(port: number) {
 
       // ---------- the operator: the coding agent drives Retake, fenced to its tools ----------
       if (p === "/api/operator" && req.method === "POST") {
-        const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; project?: string; name?: string };
+        const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; project?: string; name?: string; narration?: "silent" | "edge" | "aiden" | "kokoro" };
         if (!b.describe?.trim()) return json(res, 400, { error: "say what the demo should show" });
+        const narration = (["silent", "edge", "aiden", "kokoro"] as const).includes(b.narration as never) ? b.narration! : "silent";
+        const sound = narration === "silent"
+          ? "Make the first draft silent and do not add captions."
+          : narration === "edge"
+            ? "Make the first draft silent and do not add captions. The person chose Edge for the final narration. Do not synthesize it until they approve both the recording and one continuous script."
+            : narration === "aiden"
+              ? "Make the first draft silent and do not add captions. The person chose the local Aiden Qwen voice for the final narration. Do not download a model or synthesize speech until they separately approve the install, recording, and one continuous script."
+              : "Make the first draft silent and do not add captions. The person chose the compact local Kokoro voice for the final narration. Do not download a model or synthesize speech until they separately approve the install, recording, and one continuous script.";
+        const describe = `${b.describe.trim()}\n\n${sound}`;
         const prov = pickProvider();
         const which = prov?.name === "codex" ? "codex" : prov?.name === "claude-code" ? "claude-code" : null;
         if (!which) return json(res, 400, { error: "The operator needs Claude Code or Codex (Settings). With another model, use “Take it from here” — same result, fixed steps." });
         const ui = `http://localhost:${(req.socket.localPort as number) || 4310}`;
         const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
-        const s = startOperator({ describe: b.describe, url: b.url?.trim() || undefined, project, name: b.name && safeName(b.name) ? b.name : undefined, ui, root: ROOT, provider: which, onDemo: (demo) => { if (project && safeName(demo)) assignDemoProject(demo, project); } });
+        const s = startOperator({ describe, url: b.url?.trim() || undefined, project, name: b.name && safeName(b.name) ? b.name : undefined, ui, root: ROOT, provider: which, onDemo: (demo) => { if (project && safeName(demo)) assignDemoProject(demo, project); } });
         return json(res, 200, { id: s.id, startedAt: s.startedAt, provider: which });
       }
       const mop = /^\/api\/operator\/([a-z0-9]+)(?:\/(log|pending|done|stream|stop|answer)(?:\/([a-z0-9]+))?)?$/.exec(p);
@@ -1055,7 +1118,11 @@ export function serve(port: number) {
           f === "stills" || f === "clips" ? fs.readdirSync(path.join(dir, f)).map((x) => `${f}/${x}`) : [f]);
         const proof = fs.existsSync(path.join(dir, "proof-log.md")) ? fs.readFileSync(path.join(dir, "proof-log.md"), "utf8") : "";
         const facts = fs.existsSync(path.join(dir, "facts.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "facts.json"), "utf8")) : null;
-        const stamp = fs.statSync(tp).mtimeMs;
+        const preview = readPreviewReceipt(dir);
+        const stamp = ["take.json", "preview.json", "facts.json", "demo.mp4"]
+          .map((file) => path.join(dir, file))
+          .filter((file) => fs.existsSync(file))
+          .reduce((latest, file) => Math.max(latest, fs.statSync(file).mtimeMs), 0);
         // What was flagged on this demo, and the last answer. Read from disk,
         // never judged here: a page load must cost nothing, and a recording
         // must never wait on it.
@@ -1078,7 +1145,7 @@ export function serve(port: number) {
         // Which checks have actually run against THIS take. Read from disk,
         // never judged here — the window must cost nothing to open.
         const checks = readChecks(dir);
-        return json(res, 200, { take, files, proof, facts, stamp, dir, flagged, checks });
+        return json(res, 200, { take, files, proof, facts, preview, stamp, dir, flagged, checks });
       }
       m = /^\/out\/([a-z0-9-]+)\/((?:stills\/|clips\/)?[A-Za-z0-9._-]+)$/.exec(p);
       if (m && req.method === "GET") {

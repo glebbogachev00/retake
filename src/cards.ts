@@ -20,6 +20,66 @@ const AMBER = "#e8b04b";
 
 const ease = "t<0?0:t>1?1:t*t*(3-2*t)"; // smoothstep, in the page
 
+export type CardStyle = { background: string; ink: string; logo?: string; font?: string; weight: number; ornament: "circles" | "none"; orb?: string };
+
+/** A file as a data: URI, so the card page needs nothing from disk or network. */
+function dataUri(file: string): string {
+  const ext = path.extname(file).toLowerCase();
+  const mime = ext === ".svg" ? "image/svg+xml" : ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".woff2" ? "font/woff2" : ext === ".woff" ? "font/woff" : ext === ".ttf" ? "font/ttf" : ext === ".otf" ? "font/otf" : "application/octet-stream";
+  return `data:${mime};base64,${fs.readFileSync(path.resolve(file)).toString("base64")}`;
+}
+
+/**
+ * A card that looks like the product rather than like Retake: the mark above
+ * the title, the brand's own typeface, its ground and ink, and — if asked —
+ * two soft circles in opposite corners. Built to reproduce a north-star card,
+ * which before this could only be made outside Retake and recoloured in.
+ *
+ * Same contract as the plain card: `__seek(ms)` lays out that exact moment,
+ * `__still` names the window where nothing moves (the poster comes from it).
+ */
+function brandedCardHtml(w: number, h: number, c: CardStyle, title: string, subtitle: string | undefined, ms: number): string {
+  // Measured off a north-star card at 1920×1080: a 143px mark, the title
+  // 66px below it, two lines of ~92px type spanning 192px, wrapping at ~1300px.
+  const titleSize = Math.round(Math.min(w * 0.048, h * 0.085));
+  const subSize = Math.round(titleSize * 0.4);
+  const mark = Math.round(h * 0.133);
+  const font = c.font ? `@font-face{font-family:"BrandCard";src:url(${dataUri(c.font)});font-weight:100 900;font-display:block}` : "";
+  const family = c.font ? `"BrandCard",Georgia,serif` : `-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif`;
+  const logo = c.logo ? `<img class="mark" src="${dataUri(c.logo)}" alt="">` : "";
+  const circles = c.ornament === "circles"
+    ? `<i class="orb a"></i><i class="orb b"></i>` : "";
+  return `<!doctype html><meta charset="utf-8"><style>
+  ${font}
+  html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden;background:${c.background}}
+  .orb{position:absolute;border-radius:50%;background:${c.orb ?? `color-mix(in srgb, ${c.ink} 6%, ${c.background})`}}
+  .orb.a{width:${Math.round(h * 0.6)}px;height:${Math.round(h * 0.6)}px;left:${Math.round(-h * 0.25)}px;top:${Math.round(-h * 0.3)}px}
+  .orb.b{width:${Math.round(h * 0.7)}px;height:${Math.round(h * 0.7)}px;right:${Math.round(-h * 0.3)}px;bottom:${Math.round(-h * 0.33)}px}
+  .wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(h * 0.06)}px}
+  .mark{width:${mark}px;height:${mark}px;border-radius:${Math.round(mark * 0.22)}px;box-shadow:0 ${Math.round(mark * 0.12)}px ${Math.round(mark * 0.3)}px rgba(0,0,0,.10);opacity:0;object-fit:cover}
+  .text{display:flex;flex-direction:column;align-items:center;gap:${Math.round(subSize * 0.8)}px}
+  .title{font-family:${family};font-size:${titleSize}px;font-weight:${c.weight};line-height:1.1;letter-spacing:-.022em;color:${c.ink};text-align:center;max-width:${Math.round(w * 0.68)}px;opacity:0;font-variation-settings:"opsz" 144}
+  .sub{font-family:${family};font-size:${subSize}px;color:${c.ink};opacity:0;text-align:center;max-width:${Math.round(w * 0.6)}px}
+  </style>
+  ${circles}
+  <div class="wrap">${logo}<div class="text"><div class="title"></div><div class="sub"></div></div></div>
+  <script>
+  const M = document.querySelector(".mark"), T = document.querySelector(".title"), S = document.querySelector(".sub");
+  T.textContent = ${JSON.stringify(title)}; S.textContent = ${JSON.stringify(subtitle ?? "")};
+  if (!S.textContent) S.remove();
+  const DUR = ${ms}, FADE = Math.min(460, DUR * 0.24), OUT = Math.min(320, DUR * 0.18);
+  const ez = (t) => (${ease});
+  window.__still = [FADE * 1.6, DUR - OUT];
+  window.__seek = (ms) => {
+    const a = ez(ms / FADE), b = ez((ms - FADE * 0.35) / FADE), o = ez((DUR - ms) / OUT);
+    if (M) { M.style.opacity = Math.min(a, o); M.style.transform = "translateY(" + (1 - a) * 10 + "px)"; }
+    T.style.opacity = Math.min(b, o); T.style.transform = "translateY(" + (1 - b) * 12 + "px)";
+    if (S.isConnected) { S.style.opacity = Math.min(b, o); }
+    return true;
+  };
+  </script>`;
+}
+
 function cardHtml(w: number, h: number, theme: Theme, title: string, subtitle: string | undefined, ms: number): string {
   const titleSize = Math.round(Math.min(w * 0.055, h * 0.14));
   const subSize = Math.round(titleSize * 0.4);
@@ -127,9 +187,10 @@ async function renderFrames(html: string, w: number, h: number, ms: number, fps:
 export async function renderCard(
   ffmpeg: string, outDir: string, kind: "intro" | "outro",
   spec: { title: string; subtitle?: string; ms: number },
-  w: number, h: number, fps: number, theme: Theme,
+  w: number, h: number, fps: number, theme: Theme, style?: CardStyle,
 ): Promise<{ mp4: string; cover?: string }> {
-  const dir = await renderFrames(cardHtml(w, h, theme, spec.title, spec.subtitle, spec.ms), w, h, spec.ms, fps, false);
+  const html = style ? brandedCardHtml(w, h, style, spec.title, spec.subtitle, spec.ms) : cardHtml(w, h, theme, spec.title, spec.subtitle, spec.ms);
+  const dir = await renderFrames(html, w, h, spec.ms, fps, false);
   const mp4 = path.join(outDir, `.card-${kind}.mp4`);
   execFileSync(ffmpeg, ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", path.join(dir, "f%05d.png"), "-c:v", "libx264", "-crf", "17", "-preset", "veryfast", "-pix_fmt", "yuv420p", mp4], { stdio: "inherit" });
   let cover: string | undefined;

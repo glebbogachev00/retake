@@ -70,10 +70,8 @@ test("the cap dry passes shortens the wait without changing what is waited for",
 });
 
 test("`scroll to: bottom` means the page's end in BOTH dry and run", async () => {
-  // Found by recording Retake's own guide page: dry treated "bottom" as a
-  // selector, looked for an element called bottom, timed out, and failed a
-  // step that records perfectly. The starter demo shipped by `retake init`
-  // uses it, so a new person's first dry run failed on a demo that works.
+  // Dry once treated "bottom" as a selector, looked for an element called
+  // bottom, timed out, and failed a step that records perfectly.
   const { dryRun } = await import("../src/dryrun.js");
   const { loadManifest } = await import("../src/manifest.js");
   const fs = await import("node:fs");

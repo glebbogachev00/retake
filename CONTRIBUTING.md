@@ -21,7 +21,7 @@ how to spawn child processes.
 ```bash
 npm run typecheck
 npm test
-npm run build && node dist/cli.js validate demos/example.yaml
+npm run build && node dist/cli.js --help
 ```
 
 CI runs exactly that. There is no lint step; match the surrounding code.

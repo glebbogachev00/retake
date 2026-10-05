@@ -74,6 +74,14 @@ export const PRESETS: Record<string, Preset> = {
     encoder: "x264", master: true,
     description: "A true 1920×1080, 30fps, CRF 17. The general-purpose demo. GIF on request.",
   },
+  "post-4k": {
+    name: "post-4k",
+    width: 3840, height: 2160, scale: 2, fps: 30, crf: 14,
+    gif: false, layout: "band", cameraZoom: 1.25,
+    cursorSize: 96, captionFontSize: 72, bandHeight: 240,
+    encoder: "x264", master: true,
+    description: "3840×2160 high-density master for crisp desktop UI and large-screen delivery.",
+  },
   "post-square": {
     name: "post-square",
     /* The page area is the canvas minus the caption band, so the file really

@@ -85,6 +85,35 @@ test("idle warp: piecewise time map is monotonic and hits the planned lengths", 
   for (let t = 0; t <= 20; t += 0.25) { const m = warpTime(segs, t); assert.ok(m >= prev); prev = m; }
 });
 
+test("idle warp shortens only abnormally long hover tails without snapping normal cursor moves", async () => {
+  const { planIdle, warpTake } = await import("../src/pace.js");
+  const take = { trimBefore: 0, duration: 12, timeline: [
+    { index: 0, action: "hover", summary: "normal cursor move", start: 0, end: 1.2, ok: true },
+    { index: 1, action: "hover", summary: "cursor reached target but action lagged", start: 2, end: 6, ok: true },
+    { index: 2, action: "click", summary: "click", start: 6, end: 6.3, ok: true },
+  ] } as never;
+  const segs = planIdle(take, 0.8);
+  assert.equal(segs.length, 1, "only the abnormally long hover is compressed");
+  const w = warpTake(take, segs);
+  assert.equal(w.timeline[0].end - w.timeline[0].start, 1.2, "normal cursor movement remains natural");
+  const shownHover = w.timeline[1].end - w.timeline[1].start;
+  assert.ok(Math.abs(shownHover - 1.8) < 0.05, `long hover shown as ~1.8s, got ${shownHover}`);
+});
+
+test("idle warp shortens browser latency inside abnormally long clicks without touching normal clicks", async () => {
+  const { planIdle, warpTake } = await import("../src/pace.js");
+  const take = { trimBefore: 0, duration: 12, timeline: [
+    { index: 0, action: "click", summary: "normal click", start: 0, end: 1.2, ok: true },
+    { index: 1, action: "click", summary: "click followed by browser navigation", start: 2, end: 7, ok: true },
+  ] } as never;
+  const segs = planIdle(take, 0.8);
+  assert.equal(segs.length, 1, "only the abnormally long click is compressed");
+  const w = warpTake(take, segs);
+  assert.equal(w.timeline[0].end - w.timeline[0].start, 1.2, "normal click remains natural");
+  const shownClick = w.timeline[1].end - w.timeline[1].start;
+  assert.ok(Math.abs(shownClick - 1.8) < 0.05, `long click shown as ~1.8s, got ${shownClick}`);
+});
+
 test("waitFor can wait for absence, for text, and for the DOM to settle", async () => {
   const { Manifest } = await import("../src/manifest.js");
   const m = Manifest.parse({

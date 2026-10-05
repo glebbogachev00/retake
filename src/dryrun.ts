@@ -8,10 +8,11 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { applyPageSetup, authState, dragPoints, gateOnApp, resolvePoint, runEvaluateSeed, runFileOrCommandSeed } from "./record.js";
+import { applyPageSetup, authState, dragPoints, gateOnApp, pageGeometry, resolvePoint, runEvaluateSeed, runFileOrCommandSeed } from "./record.js";
 import { chromium, type Page, type BrowserContext } from "playwright";
 import { waitForStep } from "./waiting.js";
 import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
+import { assessActionProof, proofMatches, snapshotActionProof, waitForActionProof } from "./action-proof.js";
 
 /** The longest a dry run will wait for anything. Long enough for a real app
     to answer, short enough that checking a demo stays a seconds-long job. */
@@ -89,14 +90,18 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
   } else if (fileSeeds.length) {
     log("dry: seeds skipped (--no-seed) — app state may not match what run will see");
   }
-  const browser = await chromium.launch({ headless: true });
+  // The same geometry the recorder uses — see pageGeometry(). A dry run that
+  // lays the app out differently from the take proves nothing about the take.
+  const geo = pageGeometry(q);
+  const browser = await chromium.launch({ headless: true, ...(geo.args.length ? { args: geo.args } : {}) });
   // Start from the same session run would. Without this, a demo behind a
   // login was dry-run logged OUT — every selector "missing", or worse, a
   // green dry against a marketing page and a failed take against the app.
   const auth = authState(m, manifestDir);
   if (auth.path) log(auth.fresh ? `dry: reusing session ${path.relative(process.cwd(), auth.path)}` : `dry: no fresh session — auth.setup will have to sign in`);
   const context = await browser.newContext({
-    viewport: q.viewport,
+    viewport: geo.viewport,
+    deviceScaleFactor: geo.deviceScaleFactor,
     colorScheme: m.colorScheme,
     ...(m.reducedMotion ? { reducedMotion: "reduce" as const } : {}),
     ...(auth.fresh && auth.path ? { storageState: auth.path } : {}),
@@ -128,7 +133,8 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
     // Document first; idle only if it comes quickly. Busy public sites never
     // go network-idle, and the manifest's waitForSelector is the real gate.
     await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => { /* see above */ });
+    // Setup/step waitFor selectors are the real readiness signal. A fixed
+    // network-idle wait costs time on streaming/public apps and proves less.
     // `evaluate` seeds write into the page itself — the panel that only
     // exists once some state is seeded. Dry skipped them, so dry and run were
     // literally looking at different apps; that was one of three lost takes
@@ -165,6 +171,17 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         const complaint = el && actionFits(step.action, el);
         if (complaint) throw new Error(complaint);
       }
+      const proof = step.action === "click" ? step.proof : undefined;
+      const beforeProof = proof ? await snapshotActionProof(page, proof) : undefined;
+      if (proof && beforeProof && proof.change && proofMatches(proof, beforeProof)) {
+        throw new Error(`proof already satisfied before the action: ${proof.selector} is ${proof.state}; choose an action that visibly changes state`);
+      }
+      const verifyProof = async () => {
+        if (!proof || !beforeProof) return;
+        const after = await waitForActionProof(page, proof);
+        const result = assessActionProof(proof, beforeProof, after);
+        if (!result.ok) throw new Error(result.reason);
+      };
       // A point step (click/hover `at`, or a drag) is verified by resolving
       // its target's rect in the page — the same way the recorder will.
       const point = async (t: unknown): Promise<{ x: number; y: number }> => {
@@ -190,7 +207,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         await page.waitForTimeout(400);
       } else if ((step.action === "click" || step.action === "hover") && step.at) {
         const pt = await point(step.at);
-        if (step.action === "click") { await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(400); }
+        if (step.action === "click") { await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(400); await verifyProof(); }
         else await page.mouse.move(pt.x, pt.y);
       }
       else switch (step.action) {
@@ -223,8 +240,8 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         // `to: top` and `to: bottom` are the PAGE's ends, not selectors — the
         // recorder reads scrollY and scrollHeight for them. Dry was looking for
         // an element called "bottom", timing out, and failing a step that
-        // records perfectly. The starter demo shipped with `retake init` hits
-        // it, so a new person's first dry run failed on a demo that works.
+        // records perfectly. Keeping both paths equivalent prevents a dry pass
+        // from rejecting a manifest that the recorder can run.
         case "scroll":
           // And actually scroll. Skipping it left the page at the top while
           // every later step ran, so a dry run rehearsed a different page from
@@ -233,7 +250,15 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
           else if (step.to === "bottom") await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
           else if (step.to) { await page.locator(step.to).first().boundingBox({ timeout: short }); await page.locator(step.to).first().scrollIntoViewIfNeeded({ timeout: short }); }
           break;
-        case "upload": await page.locator(step.selector).first().waitFor({ timeout: short }); break;
+        case "upload": {
+          const files = (Array.isArray(step.files) ? step.files : [step.files])
+            .map((file) => path.resolve(manifestDir, expandEnv(file)));
+          for (const file of files) {
+            if (!fs.existsSync(file)) throw new Error(`upload: no such file ${file}`);
+          }
+          await page.setInputFiles(step.selector, files, { timeout: short });
+          break;
+        }
         case "evaluate": await page.evaluate(step.script); break;
         case "stub": await arm({ url: step.url, method: step.method, status: step.status ?? 200, json: step.json, from: step.from, contentType: "application/json; charset=utf-8" }); break;
         case "keyboard": await page.keyboard.press(step.key); break;
@@ -244,6 +269,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         case "callout": await point(step.selector ?? step.at!); break;
         default: break; // scene, screenshot, zoom, download: nothing to verify
       }
+      if (step.action === "click" && !step.at) await verifyProof();
       if (step.pauseAfter) await page.waitForTimeout(120);
     } catch (e) {
       failures++;

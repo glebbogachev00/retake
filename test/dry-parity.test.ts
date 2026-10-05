@@ -61,3 +61,14 @@ test("dry runs evaluate seeds, which it used to skip entirely", () => {
   assert.match(s, /runEvaluateSeed\(/, "dry skips `evaluate` seeds — it will check a different app state than run");
   assert.doesNotMatch(s, /filter\(\(s\) => s\.kind !== "evaluate"\)[\s\S]{0,80}for \(const s of \w+\) await runEvaluateSeed/, "evaluate seeds must not be filtered out before being run");
 });
+
+test("dry performs uploads so result waits see the same page state as a take", () => {
+  const s = src("dryrun.ts");
+  assert.match(s, /case "upload":[\s\S]{0,500}setInputFiles\(/, "dry only resolves the file input instead of uploading the file");
+  assert.match(s, /case "upload":[\s\S]{0,500}path\.resolve\(manifestDir,/, "dry does not resolve upload paths from the manifest directory like record does");
+});
+
+test("voiceover audio is padded so short narration cannot truncate the video", () => {
+  const s = src("render.ts");
+  assert.match(s, /amix=inputs=\$\{mixIns\.length\}[\s\S]{0,100},apad,atrim=0:/, "short narration can make -shortest cut off the final video scene");
+});

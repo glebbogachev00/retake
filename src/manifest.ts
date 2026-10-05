@@ -16,6 +16,24 @@ import { DEFAULT_PRESET, PRESETS, type Layout, type Preset } from "./presets.js"
 
 const Selector = z.string().min(1);
 
+export const ActionProof = z.object({
+  /** A post-action state that a viewer can actually see. Dry and record both
+      reject the action when this state was already true or never arrives. */
+  selector: Selector,
+  state: z.enum(["visible", "hidden", "active", "checked", "text", "attribute"]),
+  value: z.string().optional(),
+  attribute: z.string().optional(),
+  change: z.boolean().default(true),
+  timeout: z.number().int().min(100).max(15_000).default(2000),
+}).superRefine((proof, ctx) => {
+  if (proof.state === "text" && proof.value === undefined) {
+    ctx.addIssue({ code: "custom", message: "text proof needs `value`" });
+  }
+  if (proof.state === "attribute" && (!proof.attribute || proof.value === undefined)) {
+    ctx.addIssue({ code: "custom", message: "attribute proof needs `attribute` and `value`" });
+  }
+});
+
 /** Where a pointer goes: a selector (its centre), a raw viewport point, or a
     selector plus an offset. Points are resolved by reading the rect in the
     page rather than through Playwright's locator engine, because canvas
@@ -40,18 +58,36 @@ const Base = z.object({
   secret: z.boolean().optional(),
 });
 
+/**
+ * Every step is strict: a key Retake does not know is a mistake, never a note.
+ *
+ * zod strips unknown keys by default, so `{ action: scroll, selector: "…" }` —
+ * when the key is `to:` — validated, dry-ran green, and then scrolled to the
+ * origin on every take. Green and wrong is the worst result a checker can
+ * give, and it is also how two videos in one routine stop matching: one
+ * manifest's typo silently turns a setting off for that video alone.
+ */
 export const Step = z.discriminatedUnion("action", [
-  Base.extend({ action: z.literal("wait"), ms: z.number().nonnegative().default(1000) }),
-  Base.extend({ action: z.literal("click"), selector: Selector.optional(), at: Point.optional(), zoom: z.number().positive().optional() }),
+  Base.extend({ action: z.literal("wait"), ms: z.number().nonnegative().default(1000) }).strict(),
+  Base.extend({
+    action: z.literal("click"),
+    selector: Selector.optional(),
+    at: Point.optional(),
+    proof: ActionProof.optional(),
+    /** Optional waypoints for a deliberate curved/stepped pointer route.
+        The final destination remains `at`; waypoints only shape the travel. */
+    via: z.array(Point).max(8).optional(),
+    zoom: z.number().positive().optional(),
+  }).strict(),
   Base.extend({
     action: z.literal("type"),
     selector: Selector,
     text: z.string(),
     delay: z.number().nonnegative().optional(),
     clear: z.boolean().optional(),
-  }),
-  Base.extend({ action: z.literal("fill"), selector: Selector, text: z.string() }),
-  Base.extend({ action: z.literal("hover"), selector: Selector.optional(), at: Point.optional() }),
+  }).strict(),
+  Base.extend({ action: z.literal("fill"), selector: Selector, text: z.string() }).strict(),
+  Base.extend({ action: z.literal("hover"), selector: Selector.optional(), at: Point.optional(), via: z.array(Point).max(8).optional() }).strict(),
   /** Scroll by a pixel delta, or `to` a selector — which computes the delta so
       the element lands where you want it and animates there, so the viewer sees
       the page move rather than jumping. */
@@ -69,7 +105,7 @@ export const Step = z.discriminatedUnion("action", [
     holdMs: z.number().int().min(0).max(2000).default(120),
     /** How long the move takes, ms. */
     durationMs: z.number().int().min(120).max(6000).default(700),
-  }),
+  }).strict(),
   Base.extend({
     action: z.literal("scroll"),
     x: z.number().optional(),
@@ -83,7 +119,7 @@ export const Step = z.discriminatedUnion("action", [
         `speed: 0.4` takes 1.5s. A long scroll at full speed reads as a jump —
         slow it down and the viewer can follow what went past. */
     speed: z.number().positive().max(4).optional(),
-  }),
+  }).strict(),
   /** Choose an option in a <select>. A form-heavy app is mostly dropdowns, and
       without this a demo of one has to fake them with evaluate. */
   Base.extend({
@@ -91,7 +127,7 @@ export const Step = z.discriminatedUnion("action", [
     selector: Selector,
     /** The option's value, or its visible label — whichever the page uses. */
     value: z.string(),
-  }),
+  }).strict(),
   Base.extend({
     action: z.literal("zoom"),
     selector: Selector.optional(),
@@ -99,15 +135,15 @@ export const Step = z.discriminatedUnion("action", [
     x: z.number().optional(),
     y: z.number().optional(),
     duration: z.number().positive().optional(),
-  }),
-  Base.extend({ action: z.literal("keyboard"), key: z.string().min(1) }),
-  Base.extend({ action: z.literal("navigate"), url: z.string().min(1) }),
-  Base.extend({ action: z.literal("screenshot"), name: z.string().optional() }),
+  }).strict(),
+  Base.extend({ action: z.literal("keyboard"), key: z.string().min(1) }).strict(),
+  Base.extend({ action: z.literal("navigate"), url: z.string().min(1) }).strict(),
+  Base.extend({ action: z.literal("screenshot"), name: z.string().optional() }).strict(),
   /** Attach local files to a file input (no OS dialog is involved). */
-  Base.extend({ action: z.literal("upload"), selector: Selector, files: z.union([z.string(), z.array(z.string())]) }),
+  Base.extend({ action: z.literal("upload"), selector: Selector, files: z.union([z.string(), z.array(z.string())]) }).strict(),
   /** Click something that downloads, and catch the file. Saved next to the
       video as downloads/<name>; `expect` fails the step if the name mismatches. */
-  Base.extend({ action: z.literal("download"), selector: Selector.optional(), saveAs: z.string().optional(), expect: z.string().optional() }),
+  Base.extend({ action: z.literal("download"), selector: Selector.optional(), saveAs: z.string().optional(), expect: z.string().optional() }).strict(),
   /** Wait for a selector to appear (Retake extra; the thing testreel's JSON lacks
       for AI-driven apps whose next screen arrives whenever the model answers). */
   /** Wait for a real result. A bare selector resolves the instant the element
@@ -126,9 +162,9 @@ export const Step = z.discriminatedUnion("action", [
     stableMs: z.number().min(50).max(30_000).optional(),
     /** Resolve only once it holds at least this much text. */
     minChars: z.number().int().positive().optional(),
-  }),
+  }).strict(),
   /** Run JS in the page (Retake extra). Used for seeding, hiding chrome, etc. */
-  Base.extend({ action: z.literal("evaluate"), script: z.string().min(1) }),
+  Base.extend({ action: z.literal("evaluate"), script: z.string().min(1) }).strict(),
   /** Change what a stubbed endpoint answers, mid-take. This is how a demo shows
       something *arriving*: the queue is empty, an action happens, the stub is
       swapped, the next poll shows the new row. */
@@ -139,7 +175,7 @@ export const Step = z.discriminatedUnion("action", [
     status: z.number().int().optional(),
     json: z.unknown().optional(),
     from: z.string().optional(),
-  }),
+  }).strict(),
   /** Point at something while the take holds: an animated ring and an optional
       label, drawn at render time from the box recorded here. Sparingly — one
       per scene at most; the captions carry the story. */
@@ -149,7 +185,7 @@ export const Step = z.discriminatedUnion("action", [
     at: Point.optional(),
     label: z.string().max(60).optional(),
     ms: z.number().positive().max(8000).default(2200),
-  }),
+  }).strict(),
   /** A named beat. Timestamps go into the proof log; `caption` gets burned into
       the video from this moment until the next scene (or `holdMs`). */
   Base.extend({
@@ -179,9 +215,16 @@ export const Step = z.discriminatedUnion("action", [
     /** Where the camera looks during this scene. Omitted → the manifest's
         `camera` policy (auto = focus on the last selector used, static = none). */
     camera: z
-      .union([z.literal("static"), z.literal("auto"), z.object({ focus: Selector.optional(), zoom: z.number().min(1).max(3).optional() })])
+      .union([z.literal("static"), z.literal("auto"), z.object({
+        focus: Selector.optional(),
+        zoom: z.number().min(1).max(3).optional(),
+        /** Hold the focused view, then ease back to the full frame. Render-time. */
+        holdMs: z.number().int().min(0).max(30_000).optional(),
+        /** Duration of both the zoom-in and zoom-out transition. Render-time. */
+        easeMs: z.number().int().min(200).max(3000).optional(),
+      })])
       .optional(),
-  }),
+  }).strict()
 ]).superRefine((st, ctx) => {
   if ((st.action === "click" || st.action === "hover" || st.action === "callout") && !st.selector && !st.at) {
     ctx.addIssue({ code: "custom", message: `${st.action} needs either a selector or an \`at\` point` });
@@ -256,6 +299,11 @@ const ManifestShape = z.object({
       legitimate, and each one still has to earn the second it costs.
       Retake never upgrades a demo to a launch on its own. */
   mode: z.enum(["demo", "launch"]).default("demo"),
+  /** Narrated videos default to a real walkthrough: each spoken beat must
+      contain a visible state-changing action. `presentation` is an explicit
+      opt-out for announcements/title reels whose subject is intentionally
+      static. Never use it to make a tutorial validate. */
+  interactionStyle: z.enum(["walkthrough", "presentation"]).default("walkthrough"),
   /** How typed text lands. `natural` is the per-step default (~80ms a key);
       `brisk` is the launch rhythm — fast keys (~22ms), the pauses carrying
       the meaning instead. A step's own `delay` always wins. */
@@ -269,6 +317,9 @@ const ManifestShape = z.object({
       z.object({
         voice: z.string().default("en-US-JennyNeural"),
         gainDb: z.number().min(-20).max(10).default(0),
+        /** Edge TTS speaking-rate adjustment. Keep it bounded so narration
+            remains understandable and does not outrun the matching action. */
+        ratePercent: z.number().int().min(-50).max(50).default(0),
         /** One continuous script, synthesized as a single performance and
             laid under the whole video — the only shape that keeps prosody.
             Without it, narration is per-scene fragments: prosody resets at
@@ -276,6 +327,14 @@ const ManifestShape = z.object({
             instead of speech. Fragments are refused unless `fragments: true`
             says you know. */
         script: z.string().optional(),
+        /** Where the performance goes. "start": laid under the whole video
+            from the first frame — natural, but nothing lands on its action.
+            "scenes": the script is read ONCE (prosody intact), then each
+            blank-line-separated paragraph is cut from that performance and
+            placed at its narrated scene, in order. One paragraph per
+            narrated scene. A paragraph that runs into the next scene is
+            reported, never sped up: shorten the line. */
+        align: z.enum(["start", "scenes"]).default("start"),
         fragments: z.boolean().default(false),
         /** A person has heard this voice and this script and approved them.
             Synthesis succeeding is not approval. */
@@ -327,17 +386,45 @@ const ManifestShape = z.object({
       true` when a viewer genuinely cannot follow without them. */
   captions: z.union([z.boolean(), z.object({ fontSize: z.number().int().optional(), color: z.string().optional() })]).default(false),
   theme: z.object({ background: z.string().optional(), ink: z.string().optional() }).prefault({}),
+  /** How the title and end cards look, when they should look like a brand
+      rather than like Retake. Ground and ink, the mark above the title, the
+      typeface, and the soft circles in opposite corners. Paths are from the
+      workspace root, like `music`. Embedded into the card at render, so the
+      render never depends on the network. Absent: Retake's own card. */
+  card: z.object({
+    background: z.string(),
+    ink: z.string(),
+    logo: z.string().optional(),
+    font: z.string().optional(),
+    weight: z.number().int().min(100).max(900).default(560),
+    ornament: z.enum(["circles", "none"]).default("none"),
+    /** The circles' own colour. A tint of the ink cannot reach a pale mint. */
+    orb: z.string().optional(),
+  }).strict().optional(),
   colorScheme: z.enum(["light", "dark"]).default("light"),
   /** Ask the page for reduced motion. Apps that respect it lose their infinite
       spinners and entrance animations — steadier frames, smaller files. */
   reducedMotion: z.boolean().default(false),
+  /** CSS injected before every document in the browser context. Unlike a
+      setup/evaluate step, this survives full-page navigation and prevents a
+      private balance or transient widget from appearing for even one frame
+      before the destination cleanup step runs. */
+  persistentCss: z.string().max(50_000).optional(),
+  /** Make browser-visible time and randomness repeatable. Useful when a demo
+      contains relative dates, generated examples, or randomized ordering. */
+  determinism: z.object({
+    freezeTime: z.string().datetime({ offset: true }).optional(),
+    randomSeed: z.number().int().min(0).max(0xffffffff).optional(),
+  }).optional(),
   waitForSelector: Selector.optional(),
   speed: z.number().positive().default(1),
-  /** Cursor overlay (testreel). false → none; {style: touch} → tap dot. Size is preset-scaled unless set. */
+  /** Cursor overlay (testreel). false → none; {style: touch} → tap dot. Size is
+      preset-scaled unless set. transitionMs fixes the travel time independently
+      of global video speed, for deliberately paced presentation demos. */
   /** cursor.idleHide: fade the cursor out when idle (testreel default). Long
       demos used to lose it (nested-if depth in ffmpeg); the flat cursor
       expressions lifted that, so it is simply on unless you say otherwise. */
-  cursor: z.union([z.boolean(), z.object({ style: z.enum(["default", "pointer", "text", "touch"]).optional(), size: z.number().optional(), idleHideMs: z.number().optional(), idleHide: z.boolean().optional() })]).default(true),
+  cursor: z.union([z.boolean(), z.object({ style: z.enum(["default", "pointer", "text", "touch"]).optional(), size: z.number().optional(), rippleColor: z.string().optional(), rippleSize: z.number().min(0).optional(), transitionMs: z.number().int().min(100).max(2000).optional(), idleHideMs: z.number().optional(), idleHide: z.boolean().optional() })]).default(true),
   seed: z.array(Seed).default([]),
   /** What a failed step does to the take. "stop" (default): the camera stops
       at the failure, so nobody gets one interaction and ten minutes of
@@ -384,6 +471,13 @@ export const Manifest = ManifestShape.superRefine((m, ctx) => {
   // not read the captions as fragments at all, because that is the defect,
   // not the voice: prosody resets every line and the rhythm follows scene
   // boundaries instead of speech.
+  if (m.voiceover && m.voiceover !== true && m.voiceover.align === "scenes" && m.voiceover.script) {
+    const paragraphs = m.voiceover.script.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean).length;
+    const narrated = m.steps.filter((st) => st.action === "scene" && !!st.caption?.trim()).length;
+    if (paragraphs !== narrated) {
+      ctx.addIssue({ code: "custom", path: ["voiceover", "script"], message: `aligned narration needs one paragraph per narrated scene, in order — the script has ${paragraphs}, the demo has ${narrated}. Separate paragraphs with a blank line.` });
+    }
+  }
   if (m.voiceover) {
     const vo = m.voiceover === true ? { approved: false, script: undefined, fragments: false } : m.voiceover;
     if (!vo.approved) {
@@ -391,6 +485,38 @@ export const Manifest = ManifestShape.superRefine((m, ctx) => {
     }
     if (!vo.script && !vo.fragments) {
       ctx.addIssue({ code: "custom", path: ["voiceover"], message: "voiceover needs `script:` — one continuous script, synthesized as a single performance. Reading the captions line by line resets prosody at every scene and paces the speech off scene boundaries. Set `fragments: true` only if you have heard the fragmented read and want it." });
+    }
+
+    if (m.interactionStyle === "walkthrough") {
+      const narrated = m.steps
+        .map((step, index) => ({ step, index }))
+        .filter(({ step }) => step.action === "scene" && !!step.caption?.trim());
+      const visibleActions = new Set(["click", "type", "fill", "select", "drag", "scroll", "keyboard", "navigate", "upload", "download"]);
+
+      const opening = narrated[0];
+      if (opening?.step.action === "scene" && (opening.step.pauseAfter ?? 0) > 4000) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["steps", opening.index, "pauseAfter"],
+          message: "walkthrough opening orientation must be 4000ms or shorter; show the first real action instead of narrating over a static screen",
+        });
+      }
+
+      // A final narrated beat may close the story. Every earlier beat has to
+      // contain an actual operation before the next narration marker. Hover,
+      // wait, camera motion and page animation are not proof of a walkthrough.
+      for (let i = 0; i < narrated.length - 1; i += 1) {
+        const current = narrated[i];
+        const next = narrated[i + 1];
+        const interval = m.steps.slice(current.index + 1, next.index);
+        if (!interval.some((step) => visibleActions.has(step.action))) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["steps", current.index],
+            message: `narrated walkthrough scene "${current.step.action === "scene" ? current.step.label : current.index}" needs a visible state-changing action before the next narrated beat; hover, wait, camera motion and a static screen do not count`,
+          });
+        }
+      }
     }
   }
 
@@ -449,8 +575,60 @@ export function loadManifest(file: string): LoadedManifest {
 }
 
 /** Things worth saying out loud before a run. Not errors — the run proceeds. */
+/** Words that carry no subject, so sharing them proves nothing. */
+const FILLER = new Set("a an and are as at be because been but by do does for from had has have how in into is it its not of on one or our out so still that the their them then there these they this to too up was what when where which who will with you your".split(" "));
+
+/**
+ * Does the narration belong to THIS demo?
+ *
+ * A script copied from another manifest records perfectly: right size, right
+ * voice, right loudness, every check green — and says the wrong words over the
+ * wrong screens. Nothing downstream can catch that, because every signal a
+ * checker measures is about form. The captions are the demo's own spine, so a
+ * script that shares almost no subject matter with them is the one sign worth
+ * acting on.
+ */
+export function narrationMatchesCaptions(m: Manifest): { overlap: number; shared: string[] } | null {
+  const vo = m.voiceover;
+  const script = vo && typeof vo === "object" ? vo.script : undefined;
+  if (!script) return null;
+  const captions = m.steps
+    .filter((st): st is Extract<Step, { action: "scene" }> => st.action === "scene")
+    .map((st) => st.caption ?? "")
+    .join(" ");
+  if (!captions.trim()) return null;
+  const words = (t: string) => new Set(t.toLowerCase().match(/[a-z']{3,}/g)?.filter((x) => !FILLER.has(x)) ?? []);
+  const cap = words(captions);
+  const scr = words(script);
+  if (!cap.size || !scr.size) return null;
+  const shared = [...cap].filter((x) => scr.has(x));
+  return { overlap: shared.length / cap.size, shared };
+}
+
 export function warnings(m: Manifest): string[] {
   const w: string[] = [];
+  // Narration leads the cursor. A scene marker AFTER the actions it describes
+  // means the voice says "turn it on" once the switch is already on — and
+  // everything before the first line plays in silence.
+  if (m.voiceover && m.voiceover !== true && m.voiceover.script) {
+    const visible = new Set(["click", "type", "fill", "select", "drag", "scroll", "keyboard", "navigate", "upload"]);
+    const firstLine = m.steps.findIndex((st) => st.action === "scene" && !!st.caption?.trim());
+    const before = firstLine < 0 ? 0 : m.steps.slice(0, firstLine).filter((st) => visible.has(st.action)).length;
+    if (before > 0) w.push(`${before} action${before === 1 ? "" : "s"} happen on screen before the first line is spoken — they play in silence, and every line lands after what it describes. Put each scene marker BEFORE the actions it narrates, so the voice leads the cursor.`);
+  }
+  // Narration says why, never how. The viewer can see the cursor; a voice
+  // that says "turn it on" or "click the tab" is reading the screen aloud.
+  // None of the north-star scripts give the viewer an instruction — they say
+  // what the person wanted and what it saves them.
+  if (m.voiceover && m.voiceover !== true && m.voiceover.script) {
+    const verbs = /^(?:(?:then|now|and|so|next|first|just)\s+)?(click|tap|press|open|close|turn|toggle|switch|pin|unpin|scroll|select|choose|pick|type|enter|drag|go|navigate|hit|expand|collapse|hover)\b/i;
+    const told = m.voiceover.script.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter((x) => verbs.test(x));
+    if (told.length) w.push(`the narration tells the viewer to operate the screen — ${told.slice(0, 3).map((x) => `“${x.length > 48 ? x.slice(0, 48) + "…" : x}”`).join(", ")}. They can see the cursor do that. Say why it matters or what it saves instead.`);
+  }
+  const match = narrationMatchesCaptions(m);
+  if (match && match.overlap < 0.25) {
+    w.push(`the narration barely mentions what this demo shows — ${Math.round(match.overlap * 100)}% of the captions' words appear in the script${match.shared.length ? ` (only: ${match.shared.slice(0, 6).join(", ")})` : ""}. A script copied from another manifest records perfectly and says the wrong thing; read it against the captions before approving it.`);
+  }
   // A demo proves an interaction; a launch presents the product. Launch
   // furniture in a demo is noise the viewer has to look past.
   // A held opening frame is the point of a launch cut, not a mistake.
@@ -540,7 +718,7 @@ export type Resolved = Preset & {
   viewport: { width: number; height: number };
   layout: Layout;
   gif: { width: number; fps: number } | false;
-  cursor: false | { style: "default" | "pointer" | "text" | "touch"; size: number; idleHideMs: number; idleHide: boolean | undefined };
+  cursor: false | { style: "default" | "pointer" | "text" | "touch"; size: number; rippleColor: string | undefined; rippleSize: number | undefined; transitionMs: number | undefined; idleHideMs: number; idleHide: boolean | undefined };
   captions: false | { fontSize: number; color?: string };
   theme: { background: string; ink: string };
 };
@@ -565,7 +743,7 @@ export function resolve(m: Manifest): Resolved {
     : gifOverride === true ? (p.gif === false ? GIF_DEFAULT : p.gif)
     : p.gif === false ? { width: gifOverride.width ?? GIF_DEFAULT.width, fps: gifOverride.fps ?? GIF_DEFAULT.fps }
     : { width: gifOverride.width ?? p.gif.width, fps: gifOverride.fps ?? p.gif.fps };
-  const cursor = m.cursor === false ? (false as const) : { style: (m.cursor === true ? "default" : m.cursor.style ?? "default") as "default" | "pointer" | "text" | "touch", size: m.cursor === true ? p.cursorSize : m.cursor.size ?? p.cursorSize, idleHideMs: m.cursor === true ? 2000 : m.cursor.idleHideMs ?? 2000, idleHide: m.cursor === true ? undefined : m.cursor.idleHide };
+  const cursor = m.cursor === false ? (false as const) : { style: (m.cursor === true ? "default" : m.cursor.style ?? "default") as "default" | "pointer" | "text" | "touch", size: m.cursor === true ? p.cursorSize : m.cursor.size ?? p.cursorSize, rippleColor: m.cursor === true ? undefined : m.cursor.rippleColor, rippleSize: m.cursor === true ? undefined : m.cursor.rippleSize, transitionMs: m.cursor === true ? undefined : m.cursor.transitionMs, idleHideMs: m.cursor === true ? 2000 : m.cursor.idleHideMs ?? 2000, idleHide: m.cursor === true ? undefined : m.cursor.idleHide };
   const captions = m.captions === false ? (false as const) : { fontSize: m.captions === true ? p.captionFontSize : m.captions.fontSize ?? p.captionFontSize, color: m.captions === true ? undefined : m.captions.color };
   return {
     ...p,

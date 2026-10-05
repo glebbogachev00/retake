@@ -2,7 +2,7 @@
  * Where things are. Two roots, kept apart on purpose:
  *
  *   PKG_ROOT      the installed Retake package — its skill, landing page,
- *                 assets, example manifest, and the code itself
+ *                 assets and the code itself
  *   PROJECT_ROOT  the workspace Retake works in — demos/, outputs/, .env,
  *                 .auth/, the UI's drafts and trash
  *
