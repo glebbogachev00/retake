@@ -11,7 +11,7 @@ import YAML from "yaml";
 import { EnvSpec } from "../src/recording-env.js";
 import {
   briefMarkdown, contrast, dominant, environmentYaml, hexRgb, isLocal, isolatedPort, movePort, productName,
-  orbs, reachingVariables, readLook, routineFor, startOnPort, straightSides, type Frame, type Rgb,
+  decideBrand, orbs, reachingVariables, readLook, routineFor, svgColours, startOnPort, straightSides, type Frame, type Rgb,
 } from "../src/setup.js";
 
 const W = 96, H = 54;
@@ -141,4 +141,41 @@ test("soft circles in opposite corners are the card's ornament; a plain card has
   // One corner alone is a stray mark, not an ornament.
   const oneCorner = frame((x, y) => (x < 12 && y < 9 ? ORB : LIGHT));
   assert.deepEqual(orbs(oneCorner, LIGHT), {});
+});
+
+test("the brand comes from the app: Retake is paper and ink with amber, never Capture green", () => {
+  const b = decideBrand({
+    ground: "#f2efe6", ink: "#191d19",
+    vars: { "--paper": "#f2efe6", "--ink": "#191d19", "--accent": "#1a1c1e", "--amber": "#e8b04b", "--ok": "#2f5d3f", "--bad": "#a23b2c" },
+    mark: ["#1a1c1e", "#e8b04b"],
+  });
+  assert.equal(b.accent, "#e8b04b", "a status green or an error red is not the brand");
+  assert.equal(b.matte, "#191d19", "amber is too light to carry text, so the frame is the ink");
+  assert.equal(b.ground, "#f2efe6");
+});
+
+test("a dark brand colour carries the frame and the card's words", () => {
+  const b = decideBrand({ ground: "#fdfdfd", ink: "#1b1b1b", vars: { "--brand": "#2f5d3f" }, mark: [] });
+  assert.equal(b.matte, "#2f5d3f");
+  // Nothing declared: the theme-color, then the mark's own colour.
+  assert.equal(decideBrand({ ground: "#ffffff", ink: "#111111", vars: {}, themeColor: "#1d4ed8", mark: [] }).accent, "#1d4ed8");
+  assert.equal(decideBrand({ ground: "#ffffff", ink: "#111111", vars: {}, mark: ["#ffffff", "#c2410c"] }).accent, "#c2410c");
+  assert.equal(decideBrand({ ground: "#ffffff", ink: "#111111", vars: {}, mark: [] }).matte, "#111111");
+});
+
+test("an SVG mark's colours are read from its fills", () => {
+  assert.deepEqual(svgColours(`<svg><rect fill="#1A1C1E"/><path style="fill:#e8b04b"/><circle stroke='#fff'/></svg>`), ["#1a1c1e", "#e8b04b", "#ffffff"]);
+});
+
+test("the north star lends its format, the brand its colours", () => {
+  const look = readLook({ intro: card, body: inset, outro: card }, { width: 1920, height: 1080 });
+  const brand = decideBrand({ ground: "#f2efe6", ink: "#191d19", vars: { "--amber": "#e8b04b" }, mark: [] });
+  const r = routineFor({ look: { ...look, card: { ...look.card!, ornament: "circles", orb: "#edf5f0" } }, narrated: true, brief: "b", brand });
+  assert.equal(r.style, "showcase");
+  assert.equal(r.cards, true);
+  assert.equal(r.card?.ornament, "circles", "the format is the north star's");
+  assert.equal(r.card?.background, "#f2efe6");
+  assert.equal(r.card?.ink, "#191d19");
+  assert.notEqual(r.card?.orb, "#edf5f0", "the circles are tinted with this brand, not the north star's");
+  assert.deepEqual(r.theme, { background: "#191d19", ink: "#f2efe6" });
 });

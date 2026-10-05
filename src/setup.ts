@@ -345,9 +345,13 @@ export function briefMarkdown(o: {
 
 export function routineFor(o: {
   look?: Look; narrated: boolean; inheritVoice?: { voice: string; rate: number };
-  reference?: string; brief: string; environment?: string; logo?: string;
+  reference?: string; brief: string; environment?: string; logo?: string; brand?: Brand;
 }): Routine {
   const look = o.look;
+  const b = o.brand;
+  // The north star's shape, the product's colours.
+  const theme = b ? (look?.style !== "fullscreen" ? { background: b.matte, ink: b.ground } : undefined) : look?.theme;
+  const card = look?.card ? { ...look.card, ...(b ? { background: b.ground, ink: b.matte, ...(look.card.ornament ? { orb: b.orb } : {}) } : {}) } : undefined;
   const voice = o.narrated ? (o.inheritVoice?.voice && o.inheritVoice.voice !== "silent" ? o.inheritVoice.voice : "andrew") : "silent";
   return RoutineSchema.parse({
     style: look?.style ?? "showcase",
@@ -355,9 +359,9 @@ export function routineFor(o: {
     rate: o.narrated && o.inheritVoice && o.inheritVoice.voice === voice ? o.inheritVoice.rate : 0,
     captions: false,
     mode: look?.cards ? "launch" : "demo",
-    ...(look?.theme ? { theme: look.theme } : {}),
+    ...(theme ? { theme } : {}),
     cards: look?.cards ?? false,
-    ...(look?.card ? { card: { ...look.card, ...(o.logo ? { logo: o.logo } : {}) } } : {}),
+    ...(card ? { card: { ...card, ...(o.logo ? { logo: o.logo } : {}) } } : {}),
     ...(o.reference ? { reference: o.reference } : {}),
     brief: o.brief,
     ...(o.environment ? { environment: o.environment } : {}),
@@ -374,20 +378,112 @@ export function startOnPort(command: string, script: string, port: number): stri
   return `PORT=${port} ${command}${takesFlag ? ` -- --port ${port}` : ""}`;
 }
 
-/** The brand's mark as the page declares it: an SVG, or a PNG big enough to
-    sit on a 1080p card. A 16px favicon is not a mark; it is left out. */
-export async function fetchMark(url: string, outBase: string): Promise<string | null> {
+/* ─── the brand ───────────────────────────────────────────────────────────
+   The north star gives the FORMAT — cards or not, inset or full frame, the
+   corner circles, the pace and the voice. The colours are the product's own.
+   Taking them from the north star dressed Retake's videos in Capture green.
+   They are read off the app: what its page is painted with, and the colour
+   it declares as its own. */
+
+export type BrandFacts = {
+  /** The page's own ground and text, as rendered. */
+  ground: string; ink: string;
+  /** Colour custom properties declared on :root, by name. */
+  vars: Record<string, string>;
+  themeColor?: string;
+  /** Colours the mark itself is drawn in. */
+  mark: string[];
+};
+
+export type Brand = { ground: string; ink: string; accent?: string; matte: string; orb: string; why: string[] };
+
+function hsl([r, g, b]: Rgb): { s: number; l: number } {
+  const [R, G, B] = [r / 255, g / 255, b / 255];
+  const max = Math.max(R, G, B), min = Math.min(R, G, B), l = (max + min) / 2;
+  const s = max === min ? 0 : l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+  return { s, l };
+}
+
+export const mix = (a: string, b: string, t: number): string => {
+  const [x, y] = [hexRgb(a), hexRgb(b)];
+  return hex([x[0] * t + y[0] * (1 - t), x[1] * t + y[1] * (1 - t), x[2] * t + y[2] * (1 - t)]);
+};
+
+/**
+ * The brand, decided from what the app declares. The accent is the colour it
+ * names as its own — a saturated custom property, never a status colour (an
+ * error red is not a brand) — else its theme-color, else its mark's. The
+ * frame and the card's words are the brand's carrying colour: the accent when
+ * it is dark enough to hold the ground as text, the ink when it is not.
+ */
+export function decideBrand(f: BrandFacts): Brand {
+  const why: string[] = [];
+  const vivid = (h: string) => { const { s, l } = hsl(hexRgb(h)); return s >= 0.25 && l >= 0.18 && l <= 0.82; };
+  const status = /(bad|error|danger|warn|warning|ok|success|good|info|fail|pass|positive|negative)$/i;
+  const named = Object.entries(f.vars).filter(([k, v]) => !status.test(k) && vivid(v));
+  const preferred = named.find(([k]) => /(brand|primary|accent)/i.test(k)) ?? [...named].sort((x, y) => hsl(hexRgb(y[1])).s - hsl(hexRgb(x[1])).s)[0];
+  let accent: string | undefined;
+  if (preferred) { accent = preferred[1]; why.push(`accent ${accent} — the page's ${preferred[0]}`); }
+  else if (f.themeColor && vivid(f.themeColor)) { accent = f.themeColor; why.push(`accent ${accent} — its theme-color`); }
+  else { const m = f.mark.find(vivid); if (m) { accent = m; why.push(`accent ${accent} — from its mark`); } }
+  const { ground, ink } = f;
+  const carries = !!accent && contrast(hexRgb(accent), hexRgb(ground)) >= 4.5;
+  const matte = carries ? accent! : ink;
+  why.push(`ground ${ground}, ink ${ink} — what the page is painted with`);
+  why.push(carries ? `frame and card words in ${accent}, which holds the ground as text` : `frame and card words in ${ink}${accent ? ` — ${accent} is too light to carry text` : ""}`);
+  return { ground, ink, accent, matte, orb: mix(accent ?? ink, ground, accent ? 0.14 : 0.06), why };
+}
+
+const COLOR_FACTS = `(() => {
+  const probe = document.createElement('i');
+  document.body.appendChild(probe);
+  const toHex = (v) => {
+    probe.style.color = ''; probe.style.color = v;
+    if (!probe.style.color) return null;
+    const m = getComputedStyle(probe).color.match(/rgba?\\(([\\d.]+), ([\\d.]+), ([\\d.]+)(?:, ([\\d.]+))?/);
+    if (!m || (m[4] !== undefined && Number(m[4]) < 0.5)) return null;
+    return '#' + [m[1], m[2], m[3]].map((n) => Math.round(Number(n)).toString(16).padStart(2, '0')).join('');
+  };
+  const bgHex = (el) => { const c = getComputedStyle(el).backgroundColor; const m = c.match(/rgba?\\(([\\d.]+), ([\\d.]+), ([\\d.]+)(?:, ([\\d.]+))?/); if (!m || (m[4] !== undefined && Number(m[4]) < 0.5)) return null; return toHex(c); };
+  const vars = {};
+  for (const sheet of [...document.styleSheets]) {
+    let rules; try { rules = sheet.cssRules; } catch { continue; }
+    for (const r of [...rules]) {
+      if (!r.style || !/^(:root|html|body)$/.test((r.selectorText || '').trim())) continue;
+      for (const k of [...r.style]) if (k.startsWith('--')) { const h = toHex(r.style.getPropertyValue(k).trim()); if (h) vars[k] = h; }
+    }
+  }
+  const ground = bgHex(document.body) || bgHex(document.documentElement) || '#ffffff';
+  const ink = toHex(getComputedStyle(document.body).color) || '#111111';
+  const tc = document.querySelector('meta[name="theme-color"]');
+  probe.remove();
+  return { ground, ink, vars, themeColor: tc ? (toHex(tc.content) || undefined) : undefined };
+})()`;
+
+/** Colours an SVG mark is drawn in, read from its fill and stroke values. */
+export function svgColours(svg: string): string[] {
+  const found = [...svg.matchAll(/(?:fill|stroke|stop-color)\s*[:=]\s*["']?(#[0-9a-f]{6}|#[0-9a-f]{3})\b/gi)].map((m) => m[1].toLowerCase());
+  return [...new Set(found.map((h) => (h.length === 4 ? `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}` : h)))];
+}
+
+/** The brand's mark as the page declares it — an SVG, or a PNG big enough to
+    sit on a 1080p card (a 16px favicon is not a mark) — and the colours the
+    page is painted with. One visit to the page for both. */
+export async function readBrand(url: string, outBase: string): Promise<{ logo: string | null; facts: BrandFacts | null }> {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage();
+    const page = await browser.newPage({ colorScheme: "light" });
     await page.goto(url, { waitUntil: "networkidle", timeout: 25_000 }).catch(() => undefined);
+    const colours = (await page.evaluate(COLOR_FACTS).catch(() => null)) as Omit<BrandFacts, "mark"> | null;
     const icons = (await page.evaluate(`[...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"], link[rel="mask-icon"]')]
       .map((l) => ({ href: l.href, rel: l.rel, type: l.type || "", sizes: (l.sizes && l.sizes.value) || "" }))`)) as { href: string; rel: string; type: string; sizes: string }[];
     const size = (s: string) => Math.max(0, ...s.split(/\s+/).map((v) => Number(v.split("x")[0]) || 0));
     const ranked = icons
       .filter((i) => i.href && !/\.ico(\?|$)/i.test(i.href) && !/mask-icon/.test(i.rel))
       .sort((a, b) => Number(/svg/.test(b.type + b.href)) - Number(/svg/.test(a.type + a.href)) || size(b.sizes) - size(a.sizes));
+    let logo: string | null = null;
+    let mark: string[] = [];
     for (const icon of ranked) {
       const res = await page.request.get(icon.href).catch(() => null);
       if (!res || !res.ok()) continue;
@@ -398,9 +494,11 @@ export async function fetchMark(url: string, outBase: string): Promise<string | 
       if (ext === ".png" && body.length > 24 && body.readUInt32BE(16) < 96) continue;
       fs.mkdirSync(path.dirname(outBase), { recursive: true });
       fs.writeFileSync(outBase + ext, body);
-      return outBase + ext;
+      logo = outBase + ext;
+      if (ext === ".svg") mark = svgColours(body.toString("utf8"));
+      break;
     }
-    return null;
+    return { logo, facts: colours ? { ...colours, mark } : null };
   } finally {
     await browser.close();
   }
@@ -460,7 +558,7 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
       body: grabFrame(ff, reference, m.seconds / 2),
       outro: grabFrame(ff, reference, Math.max(0, m.seconds - 0.8)),
     }, m);
-    o.log(`  north star  ${facts} — ${look.style}${look.cards ? `, cards on ${look.card!.background} in ${look.card!.ink}` : ", no cards"}${look.theme ? `, inset on ${look.theme.background}` : ""}`);
+    o.log(`  north star  ${facts} — the format: ${look.style}${look.cards ? `, opening and closing cards${look.card?.ornament ? " with corner circles" : ""}` : ", no cards"}`);
     for (const n of look.notes) o.log(`             ${n}`);
   } else {
     next.push(`retake routine reference <video>   — the one cut you would be happy to get every time; the cards and colours come from it`);
@@ -502,6 +600,7 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
   // isolated instance or the live site, never from your own tab.
   let seen: Seen[] = [];
   let logo: string | undefined;
+  let brand: Brand | undefined;
   if (target) {
     const { scout } = await import("./describe.js");
     try {
@@ -513,10 +612,14 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
     } catch (e) {
       o.log(`  could not read the first screen: ${(e as Error).message.split("\n")[0]}`);
     }
+    const read = await readBrand(target, path.join(o.demosDir, "brand", `${name}-mark`)).catch(() => ({ logo: null, facts: null }));
+    if (read.facts) {
+      brand = decideBrand(read.facts);
+      o.log(`  brand       ${brand.why.join("\n              ")}`);
+    }
     if (look?.cards) {
-      const mark = await fetchMark(target, path.join(o.demosDir, "brand", `${name}-mark`)).catch(() => null);
-      if (mark) { logo = rel(mark); wrote.push(logo); o.log(`  mark        ${logo}`); }
-      else next.push(`no mark the card can draw was found on the page (an SVG or a large PNG) — put one at demos/brand/${name}-mark.svg and \`retake routine set\` will not need touching: setup reads it on the next run`);
+      if (read.logo) { logo = rel(read.logo); wrote.push(logo); o.log(`  mark        ${logo}`); }
+      else next.push(`no mark the card can draw was found on the page (an SVG or a large PNG) — put one at demos/brand/${name}-mark.svg, then \`retake routine set logo <file>\``);
     }
     if (environment && seen.length) {
       // Proof the right app answered: two things the first screen showed.
@@ -545,8 +648,9 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
   const routine = routineFor({
     look, narrated,
     inheritVoice: current ? { voice: current.voice, rate: current.rate } : undefined,
-    reference: reference && rel(reference), brief: rel(brief), environment: environment && rel(environment), logo,
+    reference: reference && rel(reference), brief: rel(brief), environment: environment && rel(environment), logo, brand,
   });
+  if (!brand && look?.card) next.push(`the app's colours could not be read, so the cards and frame use the north star's — \`retake routine set brand ground=#… matte=#…\``);
   const file = existing ?? starter();
   if (!existing) delete (file.routines as Record<string, Routine>).default;
   file.routines[name] = routine;
