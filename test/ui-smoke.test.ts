@@ -364,6 +364,46 @@ test("a first-time user can describe one demo and make an honest narration choic
   await p.close();
 });
 
+test("an expired agent sign-in is one button, and the draft starts again by itself", async () => {
+  const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs: string[] = [];
+  p.on("pageerror", (e) => errs.push(String(e)));
+  p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  let starts = 0;
+  let polls = 0;
+  let loginStarted = false;
+  await p.route("**/api/demos", async (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await p.route("**/api/brand", async (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ name: "example", brand: null }) }));
+  await p.route("**/api/operator", async (r) => { starts++; await r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: `run${starts}`, provider: "claude-code" }) }); });
+  await p.route("**/api/operator/run1/stream*", async (r) => r.fulfill({
+    status: 200, contentType: "text/event-stream",
+    body: `event: done\ndata: ${JSON.stringify({ code: 1, summary: "Claude Code needs you to sign in again.", signIn: "claude-code" })}\n\n`,
+  }));
+  await p.route("**/api/operator/run2/stream*", async (r) => r.fulfill({ status: 200, contentType: "text/event-stream", body: "retry: 5000\n\n" }));
+  await p.route("**/api/signin*", async (r) => {
+    if (r.request().method() === "POST") loginStarted = true; else polls++;
+    await r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: polls >= 2, waiting: polls < 2, failed: false }) });
+  });
+  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
+  await p.locator("#onboard-url").fill("https://example.com");
+  await p.locator("#onboard-next").click();
+  await p.waitForFunction(() => /could not be read/.test(document.getElementById("brand-lead")?.textContent || ""));
+  await p.locator("#onboard-next").click();
+  await p.locator("#onboard-describe").fill("Show a visitor creating the first project");
+  await p.locator("#onboard-next").click();
+  await p.locator("#onboard-next").click();
+  await p.locator("#onboard-submit").click();
+  await p.locator("[data-signin]").waitFor();
+  assert.match(await p.locator("#onboarding").innerText(), /Sign in to Claude Code/);
+  assert.match(await p.locator("#onboarding").innerText(), /never sees your password/i);
+  await p.locator("[data-signin]").click();
+  await p.waitForFunction(() => /making the first draft/i.test(document.getElementById("onboarding")?.innerText || ""), undefined, { timeout: 15_000 });
+  assert.equal(loginStarted, true, "the agent's own login was started");
+  assert.equal(starts, 2, "the same draft started again by itself once signed in");
+  assert.deepEqual(errs, []);
+  await p.close();
+});
+
 test("a failed first draft retries without asking for the request again", async () => {
   const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errs: string[] = [];

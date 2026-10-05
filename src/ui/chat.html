@@ -585,6 +585,7 @@ async function api(u, o) {
 // title can be inferred later; blocking a first take on them would be ceremony.
 const ONBOARD_KEY = 'retake:first-demo';
 const ONBOARD_RETRY_KEY = 'retake:retry-first-demo';
+const ONBOARD_AUTOSTART_KEY = 'retake:autostart-first-demo';
 const VOICE_NAMES = { silent:'No voiceover', edge:'Edge online voice', aiden:'Aiden · local Qwen', kokoro:'Kokoro · local, compact' };
 let onboardingStep = 1;
 let onboardingState = { url:'', describe:'', voice:'silent', consent:false };
@@ -657,6 +658,13 @@ function showOnboarding() {
   if (onboardingSubmitted) return;
   renderOnboarding();
   setTimeout(() => (onboardingStep === 1 ? $('onboard-url') : onboardingStep === 3 ? $('onboard-describe') : null)?.focus(), 40);
+  // Back from signing the agent in: start the same draft again, once. A
+  // voice that needs consent stops at that step instead — consent is asked
+  // again, never carried.
+  if (sessionStorage.getItem(ONBOARD_AUTOSTART_KEY) === '1') {
+    sessionStorage.removeItem(ONBOARD_AUTOSTART_KEY);
+    if (onboardingStep === 5) setTimeout(() => $('onboard-submit').click(), 60);
+  }
 }
 for (const card of document.querySelectorAll('[data-voice]')) card.onclick = () => {
   onboardingState.voice = card.dataset.voice;
@@ -795,11 +803,37 @@ function finishOnboardingOperator(data) {
     drawDemos();
     return;
   }
-  card.innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">!</div><h2>The draft was not completed</h2><p class="ob-operator-result bad">${esc(data?.summary || 'The operator stopped before the video was ready.')}</p><button class="ob-retry" data-operator-retry type="button">Try again</button></div>`;
-  card.querySelector('[data-operator-retry]').onclick = () => {
+  const retry = (auto) => {
     sessionStorage.setItem(ONBOARD_RETRY_KEY, '1');
+    if (auto) sessionStorage.setItem(ONBOARD_AUTOSTART_KEY, '1');
     location.reload();
   };
+  // An expired sign-in is not a failure to explain; it is one button. The
+  // agent's own login opens its provider's page; when it says it is signed
+  // in, the draft starts again by itself — nothing is asked twice.
+  if (data?.signIn) {
+    const agent = data.signIn === 'codex' ? 'Codex' : 'Claude Code';
+    card.innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">↻</div><h2>Sign in to ${agent}</h2><p class="ob-lead">Your first draft is made by ${agent}, and its sign-in has expired. Sign in on its own page — Retake never sees your password — and the draft starts again.</p><p class="ob-operator-status" data-signin-status></p><button class="ob-retry" data-signin type="button">Sign in to ${agent}</button></div>`;
+    const btn = card.querySelector('[data-signin]');
+    const status = card.querySelector('[data-signin-status]');
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = 'Waiting for you to sign in…';
+      try {
+        await api('/api/signin', { method:'POST', body:JSON.stringify({ provider:data.signIn }) });
+        status.textContent = 'Finish signing in on the page that opened.';
+        const poll = setInterval(async () => {
+          const st = await api('/api/signin?provider=' + data.signIn).catch(() => null);
+          if (!st) return;
+          if (st.url && !status.querySelector('a')) status.innerHTML = `If no page opened, <a href="${esc(st.url)}" target="_blank" rel="noopener">open the sign-in page</a>.`;
+          if (st.signedIn) { clearInterval(poll); status.textContent = 'Signed in. Starting the draft again…'; retry(true); }
+          else if (st.failed) { clearInterval(poll); btn.disabled = false; btn.textContent = `Sign in to ${agent}`; status.textContent = 'Sign-in did not finish. Try once more.'; }
+        }, 2000);
+      } catch (e) { btn.disabled = false; btn.textContent = `Sign in to ${agent}`; status.textContent = e.message; }
+    };
+    return;
+  }
+  card.innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">!</div><h2>The draft was not completed</h2><p class="ob-operator-result bad">${esc(data?.summary || 'The operator stopped before the video was ready.')}</p><button class="ob-retry" data-operator-retry type="button">Try again</button></div>`;
+  card.querySelector('[data-operator-retry]').onclick = () => retry(false);
 }
 function watchOnboardingOperator(sessionId) {
   onboardingOperatorStream?.close();

@@ -21,6 +21,8 @@ export type Session = {
   done: boolean;
   code: number | null;
   summary?: string;
+  /** The agent stopped because its sign-in expired: which one to sign in. */
+  signIn?: "claude-code" | "codex";
   demo?: string;
   lastMessage?: string;
   lastDemo?: string;
@@ -156,11 +158,12 @@ export function startOperator(input: { describe: string; url?: string; project?:
       s.summary = s.lastMessage || (code === 0
         ? "The operator finished without creating a demo. Please try the request again."
         : operatorFailure(input.provider, said));
+      if (code !== 0 && needsSignIn(said)) s.signIn = input.provider;
     }
     // A task that used Retake but never called `done` is incomplete, even if
     // the agent process itself happened to exit cleanly.
     if (s.code === 0 && s.usedTools && !s.demo) s.code = 2;
-    push(s, "done", { code: s.code, summary: s.summary, demo: s.demo, cost: s.cost, turns: s.turns });
+    push(s, "done", { code: s.code, summary: s.summary, demo: s.demo, cost: s.cost, turns: s.turns, signIn: s.signIn });
     fs.rmSync(cfgPath, { force: true });
     if (catalogPath) fs.rmSync(catalogPath, { force: true });
   });
@@ -241,13 +244,60 @@ export function answerPending(s: Session, id: string, answer: string): boolean {
   return true;
 }
 /** Why the agent stopped, as something to do about it. */
+export const needsSignIn = (said: string) => /authenticat|oauth|sign(ed)? ?in|log(ged)? ?in|unauthori[sz]ed|\b401\b|token.*(expired|refresh)|session expired/i.test(said);
+
 export function operatorFailure(provider: "claude-code" | "codex", said: string): string {
   const agent = provider === "codex" ? "Codex" : "Claude Code";
-  if (/authenticat|oauth|sign(ed)? ?in|log(ged)? ?in|unauthori[sz]ed|\b401\b|token.*(expired|refresh)|session expired/i.test(said)) {
+  if (needsSignIn(said)) {
     return `${agent} needs you to sign in again — its login has expired. Open a terminal, run \`${provider === "codex" ? "codex login" : "claude auth login"}\` and sign in, then press Try again.`;
   }
   if (/rate.?limit|usage limit|quota|\b429\b/i.test(said)) return `${agent} has hit its usage limit. Try again when it resets.`;
   return said ? `${agent} stopped before the demo was ready: ${said.slice(0, 240)}` : `${agent} stopped before the demo was ready, without saying why. Press Try again.`;
+}
+
+/* ─── signing the agent in ───────────────────────────────────────────────
+   The window makes drafts with the person's own coding agent, signed in to
+   their own account. When that sign-in has expired, the agent's OWN login
+   runs — it opens the provider's page in the browser. Retake never sees a
+   password or a token; it only asks the agent whether it is signed in. */
+
+const SIGN_IN: Record<"claude-code" | "codex", { login: string[]; status: string[]; bin: string }> = {
+  "claude-code": { bin: "claude", login: ["auth", "login"], status: ["auth", "status"] },
+  codex: { bin: "codex", login: ["login"], status: ["login", "status"] },
+};
+
+type Login = { proc: ChildProcess; code: number | null; url?: string };
+const logins = new Map<string, Login>();
+
+export function startSignIn(provider: "claude-code" | "codex"): { url?: string } {
+  const prev = logins.get(provider);
+  if (prev && prev.code === null) return { url: prev.url };
+  const c = SIGN_IN[provider];
+  const proc = spawn(c.bin, c.login, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+  const login: Login = { proc, code: null };
+  // If the agent cannot open the browser itself, it prints the page to open.
+  const look = (b: Buffer) => { const m = /https:\/\/[^\s"']+/.exec(b.toString()); if (m && !login.url) login.url = m[0]; };
+  proc.stdout?.on("data", look);
+  proc.stderr?.on("data", look);
+  proc.on("close", (code) => { login.code = code ?? 1; });
+  proc.on("error", () => { login.code = 1; });
+  logins.set(provider, login);
+  return {};
+}
+
+export function signedIn(provider: "claude-code" | "codex"): boolean {
+  const c = SIGN_IN[provider];
+  try {
+    const out = execFileSync(c.bin, c.status, { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"] });
+    if (provider === "claude-code") return JSON.parse(out).loggedIn === true;
+    return /^\s*logged in/im.test(out);
+  } catch { return false; }
+}
+
+export function signInState(provider: "claude-code" | "codex"): { signedIn: boolean; waiting: boolean; url?: string; failed: boolean } {
+  const l = logins.get(provider);
+  const ok = signedIn(provider);
+  return { signedIn: ok && (!l || l.code !== null), waiting: !!l && l.code === null, url: l?.url, failed: !!l && l.code !== null && l.code !== 0 && !ok };
 }
 
 export function markDone(s: Session, summary: string, demo?: string) { s.summary = summary; s.demo = demo; if (demo) s.onDemo?.(demo); push(s, "line", `✓ ${summary}`); }

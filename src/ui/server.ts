@@ -924,6 +924,14 @@ export function serve(port: number) {
       }
 
       // ---------- the operator: the coding agent drives Retake, fenced to its tools ----------
+      // Signing the person's own agent back in: its own login, its own page.
+      if (p === "/api/signin" && (req.method === "POST" || req.method === "GET")) {
+        const provider = (req.method === "POST" ? (JSON.parse(await readBody(req)) as { provider?: string }).provider : url.searchParams.get("provider")) ?? "";
+        if (provider !== "claude-code" && provider !== "codex") return json(res, 400, { error: "provider is claude-code or codex" });
+        const { startSignIn, signInState } = await import("../operator/run.js");
+        if (req.method === "POST") startSignIn(provider);
+        return json(res, 200, signInState(provider));
+      }
       if (p === "/api/operator" && req.method === "POST") {
         const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; project?: string; name?: string; narration?: "silent" | "edge" | "aiden" | "kokoro" };
         if (!b.describe?.trim()) return json(res, 400, { error: "say what the demo should show" });
