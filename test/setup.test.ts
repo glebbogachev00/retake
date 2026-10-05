@@ -161,6 +161,10 @@ test("a dark brand colour carries the frame and the card's words", () => {
   assert.equal(decideBrand({ ground: "#ffffff", ink: "#111111", vars: {}, themeColor: "#1d4ed8", mark: [] }).accent, "#1d4ed8");
   assert.equal(decideBrand({ ground: "#ffffff", ink: "#111111", vars: {}, mark: ["#ffffff", "#c2410c"] }).accent, "#c2410c");
   assert.equal(decideBrand({ ground: "#ffffff", ink: "#111111", vars: {}, mark: [] }).matte, "#111111");
+  // Nothing declared at all — utility CSS, a PNG logo: the buttons carry it.
+  const tw = decideBrand({ ground: "#ffffff", ink: "#0f172a", vars: {}, mark: [], ui: ["#e2e8f0", "#193b92", "#f97316"] });
+  assert.equal(tw.accent, "#193b92");
+  assert.equal(tw.matte, "#193b92", "a dark brand blue carries the frame");
 });
 
 test("an SVG mark's colours are read from its fills", () => {

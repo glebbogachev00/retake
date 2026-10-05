@@ -310,6 +310,31 @@
   .voice-consent { display:none; margin-top:12px; padding:12px 14px; border:1px solid var(--rule); border-radius:12px; background:var(--paper); color:var(--muted); font-size:12.5px; text-align:left; }
   .voice-consent.show { display:flex; gap:9px; align-items:flex-start; }
   .voice-consent input { margin-top:3px; accent-color:var(--ink); }
+  /* The brand, shown back: the opening card and the site in its frame. */
+  .ob-brand { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .ob-brand figure { margin:0; }
+  .ob-brand figcaption { margin-top:6px; color:var(--muted); font-size:12px; text-align:center; }
+  .ob-frame { position:relative; aspect-ratio:16/9; border-radius:12px; overflow:hidden; border:1px solid var(--rule); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7%; }
+  .ob-frame .orb { position:absolute; border-radius:50%; }
+  .ob-frame .orb.a { width:60%; aspect-ratio:1; left:-14%; top:-30%; }
+  .ob-frame .orb.b { width:70%; aspect-ratio:1; right:-17%; bottom:-38%; }
+  .ob-frame img.ob-mark { position:relative; flex:none; height:16%; width:auto; max-width:62%; object-fit:contain; }
+  .ob-frame img.ob-mark.word { height:20%; }
+  .ob-frame b { position:relative; font-size:clamp(13px,2.6vw,17px); letter-spacing:-.02em; }
+  .ob-frame img.site { width:89%; border-radius:4px; box-shadow:0 6px 18px rgba(0,0,0,.25); }
+  .ob-brand .opening { grid-column:1/-1; max-width:360px; width:100%; justify-self:center; }
+  .ob-shapes-h { grid-column:1/-1; margin:8px 0 0; font-size:13px; font-weight:600; }
+  .ob-shapes { grid-column:1/-1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  .ob-shape { border:1px solid var(--rule2); border-radius:13px; background:#fff; padding:9px 9px 10px; cursor:pointer; text-align:center; font:inherit; transition:border-color .12s, box-shadow .12s; }
+  .ob-shape[aria-checked="true"] { border-color:var(--ink); box-shadow:0 0 0 3px var(--amber); }
+  .ob-shape .ob-frame { border-radius:8px; }
+  .ob-shape .ob-frame.full img.site { width:100%; height:100%; object-fit:cover; object-position:top; border-radius:0; box-shadow:none; }
+  .ob-shape .ob-frame.tall img.site { width:auto; height:88%; max-width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top; }
+  .ob-shape { min-width:0; }
+  .ob-shape b { display:block; margin-top:7px; font-size:12.5px; }
+  .ob-shape small { display:block; color:var(--muted); font-size:11px; line-height:1.35; }
+  .ob-brand .empty { grid-column:1/-1; min-height:150px; display:grid; place-items:center; color:var(--muted); font-size:13px; border:1px dashed var(--rule2); border-radius:12px; }
+  @media (max-width:560px) { .ob-brand { grid-template-columns:1fr; } .ob-shapes { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; } .ob-shape small { display:none; } }
   .ob-review { display:grid; gap:10px; }
   .ob-review .line { padding:12px 14px; border:1px solid var(--rule); border-radius:12px; background:#fff; }
   .ob-review .line small { display:block; color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; }
@@ -461,7 +486,7 @@
     </div>
     <section class="onboarding" id="onboarding" style="display:none" aria-label="Create your first demo">
       <div class="ob-card">
-        <div class="ob-progress" aria-label="Step 1 of 4"><i class="on"></i><i></i><i></i><i></i><span>Step 1 of 4</span></div>
+        <div class="ob-progress" aria-label="Step 1 of 5"><i class="on"></i><i></i><i></i><i></i><i></i><span>Step 1 of 5</span></div>
 
         <div class="ob-step on" data-step="1">
           <div class="ob-icon" aria-hidden="true">↗</div>
@@ -473,6 +498,12 @@
         </div>
 
         <div class="ob-step" data-step="2">
+          <h2>Your videos, in your colours</h2>
+          <p class="ob-lead" id="brand-lead">Reading your site…</p>
+          <div class="ob-brand" id="ob-brand" aria-live="polite"></div>
+        </div>
+
+        <div class="ob-step" data-step="3">
           <div class="ob-icon" aria-hidden="true">◎</div>
           <h2>What should the viewer see?</h2>
           <p class="ob-lead">One sentence is enough. Describe the result, not every click.</p>
@@ -481,7 +512,7 @@
           <div class="ob-error" id="onboard-describe-error" role="alert"></div>
         </div>
 
-        <div class="ob-step" data-step="3">
+        <div class="ob-step" data-step="4">
           <div class="ob-icon" aria-hidden="true">∿</div>
           <h2>Choose the final sound</h2>
           <p class="ob-lead">The first draft stays silent. Narration comes after you approve the recording and script.</p>
@@ -503,7 +534,7 @@
           <label class="voice-consent" id="voice-consent"><input type="checkbox" /><span id="voice-consent-copy"></span></label>
         </div>
 
-        <div class="ob-step" data-step="4">
+        <div class="ob-step" data-step="5">
           <div class="ob-icon" aria-hidden="true">✓</div>
           <h2>Ready for the first draft</h2>
           <p class="ob-lead">Retake will inspect the page, plan the shortest clear workflow, and record a silent draft.</p>
@@ -556,12 +587,13 @@ const VOICE_NAMES = { silent:'No voiceover', edge:'Edge online voice', aiden:'Ai
 let onboardingStep = 1;
 let onboardingState = { url:'', describe:'', voice:'silent', consent:false };
 let onboardingSubmitted = false;
+let brandRead = { state:'idle', url:'', data:null, style:'showcase' };
 try {
   const saved = JSON.parse(localStorage.getItem(ONBOARD_KEY) || 'null');
   if (saved && typeof saved === 'object') {
     onboardingState = { ...onboardingState, ...saved, voice: VOICE_NAMES[saved.voice] ? saved.voice : 'silent', consent:false };
     if (sessionStorage.getItem(ONBOARD_RETRY_KEY) === '1') {
-      onboardingStep = onboardingState.voice === 'silent' ? 4 : 3;
+      onboardingStep = onboardingState.voice === 'silent' ? 5 : 4;
       sessionStorage.removeItem(ONBOARD_RETRY_KEY);
     }
   }
@@ -578,19 +610,19 @@ function normalUrl(raw) {
 }
 function syncOnboarding() {
   if (onboardingStep === 1) onboardingState.url = $('onboard-url').value.trim();
-  if (onboardingStep === 2) onboardingState.describe = $('onboard-describe').value.trim();
+  if (onboardingStep === 3) onboardingState.describe = $('onboard-describe').value.trim();
   const consent = $('voice-consent').querySelector('input');
-  if (onboardingStep === 3) onboardingState.consent = consent.checked;
+  if (onboardingStep === 4) onboardingState.consent = consent.checked;
   saveOnboarding();
 }
 function renderOnboarding() {
   document.querySelectorAll('.ob-step').forEach((el) => el.classList.toggle('on', Number(el.dataset.step) === onboardingStep));
   document.querySelectorAll('.ob-progress i').forEach((el, i) => el.classList.toggle('on', i + 1 === onboardingStep));
-  document.querySelector('.ob-progress').setAttribute('aria-label', `Step ${onboardingStep} of 4`);
-  document.querySelector('.ob-progress span').textContent = `Step ${onboardingStep} of 4`;
+  document.querySelector('.ob-progress').setAttribute('aria-label', `Step ${onboardingStep} of 5`);
+  document.querySelector('.ob-progress span').textContent = `Step ${onboardingStep} of 5`;
   $('onboard-back').style.display = onboardingStep > 1 ? '' : 'none';
-  $('onboard-next').style.display = onboardingStep < 4 ? '' : 'none';
-  $('onboard-submit').style.display = onboardingStep === 4 ? '' : 'none';
+  $('onboard-next').style.display = onboardingStep < 5 ? '' : 'none';
+  $('onboard-submit').style.display = onboardingStep === 5 ? '' : 'none';
   $('onboard-url').value = onboardingState.url;
   $('onboard-describe').value = onboardingState.describe;
   for (const card of document.querySelectorAll('[data-voice]')) {
@@ -608,9 +640,11 @@ function renderOnboarding() {
   if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a separate local model download of roughly 100–200 MB. Nothing downloads on this screen.';
   $('onboard-next').disabled =
     (onboardingStep === 1 && !normalUrl($('onboard-url').value)) ||
-    (onboardingStep === 2 && !$('onboard-describe').value.trim()) ||
-    (onboardingStep === 3 && needsConsent && !onboardingState.consent);
-  if (onboardingStep === 4) {
+    (onboardingStep === 2 && brandRead.state === 'reading') ||
+    (onboardingStep === 3 && !$('onboard-describe').value.trim()) ||
+    (onboardingStep === 4 && needsConsent && !onboardingState.consent);
+  $('onboard-next').textContent = onboardingStep === 2 && brandRead.state === 'read' ? 'Looks right' : 'Continue';
+  if (onboardingStep === 5) {
     $('review-url').textContent = onboardingState.url;
     $('review-describe').textContent = onboardingState.describe;
     $('review-voice').textContent = VOICE_NAMES[onboardingState.voice];
@@ -620,7 +654,7 @@ function showOnboarding() {
   $('onboarding').style.display = '';
   if (onboardingSubmitted) return;
   renderOnboarding();
-  setTimeout(() => (onboardingStep === 1 ? $('onboard-url') : $('onboard-describe'))?.focus(), 40);
+  setTimeout(() => (onboardingStep === 1 ? $('onboard-url') : onboardingStep === 3 ? $('onboard-describe') : null)?.focus(), 40);
 }
 for (const card of document.querySelectorAll('[data-voice]')) card.onclick = () => {
   onboardingState.voice = card.dataset.voice;
@@ -643,7 +677,7 @@ for (const card of document.querySelectorAll('[data-voice]')) card.onclick = () 
 $('onboard-url').oninput = (e) => { onboardingState.url = e.target.value; renderOnboarding(); };
 $('onboard-describe').oninput = (e) => { onboardingState.describe = e.target.value; renderOnboarding(); };
 $('voice-consent').querySelector('input').onchange = (e) => { onboardingState.consent = e.target.checked; renderOnboarding(); };
-$('onboard-back').onclick = () => { syncOnboarding(); onboardingStep = Math.max(1, onboardingStep - 1); renderOnboarding(); };
+$('onboard-back').onclick = () => { syncOnboarding(); onboardingStep = Math.max(1, onboardingStep - 1); if (onboardingStep === 2) readBrand(onboardingState.url); renderOnboarding(); };
 $('onboard-next').onclick = () => {
   syncOnboarding();
   if (onboardingStep === 1) {
@@ -651,12 +685,59 @@ $('onboard-next').onclick = () => {
     if (!url) { $('onboard-error').textContent = 'Paste a public or localhost address.'; return; }
     onboardingState.url = url; $('onboard-error').textContent = '';
   }
-  if (onboardingStep === 2 && !onboardingState.describe) { $('onboard-describe-error').textContent = 'Say what the viewer should see.'; return; }
-  if (onboardingStep === 2) $('onboard-describe-error').textContent = '';
-  if (onboardingStep === 3 && onboardingState.voice !== 'silent' && !onboardingState.consent) return;
-  onboardingStep = Math.min(4, onboardingStep + 1);
+  if (onboardingStep === 2 && brandRead.state === 'read') keepBrand();
+  if (onboardingStep === 3 && !onboardingState.describe) { $('onboard-describe-error').textContent = 'Say what the viewer should see.'; return; }
+  if (onboardingStep === 3) $('onboard-describe-error').textContent = '';
+  if (onboardingStep === 4 && onboardingState.voice !== 'silent' && !onboardingState.consent) return;
+  onboardingStep = Math.min(5, onboardingStep + 1);
+  if (onboardingStep === 2) readBrand(onboardingState.url);
   renderOnboarding();
 };
+
+// The brand, read off the pasted site and shown back before anything else is
+// asked: the moment a new owner sees their own videos, not Retake's. Their
+// colours and mark become the product's routine the moment they say so.
+async function readBrand(url) {
+  if (brandRead.url === url && brandRead.state !== 'failed') return;
+  brandRead = { state:'reading', url, data:null, style:'showcase' };
+  $('brand-lead').textContent = 'Reading your site…';
+  $('ob-brand').innerHTML = '<div class="empty">Looking at your colours and logo</div>';
+  renderOnboarding();
+  try {
+    const data = await api('/api/brand', { method:'POST', body:JSON.stringify({ url }) });
+    if (brandRead.url !== url) return;
+    if (!data.brand) throw new Error('no colours');
+    brandRead = { state:'read', url, data, style:'showcase' };
+    const b = data.brand;
+    const orbs = `<i class="orb a" style="background:${esc(b.orb)}"></i><i class="orb b" style="background:${esc(b.orb)}"></i>`;
+    $('brand-lead').textContent = 'Your colours and your logo, read from your site.';
+    // One decision on this screen: the shape. The card is shown, not asked.
+    const site = (src) => src ? `<img class="site" src="${src}" alt="">` : '';
+    const SHAPES = [
+      { style:'showcase', label:'Showcase', note:'Framed in your colour', frame:`<div class="ob-frame" style="background:${esc(b.matte)}">${site(data.shot)}</div>` },
+      { style:'fullscreen', label:'Full screen', note:'Edge to edge', frame:`<div class="ob-frame full">${site(data.shot)}</div>` },
+      { style:'mobile', label:'Vertical', note:'For phones', frame:`<div class="ob-frame tall" style="background:${esc(b.matte)}">${site(data.phone || data.shot)}</div>` },
+    ];
+    $('ob-brand').innerHTML = `
+      <figure class="opening"><div class="ob-frame" style="background:${esc(b.ground)};color:${esc(b.matte)}">${orbs}${data.logo ? `<img class="ob-mark" src="${data.logo}" alt="" onload="if (this.naturalWidth > this.naturalHeight * 2.2) { this.classList.add('word'); this.nextElementSibling.hidden = true; }">` : ''}<b>${esc(data.title)}</b></div><figcaption>Every video opens on this</figcaption></figure>
+      <p class="ob-shapes-h">Which shape?</p>
+      <div class="ob-shapes" role="radiogroup" aria-label="Video shape">${SHAPES.map((x) => `<button type="button" class="ob-shape" role="radio" data-style="${x.style}" aria-checked="${x.style === brandRead.style}">${x.frame}<b>${x.label}</b><small>${x.note}</small></button>`).join('')}</div>`;
+    for (const el of document.querySelectorAll('.ob-shape')) el.onclick = () => {
+      brandRead.style = el.dataset.style;
+      document.querySelectorAll('.ob-shape').forEach((o) => o.setAttribute('aria-checked', String(o === el)));
+    };
+  } catch {
+    if (brandRead.url !== url) return;
+    brandRead = { state:'failed', url, data:null, style:'showcase' };
+    $('brand-lead').textContent = "Your site's colours could not be read, so the first videos use Retake's own.";
+    $('ob-brand').innerHTML = '';
+  }
+  renderOnboarding();
+}
+async function keepBrand() {
+  try { await api('/api/brand/keep', { method:'POST', body:JSON.stringify({ name: brandRead.data.name, style: brandRead.style }) }); }
+  catch { /* the first draft still records; the routine can take the brand later */ }
+}
 let onboardingOperatorStream = null;
 let onboardingPendingId = null;
 function operatorData(e) { try { return JSON.parse(e.data); } catch { return null; } }
