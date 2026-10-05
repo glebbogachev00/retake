@@ -77,6 +77,21 @@ export function brief(input: { describe: string; url?: string; project?: string;
   ].join("\n");
 }
 
+/**
+ * The environment the person's coding agent runs in: theirs, minus what
+ * would point it at someone else's sign-in. Inside another Claude Code
+ * session the inherited CLAUDE_ and ANTHROPIC_ variables do that (describe.ts
+ * strips the same). It used to be HOME and PATH alone — and on a Mac the
+ * Keychain entry holding the sign-in is found by USER, so every draft failed
+ * with "OAuth session expired" for a person who was signed in all along.
+ */
+export function agentEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !/^(CLAUDE|ANTHROPIC)/i.test(k)) env[k] = v;
+  env.PATH ??= "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin";
+  return env;
+}
+
 export function startOperator(input: { describe: string; url?: string; project?: string; name?: string; ui: string; root: string; provider: "claude-code" | "codex"; onDemo?: (demo: string) => void }): Session {
   const id = "op" + Date.now().toString(36);
   const s: Session = { id, proc: null, lines: [], pending: [], done: false, code: null, onDemo: input.onDemo, startedAt: Date.now(), listeners: new Set() };
@@ -89,9 +104,7 @@ export function startOperator(input: { describe: string; url?: string; project?:
   fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
   fs.writeFileSync(cfgPath, JSON.stringify(mcpConfig));
 
-  // A clean env: inside another Claude Code session the inherited vars point
-  // the child at the wrong auth (see describe.ts); HOME + PATH is enough.
-  const env: Record<string, string> = { HOME: process.env.HOME ?? "", PATH: process.env.PATH ?? "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" };
+  const env = agentEnv();
   let catalogPath: string | null = null;
 
   let proc: ChildProcess;
@@ -273,7 +286,7 @@ export function startSignIn(provider: "claude-code" | "codex"): { url?: string }
   const prev = logins.get(provider);
   if (prev && prev.code === null) return { url: prev.url };
   const c = SIGN_IN[provider];
-  const proc = spawn(c.bin, c.login, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+  const proc = spawn(c.bin, c.login, { stdio: ["ignore", "pipe", "pipe"], env: agentEnv() });
   const login: Login = { proc, code: null };
   // If the agent cannot open the browser itself, it prints the page to open.
   const look = (b: Buffer) => { const m = /https:\/\/[^\s"']+/.exec(b.toString()); if (m && !login.url) login.url = m[0]; };
@@ -288,7 +301,7 @@ export function startSignIn(provider: "claude-code" | "codex"): { url?: string }
 export function signedIn(provider: "claude-code" | "codex"): boolean {
   const c = SIGN_IN[provider];
   try {
-    const out = execFileSync(c.bin, c.status, { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"] });
+    const out = execFileSync(c.bin, c.status, { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"], env: agentEnv() });
     if (provider === "claude-code") return JSON.parse(out).loggedIn === true;
     return /^\s*logged in/im.test(out);
   } catch { return false; }
