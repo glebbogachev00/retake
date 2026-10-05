@@ -54,7 +54,7 @@ import { checkFlags, flag, unflag } from "./ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "./ext/heal.js";
 import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "./ext/destroy.js";
 import { addGolden, assertGoldenApproval, goldenSetStatus, inspectMedia, loadGoldenLedger, scoreGolden, verifyGoldenIntegrity, writeGoldenScorecard, type GoldenRubric } from "./ext/golden.js";
-import { PKG_ROOT, VERSION, entry } from "./paths.js";
+import { PKG_ROOT, VERSION, entry, isDemoFile } from "./paths.js";
 import { bringUp, loadEnvSpec, stopEnvironment, verify as verifyEnv } from "./recording-env.js";
 import { STYLES, VOICES, RoutineSchema, applyToManifest, environmentFor, compare as compareRoutine, compareToReference, preflightAgainst, learnFrom, measure as measureOutputs, readPlan, describe as describeRoutine, pick as pickRoutine, readRoutines, runRoutine, routineFile, starter, voiceId, writeRoutines, type Routine } from "./routine.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
@@ -1344,7 +1344,7 @@ routine
   .action((files: string[], opts: { as?: string; write: boolean }) => {
     const targets = files.length
       ? files.map((f) => path.resolve(f))
-      : fs.readdirSync(DEMOS_DIR()).filter((f) => /\.ya?ml$/.test(f)).map((f) => path.join(DEMOS_DIR(), f));
+      : fs.readdirSync(DEMOS_DIR()).filter(isDemoFile).map((f) => path.join(DEMOS_DIR(), f));
     const { routine: learned, from, notes } = learnFrom(targets);
     say(`read ${from.length} manifest${from.length === 1 ? "" : "s"}: ${from.slice(0, 6).join(", ")}${from.length > 6 ? `, +${from.length - 6} more` : ""}\n`);
     const file = readRoutines(DEMOS_DIR());
@@ -1506,7 +1506,7 @@ routine
     if (said.length) say(`routine ${name}, just this once: ${said.join(" · ")}`);
     const targets = files.length
       ? files.map((f) => path.resolve(f))
-      : fs.readdirSync(DEMOS_DIR()).filter((f) => /\.ya?ml$/.test(f)).map((f) => path.join(DEMOS_DIR(), f));
+      : fs.readdirSync(DEMOS_DIR()).filter(isDemoFile).map((f) => path.join(DEMOS_DIR(), f));
     if (!targets.length) throw new Error("no manifests in demos/");
     let touched = 0;
     for (const t of targets) {

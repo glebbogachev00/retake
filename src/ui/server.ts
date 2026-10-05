@@ -44,10 +44,11 @@ import { productName } from "../ext/intent.js";
 import { running } from "../progress.js";
 import { MAX_BODY, checkRequest, clearToken, newToken, readBodyLimited, writeToken } from "./guard.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
-import { PKG_ROOT, PROJECT_ROOT, VERSION, entry } from "../paths.js";
+import { PKG_ROOT, PROJECT_ROOT, VERSION, entry, isDemoFile } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
 import { captureMatchesTake, readPreviewReceipt } from "../preview.js";
-import { STYLES, VOICES, RoutineSchema, readRoutines, starter, voiceId, writeRoutines } from "../routine.js";
+import { STYLES, VOICES, RoutineSchema, environmentFor, readRoutines, starter, voiceId, writeRoutines, type Routine } from "../routine.js";
+import { loadEnvSpec } from "../recording-env.js";
 import { synthesize, voiceCachePath } from "../voice.js";
 
 const ROOT = PROJECT_ROOT;
@@ -134,7 +135,30 @@ const json = (res: http.ServerResponse, code: number, body: unknown) => {
 };
 const readBody = (req: http.IncomingMessage) => readBodyLimited(req, MAX_BODY);
 const safeName = (s: string) => /^[a-z0-9-]+$/.test(s);
-const MIME: Record<string, string> = { ".mp4": "video/mp4", ".gif": "image/gif", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
+const MIME: Record<string, string> = { ".mp4": "video/mp4", ".mov": "video/quicktime", ".gif": "image/gif", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
+
+/** A path as routine.json writes it: relative to the workspace, or ~/. */
+const routinePath = (f: string) => path.resolve(ROOT, f.replace(/^~(?=\/|$)/, os.homedir()));
+
+/** What a person needs to see about a routine besides its settings: the
+    north star, where finished videos go, what an agent reads first, and
+    which app gets recorded. Facts from disk, so a missing file shows. */
+function aboutRoutine(r: Routine) {
+  const file = (f?: string) => (f ? { path: f, exists: fs.existsSync(routinePath(f)) } : null);
+  let environment: { path: string; name?: string; port?: number } | null = null;
+  const envFile = environmentFor(DEMOS, r);
+  if (envFile) {
+    try { const spec = loadEnvSpec(envFile); environment = { path: path.relative(ROOT, envFile), name: spec.name, port: spec.start.port }; }
+    catch { environment = { path: path.relative(ROOT, envFile) }; }
+  }
+  let deliver: { path: string; exists: boolean; videos: number } | null = null;
+  if (r.deliver) {
+    const d = routinePath(r.deliver);
+    const exists = fs.existsSync(d);
+    deliver = { path: r.deliver.replace(os.homedir(), "~"), exists, videos: exists ? fs.readdirSync(d).filter((f) => f.endsWith(".mp4")).length : 0 };
+  }
+  return { reference: file(r.reference), brief: file(r.brief), environment, deliver };
+}
 
 /** A short name for "the app at this URL": the last path segment if there
     is one (demo.playwright.dev/todomvc → todomvc), else the host without
@@ -210,7 +234,7 @@ function listDemos(project?: string) {
   // answer.
   const byUrl = new Map<string, string>();
   const namedByUrl = new Map<string, string>();
-  for (const f of fs.readdirSync(DEMOS).filter((x) => /\.ya?ml$/.test(x))) {
+  for (const f of fs.readdirSync(DEMOS).filter(isDemoFile)) {
     const mm = cachedManifest(path.join(DEMOS, f));
     if (!mm) continue;
     const asg = assignments[mm.name];
@@ -220,7 +244,7 @@ function listDemos(project?: string) {
   }
   const listed = fs
     .readdirSync(DEMOS)
-    .filter((f) => /\.ya?ml$/.test(f))
+    .filter(isDemoFile)
     .map((f) => {
       const file = path.join(DEMOS, f);
       let title = "", name = f.replace(/\.ya?ml$/, ""), valid = true, url = "", settings: Record<string, unknown> = {};
@@ -577,10 +601,12 @@ export function serve(port: number) {
       // for the first time. The window is where they live now.
       if (p === "/api/routine" && req.method === "GET") {
         const file = readRoutines(DEMOS);
+        const routines = file?.routines ?? starter().routines;
         return json(res, 200, {
           exists: !!file,
           use: file?.use ?? "default",
-          routines: file?.routines ?? starter().routines,
+          routines,
+          about: Object.fromEntries(Object.entries(routines).map(([n, r]) => [n, aboutRoutine(r)])),
           styles: Object.entries(STYLES).map(([name, st]) => ({ name, ...st })),
           voices: Object.entries(VOICES).map(([name, v]) => ({ name, ...v })),
         });
@@ -1146,6 +1172,27 @@ export function serve(port: number) {
         // never judged here — the window must cost nothing to open.
         const checks = readChecks(dir);
         return json(res, 200, { take, files, proof, facts, preview, stamp, dir, flagged, checks });
+      }
+      // The routine's own files — its north star, mark and typeface — and
+      // nothing else: the path comes from routine.json, never from the URL.
+      m = /^\/routine\/([a-z0-9-]+)\/(reference|logo|font)$/.exec(p);
+      if (m && req.method === "GET") {
+        const r = readRoutines(DEMOS)?.routines[m[1]];
+        const named = !r ? undefined : m[2] === "reference" ? r.reference : m[2] === "logo" ? r.card?.logo : r.card?.font;
+        const f = named ? routinePath(named) : null;
+        if (!f || !fs.existsSync(f)) return json(res, 404, { error: "not found" });
+        const stat = fs.statSync(f);
+        const type = MIME[path.extname(f).toLowerCase()] ?? "application/octet-stream";
+        const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range ?? "");
+        if (range && type === "video/mp4") {
+          const start = Number(range[1] || 0);
+          const end = Math.min(range[2] ? Number(range[2]) : stat.size - 1, stat.size - 1);
+          if (start > end || start >= stat.size) { res.writeHead(416, { "content-range": `bytes */${stat.size}` }); return res.end(); }
+          res.writeHead(206, { "content-type": type, "content-range": `bytes ${start}-${end}/${stat.size}`, "accept-ranges": "bytes", "content-length": end - start + 1 });
+          return stream(f, res, { start, end });
+        }
+        res.writeHead(200, { "content-type": type, "content-length": stat.size, "accept-ranges": "bytes", "cache-control": "no-store" });
+        return stream(f, res);
       }
       m = /^\/out\/([a-z0-9-]+)\/((?:stills\/|clips\/)?[A-Za-z0-9._-]+)$/.exec(p);
       if (m && req.method === "GET") {

@@ -41,6 +41,7 @@ import { applyEdits, receiptsFor } from "../edits.js";
 import { SECRET_NAME, missingSecrets, readEnvFile } from "../env.js";
 import { presetNames } from "../presets.js";
 import { assertFinalReceipt, captureMatchesTake, notePreviewCapture, notePreviewRender, readPreviewReceipt } from "../preview.js";
+import { isDemoFile } from "../paths.js";
 
 const ROOT = process.env.RETAKE_ROOT || process.cwd();
 const DEMOS = path.join(ROOT, "demos");
@@ -380,7 +381,7 @@ server.registerTool("plan_mark", {
 
 server.registerTool("list_demos", { description: "Every demo in this workspace, with when it was last recorded and whether that take passed. Call it first in a session you did not start: it tells you what already exists, so you extend a demo rather than writing a second one for the same flow — and it is how you learn the exact names the other tools want.", inputSchema: {}, annotations: READ_ONLY }, async () => {
   if (!fs.existsSync(DEMOS)) return text("no demos yet");
-  const rows = fs.readdirSync(DEMOS).filter((f) => /\.ya?ml$/.test(f)).map((f) => {
+  const rows = fs.readdirSync(DEMOS).filter(isDemoFile).map((f) => {
     const name = f.replace(/\.ya?ml$/, "");
     const tp = path.join(OUT, name, "take.json");
     let last = "no take";

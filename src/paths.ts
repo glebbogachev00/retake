@@ -37,3 +37,7 @@ export function entry(name: "cli" | "operator/tools"): { command: string; args: 
   const require = createRequire(import.meta.url);
   return { command: process.execPath, args: [require.resolve("tsx/cli"), file] };
 }
+
+/** A demo's manifest: any YAML in demos/ except the files that sit beside
+    the demos without being one — the workspace's recording environment. */
+export const isDemoFile = (f: string): boolean => /\.ya?ml$/.test(f) && !/^environment\.ya?ml$/.test(path.basename(f));

@@ -377,7 +377,23 @@
   .rt-err { margin:9px 0 0; color:var(--bad); font-size:12.5px; }
   .rt-saved { color:var(--ok); font-size:12.5px; font-weight:600; opacity:0; transition:opacity .18s; }
   .rt-saved.on { opacity:1; }
-  @media (max-width:560px) { .rt-shapes { grid-template-columns:1fr; } .rt-fig { height:52px; } }
+  /* The north star: what every cut is held to, shown rather than named. */
+  .rt-pick { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 18px; }
+  .rt-pick button { min-height:34px; padding:0 13px; border:1px solid var(--rule2); border-radius:99px; background:#fff; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  .rt-pick button[aria-pressed="true"] { border-color:var(--ink); box-shadow:0 0 0 3px var(--amber); }
+  .rt-star video { display:block; width:100%; aspect-ratio:16/9; border-radius:12px; background:#111; }
+  .rt-star video.tall { aspect-ratio:9/16; max-height:360px; width:auto; margin:0 auto; }
+  .rt-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+  .rt-card { position:relative; aspect-ratio:16/9; border-radius:10px; border:1px solid var(--rule); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6%; padding:0 10%; text-align:center; overflow:hidden; }
+  .rt-card img { height:17%; }
+  .rt-card b { font-size:clamp(11px,2.4vw,15px); line-height:1.15; letter-spacing:-.02em; }
+  .rt-card small { position:absolute; left:8px; top:6px; font-size:10.5px; opacity:.55; letter-spacing:.02em; }
+  .rt-facts { display:grid; grid-template-columns:auto 1fr; gap:7px 14px; margin:14px 0 0; font-size:12.5px; line-height:1.45; }
+  .rt-facts dt { color:var(--muted); }
+  .rt-facts dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+  .rt-facts .miss { color:var(--bad); }
+  .rt-cmd { display:block; margin-top:8px; padding:9px 11px; border-radius:9px; background:var(--paper); border:1px solid var(--rule); font:12px/1.5 ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }
+  @media (max-width:560px) { .rt-shapes { grid-template-columns:1fr; } .rt-fig { height:52px; } .rt-cards { grid-template-columns:1fr; } }
   @media (prefers-reduced-motion:reduce) { .spin { animation:none; opacity:.9 } .live .bar i { transition:none } }
 </style>
 </head>
@@ -767,8 +783,8 @@ $('routineBtn').onclick = async () => {
   try { data = await api('/api/routine'); }
   catch (e) { alert(e.message); return; }
 
-  const name = data.use;
-  let cur = data.routines[name] || { style: 'showcase', voice: 'silent', rate: 0, music: false, captions: true };
+  let name = data.use;
+  let cur = data.routines[name] || { style: 'showcase', voice: 'silent', rate: 0, music: false, captions: false, narration: 'scenes' };
   let audio = null;
 
   const veil = document.createElement('div');
@@ -777,6 +793,8 @@ $('routineBtn').onclick = async () => {
     <h3 id="rtTitle">Routine <span class="rt-saved" id="rtSaved">Saved</span></h3>
     <p class="guide-intro">Every recording in this workspace comes out this way. Decide here once — your agent is not allowed to choose these per video.</p>
     <div class="scroll guide-scroll">
+      <div class="rt-pick" id="rtPick" hidden></div>
+      <div class="rt-sec rt-star" id="rtStar"></div>
       <div class="rt-sec">
         <h4>Shape</h4>
         <p class="rt-why">Where the app sits in the frame, and where the words go.</p>
@@ -799,6 +817,11 @@ $('routineBtn').onclick = async () => {
           <input type="range" id="rtRate" min="-50" max="50" step="1" value="0">
           <span class="val" id="rtRateVal">0%</span>
         </div>
+        <p class="rt-why" style="margin:14px 0 8px">Where the voice lands.</p>
+        <div class="rt-toggle" id="rtNarr">
+          <button type="button" data-n="scenes" aria-pressed="false">On its scene</button>
+          <button type="button" data-n="start" aria-pressed="false">From the start</button>
+        </div>
         <p class="rt-err" id="rtErr"></p>
       </div>
       <p class="rt-note">Picking a voice does not switch narration on. A video stays silent until someone writes a script and listens to it — this only settles which voice reads it, and how fast.</p>
@@ -814,6 +837,7 @@ $('routineBtn').onclick = async () => {
     try {
       const out = await api('/api/routine', { method: 'PUT', body: JSON.stringify({ name, patch }) });
       cur = out.routines[name];
+      data.routines = out.routines;
       flash();
       paint();
     } catch (e) { q('#rtErr').textContent = e.message; }
@@ -825,7 +849,52 @@ $('routineBtn').onclick = async () => {
     mobile: '<span class="rt-box tall"><i class="rt-band under"></i></span>',
   };
 
+  // Several products, several routines — one is in use. Switching is the
+  // whole decision, so it is a row of names, not a menu.
+  async function use(n) {
+    q('#rtErr').textContent = '';
+    try {
+      const out = await api('/api/routine', { method: 'PUT', body: JSON.stringify({ use: n }) });
+      data.use = name = out.use; data.routines = out.routines; cur = out.routines[name];
+      flash(); paint();
+    } catch (e) { q('#rtErr').textContent = e.message; }
+  }
+
+  function paintStar() {
+    const names = Object.keys(data.routines);
+    const pick = q('#rtPick');
+    pick.hidden = names.length < 2;
+    pick.innerHTML = names.map((n) => `<button type="button" data-use="${esc(n)}" aria-pressed="${n === name}">${esc(n)}</button>`).join('');
+    for (const b of pick.children) b.onclick = () => { if (b.dataset.use !== name) use(b.dataset.use); };
+
+    const about = (data.about || {})[name] || {};
+    const ref = about.reference;
+    const card = cur.card;
+    const font = card && card.font ? `@font-face{font-family:rt-${esc(name)};src:url('/routine/${esc(name)}/font')}` : '';
+    const face = card && card.font ? `font-family:rt-${esc(name)},serif;` : '';
+    const mini = (label, title) => card
+      ? `<div class="rt-card" style="background:${esc(card.background)};color:${esc(card.ink)}"><small>${label}</small>${card.logo ? `<img src="/routine/${esc(name)}/logo" alt="">` : ''}<b style="${face}font-weight:${Number(card.weight) || 560}">${esc(title)}</b></div>`
+      : '';
+    const cards = cur.cards && card
+      ? `<div class="rt-cards">${mini('Opens', cur.intro ? cur.intro.title : "Each video's own title")}${cur.outro ? mini('Closes', cur.outro.title) : ''}</div>`
+      : '';
+    const facts = [];
+    if (about.deliver) facts.push(['Delivers to', `${esc(about.deliver.path)} · ${about.deliver.videos} video${about.deliver.videos === 1 ? '' : 's'} — only ones that match`]);
+    if (about.brief) facts.push(['Brief', about.brief.exists ? `${esc(about.brief.path)} — what an agent reads before writing a step` : `<span class="miss">${esc(about.brief.path)} is missing</span>`]);
+    if (about.environment) facts.push(['App', `${esc(about.environment.name || about.environment.path)}${about.environment.port ? ` on :${about.environment.port}` : ''} — started isolated and proven before every take`]);
+    q('#rtStar').innerHTML = (font ? `<style>${font}</style>` : '') + `
+      <h4>North star</h4>
+      ${ref && ref.exists
+        ? `<p class="rt-why">The one video every recording is held to. A cut that does not match it never reaches the folder you post from.</p>
+           <video src="/routine/${esc(name)}/reference" controls playsinline preload="metadata" class="${cur.style === 'mobile' ? 'tall' : ''}"></video>`
+        : `<p class="rt-why">${ref ? `<span class="miss">${esc(ref.path)} is missing.</span> ` : 'None yet. '}The one video you would be happy to get every time — its cards, colours and shape become the routine's.</p>
+           <code class="rt-cmd">retake routine reference &lt;video&gt;</code>`}
+      ${cards}
+      ${facts.length ? `<dl class="rt-facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}`;
+  }
+
   function paint() {
+    paintStar();
     q('#rtShapes').innerHTML = data.styles.map((st) => `
       <button class="rt-shape" type="button" role="radio" data-style="${esc(st.name)}" aria-checked="${st.name === cur.style}">
         <span class="rt-fig">${FIG[st.name] || FIG.showcase}</span>
@@ -857,6 +926,11 @@ $('routineBtn').onclick = async () => {
       el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); save({ voice: el.dataset.voice }); } };
       const play = el.querySelector('.rt-play');
       if (play) play.onclick = () => hear(play.dataset.hear, play);
+    }
+
+    for (const b of q('#rtNarr').children) {
+      b.setAttribute('aria-pressed', String((cur.narration || 'scenes') === b.dataset.n));
+      b.onclick = () => save({ narration: b.dataset.n });
     }
 
     q('#rtRate').value = String(cur.rate);
