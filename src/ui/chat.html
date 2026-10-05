@@ -586,6 +586,7 @@ async function api(u, o) {
 const ONBOARD_KEY = 'retake:first-demo';
 const ONBOARD_RETRY_KEY = 'retake:retry-first-demo';
 const ONBOARD_AUTOSTART_KEY = 'retake:autostart-first-demo';
+const ONBOARD_SIGNED_KEY = 'retake:signed-in-for-draft';
 const VOICE_NAMES = { silent:'No voiceover', edge:'Edge online voice', aiden:'Aiden · local Qwen', kokoro:'Kokoro · local, compact' };
 let onboardingStep = 1;
 let onboardingState = { url:'', describe:'', voice:'silent', consent:false };
@@ -794,6 +795,7 @@ function finishOnboardingOperator(data) {
   const ok = data && data.code === 0 && data.demo;
   if (ok) {
     localStorage.removeItem(ONBOARD_KEY);
+    sessionStorage.removeItem(ONBOARD_SIGNED_KEY);
     card.innerHTML = `<div class="ob-success" data-operator-done><div class="ob-icon" aria-hidden="true">✓</div><h2>Your first draft is ready</h2><p class="ob-lead">${esc(data.summary || 'Open it from the library.')}</p><button type="button" data-open-first>Open first draft</button></div>`;
     card.querySelector('[data-open-first]').onclick = async () => {
       onboardingSubmitted = false;
@@ -811,6 +813,16 @@ function finishOnboardingOperator(data) {
   // An expired sign-in is not a failure to explain; it is one button. The
   // agent's own login opens its provider's page; when it says it is signed
   // in, the draft starts again by itself — nothing is asked twice.
+  // Signed in, started again, and still refused: the sign-in exists but
+  // cannot be used from where Retake is running (a sandboxed launcher, a
+  // different user). Another round of the same button would not help.
+  if (data?.signIn && sessionStorage.getItem(ONBOARD_SIGNED_KEY) === '1') {
+    sessionStorage.removeItem(ONBOARD_SIGNED_KEY);
+    const agent = data.signIn === 'codex' ? 'Codex' : 'Claude Code';
+    card.innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">!</div><h2>${agent} is signed in, but not from here</h2><p class="ob-lead">Retake is running somewhere that cannot use your ${agent} sign-in. Start Retake from your own terminal with <code>retake ui</code>, then make the draft again.</p><button class="ob-retry" data-operator-retry type="button">Try again</button></div>`;
+    card.querySelector('[data-operator-retry]').onclick = () => retry(false);
+    return;
+  }
   if (data?.signIn) {
     const agent = data.signIn === 'codex' ? 'Codex' : 'Claude Code';
     card.innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">↻</div><h2>Sign in to ${agent}</h2><p class="ob-lead">Your first draft is made by ${agent}, and its sign-in has expired. Sign in on its own page — Retake never sees your password — and the draft starts again.</p><p class="ob-operator-status" data-signin-status></p><button class="ob-retry" data-signin type="button">Sign in to ${agent}</button></div>`;
@@ -825,7 +837,7 @@ function finishOnboardingOperator(data) {
           const st = await api('/api/signin?provider=' + data.signIn).catch(() => null);
           if (!st) return;
           if (st.url && !status.querySelector('a')) status.innerHTML = `If no page opened, <a href="${esc(st.url)}" target="_blank" rel="noopener">open the sign-in page</a>.`;
-          if (st.signedIn) { clearInterval(poll); status.textContent = 'Signed in. Starting the draft again…'; retry(true); }
+          if (st.signedIn) { clearInterval(poll); status.textContent = 'Signed in. Starting the draft again…'; sessionStorage.setItem(ONBOARD_SIGNED_KEY, '1'); retry(true); }
           else if (st.failed) { clearInterval(poll); btn.disabled = false; btn.textContent = `Sign in to ${agent}`; status.textContent = 'Sign-in did not finish. Try once more.'; }
         }, 2000);
       } catch (e) { btn.disabled = false; btn.textContent = `Sign in to ${agent}`; status.textContent = e.message; }

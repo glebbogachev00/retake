@@ -400,6 +400,14 @@ test("an expired agent sign-in is one button, and the draft starts again by itse
   await p.waitForFunction(() => /making the first draft/i.test(document.getElementById("onboarding")?.innerText || ""), undefined, { timeout: 15_000 });
   assert.equal(loginStarted, true, "the agent's own login was started");
   assert.equal(starts, 2, "the same draft started again by itself once signed in");
+  // Signed in and still refused: say where the problem is, not the same button again.
+  await p.route("**/api/operator/run3/stream*", async (r) => r.fulfill({
+    status: 200, contentType: "text/event-stream",
+    body: `event: done\ndata: ${JSON.stringify({ code: 1, summary: "Claude Code needs you to sign in again.", signIn: "claude-code" })}\n\n`,
+  }));
+  await p.evaluate(() => { (window as typeof window & { finishOnboardingOperator: (d: unknown) => void }).finishOnboardingOperator({ code: 1, signIn: "claude-code" }); });
+  assert.match(await p.locator("#onboarding").innerText(), /signed in, but not from here/i);
+  assert.equal(await p.locator("[data-signin]").count(), 0);
   assert.deepEqual(errs, []);
   await p.close();
 });
