@@ -138,6 +138,9 @@ const readBody = (req: http.IncomingMessage) => readBodyLimited(req, MAX_BODY);
 const safeName = (s: string) => /^[a-z0-9-]+$/.test(s);
 const MIME: Record<string, string> = { ".mp4": "video/mp4", ".mov": "video/quicktime", ".gif": "image/gif", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf", ".md": "text/markdown", ".json": "application/json", ".html": "text/html", ".yaml": "text/yaml" };
 
+/** Brands read in this window, waiting for the owner to keep one. */
+const brandReads = new Map<string, { brand: import("../setup.js").Brand; logo?: string }>();
+
 /** A path as routine.json writes it: relative to the workspace, or ~/. */
 const routinePath = (f: string) => path.resolve(ROOT, f.replace(/^~(?=\/|$)/, os.homedir()));
 
@@ -629,6 +632,44 @@ export function serve(port: number) {
         }
         writeRoutines(DEMOS, file);
         return json(res, 200, { use: file.use, routines: file.routines });
+      }
+      // ---------- the brand, read off a pasted link and shown back ----------
+      // The first thing a new owner sees after pasting their site is their
+      // own videos' look: their mark on their colours, their site framed in
+      // its colour. Read once, kept in memory until they say it is right.
+      if (p === "/api/brand" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { url?: string };
+        let target: URL;
+        try { target = new URL(String(b.url ?? "")); if (!/^https?:$/.test(target.protocol)) throw new Error(); }
+        catch { return json(res, 400, { error: "paste a web address" }); }
+        const { readBrand, decideBrand, nameForUrl } = await import("../setup.js");
+        const name = nameForUrl(target.href);
+        const read = await readBrand(target.href, path.join(DEMOS, "brand", `${name}-mark`), { shot: true }).catch(() => null);
+        if (!read || !read.facts) return json(res, 200, { name, brand: null, title: read?.title ?? "" });
+        const brand = decideBrand(read.facts);
+        const logo = read.logo ? path.relative(ROOT, read.logo) : undefined;
+        brandReads.set(name, { brand, logo });
+        const uri = (f: string | Buffer, type: string) => `data:${type};base64,${(typeof f === "string" ? fs.readFileSync(f) : f).toString("base64")}`;
+        return json(res, 200, {
+          name,
+          title: (read.title || name).split(/\s+[—–|·-]\s+/)[0].slice(0, 60),
+          brand: { ground: brand.ground, ink: brand.ink, matte: brand.matte, orb: brand.orb, accent: brand.accent },
+          logo: read.logo ? uri(read.logo, read.logo.endsWith(".svg") ? "image/svg+xml" : "image/png") : null,
+          shot: read.shot ? uri(read.shot, "image/jpeg") : null,
+          phone: read.phone ? uri(read.phone, "image/jpeg") : null,
+        });
+      }
+      if (p === "/api/brand/keep" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { name?: string; style?: string };
+        const got = b.name ? brandReads.get(b.name) : undefined;
+        if (b.style && !(b.style in STYLES)) return json(res, 400, { error: `shape is one of ${Object.keys(STYLES).join(", ")}` });
+        if (!b.name || !got) return json(res, 400, { error: "read the site first" });
+        const { brandedRoutine } = await import("../setup.js");
+        const file = readRoutines(DEMOS) ?? { use: b.name, routines: {} };
+        file.routines[b.name] = brandedRoutine(got.brand, got.logo, file.routines[b.name], b.style as Routine["style"] | undefined);
+        file.use = b.name;
+        writeRoutines(DEMOS, file);
+        return json(res, 200, { use: file.use });
       }
       // Hearing one is the only way to choose one. Synthesized on demand and
       // cached by text+voice+rate, so the second press is instant.

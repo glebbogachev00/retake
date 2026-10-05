@@ -187,6 +187,27 @@ export function productName(url: string, projectDir?: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "product";
 }
 
+/** The product a URL belongs to: the project serving it, or the site's name. */
+export function nameForUrl(url: string): string {
+  if (isLocal(url)) {
+    const port = Number(new URL(url).port || 80);
+    const dir = projectOnPort(port);
+    return dir ? productName(url, dir) : `app-${port}`;
+  }
+  return productName(url);
+}
+
+/** A routine in the house format — showcase, cards with corner circles — in
+    this brand's colours. The format until the owner approves a north star. */
+export function brandedRoutine(brand: Brand, logo?: string, base?: Routine, style?: Routine["style"]): Routine {
+  return RoutineSchema.parse({
+    ...(base ?? { style: "showcase", cards: true, mode: "launch", captions: false }),
+    ...(style ? { style } : {}),
+    theme: { background: brand.matte, ink: brand.ground },
+    card: { ...(base?.card ?? { weight: 560, ornament: "circles" }), background: brand.ground, ink: brand.matte, orb: brand.orb, ...(logo ? { logo } : {}) },
+  });
+}
+
 export function isLocal(url: string): boolean {
   return /^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost|.+\.test)$/.test(new URL(url).hostname);
 }
@@ -393,6 +414,10 @@ export type BrandFacts = {
   themeColor?: string;
   /** Colours the mark itself is drawn in. */
   mark: string[];
+  /** Colours the page actually uses where it asks for action — its buttons
+      and links — most used first. A site that declares nothing (utility CSS,
+      no theme-color, a PNG logo) still paints its brand here. */
+  ui?: string[];
 };
 
 export type Brand = { ground: string; ink: string; accent?: string; matte: string; orb: string; why: string[] };
@@ -425,7 +450,12 @@ export function decideBrand(f: BrandFacts): Brand {
   let accent: string | undefined;
   if (preferred) { accent = preferred[1]; why.push(`accent ${accent} — the page's ${preferred[0]}`); }
   else if (f.themeColor && vivid(f.themeColor)) { accent = f.themeColor; why.push(`accent ${accent} — its theme-color`); }
-  else { const m = f.mark.find(vivid); if (m) { accent = m; why.push(`accent ${accent} — from its mark`); } }
+  else {
+    const m = f.mark.find(vivid);
+    const u = (f.ui ?? []).find(vivid);
+    if (m) { accent = m; why.push(`accent ${accent} — from its mark`); }
+    else if (u) { accent = u; why.push(`accent ${accent} — its buttons and links`); }
+  }
   const { ground, ink } = f;
   const carries = !!accent && contrast(hexRgb(accent), hexRgb(ground)) >= 4.5;
   const matte = carries ? accent! : ink;
@@ -456,9 +486,25 @@ const COLOR_FACTS = `(() => {
   const ground = bgHex(document.body) || bgHex(document.documentElement) || '#ffffff';
   const ink = toHex(getComputedStyle(document.body).color) || '#111111';
   const tc = document.querySelector('meta[name="theme-color"]');
+  // Where the page asks for action: button and link fills, then link text.
+  // Weighted by area on screen, so the main call to action outranks a footer.
+  const used = {};
+  const add = (h, w) => { if (h && h !== ground && h !== ink) used[h] = (used[h] || 0) + w; };
+  for (const el of [...document.querySelectorAll('button, a, [role=button], input[type=submit]')].slice(0, 400)) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > innerHeight * 3) continue;
+    const area = r.width * r.height;
+    add(bgHex(el), area * 3);
+    add(toHex(getComputedStyle(el).color), area);
+  }
+  const ui = Object.entries(used).sort((a, b) => b[1] - a[1]).map(([h]) => h).slice(0, 8);
   probe.remove();
-  return { ground, ink, vars, themeColor: tc ? (toHex(tc.content) || undefined) : undefined };
+  return { ground, ink, vars, themeColor: tc ? (toHex(tc.content) || undefined) : undefined, ui };
 })()`;
+
+/** Where a site keeps its own logo: a home link or a logo-named element in
+    its header. */
+const HEADER_LOGO = ["header a[href='/']", "header a[href='./']", "header [class*='logo' i]", "nav a[href='/']", "[class*='logo' i]:not(body):not(html)", "a[href='/']"].join(", ");
 
 /** Colours an SVG mark is drawn in, read from its fill and stroke values. */
 export function svgColours(svg: string): string[] {
@@ -469,13 +515,25 @@ export function svgColours(svg: string): string[] {
 /** The brand's mark as the page declares it — an SVG, or a PNG big enough to
     sit on a 1080p card (a 16px favicon is not a mark) — and the colours the
     page is painted with. One visit to the page for both. */
-export async function readBrand(url: string, outBase: string): Promise<{ logo: string | null; facts: BrandFacts | null }> {
+export async function readBrand(url: string, outBase: string, o: { shot?: boolean } = {}): Promise<{ logo: string | null; facts: BrandFacts | null; title: string; shot?: Buffer; phone?: Buffer }> {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage({ colorScheme: "light" });
+    const page = await browser.newPage({ colorScheme: "light", viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2 });
     await page.goto(url, { waitUntil: "networkidle", timeout: 25_000 }).catch(() => undefined);
     const colours = (await page.evaluate(COLOR_FACTS).catch(() => null)) as Omit<BrandFacts, "mark"> | null;
+    const title = await page.title().catch(() => "");
+    // What the site looks like, for showing it back framed in its own colour.
+    const shot = o.shot ? await page.screenshot({ type: "jpeg", quality: 72, scale: "css" }).catch(() => undefined) : undefined;
+    // And on a phone, for the vertical shape.
+    let phone: Buffer | undefined;
+    if (o.shot) {
+      await page.setViewportSize({ width: 390, height: 780 });
+      await page.waitForTimeout(700);
+      phone = await page.screenshot({ type: "jpeg", quality: 72, scale: "css" }).catch(() => undefined);
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.waitForTimeout(400);
+    }
     const icons = (await page.evaluate(`[...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"], link[rel="mask-icon"]')]
       .map((l) => ({ href: l.href, rel: l.rel, type: l.type || "", sizes: (l.sizes && l.sizes.value) || "" }))`)) as { href: string; rel: string; type: string; sizes: string }[];
     const size = (s: string) => Math.max(0, ...s.split(/\s+/).map((v) => Number(v.split("x")[0]) || 0));
@@ -484,7 +542,29 @@ export async function readBrand(url: string, outBase: string): Promise<{ logo: s
       .sort((a, b) => Number(/svg/.test(b.type + b.href)) - Number(/svg/.test(a.type + a.href)) || size(b.sizes) - size(a.sizes));
     let logo: string | null = null;
     let mark: string[] = [];
-    for (const icon of ranked) {
+    // The logo the site shows in its own header comes first: that is the
+    // brand as the owner drew it. A favicon is a 16px stand-in — on one
+    // school's site it was a cartoon character, not the TechBash wordmark.
+    // A wordmark set in text is captured as a picture, background removed.
+    const head = page.locator(HEADER_LOGO).first();
+    const box = await head.boundingBox().catch(() => null);
+    if (box && box.width >= 40 && box.height >= 14 && box.height <= 140 && box.y < 200) {
+      const inner = await head.evaluate(`(el) => { const i = el.querySelector('img[src$=".svg"], img'); const s = el.querySelector('svg'); return { img: i ? i.src : null, svg: s && !i ? s.outerHTML : null }; }`).catch(() => null) as { img: string | null; svg: string | null } | null;
+      fs.mkdirSync(path.dirname(outBase), { recursive: true });
+      if (inner?.svg) {
+        fs.writeFileSync(outBase + ".svg", inner.svg.includes("xmlns") ? inner.svg : inner.svg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"'));
+        logo = outBase + ".svg"; mark = svgColours(inner.svg);
+      } else if (inner?.img && /\.svg(\?|$)/i.test(inner.img)) {
+        const res = await page.request.get(inner.img).catch(() => null);
+        if (res && res.ok()) { const body = await res.body(); fs.writeFileSync(outBase + ".svg", body); logo = outBase + ".svg"; mark = svgColours(body.toString("utf8")); }
+      }
+      if (!logo) {
+        await page.addStyleTag({ content: "*,*::before,*::after{background:transparent!important;box-shadow:none!important;backdrop-filter:none!important}" }).catch(() => undefined);
+        const png = await head.screenshot({ omitBackground: true }).catch(() => null);
+        if (png) { fs.writeFileSync(outBase + ".png", png); logo = outBase + ".png"; }
+      }
+    }
+    for (const icon of logo ? [] : ranked) {
       const res = await page.request.get(icon.href).catch(() => null);
       if (!res || !res.ok()) continue;
       const body = await res.body();
@@ -498,7 +578,7 @@ export async function readBrand(url: string, outBase: string): Promise<{ logo: s
       if (ext === ".svg") mark = svgColours(body.toString("utf8"));
       break;
     }
-    return { logo, facts: colours ? { ...colours, mark } : null };
+    return { logo, facts: colours ? { ...colours, mark } : null, title, shot, phone };
   } finally {
     await browser.close();
   }

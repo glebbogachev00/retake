@@ -284,6 +284,17 @@ test("a first-time user can describe one demo and make an honest narration choic
       : `retry: 50\nevent: pending\ndata: ${JSON.stringify({ id: "q-login", kind: "question", text: "Which demo account should Retake use?", detail: "Sign in before recording." })}\n\n`;
     await r.fulfill({ status: 200, contentType: "text/event-stream", body: event });
   });
+  // The site's brand, read and shown back before anything else is asked.
+  let kept: Record<string, unknown> | null = null;
+  await p.route("**/api/brand", async (r) => r.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ name: "example", title: "Example", brand: { ground: "#f2efe6", ink: "#191d19", matte: "#191d19", orb: "#f1e6d0", accent: "#e8b04b" }, logo: null, shot: null }),
+  }));
+  await p.route("**/api/brand/keep", async (r) => {
+    kept = r.request().postDataJSON();
+    await r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ use: "example" }) });
+  });
   await p.route("**/api/take/first-project", async (r) => r.fulfill({
     status: 200,
     contentType: "application/json",
@@ -300,6 +311,14 @@ test("a first-time user can describe one demo and make an honest narration choic
 
   await p.locator("#onboard-url").fill("https://example.com");
   await p.locator("#onboard-next").click();
+  await p.locator(".ob-frame").first().waitFor();
+  assert.match(await p.locator("[data-step='2']").innerText(), /in your colours/i, "the owner sees their own brand before anything else is asked");
+  assert.equal(await p.locator(".ob-shape[aria-checked='true']").getAttribute("data-style"), "showcase", "showcase is chosen until they pick another");
+  await p.locator(".ob-shape[data-style='mobile']").click();
+  assert.equal(await p.locator("#onboard-next").innerText(), "Looks right");
+  assert.equal(await p.locator(".ob-frame").first().evaluate((e) => getComputedStyle(e).backgroundColor), "rgb(242, 239, 230)");
+  await p.locator("#onboard-next").click();
+  assert.deepEqual(kept, { name: "example", style: "mobile" }, "Looks right keeps the brand and the chosen shape as the product's routine");
   await p.locator("#onboard-describe").fill("Show how a visitor creates their first project");
   await p.locator("#onboard-next").click();
   await p.locator("[data-voice=aiden]").click();
@@ -361,8 +380,12 @@ test("a failed first draft retries without asking for the request again", async 
     contentType: "text/event-stream",
     body: `event: done\ndata: ${JSON.stringify({ code: 1, summary: "The app did not start." })}\n\n`,
   }));
+  // A site whose colours cannot be read still goes on — in Retake's own.
+  await p.route("**/api/brand", async (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ name: "example", brand: null }) }));
   await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
   await p.locator("#onboard-url").fill("https://example.com");
+  await p.locator("#onboard-next").click();
+  await p.waitForFunction(() => /could not be read/.test(document.getElementById("brand-lead")?.textContent || ""));
   await p.locator("#onboard-next").click();
   await p.locator("#onboard-describe").fill("Show a visitor creating the first project");
   await p.locator("#onboard-next").click();
