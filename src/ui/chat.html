@@ -573,7 +573,9 @@ async function api(u, o) {
   const opt = { ...(o || {}) };
   opt.headers = { ...(opt.headers || {}), 'x-retake-token': window.__retakeToken || '' };
   if (opt.body && !opt.headers['content-type']) opt.headers['content-type'] = 'application/json';
-  const r = await fetch(u, opt);
+  // A window whose Retake has stopped cannot reach it; say that, not the
+  // browser's "Failed to fetch".
+  const r = await fetch(u, opt).catch(() => { throw new Error('Retake has stopped running. Start it again with `retake ui`, then try once more.'); });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
