@@ -18,6 +18,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
+import { execFileSync } from "node:child_process";
+import * as mediaBin from "./media-bin.js";
 import { z } from "zod";
 
 /* ─── the three styles ───────────────────────────────────────────────────────
@@ -745,10 +747,17 @@ async function ssim(ffmpeg: string, a: string, b: string): Promise<number> {
   return m ? Number(m[1]) : 0;
 }
 
-async function frameAt(ffmpeg: string, video: string, at: number, fromEnd: boolean, out: string): Promise<string> {
+/** The average colour of a still, read through ffmpeg as one pixel. */
+function meanRgb(png: string): [number, number, number] {
+  const { ffmpegBin } = mediaBin;
+  const px = execFileSync(ffmpegBin(), ["-hide_banner", "-loglevel", "error", "-i", png, "-vf", "scale=1:1:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"]);
+  return [px[0] ?? 0, px[1] ?? 0, px[2] ?? 0];
+}
+
+async function frameAt(ffmpeg: string, video: string, at: number, fromEnd: boolean, out: string, vf?: string): Promise<string> {
   const { execFile } = await import("node:child_process");
   const args = fromEnd ? ["-sseof", String(-at)] : ["-ss", String(at)];
-  await new Promise<void>((done) => execFile(ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", ...args, "-i", video, "-frames:v", "1", out], () => done()));
+  await new Promise<void>((done) => execFile(ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", ...args, "-i", video, "-frames:v", "1", ...(vf ? ["-vf", vf] : []), out], () => done()));
   return out;
 }
 
@@ -759,12 +768,24 @@ export async function compareToReference(ffmpeg: string, reference: string, cand
   // A settled moment inside each card: past the fade-in, before the fade-out.
   const settle = Math.max(0.8, Math.min(1.6, r.cardMs / 1000 * 0.55));
   if (r.cards) {
-    const [ri, ci] = await Promise.all([frameAt(ffmpeg, reference, settle, false, path.join(work, "ref-intro.png")), frameAt(ffmpeg, candidate, settle, false, path.join(work, "cut-intro.png"))]);
+    // The card's design — its ground, ornaments and where things sit — not
+    // its words or mark. A video's own title belongs on its opening card, and
+    // a second product's mark on its own; judged in, they failed every cut of
+    // a product whose north star was another product's video. The centre
+    // holds the mark and title (cards.ts) and is blanked on both sides, the
+    // way the app is blanked when the frame around it is compared.
+    const content = "drawbox=x=iw*0.14:y=ih*0.2:w=iw*0.72:h=ih*0.6:color=black:t=fill";
+    const [ri, ci] = await Promise.all([frameAt(ffmpeg, reference, settle, false, path.join(work, "ref-intro.png"), content), frameAt(ffmpeg, candidate, settle, false, path.join(work, "cut-intro.png"), content)]);
+    // Structure alone cannot see colour: a flat grey card and a flat white one
+    // are the same shape. The ground is compared as a colour too.
+    const shift = (a: string, b: string) => Math.hypot(...[0, 1, 2].map((i) => meanRgb(a)[i] - meanRgb(b)[i]));
     const si = await ssim(ffmpeg, ri, ci);
-    out.push({ label: "opening card", score: si, pass: si >= 0.9, note: si >= 0.9 ? "matches" : "does not look like the reference's opening card" });
-    const [ro, co] = await Promise.all([frameAt(ffmpeg, reference, settle, true, path.join(work, "ref-outro.png")), frameAt(ffmpeg, candidate, settle, true, path.join(work, "cut-outro.png"))]);
+    const ci2 = shift(ri, ci) <= 8;
+    out.push({ label: "opening card", score: si, pass: si >= 0.9 && ci2, note: !ci2 ? "a different colour from the reference's opening card" : si >= 0.9 ? "matches" : "does not look like the reference's opening card" });
+    const [ro, co] = await Promise.all([frameAt(ffmpeg, reference, settle, true, path.join(work, "ref-outro.png"), content), frameAt(ffmpeg, candidate, settle, true, path.join(work, "cut-outro.png"), content)]);
     const so = await ssim(ffmpeg, ro, co);
-    out.push({ label: "closing card", score: so, pass: so >= 0.9, note: so >= 0.9 ? "matches" : "does not look like the reference's closing card" });
+    const co2 = shift(ro, co) <= 8;
+    out.push({ label: "closing card", score: so, pass: so >= 0.9 && co2, note: !co2 ? "a different colour from the reference's closing card" : so >= 0.9 ? "matches" : "does not look like the reference's closing card" });
   }
   // The frame around the app — the matte and where the app sits — compared on
   // a body frame with the app's own contents blanked: only the border counts.

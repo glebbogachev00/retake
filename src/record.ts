@@ -337,6 +337,57 @@ export class SetupFailed extends Error {}
  * drawn cursor, the camera focus and callouts.
  */
 export const GEOMETRY_VERSION = "native-dpr-v1";
+/**
+ * Scroll the panel that actually holds the target, when that is not the page.
+ * The recorder's scroll moves the window; a target inside a scrolling dialog
+ * or sidebar stayed where it was while the page behind it moved, so a scene
+ * narrated what the viewer never saw — and the dry run, which used the
+ * browser's own scrollIntoView, passed. Both now use this.
+ *
+ * A string, not a function: tsx/esbuild's keepNames would inject a `__name`
+ * helper that does not exist inside the page. The target is marked with
+ * data-retake-scroll first (Playwright selectors are not CSS). Resolves true
+ * when a panel was scrolled, false when the page should be.
+ */
+export const PANEL_SCROLL = `(async ({ align, speed, instant }) => {
+  const el = document.querySelector('[data-retake-scroll]');
+  if (!el) return false;
+  el.removeAttribute('data-retake-scroll');
+  let box = el.parentElement;
+  while (box && box !== document.body && box !== document.documentElement) {
+    const st = getComputedStyle(box);
+    if (/(auto|scroll|overlay)/.test(st.overflowY) && box.scrollHeight > box.clientHeight + 1) break;
+    box = box.parentElement;
+  }
+  if (!box || box === document.body || box === document.documentElement) return false;
+  const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
+  const want = align === 'top' ? b.top + 16 : align === 'bottom' ? b.bottom - r.height - 16 : b.top + (b.height - r.height) / 2;
+  const from = box.scrollTop;
+  const to = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, from + (r.top - want)));
+  const dist = Math.abs(to - from);
+  if (dist < 1) return true;
+  const ms = instant ? 0 : speed ? 600 / speed : Math.min(2500, Math.max(400, dist / 1100 * 1000));
+  const was = box.style.scrollBehavior;
+  box.style.scrollBehavior = 'auto';
+  await new Promise((done) => {
+    const t0 = performance.now();
+    const ease = (m) => m < .5 ? 4 * m * m * m : 1 - Math.pow(-2 * m + 2, 3) / 2;
+    const tick = (now) => {
+      const g = ms ? Math.min((now - t0) / ms, 1) : 1;
+      box.scrollTop = from + (to - from) * ease(g);
+      if (g < 1) requestAnimationFrame(tick); else done();
+    };
+    requestAnimationFrame(tick);
+  });
+  box.style.scrollBehavior = was;
+  return true;
+})`;
+
+export async function scrollPanel(page: Page, selector: string, o: { align: string; speed?: number; instant?: boolean; timeout: number }): Promise<boolean> {
+  await page.locator(selector).first().evaluate((el) => el.setAttribute("data-retake-scroll", "1"), undefined, { timeout: o.timeout });
+  return (await page.evaluate(`${PANEL_SCROLL}(${JSON.stringify({ align: o.align, speed: o.speed ?? null, instant: !!o.instant })})`)) as boolean;
+}
+
 export function pageGeometry(q: { viewport: { width: number; height: number }; scale: number }) {
   const s = q.scale;
   return {
@@ -1332,6 +1383,8 @@ export async function runStep(rec: PageRecorder, page: Page, step: Step, m: Mani
         const cur = await page.evaluate(() => ({ y: window.scrollY, max: document.documentElement.scrollHeight - window.innerHeight }));
         dy = Math.round((want === "top" ? 0 : cur.max) - cur.y);
       } else if (step.to) {
+        // Inside a scrolling panel, move the panel — see PANEL_SCROLL.
+        if (await scrollPanel(page, step.to, { align: step.align, speed: step.speed, timeout })) break;
         // Work out how far to move so the element sits where we asked, then let
         // testreel animate that distance (an eased scroll, not a jump).
         const box = await page.locator(step.to).first().boundingBox({ timeout });

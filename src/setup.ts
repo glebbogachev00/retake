@@ -64,7 +64,7 @@ export type Look = {
   style: "showcase" | "fullscreen" | "mobile";
   /** Opens on a card: one flat ground with a mark and a line on it. */
   cards: boolean;
-  card?: { background: string; ink: string };
+  card?: { background: string; ink: string; ornament?: "circles"; orb?: string };
   /** The matte around an inset app — the routine's theme. */
   theme?: { background: string; ink: string };
   notes: string[];
@@ -112,7 +112,7 @@ export function readLook(frames: { intro: Frame; body: Frame; outro: Frame }, si
     const chosen = inset && inkColor && dist(inkColor, ring.color) < 48 ? ring.color : inkColor ?? (inset && contrast(ring.color, ground) >= 3 ? ring.color : null);
     if (!chosen) notes.push("the card's ink could not be read — the title is drawn in black or white, whichever reads on the ground");
     const fallback: Rgb = luminance(ground) > 0.4 ? [17, 17, 17] : [250, 250, 250];
-    card = { background: hex(ground), ink: hex(chosen ?? fallback) };
+    card = { background: hex(ground), ink: hex(chosen ?? fallback), ...orbs(intro, ground) };
     if (!flat(outroGround)) notes.push("it opens on a card but does not close on one — the routine closes on one too, so the set stays alike");
   } else {
     notes.push("no opening card in the reference — the routine has none either");
@@ -126,6 +126,18 @@ export function readLook(frames: { intro: Frame; body: Frame; outro: Frame }, si
     theme = { background: hex(bg), ink: hex(ink) };
   }
   return { style, cards, card, theme, notes };
+}
+
+/** Soft circles in opposite corners — a tint of the ground, top-left and
+    bottom-right, the way a branded card carries them. Both corners must
+    agree, so a stray mark in one corner is not mistaken for an ornament. */
+export function orbs(f: Frame, ground: Rgb): { ornament?: "circles"; orb?: string } {
+  const box = (x0: number, y0: number) => dominant(f, (x, y) =>
+    x >= f.width * x0 && x < f.width * (x0 + 0.1) && y >= f.height * y0 && y < f.height * (y0 + 0.12));
+  const a = box(0.01, 0.02), b = box(0.89, 0.86);
+  const tinted = (c: { color: Rgb; share: number }) => c.share >= 0.6 && dist(c.color, ground) >= 6 && dist(c.color, ground) <= 70;
+  if (!tinted(a) || !tinted(b) || dist(a.color, b.color) > 12) return {};
+  return { ornament: "circles", orb: hex([(a.color[0] + b.color[0]) / 2, (a.color[1] + b.color[1]) / 2, (a.color[2] + b.color[2]) / 2]) };
 }
 
 /** Do the app's left and right edges run straight down the frame, at the
@@ -211,6 +223,21 @@ export function reachingVariables(projectDir: string): string[] {
     }
   }
   return [...names].sort();
+}
+
+/** The command line of whatever serves this port — how the owner started it. */
+export function commandOnPort(port: number): string | null {
+  try {
+    const pid = execFileSync("lsof", ["-tiTCP:" + port, "-sTCP:LISTEN"], { encoding: "utf8" }).trim().split("\n")[0];
+    return pid ? execFileSync("ps", ["-o", "command=", "-p", pid], { encoding: "utf8" }).trim() || null : null;
+  } catch { return null; }
+}
+
+/** The same command on another port: the port it names is swapped, or, if it
+    names none, $PORT is set — the convention nearly every server reads. */
+export function movePort(command: string, from: number, to: number): string {
+  const swapped = command.replace(new RegExp(`(--port[= ]|-p |:|PORT=)${from}\\b`, "g"), `$1${to}`);
+  return swapped !== command ? swapped : `PORT=${to} ${command}`;
 }
 
 /** A port nothing listens on, near the real one — a different origin, so the
@@ -447,14 +474,16 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
   if (local && projectDir) {
     const { startOffer } = await import("./appserver.js");
     const offer = startOffer(projectDir);
-    if (!offer) throw new Error(`${projectDir} has no dev/start script to run — add one, or write the environment by hand (see demos/environment.yaml in the docs)`);
     const { portBusy } = await import("./recording-env.js");
     const port = isolatedPort(realPort, portBusy);
+    // No script to run: start it the way it is running now, on our port.
+    const running = offer ? null : commandOnPort(realPort);
+    if (!offer && !running) throw new Error(`${projectDir} has no dev/start script, and nothing is running on :${realPort} to copy — start it once, or write the environment by hand`);
     blank = reachingVariables(projectDir);
     target = `http://localhost:${port}${url.pathname}${url.search}`;
     environment = path.join(o.demosDir, "environments", `${name}.yaml`);
     fs.mkdirSync(path.dirname(environment), { recursive: true });
-    const draft = { name, command: startOnPort(offer.command, offer.script, port), cwd: projectDir, port, blank, path: url.pathname || "/", present: [] as string[] };
+    const draft = { name, command: offer ? startOnPort(offer.command, offer.script, port) : movePort(running!, realPort, port), cwd: projectDir, port, blank, path: url.pathname || "/", present: [] as string[] };
     fs.writeFileSync(environment, environmentYaml(draft));
     wrote.push(rel(environment));
     o.log(`  app         ${projectDir.replace(os.homedir(), "~")} · \`${draft.command}\` on :${port}, not :${realPort}`);

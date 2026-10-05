@@ -10,8 +10,8 @@ import path from "node:path";
 import YAML from "yaml";
 import { EnvSpec } from "../src/recording-env.js";
 import {
-  briefMarkdown, contrast, dominant, environmentYaml, hexRgb, isLocal, isolatedPort, productName,
-  reachingVariables, readLook, routineFor, startOnPort, straightSides, type Frame, type Rgb,
+  briefMarkdown, contrast, dominant, environmentYaml, hexRgb, isLocal, isolatedPort, movePort, productName,
+  orbs, reachingVariables, readLook, routineFor, startOnPort, straightSides, type Frame, type Rgb,
 } from "../src/setup.js";
 
 const W = 96, H = 54;
@@ -82,6 +82,12 @@ test("the project's own start command, moved to our port", () => {
   assert.equal(startOnPort("vercel dev", "vercel dev", 4319), "vercel dev --listen 4319");
 });
 
+test("no script: the running command, moved to our port", () => {
+  assert.equal(movePort("node /x/dist/cli.js ui --port 4310", 4310, 4329), "node /x/dist/cli.js ui --port 4329");
+  assert.equal(movePort("python3 -m http.server 8000", 8000, 8019), "PORT=8019 python3 -m http.server 8000");
+  assert.equal(movePort("serve -l tcp://localhost:5000", 5000, 5019), "serve -l tcp://localhost:5019");
+});
+
 test("variables that reach a real account are named — their values never read out", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retake-setup-"));
   fs.writeFileSync(path.join(dir, ".env.local"), [
@@ -125,4 +131,14 @@ test("the routine takes the look, a narrated north star gets a voice", () => {
   // The workspace's own voice and pace carry over to its next product.
   assert.equal(routineFor({ look, narrated: true, brief: "b", inheritVoice: { voice: "ryan", rate: -8 } }).rate, -8);
   assert.equal(routineFor({ narrated: false, brief: "b" }).voice, "silent");
+});
+
+test("soft circles in opposite corners are the card's ornament; a plain card has none", () => {
+  const ORB: Rgb = [237, 245, 240];
+  const circled = frame((x, y) => ((x < 12 && y < 9) || (x > W - 12 && y > H - 9) ? ORB : y > 24 && y < 30 && x > 30 && x < 66 ? GREEN : LIGHT));
+  assert.deepEqual(orbs(circled, LIGHT), { ornament: "circles", orb: "#edf5f0" });
+  assert.deepEqual(orbs(card, LIGHT), {});
+  // One corner alone is a stray mark, not an ornament.
+  const oneCorner = frame((x, y) => (x < 12 && y < 9 ? ORB : LIGHT));
+  assert.deepEqual(orbs(oneCorner, LIGHT), {});
 });

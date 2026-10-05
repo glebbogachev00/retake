@@ -8,7 +8,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { applyPageSetup, authState, dragPoints, gateOnApp, pageGeometry, resolvePoint, runEvaluateSeed, runFileOrCommandSeed } from "./record.js";
+import { applyPageSetup, authState, dragPoints, gateOnApp, pageGeometry, resolvePoint, scrollPanel, runEvaluateSeed, runFileOrCommandSeed } from "./record.js";
 import { chromium, type Page, type BrowserContext } from "playwright";
 import { waitForStep } from "./waiting.js";
 import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
@@ -251,7 +251,12 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
           // the one the recording would see.
           if (step.to === "top") await page.evaluate(() => window.scrollTo(0, 0));
           else if (step.to === "bottom") await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-          else if (step.to) { await page.locator(step.to).first().boundingBox({ timeout: short }); await page.locator(step.to).first().scrollIntoViewIfNeeded({ timeout: short }); }
+          else if (step.to) {
+            await page.locator(step.to).first().boundingBox({ timeout: short });
+            // The same panel-or-page decision the take makes, or the dry run
+            // proves a scroll the recording never performs.
+            if (!(await scrollPanel(page, step.to, { align: step.align, instant: true, timeout: short }))) await page.locator(step.to).first().scrollIntoViewIfNeeded({ timeout: short });
+          }
           break;
         case "upload": {
           const files = (Array.isArray(step.files) ? step.files : [step.files])

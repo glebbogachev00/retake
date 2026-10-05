@@ -1390,7 +1390,7 @@ routine
 
 routine
   .command("set")
-  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | intro | outro | logo | note (intro/outro: \"Title | subtitle\")")
+  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | intro | outro | logo | deliver | note (intro/outro: \"Title | subtitle\")")
   .argument("<value>")
   .option("--as <name>", "which routine to change (default: the one in use)")
   .description("change the standard once, for every recording that follows")
@@ -1447,6 +1447,9 @@ routine
         if (k === "outro") next.cards = true;
         break;
       }
+      case "deliver":
+        if (/^(none|off)$/i.test(value)) { delete next.deliver; break; }
+        next.deliver = value.replace(/^~(?=\/|$)/, process.env.HOME ?? "~"); break;
       case "logo": {
         if (!fs.existsSync(path.resolve(value))) throw new Error(`no such file: ${value}`);
         if (!/\.(svg|png|jpe?g)$/i.test(value)) throw new Error("the card draws an SVG, PNG or JPEG mark");
@@ -1454,7 +1457,7 @@ routine
         next.card = { ...current.card, logo: value }; break;
       }
       default:
-        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, intro, outro, logo, note`);
+        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, intro, outro, logo, deliver, note`);
     }
 
     const parsed = RoutineSchema.safeParse(next);
