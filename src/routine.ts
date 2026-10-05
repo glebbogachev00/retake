@@ -502,9 +502,23 @@ export async function runRoutine(o: RoutineRun): Promise<ItemResult[]> {
     const missing = o.only.filter((n) => !items.some((i) => i.name === n));
     if (missing.length) throw new Error(`not in the plan: ${missing.join(", ")} — have: ${items.map((i) => i.name).join(", ")}`);
   }
-  const pending = o.only?.length ? items.filter((i) => o.only!.includes(i.name)) : items.filter((i) => i.status === "todo" || i.status === "failed");
+  const drafted = (i: PlanItem) => { try { manifestFor(o.demosDir, i.name); return true; } catch { return false; } };
+  let pending = o.only?.length ? items.filter((i) => o.only!.includes(i.name)) : items.filter((i) => i.status === "todo" || i.status === "failed");
+  // A story nobody has drafted yet is waiting, not failed. Marking it failed
+  // spent a scheduled morning on it and pushed the drafted ones back a day.
+  let waiting: PlanItem[] = [];
+  if (!o.only?.length) {
+    waiting = pending.filter((i) => !drafted(i));
+    if (waiting.length) o.log(`waiting for a draft: ${waiting.map((i) => i.name).join(", ")}`);
+    pending = pending.filter(drafted);
+  }
   const queue = o.limit ? pending.slice(0, o.limit) : pending;
-  if (!queue.length) { o.log("nothing to record — every plan item is done. `--only <name>` re-records one."); return []; }
+  if (!queue.length) {
+    o.log(waiting.length
+      ? `nothing drafted to record — ${waiting.length} ${waiting.length === 1 ? "story waits" : "stories wait"} for a manifest.`
+      : "nothing to record — every plan item is done. `--only <name>` re-records one.");
+    return [];
+  }
 
   // Bringing the environment up is not a once-per-batch job. A dry run DRIVES
   // the app — it clicks the same buttons the take will — so by the time the

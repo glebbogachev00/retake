@@ -257,6 +257,21 @@ retake routine run -n 3         # three videos, then stop
 retake routine run --only hero  # re-record one
 ```
 
+**Letting it run itself.** Once a routine has a plan and a north star, nobody
+needs to be at the keyboard:
+
+```bash
+retake routine schedule weekdays 09:00   # the next drafted video, every weekday morning
+retake routine schedule                  # what is scheduled, and whether the machine holds it
+retake routine schedule off
+```
+
+Each run brings the app up isolated, records one video, judges it against the
+north star and delivers it only if it matches — then a notification says how
+it went. launchd wakes it on a Mac, cron on Linux; nothing of Retake's stays
+running. A story with no manifest yet waits instead of failing, so an
+undrafted idea never costs a morning.
+
 Each item is stamped, dry-run, recorded as a preview and finished at full
 quality, with progress written to `plan.json` as it goes — so an interrupted
 batch resumes where it stopped, and one broken selector does not cost the other

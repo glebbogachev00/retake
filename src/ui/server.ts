@@ -49,6 +49,7 @@ import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
 import { captureMatchesTake, readPreviewReceipt } from "../preview.js";
 import { STYLES, VOICES, RoutineSchema, environmentFor, readRoutines, starter, voiceId, writeRoutines, type Routine } from "../routine.js";
 import { loadEnvSpec } from "../recording-env.js";
+import { describeSchedule, readSchedule, scheduleLoaded } from "../schedule.js";
 import { synthesize, voiceCachePath } from "../voice.js";
 
 const ROOT = PROJECT_ROOT;
@@ -607,6 +608,8 @@ export function serve(port: number) {
           use: file?.use ?? "default",
           routines,
           about: Object.fromEntries(Object.entries(routines).map(([n, r]) => [n, aboutRoutine(r)])),
+          // Runs with whichever routine is in use, so it belongs to the workspace.
+          schedule: (() => { const sc = readSchedule(ROOT); return sc ? { text: describeSchedule(sc), live: scheduleLoaded(sc.label) } : null; })(),
           styles: Object.entries(STYLES).map(([name, st]) => ({ name, ...st })),
           voices: Object.entries(VOICES).map(([name, v]) => ({ name, ...v })),
         });

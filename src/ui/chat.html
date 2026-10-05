@@ -881,6 +881,9 @@ $('routineBtn').onclick = async () => {
     const facts = [];
     if (about.deliver) facts.push(['Delivers to', `${esc(about.deliver.path)} · ${about.deliver.videos} video${about.deliver.videos === 1 ? '' : 's'} — only ones that match`]);
     if (about.brief) facts.push(['Brief', about.brief.exists ? `${esc(about.brief.path)} — what an agent reads before writing a step` : `<span class="miss">${esc(about.brief.path)} is missing</span>`]);
+    if (name === data.use) facts.push(['Runs', data.schedule
+      ? (data.schedule.live ? esc(data.schedule.text) + ' — by itself' : `<span class="miss">${esc(data.schedule.text)} — not loaded; schedule it again</span>`)
+      : 'when someone types <code>retake routine run</code> · <code>retake routine schedule weekdays 09:00</code> makes it run itself']);
     if (about.environment) facts.push(['App', `${esc(about.environment.name || about.environment.path)}${about.environment.port ? ` on :${about.environment.port}` : ''} — started isolated and proven before every take`]);
     q('#rtStar').innerHTML = (font ? `<style>${font}</style>` : '') + `
       <h4>North star</h4>

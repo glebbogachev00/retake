@@ -1627,25 +1627,76 @@ routine
   .option("--rate <percent>", "just this batch: a different pace")
   .option("--captions <on|off>", "just this batch")
   .option("-e, --env <path>", "environment file — bring the app up clean and prove it before recording")
+  .option("--scheduled", "started by `retake routine schedule`: say how it went in a notification", false)
   .description("work the plan: stamp, dry-run, record and finish each demo that is not done")
-  .action(async (opts: { as?: string; only?: string; limit?: string; preview: boolean; out: string; voice?: string; style?: string; rate?: string; captions?: string; env?: string }) => {
-    const { name, routine: base } = pickRoutine(DEMOS_DIR(), opts.as);
-    const { routine: r, said } = overrideRoutine(base, opts);
-    if (said.length) say(`just this batch: ${said.join(" · ")} (demos/routine.json is unchanged)`);
-    const limit = opts.limit === undefined ? undefined : Number(opts.limit);
-    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) throw new Error("--limit is a whole number of videos");
-    say(`routine ${name}`);
-    const results = await runRoutine({
-      demosDir: DEMOS_DIR(),
-      outRoot: path.resolve(opts.out),
-      routine: r,
-      only: opts.only?.split(",").map((s) => s.trim()).filter(Boolean),
-      limit,
-      previewOnly: opts.preview,
-      envFile: opts.env ? path.resolve(opts.env) : environmentFor(DEMOS_DIR(), r),
-      log: say,
-    });
-    if (results.some((x) => x.status === "failed")) process.exitCode = 2;
+  .action(async (opts: { as?: string; only?: string; limit?: string; preview: boolean; out: string; voice?: string; style?: string; rate?: string; captions?: string; env?: string; scheduled: boolean }) => {
+    if (!opts.scheduled) { await runPlan(opts); return; }
+    // Nobody is watching a scheduled run, so how it went has to come to them.
+    const { notify } = await import("./schedule.js");
+    say(`\n═══ scheduled run · ${new Date().toLocaleString()}`);
+    try {
+      const { results, routine: r } = await runPlan(opts);
+      const done = results.filter((x) => x.status === "final");
+      const short = results.filter((x) => x.status !== "final");
+      if (!results.length) notify("Retake", "Nothing to record today — no drafted story is waiting in the plan.");
+      else if (done.length && !short.length) notify("Retake", `${done.map((x) => x.name).join(", ")} ${done.length === 1 ? "is" : "are"} ready${r.deliver ? ` in ${path.basename(r.deliver)}` : ""}.`);
+      else notify("Retake", short.map((x) => `${x.name}: ${x.note ?? x.status}`).join(" · ").slice(0, 220));
+    } catch (e) {
+      notify("Retake — the scheduled run stopped", (e as Error).message.slice(0, 220));
+      throw e;
+    }
+  });
+
+async function runPlan(opts: { as?: string; only?: string; limit?: string; preview: boolean; out: string; voice?: string; style?: string; rate?: string; captions?: string; env?: string }) {
+  const { name, routine: base } = pickRoutine(DEMOS_DIR(), opts.as);
+  const { routine: r, said } = overrideRoutine(base, opts);
+  if (said.length) say(`just this batch: ${said.join(" · ")} (demos/routine.json is unchanged)`);
+  const limit = opts.limit === undefined ? undefined : Number(opts.limit);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) throw new Error("--limit is a whole number of videos");
+  say(`routine ${name}`);
+  const results = await runRoutine({
+    demosDir: DEMOS_DIR(),
+    outRoot: path.resolve(opts.out),
+    routine: r,
+    only: opts.only?.split(",").map((s) => s.trim()).filter(Boolean),
+    limit,
+    previewOnly: opts.preview,
+    envFile: opts.env ? path.resolve(opts.env) : environmentFor(DEMOS_DIR(), r),
+    log: say,
+  });
+  if (results.some((x) => x.status === "failed")) process.exitCode = 2;
+  return { results, routine: r };
+}
+
+routine
+  .command("schedule")
+  .argument("[every]", "daily | weekdays | off — omit to see the current schedule")
+  .argument("[at]", "24-hour time", "09:00")
+  .option("-n, --count <videos>", "videos per run", "1")
+  .description("let the routine run itself: the next planned video, recorded, judged and delivered on a cadence")
+  .action(async (every: string | undefined, at: string, opts: { count: string }) => {
+    const { installSchedule, removeSchedule, readSchedule, scheduleLoaded, describeSchedule } = await import("./schedule.js");
+    const root = process.cwd();
+    if (!every) {
+      const s = readSchedule(root);
+      if (!s) { say("not scheduled — `retake routine schedule weekdays 09:00` records the next planned video every weekday morning."); return; }
+      const live = scheduleLoaded(s.label);
+      say(`${live ? "✓" : "✗"} ${describeSchedule(s)} — ${live ? `held by ${s.mechanism}` : `written, but ${s.mechanism} is not holding it; schedule it again`}`);
+      say(`  log: ${path.relative(root, path.join(root, ".retake", "schedule.log"))}`);
+      return;
+    }
+    if (every === "off") { say(removeSchedule(root) ? "✓ unscheduled." : "nothing was scheduled."); return; }
+    if (every !== "daily" && every !== "weekdays") throw new Error("say daily, weekdays or off");
+    // It will run with nobody there. Everything a run needs must already be
+    // true, so check it now rather than learn it from tomorrow's notification.
+    const { name, routine: r } = pickRoutine(DEMOS_DIR(), undefined);
+    const drafted = readPlan(DEMOS_DIR()).filter((i) => (i.status === "todo" || i.status === "failed") && ["yaml", "yml", "json"].some((x) => fs.existsSync(path.join(DEMOS_DIR(), `${i.name}.${x}`))));
+    const bin = entry("cli");
+    const s = installSchedule(root, { every, at, count: Number(opts.count) }, [bin.command, ...bin.args, "routine", "run", "--scheduled", "-n", String(Number(opts.count))]);
+    say(`✓ routine ${name} runs ${describeSchedule(s)} — the next planned video, judged against the north star${r.deliver ? `, delivered to ${r.deliver}` : ""}.`);
+    say(`  ${drafted.length ? `${drafted.length} drafted and waiting: ${drafted.slice(0, 4).map((i) => i.name).join(", ")}${drafted.length > 4 ? "…" : ""}` : "nothing drafted is waiting — add stories to demos/plan.json and draft them, or the runs will have nothing to do"}`);
+    if (!r.reference) say(`  ℹ no north star: every take will be delivered unjudged. \`retake routine reference <video>\`.`);
+    say(`  A notification says how each run went. \`retake routine schedule off\` stops it.`);
   });
 
 program.parseAsync(process.argv).catch((e) => {
