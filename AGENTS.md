@@ -23,6 +23,7 @@ that wastes real time. Almost nothing needs the camera twice.
 |---|---|---|
 | size, shape, format | `retake render <dir> --preset <other>` | seconds |
 | caption words, speed, zoom, cards, music | edit the manifest, `retake render` | seconds |
+| join separate recorded outputs | `retake stitch outputs/a outputs/b --out outputs/joined/demo.mp4 --transition fade` | render only |
 | **where** a caption or still sits | `nudge: <ms>` on the scene, then render | seconds |
 | the ENDING of a demo | `retake run … --from <scene>` | the tail only |
 | one beat, while iterating | `retake run … --until <scene>` | the head only |
@@ -37,6 +38,13 @@ versions of a demo and `retake restore <dir> <id>` puts one back;
 `retake tidy` reports reclaimable disk and removes nothing without
 `--apply`. Neither ever touches a raw recording or a take.json — those are
 the only things a re-render cannot rebuild.
+
+`retake stitch` accepts output folders or video files in playback order. It
+uses the existing transition styles and the first clip's canvas and frame
+rate. Other clips fit without cropping. Source audio stays aligned and
+crossfades with non-cut joins. Use `--no-audio` for silence. The output must
+be a new MP4 path. This command creates no recording or library entry and
+does not synthesize or approve narration. See `docs/stitch.md`.
 
 
 ## Starting from nothing (the person pasted the repo link)
@@ -57,7 +65,9 @@ it exists.
 ## The loop an agent should run
 
 ```
-write demos/<name>.yaml
+retake routine                             the locked standard — read it BEFORE drafting
+  → write demos/<name>.yaml
+  → retake routine apply demos/<name>.yaml  stamp format, captions, voice, rate
   → retake validate demos/<name>.yaml      schema + warnings (instant)
   → retake dry demos/<name>.yaml           every selector & wait, no camera (~30–60s)
   → fix what dry reports, repeat until "all N steps resolved"
@@ -80,6 +90,41 @@ Rule of thumb: **never go straight to `run`.** `dry` catches most failures in
 seconds; a failed `run` costs two minutes and a confusing video. When `dry`
 fails it prints the step, the error, and the text that was on screen — read
 that before changing anything.
+
+## First call in any session: `retake routine`
+
+It prints the locked standard and, when the product has one, names its **brief** (`demos/capture.md` for Capture). Over MCP, the `routine` tool returns the whole brief. Read it before writing a step: where the app runs, what is on the board, which selectors hold, and the pitfalls that already cost takes.
+
+## The settings are not yours to choose — `retake routine`
+
+A workspace has a standard: output format, captions on or off, which voice
+narration uses and how fast it speaks, music or none. It lives in
+`demos/routine.json`, a person set it, and it is applied by the machine.
+
+Read it with `retake routine` before you draft, and **do not set these
+yourself**: `preset`, `layout`, `captions`, `viewport`, `scale`,
+`voiceover.voice`, `voiceover.ratePercent`, `music`. Choosing them per demo is
+exactly how one video comes back narrated too fast, the next too slow, and a
+third in a voice nobody asked for.
+
+```
+retake env up                       bring the app up isolated, reset, and proven — before any take
+retake routine                      what every recording here will look and sound like
+retake routine learn                read the standard off demos already recorded here
+retake routine apply <manifest>     stamp the standard onto a manifest you drafted
+retake routine run                  work demos/plan.json: stamp, dry, record, finish
+retake routine check                would a viewer see ONE set? measures the finished files
+retake routine reference <video>    the north star every cut is scored against
+```
+
+`retake routine apply` never turns narration ON — that still needs a script and
+a person who has heard it. It only fixes the voice and rate of narration that
+already exists, and strips any `viewport`/`scale` pin, which silently beats the
+preset and is the one way two takes of the same app come out different shapes.
+
+Writing the steps, the captions and the story is still entirely your job.
+`demos/style.md` is the taste that needs judgement; the routine is the part
+that only needs to be the same every time.
 
 ## How to tell Claude Code / Codex to use it
 

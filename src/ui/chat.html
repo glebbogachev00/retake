@@ -200,7 +200,7 @@
   .empty code { background:var(--card); border:1px solid var(--rule); border-radius:6px; padding:2px 7px; font:13px ui-monospace, Menlo, monospace; }
   .modal.wide { width:min(94vw, 560px); max-height:82vh; display:flex; flex-direction:column; }
   .modal.wide h3 { display:flex; align-items:baseline; gap:9px; }
-  .modal.wide .scroll { overflow-y:auto; margin:0 -4px; padding:0 4px; }
+  .modal.wide .scroll { min-height:0; overflow-y:auto; margin:0 -4px; padding:0 4px; }
   .rel { border-top:1px solid var(--rule); padding:15px 0; }
   .rel:first-child { border-top:0; padding-top:2px; }
   .relhead { display:flex; flex-wrap:wrap; align-items:baseline; gap:9px; margin-bottom:7px; }
@@ -212,6 +212,26 @@
   .rel ul { margin:0; padding-left:17px; }
   .rel li { margin:4px 0; font-size:13.5px; line-height:1.55; color:var(--muted); }
   .rel:not(.latest) li { opacity:.8; }
+  .guide-intro { margin:0 0 12px; color:var(--muted); font-size:14px; }
+  .guide-scroll { overflow-y:auto; padding:0 7px 24px 0; scrollbar-color:var(--rule2) transparent; scrollbar-width:thin; }
+  .guide-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .guide-card { border-left:2px solid var(--amber); padding:4px 10px; background:transparent; }
+  .guide-card b { display:block; margin-bottom:2px; font-size:13px; }
+  .guide-card span { display:block; color:var(--muted); font-size:12px; line-height:1.45; }
+  .guide-rule { margin:14px 0; padding:11px 12px; border-radius:12px; background:rgba(232,176,75,.16); color:#4b370b; font-size:12.5px; }
+  .guide-prompt { margin:0; padding:13px 14px; border:1px solid var(--rule2); border-radius:12px; background:#f8f9f5; color:var(--ink); white-space:pre-wrap; font:12px/1.55 ui-monospace,Menlo,monospace; user-select:text; }
+  .guide-scroll-cue { padding:8px 0 0; border-top:1px solid var(--rule); color:var(--muted); text-align:center; font-size:11px; }
+  .guide-actions { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .guide-actions .hint { color:var(--muted); font-size:12px; }
+  .guide-actions .btn { white-space:nowrap; }
+  .guide-actions .btn.primary { color:#fff; background:var(--ink); border-color:var(--ink); }
+  @media (max-width:600px) {
+    .guide-grid { grid-template-columns:1fr; }
+    .guide-prompt { font-size:11.5px; }
+    .guide-actions { flex-wrap:wrap; }
+    .guide-actions .hint { flex:1 0 100%; }
+    .guide-actions .sp { display:none; }
+  }
   .chip .ndot { display:inline-block; width:6px; height:6px; border-radius:99px; background:var(--amber); margin-left:6px; vertical-align:middle; }
   .lib h2 { display:flex; align-items:center; gap:8px; }
   .lib h2 .selbtn { margin-left:auto; border:1px solid var(--rule2); background:#fff; color:var(--muted); border-radius:8px; font-size:11.5px; padding:3px 9px; cursor:pointer; line-height:1.4; }
@@ -247,6 +267,133 @@
   .spin { width:9px; height:9px; border-radius:99px; background:var(--amber); flex:none;
     animation:pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity:.35; transform:scale(.82) } 50% { opacity:1; transform:scale(1) } }
+  /* First run. One question at a time; the next action is always the largest
+     object on screen. Icons are text glyphs, so the local window has no icon
+     package, remote asset, or decorative SVG to load. */
+  body.first-run .top .chip:not(#guideBtn) { display:none; }
+  .wrap.onboarding-only { grid-template-columns:minmax(0,1fr); }
+  .onboarding { width:min(100%,620px); margin:10px auto 0; }
+  .ob-card { background:var(--card); border:1px solid var(--rule2); border-radius:22px; padding:30px; box-shadow:0 18px 45px rgba(24,28,24,.08); }
+  .ob-progress { display:flex; align-items:center; justify-content:center; gap:7px; margin-bottom:20px; }
+  .ob-progress i { width:7px; height:7px; border-radius:99px; background:var(--rule2); }
+  .ob-progress i.on { width:24px; background:var(--amber); }
+  .ob-progress span { margin-left:5px; color:var(--muted); font-size:12px; }
+  .ob-step { display:none; }
+  .ob-step.on { display:block; }
+  .ob-icon { width:48px; height:48px; display:grid; place-items:center; margin:0 auto 14px; border-radius:15px; background:var(--ink); color:var(--amber); font:600 23px/1 ui-monospace,Menlo,monospace; }
+  .ob-step h2 { margin:0; text-align:center; font-size:25px; letter-spacing:-.035em; }
+  .ob-lead { max-width:520px; margin:7px auto 18px; text-align:center; color:var(--muted); font-size:14.5px; }
+  .ob-label { display:block; margin:0 0 7px; color:var(--ink); font-size:13px; font-weight:600; }
+  .ob-input, .ob-text { width:100%; border:1px solid var(--rule2); border-radius:14px; background:#fff; padding:15px 16px; font:inherit; outline:none; transition:border-color .12s, box-shadow .12s; }
+  .ob-text { min-height:116px; resize:vertical; line-height:1.5; }
+  .ob-input:focus, .ob-text:focus { border-color:var(--ink); box-shadow:0 0 0 3px rgba(232,176,75,.28); }
+  .ob-input::placeholder, .ob-text::placeholder { color:var(--muted); opacity:.78; }
+  .ob-error { min-height:22px; margin:7px 2px 0; color:var(--bad); font-size:12.5px; }
+  .ob-actions { display:flex; gap:10px; margin-top:14px; }
+  .ob-actions button { min-height:52px; border:1px solid var(--rule2); border-radius:14px; padding:0 20px; background:#fff; font-weight:600; cursor:pointer; }
+  .ob-actions .primary { flex:1; color:#fff; background:var(--ink); border-color:var(--ink); font-size:15px; }
+  .ob-actions .primary:hover { background:#000; }
+  .ob-actions button:disabled { opacity:.42; cursor:not-allowed; }
+  .voice-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .voice-card { min-height:126px; text-align:left; border:1px solid var(--rule2); border-radius:15px; padding:16px; background:#fff; cursor:pointer; transition:border-color .12s, box-shadow .12s, transform .12s; }
+  .voice-card:hover { border-color:var(--ink); transform:translateY(-1px); }
+  .voice-card.selected { border-color:var(--ink); box-shadow:0 0 0 3px var(--amber); }
+  .voice-card .vicon { display:inline-grid; place-items:center; width:28px; height:28px; margin-bottom:10px; border-radius:9px; background:var(--paper); color:var(--ink); font:600 15px/1 ui-monospace,Menlo,monospace; }
+  .voice-card b, .voice-card small { display:block; }
+  .voice-card b { font-size:15px; }
+  .voice-card small { margin-top:3px; color:var(--muted); font-size:12.5px; line-height:1.45; }
+  .voice-card .tag { display:inline-block; margin-top:8px; border-radius:99px; padding:2px 7px; background:rgba(232,176,75,.18); color:#4b370b; font-size:11px; font-weight:600; }
+  .voice-demo { display:none; margin-top:12px; padding:10px; border:1px solid var(--rule); border-radius:14px; background:#fff; }
+  .voice-demo.show { display:block; }
+  .voice-demo video { display:block; width:100%; aspect-ratio:16/9; border-radius:10px; background:#000; }
+  .voice-demo small { display:block; margin:7px 2px 0; color:var(--muted); font-size:12px; }
+  .voice-consent { display:none; margin-top:12px; padding:12px 14px; border:1px solid var(--rule); border-radius:12px; background:var(--paper); color:var(--muted); font-size:12.5px; text-align:left; }
+  .voice-consent.show { display:flex; gap:9px; align-items:flex-start; }
+  .voice-consent input { margin-top:3px; accent-color:var(--ink); }
+  .ob-review { display:grid; gap:10px; }
+  .ob-review .line { padding:12px 14px; border:1px solid var(--rule); border-radius:12px; background:#fff; }
+  .ob-review .line small { display:block; color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; }
+  .ob-review .line b { display:block; margin-top:2px; font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+  .ob-note { margin:14px 0 0; padding:12px 14px; border-radius:12px; background:rgba(232,176,75,.16); color:#4b370b; font-size:13px; text-align:left; }
+  .ob-success { text-align:center; }
+  .ob-operator-status { margin:16px 0 0; color:var(--muted); font-size:13px; line-height:1.45; }
+  .ob-operator-question { margin-top:20px; padding:16px; border:1px solid var(--rule2); border-radius:14px; background:#fff; text-align:left; }
+  .ob-operator-question h3 { margin:0 0 6px; font-size:15px; }
+  .ob-operator-question p { margin:0 0 12px; color:var(--muted); font-size:13px; line-height:1.45; }
+  .ob-operator-question .row { gap:8px; }
+  .ob-operator-question input { flex:1; min-width:0; border:1px solid var(--rule2); border-radius:11px; padding:11px 12px; font:inherit; }
+  .ob-operator-question button, .ob-retry { min-height:42px; border:1px solid var(--ink); border-radius:11px; padding:0 15px; color:#fff; background:var(--ink); font-weight:600; cursor:pointer; }
+  .ob-operator-question button.secondary { color:var(--ink); background:#fff; }
+  .ob-operator-result { margin-top:18px; }
+  .ob-operator-result.bad { color:var(--bad); }
+  @media (max-width:700px) {
+    .wrap.onboarding-only { padding:14px 12px 36px; }
+    .onboarding { margin-top:0; }
+    .ob-card { padding:24px 16px 18px; border-radius:18px; }
+    .ob-step h2 { font-size:22px; }
+    .ob-lead { margin-bottom:20px; }
+    .voice-grid { grid-template-columns:1fr; }
+    .voice-card { min-height:0; padding:14px; }
+    .ob-actions { position:sticky; bottom:0; padding-top:10px; background:linear-gradient(transparent,var(--card) 24%); }
+  }
+  /* The routine panel. These settings decided what every recording looked and
+     sounded like while living only in a JSON file and an agent's tool call —
+     invisible to anyone opening Retake for the first time. One screen, three
+     decisions, saved the moment they are made. */
+  .rt-sec { margin:0 0 24px; }
+  .rt-sec:last-of-type { margin-bottom:6px; }
+  .rt-sec h4 { margin:0 0 3px; font-size:13.5px; font-weight:600; }
+  .rt-sec .rt-why { margin:0 0 12px; color:var(--muted); font-size:12.5px; line-height:1.5; }
+  .rt-shapes { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .rt-shape { border:1px solid var(--rule2); border-radius:13px; background:#fff; padding:13px 11px 11px; cursor:pointer; text-align:center; transition:border-color .12s, box-shadow .12s; }
+  .rt-shape:hover { border-color:var(--ink); }
+  .rt-shape[aria-checked="true"] { border-color:var(--ink); box-shadow:0 0 0 3px var(--amber); }
+  .rt-fig { display:grid; place-items:center; height:62px; margin-bottom:9px; }
+  .rt-box { position:relative; background:var(--paper); border:1px solid var(--rule); border-radius:4px; overflow:hidden; }
+  .rt-box.land { width:84px; height:47px; }
+  .rt-box.tall { width:30px; height:53px; }
+  .rt-band { position:absolute; left:0; right:0; bottom:0; background:var(--rule2); }
+  .rt-band.under { height:11px; }
+  .rt-band.over { height:9px; bottom:4px; left:5px; right:5px; border-radius:2px; opacity:.85; }
+  .rt-shape b { display:block; font-size:13px; }
+  .rt-shape small { display:block; margin-top:2px; color:var(--muted); font-size:11.5px; line-height:1.4; }
+  .rt-row { display:flex; align-items:center; gap:10px; border:1px solid var(--rule2); border-radius:12px; background:#fff; padding:11px 13px; cursor:pointer; transition:border-color .12s, box-shadow .12s; }
+  .rt-row:hover { border-color:var(--ink); }
+  .rt-row[aria-checked="true"] { border-color:var(--ink); box-shadow:0 0 0 3px var(--amber); }
+  .rt-voices { display:grid; gap:7px; }
+  .rt-row b { font-size:13.5px; }
+  .rt-row small { display:block; margin-top:1px; color:var(--muted); font-size:12px; line-height:1.4; }
+  .rt-row .sp { flex:1; }
+  .rt-play { flex:none; width:32px; height:32px; border-radius:99px; border:1px solid var(--rule2); background:var(--paper); color:var(--ink); font:600 12px/1 ui-monospace,Menlo,monospace; cursor:pointer; }
+  .rt-play:hover { border-color:var(--ink); }
+  .rt-play[data-busy="1"] { opacity:.5; cursor:progress; }
+  .rt-rate { display:flex; align-items:center; gap:11px; margin-top:12px; padding:11px 13px; border:1px solid var(--rule); border-radius:12px; background:var(--paper); }
+  .rt-rate input { flex:1; accent-color:var(--ink); }
+  .rt-rate .val { min-width:46px; text-align:right; font:600 13px/1 ui-monospace,Menlo,monospace; }
+  .rt-toggle { display:flex; gap:7px; }
+  .rt-toggle button { flex:1; min-height:42px; border:1px solid var(--rule2); border-radius:12px; background:#fff; font:inherit; font-weight:600; font-size:13.5px; cursor:pointer; }
+  .rt-toggle button[aria-pressed="true"] { border-color:var(--ink); box-shadow:0 0 0 3px var(--amber); }
+  .rt-note { margin:16px 0 0; padding:11px 13px; border-radius:11px; background:rgba(232,176,75,.17); color:#4b370b; font-size:12.5px; line-height:1.5; }
+  .rt-err { margin:9px 0 0; color:var(--bad); font-size:12.5px; }
+  .rt-saved { color:var(--ok); font-size:12.5px; font-weight:600; opacity:0; transition:opacity .18s; }
+  .rt-saved.on { opacity:1; }
+  /* The north star: what every cut is held to, shown rather than named. */
+  .rt-pick { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 18px; }
+  .rt-pick button { min-height:34px; padding:0 13px; border:1px solid var(--rule2); border-radius:99px; background:#fff; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  .rt-pick button[aria-pressed="true"] { border-color:var(--ink); box-shadow:0 0 0 3px var(--amber); }
+  .rt-star video { display:block; width:100%; aspect-ratio:16/9; border-radius:12px; background:#111; }
+  .rt-star video.tall { aspect-ratio:9/16; max-height:360px; width:auto; margin:0 auto; }
+  .rt-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+  .rt-card { position:relative; aspect-ratio:16/9; border-radius:10px; border:1px solid var(--rule); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6%; padding:0 10%; text-align:center; overflow:hidden; }
+  .rt-card img { height:17%; }
+  .rt-card b { font-size:clamp(11px,2.4vw,15px); line-height:1.15; letter-spacing:-.02em; }
+  .rt-card small { position:absolute; left:8px; top:6px; font-size:10.5px; opacity:.55; letter-spacing:.02em; }
+  .rt-facts { display:grid; grid-template-columns:auto 1fr; gap:7px 14px; margin:14px 0 0; font-size:12.5px; line-height:1.45; }
+  .rt-facts dt { color:var(--muted); }
+  .rt-facts dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+  .rt-facts .miss { color:var(--bad); }
+  .rt-cmd { display:block; margin-top:8px; padding:9px 11px; border-radius:9px; background:var(--paper); border:1px solid var(--rule); font:12px/1.5 ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }
+  @media (max-width:560px) { .rt-shapes { grid-template-columns:1fr; } .rt-fig { height:52px; } .rt-cards { grid-template-columns:1fr; } }
   @media (prefers-reduced-motion:reduce) { .spin { animation:none; opacity:.9 } .live .bar i { transition:none } }
 </style>
 </head>
@@ -256,7 +403,8 @@
     <div class="mark"><i></i><i></i><i></i><i></i></div>
     <h1>Retake</h1>
     <span class="sp"></span>
-    <a class="chip" href="/guide" style="text-decoration:none">How it works</a>
+    <button class="chip" id="guideBtn" title="How to ask an agent for a good recording">Guide</button>
+    <button class="chip" id="routineBtn" title="How every recording here looks and sounds">Routine</button>
     <button class="chip" id="newsBtn" title="What changed in this version">What's new</button>
     <button class="chip" id="gremlinBtn" title="Something's off? Tell me.">Bug?</button>
   </div>
@@ -308,11 +456,70 @@
         <div class="stills" id="stills"></div>
       </div>
     </div>
-    <div class="empty" id="empty" style="display:none">
-      <div class="mark"><i></i><i></i><i></i><i></i></div>
-      <h2>Nothing recorded yet</h2>
-      <p>Ask your agent for a demo — <code>record a demo of my app showing the sign-up flow</code> —<br>It will appear here.<br><a href="/guide">How Retake works</a> — one page, two minutes.</p>
-    </div>
+    <section class="onboarding" id="onboarding" style="display:none" aria-label="Create your first demo">
+      <div class="ob-card">
+        <div class="ob-progress" aria-label="Step 1 of 4"><i class="on"></i><i></i><i></i><i></i><span>Step 1 of 4</span></div>
+
+        <div class="ob-step on" data-step="1">
+          <div class="ob-icon" aria-hidden="true">↗</div>
+          <h2>Paste the URL to record</h2>
+          <p class="ob-lead">Public links and localhost both work.</p>
+          <label class="ob-label" for="onboard-url">URL</label>
+          <input class="ob-input" id="onboard-url" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com" />
+          <div class="ob-error" id="onboard-error" role="alert"></div>
+        </div>
+
+        <div class="ob-step" data-step="2">
+          <div class="ob-icon" aria-hidden="true">◎</div>
+          <h2>What should the viewer see?</h2>
+          <p class="ob-lead">One sentence is enough. Describe the result, not every click.</p>
+          <label class="ob-label" for="onboard-describe">The workflow</label>
+          <textarea class="ob-text" id="onboard-describe" placeholder="Show how a visitor creates their first project"></textarea>
+          <div class="ob-error" id="onboard-describe-error" role="alert"></div>
+        </div>
+
+        <div class="ob-step" data-step="3">
+          <div class="ob-icon" aria-hidden="true">∿</div>
+          <h2>Choose the final sound</h2>
+          <p class="ob-lead">The first draft stays silent. Narration comes after you approve the recording and script.</p>
+          <div class="voice-grid" role="radiogroup" aria-label="Narration choice">
+            <button class="voice-card selected" type="button" data-voice="silent" role="radio" aria-checked="true">
+              <span class="vicon" aria-hidden="true">×</span><b>No voiceover</b><small>Skip this for now. You can add your own voice later.</small><span class="tag">No setup</span>
+            </button>
+            <button class="voice-card" type="button" data-voice="edge" data-sample="edge" role="radio" aria-checked="false">
+              <span class="vicon" aria-hidden="true">∞</span><b>Edge</b><small>Online. Small install, many voices, and fast generation. Your script goes to Microsoft's service.</small><span class="tag">Tap to hear</span>
+            </button>
+            <button class="voice-card" type="button" data-voice="aiden" data-sample="aiden" role="radio" aria-checked="false">
+              <span class="vicon" aria-hidden="true">A</span><b>Aiden</b><small>Local Qwen voice. The natural voice tested and selected for Retake. About 2 GB.</small><span class="tag">Tap to hear</span>
+            </button>
+            <button class="voice-card" type="button" data-voice="kokoro" data-sample="kokoro" role="radio" aria-checked="false">
+              <span class="vicon" aria-hidden="true">K</span><b>Kokoro</b><small>Local and much smaller. Roughly 100–200 MB with many voices. This is Retake's first Kokoro test.</small><span class="tag">Tap to hear</span>
+            </button>
+          </div>
+          <div class="voice-demo" id="voice-demo"><video id="voice-demo-video" controls playsinline preload="metadata"></video><small id="voice-demo-label"></small></div>
+          <label class="voice-consent" id="voice-consent"><input type="checkbox" /><span id="voice-consent-copy"></span></label>
+        </div>
+
+        <div class="ob-step" data-step="4">
+          <div class="ob-icon" aria-hidden="true">✓</div>
+          <h2>Ready for the first draft</h2>
+          <p class="ob-lead">Retake will inspect the page, plan the shortest clear workflow, and record a silent draft.</p>
+          <div class="ob-review" id="onboard-review">
+            <div class="line"><small>Open</small><b id="review-url"></b></div>
+            <div class="line"><small>Show</small><b id="review-describe"></b></div>
+            <div class="line"><small>Final sound</small><b id="review-voice"></b></div>
+            <p class="ob-note">The first draft stays silent. Retake never downloads a voice model or adds synthetic narration without a separate confirmation.</p>
+          </div>
+          <div class="ob-error" id="onboard-submit-error" role="alert"></div>
+        </div>
+
+        <div class="ob-actions">
+          <button id="onboard-back" type="button" style="display:none">Back</button>
+          <button class="primary" id="onboard-next" type="button">Continue</button>
+          <button class="primary" id="onboard-submit" type="button" style="display:none">Make first draft</button>
+        </div>
+      </div>
+    </section>
     </div>
     <aside class="lib" id="lib" style="display:none">
       <h2><span id="libTtl">Library</span><button class="selbtn" id="selBtn" title="Pick several to archive at once">Select</button></h2>
@@ -338,6 +545,220 @@ async function api(u, o) {
   return j;
 }
 
+// First run: ask only for what the recording needs. Role, team size and job
+// title can be inferred later; blocking a first take on them would be ceremony.
+const ONBOARD_KEY = 'retake:first-demo';
+const ONBOARD_RETRY_KEY = 'retake:retry-first-demo';
+const VOICE_NAMES = { silent:'No voiceover', edge:'Edge online voice', aiden:'Aiden · local Qwen', kokoro:'Kokoro · local, compact' };
+let onboardingStep = 1;
+let onboardingState = { url:'', describe:'', voice:'silent', consent:false };
+let onboardingSubmitted = false;
+try {
+  const saved = JSON.parse(localStorage.getItem(ONBOARD_KEY) || 'null');
+  if (saved && typeof saved === 'object') {
+    onboardingState = { ...onboardingState, ...saved, voice: VOICE_NAMES[saved.voice] ? saved.voice : 'silent', consent:false };
+    if (sessionStorage.getItem(ONBOARD_RETRY_KEY) === '1') {
+      onboardingStep = onboardingState.voice === 'silent' ? 4 : 3;
+      sessionStorage.removeItem(ONBOARD_RETRY_KEY);
+    }
+  }
+} catch { /* a broken local draft should never break the window */ }
+
+function saveOnboarding() {
+  localStorage.setItem(ONBOARD_KEY, JSON.stringify({ ...onboardingState, consent:false }));
+}
+function normalUrl(raw) {
+  let v = String(raw || '').trim();
+  if (!v) return '';
+  if (!/^https?:\/\//i.test(v)) v = /^(localhost|127\.0\.0\.1)(:|\/|$)/i.test(v) ? 'http://' + v : 'https://' + v;
+  try { const u = new URL(v); return /^https?:$/.test(u.protocol) && u.hostname ? u.href.replace(/\/$/, '') : ''; } catch { return ''; }
+}
+function syncOnboarding() {
+  if (onboardingStep === 1) onboardingState.url = $('onboard-url').value.trim();
+  if (onboardingStep === 2) onboardingState.describe = $('onboard-describe').value.trim();
+  const consent = $('voice-consent').querySelector('input');
+  if (onboardingStep === 3) onboardingState.consent = consent.checked;
+  saveOnboarding();
+}
+function renderOnboarding() {
+  document.querySelectorAll('.ob-step').forEach((el) => el.classList.toggle('on', Number(el.dataset.step) === onboardingStep));
+  document.querySelectorAll('.ob-progress i').forEach((el, i) => el.classList.toggle('on', i + 1 === onboardingStep));
+  document.querySelector('.ob-progress').setAttribute('aria-label', `Step ${onboardingStep} of 4`);
+  document.querySelector('.ob-progress span').textContent = `Step ${onboardingStep} of 4`;
+  $('onboard-back').style.display = onboardingStep > 1 ? '' : 'none';
+  $('onboard-next').style.display = onboardingStep < 4 ? '' : 'none';
+  $('onboard-submit').style.display = onboardingStep === 4 ? '' : 'none';
+  $('onboard-url').value = onboardingState.url;
+  $('onboard-describe').value = onboardingState.describe;
+  for (const card of document.querySelectorAll('[data-voice]')) {
+    const on = card.dataset.voice === onboardingState.voice;
+    card.classList.toggle('selected', on);
+    card.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  const consent = $('voice-consent');
+  const box = consent.querySelector('input');
+  const needsConsent = onboardingState.voice !== 'silent';
+  consent.classList.toggle('show', needsConsent);
+  box.checked = onboardingState.consent;
+  if (onboardingState.voice === 'edge') $('voice-consent-copy').textContent = 'I understand that Edge sends the narration script to Microsoft’s online speech service.';
+  if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a separate local model download of about 2 GB. Nothing downloads on this screen.';
+  if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a separate local model download of roughly 100–200 MB. Nothing downloads on this screen.';
+  $('onboard-next').disabled =
+    (onboardingStep === 1 && !normalUrl($('onboard-url').value)) ||
+    (onboardingStep === 2 && !$('onboard-describe').value.trim()) ||
+    (onboardingStep === 3 && needsConsent && !onboardingState.consent);
+  if (onboardingStep === 4) {
+    $('review-url').textContent = onboardingState.url;
+    $('review-describe').textContent = onboardingState.describe;
+    $('review-voice').textContent = VOICE_NAMES[onboardingState.voice];
+  }
+}
+function showOnboarding() {
+  $('onboarding').style.display = '';
+  if (onboardingSubmitted) return;
+  renderOnboarding();
+  setTimeout(() => (onboardingStep === 1 ? $('onboard-url') : $('onboard-describe'))?.focus(), 40);
+}
+for (const card of document.querySelectorAll('[data-voice]')) card.onclick = () => {
+  onboardingState.voice = card.dataset.voice;
+  onboardingState.consent = false;
+  renderOnboarding();
+  const sample = card.dataset.sample;
+  const demo = $('voice-demo');
+  const video = $('voice-demo-video');
+  if (!sample) {
+    video.pause();
+    demo.classList.remove('show');
+    video.removeAttribute('src');
+    return;
+  }
+  video.src = `/voice-samples/${sample}.mp4`;
+  $('voice-demo-label').textContent = `${VOICE_NAMES[card.dataset.voice]} on the same Capture demo`;
+  demo.classList.add('show');
+  video.play().catch(() => {});
+};
+$('onboard-url').oninput = (e) => { onboardingState.url = e.target.value; renderOnboarding(); };
+$('onboard-describe').oninput = (e) => { onboardingState.describe = e.target.value; renderOnboarding(); };
+$('voice-consent').querySelector('input').onchange = (e) => { onboardingState.consent = e.target.checked; renderOnboarding(); };
+$('onboard-back').onclick = () => { syncOnboarding(); onboardingStep = Math.max(1, onboardingStep - 1); renderOnboarding(); };
+$('onboard-next').onclick = () => {
+  syncOnboarding();
+  if (onboardingStep === 1) {
+    const url = normalUrl(onboardingState.url);
+    if (!url) { $('onboard-error').textContent = 'Paste a public or localhost address.'; return; }
+    onboardingState.url = url; $('onboard-error').textContent = '';
+  }
+  if (onboardingStep === 2 && !onboardingState.describe) { $('onboard-describe-error').textContent = 'Say what the viewer should see.'; return; }
+  if (onboardingStep === 2) $('onboard-describe-error').textContent = '';
+  if (onboardingStep === 3 && onboardingState.voice !== 'silent' && !onboardingState.consent) return;
+  onboardingStep = Math.min(4, onboardingStep + 1);
+  renderOnboarding();
+};
+let onboardingOperatorStream = null;
+let onboardingPendingId = null;
+function operatorData(e) { try { return JSON.parse(e.data); } catch { return null; } }
+async function answerOperator(sessionId, pending, answer) {
+  const value = String(answer || '').trim();
+  if (!value) return;
+  const controls = document.querySelectorAll('.ob-operator-question input, .ob-operator-question button');
+  controls.forEach((el) => { el.disabled = true; });
+  try {
+    await api(`/api/operator/${sessionId}/answer`, { method:'POST', body:JSON.stringify({ id:pending.id, answer:value }) });
+    onboardingPendingId = null;
+    const question = document.querySelector('.ob-operator-question');
+    if (question) question.remove();
+    const status = document.querySelector('.ob-operator-status');
+    if (status) status.textContent = 'Continuing with your answer…';
+  } catch (e) {
+    controls.forEach((el) => { el.disabled = false; });
+    const error = document.querySelector('.ob-operator-question .ob-error');
+    if (error) error.textContent = e.message;
+  }
+}
+function showOperatorQuestion(sessionId, pending) {
+  if (!pending || !pending.id || !pending.text) return;
+  if (onboardingPendingId === pending.id && document.querySelector('.ob-operator-question')) return;
+  const slot = document.querySelector('.ob-operator-slot');
+  if (!slot) return;
+  onboardingPendingId = pending.id;
+  slot.innerHTML = `<div class="ob-operator-question" data-pending="${esc(pending.id)}"><h3>${esc(pending.text)}</h3>${pending.detail ? `<p>${esc(pending.detail)}</p>` : ''}${pending.kind === 'approve' ? '<div class="row"><button class="secondary" type="button" data-operator-answer="no">Not yet</button><button type="button" data-operator-answer="yes">Approve</button></div>' : '<div class="row"><input data-operator-input type="text" autocomplete="off" aria-label="Your answer"><button type="button" data-operator-answer>Continue</button></div>'}<div class="ob-error" role="alert"></div></div>`;
+  if (pending.kind === 'approve') {
+    slot.querySelectorAll('[data-operator-answer]').forEach((button) => { button.onclick = () => answerOperator(sessionId, pending, button.dataset.operatorAnswer); });
+  } else {
+    const input = slot.querySelector('[data-operator-input]');
+    const button = slot.querySelector('[data-operator-answer]');
+    button.onclick = () => answerOperator(sessionId, pending, input.value);
+    input.onkeydown = (e) => { if (e.key === 'Enter') button.click(); };
+    input.focus();
+  }
+}
+function finishOnboardingOperator(data) {
+  onboardingOperatorStream?.close();
+  onboardingOperatorStream = null;
+  const card = document.querySelector('.ob-card');
+  if (!card) return;
+  const ok = data && data.code === 0 && data.demo;
+  if (ok) {
+    localStorage.removeItem(ONBOARD_KEY);
+    card.innerHTML = `<div class="ob-success" data-operator-done><div class="ob-icon" aria-hidden="true">✓</div><h2>Your first draft is ready</h2><p class="ob-lead">${esc(data.summary || 'Open it from the library.')}</p><button type="button" data-open-first>Open first draft</button></div>`;
+    card.querySelector('[data-open-first]').onclick = async () => {
+      onboardingSubmitted = false;
+      await drawDemos();
+      await pin(data.demo);
+    };
+    drawDemos();
+    return;
+  }
+  card.innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">!</div><h2>The draft was not completed</h2><p class="ob-operator-result bad">${esc(data?.summary || 'The operator stopped before the video was ready.')}</p><button class="ob-retry" data-operator-retry type="button">Try again</button></div>`;
+  card.querySelector('[data-operator-retry]').onclick = () => {
+    sessionStorage.setItem(ONBOARD_RETRY_KEY, '1');
+    location.reload();
+  };
+}
+function watchOnboardingOperator(sessionId) {
+  onboardingOperatorStream?.close();
+  const stream = new EventSource(`/api/operator/${encodeURIComponent(sessionId)}/stream?t=${encodeURIComponent(window.__retakeToken || '')}`);
+  onboardingOperatorStream = stream;
+  let finished = false;
+  stream.addEventListener('line', (e) => {
+    const line = operatorData(e);
+    const status = document.querySelector('.ob-operator-status');
+    if (status && typeof line === 'string') status.textContent = line.replace(/^[·✓✗→]\s*/, '');
+  });
+  stream.addEventListener('tool', (e) => {
+    const tool = operatorData(e);
+    const status = document.querySelector('.ob-operator-status');
+    if (status && tool) status.textContent = `Working: ${tool}`;
+  });
+  stream.addEventListener('pending', (e) => showOperatorQuestion(sessionId, operatorData(e)));
+  stream.addEventListener('answered', (e) => {
+    const answered = operatorData(e);
+    const question = document.querySelector('.ob-operator-question');
+    if (question && question.dataset.pending === answered?.id) { onboardingPendingId = null; question.remove(); }
+  });
+  stream.addEventListener('done', (e) => { finished = true; finishOnboardingOperator(operatorData(e)); });
+  stream.onerror = () => {
+    if (finished) return;
+    const status = document.querySelector('.ob-operator-status');
+    if (status) status.textContent = 'Connection interrupted. Retake is reconnecting…';
+  };
+}
+$('onboard-submit').onclick = async () => {
+  const btn = $('onboard-submit');
+  btn.disabled = true; btn.textContent = 'Starting…'; $('onboard-submit-error').textContent = '';
+  try {
+    saveOnboarding();
+    const started = await api('/api/operator', { method:'POST', body:JSON.stringify({ url:onboardingState.url, describe:onboardingState.describe, narration:onboardingState.voice }) });
+    if (!started?.id) throw new Error('Retake did not return an operator session. Try again.');
+    onboardingSubmitted = true;
+    document.querySelector('.ob-card').innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">●</div><h2>Retake is making the first draft</h2><p class="ob-lead">Keep this window open. Questions and the finished recording will appear here.</p><p class="ob-operator-status">Inspecting the page…</p><div class="ob-operator-slot"></div></div>`;
+    watchOnboardingOperator(started.id);
+  } catch (e) {
+    $('onboard-submit-error').textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Make first draft';
+  }
+};
+
 const REPO = 'https://github.com/glebbogachev00/retake';
 async function setCover(body, marked) {
   try {
@@ -352,6 +773,280 @@ async function setCover(body, marked) {
   } catch (e) { $('vidMeta').textContent = 'could not set the poster: ' + e.message; }
 }
 
+
+// The routine — the standard every recording here follows. It used to live
+// only in demos/routine.json and an agent's tool call, which is the same as
+// not existing for a person who just opened Retake. Three decisions, each
+// saved the moment it is made; nothing to submit.
+$('routineBtn').onclick = async () => {
+  let data;
+  try { data = await api('/api/routine'); }
+  catch (e) { alert(e.message); return; }
+
+  let name = data.use;
+  let cur = data.routines[name] || { style: 'showcase', voice: 'silent', rate: 0, music: false, captions: false, narration: 'scenes' };
+  let audio = null;
+
+  const veil = document.createElement('div');
+  veil.className = 'veil';
+  veil.innerHTML = `<div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="rtTitle">
+    <h3 id="rtTitle">Routine <span class="rt-saved" id="rtSaved">Saved</span></h3>
+    <p class="guide-intro">Every recording in this workspace comes out this way. Decide here once — your agent is not allowed to choose these per video.</p>
+    <div class="scroll guide-scroll">
+      <div class="rt-pick" id="rtPick" hidden></div>
+      <div class="rt-sec rt-star" id="rtStar"></div>
+      <div class="rt-sec">
+        <h4>Shape</h4>
+        <p class="rt-why">Where the app sits in the frame, and where the words go.</p>
+        <div class="rt-shapes" role="radiogroup" aria-label="Shape" id="rtShapes"></div>
+      </div>
+      <div class="rt-sec">
+        <h4>Captions</h4>
+        <p class="rt-why">The scene lines, burned into the picture.</p>
+        <div class="rt-toggle" id="rtCaps">
+          <button type="button" data-on="1" aria-pressed="false">On</button>
+          <button type="button" data-on="0" aria-pressed="false">Off</button>
+        </div>
+      </div>
+      <div class="rt-sec">
+        <h4>Voice</h4>
+        <p class="rt-why">Press ▶ to hear one. Whatever you pick is the voice and the pace for every video after this — there is nothing to re-ask for.</p>
+        <div class="rt-voices" id="rtVoices"></div>
+        <div class="rt-rate">
+          <span style="font-size:12.5px;color:var(--muted)">Pace</span>
+          <input type="range" id="rtRate" min="-50" max="50" step="1" value="0">
+          <span class="val" id="rtRateVal">0%</span>
+        </div>
+        <p class="rt-why" style="margin:14px 0 8px">Where the voice lands.</p>
+        <div class="rt-toggle" id="rtNarr">
+          <button type="button" data-n="scenes" aria-pressed="false">On its scene</button>
+          <button type="button" data-n="start" aria-pressed="false">From the start</button>
+        </div>
+        <p class="rt-err" id="rtErr"></p>
+      </div>
+      <p class="rt-note">Picking a voice does not switch narration on. A video stays silent until someone writes a script and listens to it — this only settles which voice reads it, and how fast.</p>
+    </div>
+    <div class="guide-actions"><span class="hint" id="rtWhere"></span><span class="sp"></span><button class="btn primary" id="rtClose">Done</button></div>
+  </div>`;
+
+  const q = (sel) => veil.querySelector(sel);
+  const flash = () => { const el = q('#rtSaved'); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1100); };
+
+  const save = async (patch) => {
+    q('#rtErr').textContent = '';
+    try {
+      const out = await api('/api/routine', { method: 'PUT', body: JSON.stringify({ name, patch }) });
+      cur = out.routines[name];
+      data.routines = out.routines;
+      flash();
+      paint();
+    } catch (e) { q('#rtErr').textContent = e.message; }
+  };
+
+  const FIG = {
+    showcase: '<span class="rt-box land"><i class="rt-band under"></i></span>',
+    fullscreen: '<span class="rt-box land"><i class="rt-band over"></i></span>',
+    mobile: '<span class="rt-box tall"><i class="rt-band under"></i></span>',
+  };
+
+  // Several products, several routines — one is in use. Switching is the
+  // whole decision, so it is a row of names, not a menu.
+  async function use(n) {
+    q('#rtErr').textContent = '';
+    try {
+      const out = await api('/api/routine', { method: 'PUT', body: JSON.stringify({ use: n }) });
+      data.use = name = out.use; data.routines = out.routines; cur = out.routines[name];
+      flash(); paint();
+    } catch (e) { q('#rtErr').textContent = e.message; }
+  }
+
+  function paintStar() {
+    const names = Object.keys(data.routines);
+    const pick = q('#rtPick');
+    pick.hidden = names.length < 2;
+    pick.innerHTML = names.map((n) => `<button type="button" data-use="${esc(n)}" aria-pressed="${n === name}">${esc(n)}</button>`).join('');
+    for (const b of pick.children) b.onclick = () => { if (b.dataset.use !== name) use(b.dataset.use); };
+
+    const about = (data.about || {})[name] || {};
+    const ref = about.reference;
+    const card = cur.card;
+    const font = card && card.font ? `@font-face{font-family:rt-${esc(name)};src:url('/routine/${esc(name)}/font')}` : '';
+    const face = card && card.font ? `font-family:rt-${esc(name)},serif;` : '';
+    const mini = (label, title) => card
+      ? `<div class="rt-card" style="background:${esc(card.background)};color:${esc(card.ink)}"><small>${label}</small>${card.logo ? `<img src="/routine/${esc(name)}/logo" alt="">` : ''}<b style="${face}font-weight:${Number(card.weight) || 560}">${esc(title)}</b></div>`
+      : '';
+    const cards = cur.cards && card
+      ? `<div class="rt-cards">${mini('Opens', cur.intro ? cur.intro.title : "Each video's own title")}${cur.outro ? mini('Closes', cur.outro.title) : ''}</div>`
+      : '';
+    const facts = [];
+    if (about.deliver) facts.push(['Delivers to', `${esc(about.deliver.path)} · ${about.deliver.videos} video${about.deliver.videos === 1 ? '' : 's'} — only ones that match`]);
+    if (about.brief) facts.push(['Brief', about.brief.exists ? `${esc(about.brief.path)} — what an agent reads before writing a step` : `<span class="miss">${esc(about.brief.path)} is missing</span>`]);
+    if (name === data.use) facts.push(['Runs', data.schedule
+      ? (data.schedule.live ? esc(data.schedule.text) + ' — by itself' : `<span class="miss">${esc(data.schedule.text)} — not loaded; schedule it again</span>`)
+      : 'when someone types <code>retake routine run</code> · <code>retake routine schedule weekdays 09:00</code> makes it run itself']);
+    if (about.environment) facts.push(['App', `${esc(about.environment.name || about.environment.path)}${about.environment.port ? ` on :${about.environment.port}` : ''} — started isolated and proven before every take`]);
+    q('#rtStar').innerHTML = (font ? `<style>${font}</style>` : '') + `
+      <h4>North star</h4>
+      ${ref && ref.exists
+        ? `<p class="rt-why">The one video every recording is held to. A cut that does not match it never reaches the folder you post from.</p>
+           <video src="/routine/${esc(name)}/reference" controls playsinline preload="metadata" class="${cur.style === 'mobile' ? 'tall' : ''}"></video>`
+        : `<p class="rt-why">${ref ? `<span class="miss">${esc(ref.path)} is missing.</span> ` : 'None yet. '}The one video you would be happy to get every time — its cards, colours and shape become the routine's.</p>
+           <code class="rt-cmd">retake routine reference &lt;video&gt;</code>`}
+      ${cards}
+      ${facts.length ? `<dl class="rt-facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}`;
+  }
+
+  function paint() {
+    paintStar();
+    q('#rtShapes').innerHTML = data.styles.map((st) => `
+      <button class="rt-shape" type="button" role="radio" data-style="${esc(st.name)}" aria-checked="${st.name === cur.style}">
+        <span class="rt-fig">${FIG[st.name] || FIG.showcase}</span>
+        <b>${esc(st.label)}</b><small>${esc(st.note)}</small>
+      </button>`).join('');
+    for (const el of q('#rtShapes').children) el.onclick = () => save({ style: el.dataset.style });
+
+    for (const b of q('#rtCaps').children) {
+      b.setAttribute('aria-pressed', String(cur.captions === (b.dataset.on === '1')));
+      b.onclick = () => save({ captions: b.dataset.on === '1' });
+    }
+
+    const rows = [{ name: 'silent', label: 'Silent', note: 'No narration. The right first answer, and the only one that needs nothing installed.', silent: true }]
+      .concat(data.voices.map((v) => ({ name: v.name, label: v.name[0].toUpperCase() + v.name.slice(1), note: v.note + ' · ' + v.id })));
+    // A routine can name any edge-tts voice — that is how it speaks another
+    // language. Show it as its own row rather than letting the panel display
+    // nothing selected and leave someone guessing what they are listening to.
+    if (!rows.some((v) => v.name === cur.voice)) {
+      rows.push({ name: cur.voice, label: cur.voice, note: 'Set outside this list — any edge-tts voice works, and that is how a routine speaks another language.' });
+    }
+    q('#rtVoices').innerHTML = rows.map((v) => `
+      <div class="rt-row" role="radio" tabindex="0" data-voice="${esc(v.name)}" aria-checked="${v.name === cur.voice}">
+        <span><b>${esc(v.label)}</b><small>${esc(v.note)}</small></span>
+        <span class="sp"></span>
+        ${v.silent ? '' : `<button class="rt-play" type="button" title="Hear ${esc(v.label)}" data-hear="${esc(v.name)}">▶</button>`}
+      </div>`).join('');
+    for (const el of q('#rtVoices').children) {
+      el.onclick = (e) => { if (!e.target.closest('.rt-play')) save({ voice: el.dataset.voice }); };
+      el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); save({ voice: el.dataset.voice }); } };
+      const play = el.querySelector('.rt-play');
+      if (play) play.onclick = () => hear(play.dataset.hear, play);
+    }
+
+    for (const b of q('#rtNarr').children) {
+      b.setAttribute('aria-pressed', String((cur.narration || 'scenes') === b.dataset.n));
+      b.onclick = () => save({ narration: b.dataset.n });
+    }
+
+    q('#rtRate').value = String(cur.rate);
+    q('#rtRateVal').textContent = (cur.rate > 0 ? '+' : '') + cur.rate + '%';
+    q('#rtWhere').textContent = 'demos/routine.json · routine ' + name;
+  }
+
+  async function hear(voice, btn) {
+    if (audio) { audio.pause(); audio = null; }
+    btn.dataset.busy = '1';
+    btn.textContent = '…';
+    try {
+      const r = await fetch('/api/routine/sample?voice=' + encodeURIComponent(voice) + '&rate=' + q('#rtRate').value,
+        { headers: { 'x-retake-token': window.__retakeToken || '' } });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'could not synthesize'); }
+      audio = new Audio(URL.createObjectURL(await r.blob()));
+      audio.onended = () => { btn.textContent = '▶'; };
+      await audio.play();
+      q('#rtErr').textContent = '';
+    } catch (e) {
+      q('#rtErr').textContent = e.message;
+      btn.textContent = '▶';
+    } finally { btn.dataset.busy = '0'; if (audio) btn.textContent = '■'; }
+  }
+
+  const close = () => { if (audio) audio.pause(); veil.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  paint();
+  // The pace is one decision for the whole workspace: change it, hear it, done.
+  q('#rtRate').oninput = () => { q('#rtRateVal').textContent = (q('#rtRate').value > 0 ? '+' : '') + q('#rtRate').value + '%'; };
+  q('#rtRate').onchange = () => save({ rate: Number(q('#rtRate').value) });
+  q('#rtClose').onclick = close;
+  veil.onclick = (e) => { if (e.target === veil) close(); };
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(veil);
+};
+
+$('guideBtn').onclick = () => {
+  const prompt = `Use Retake to produce <number> videos for <product>.
+Audience: <who will watch>
+Knowledge level: <beginner, familiar, or expert>
+Language: <language>
+Outcome: <one visible result per video>
+Recording type: <demo, launch, tutorial, bug proof, docs clip, or series>
+Format: <landscape, square, vertical, or GIF>
+Voice: <language, voice, tone, pace, pronunciation, and exact closing line>
+Music: <none, or style and energy>
+Camera: <static, or exact bounded zoom shots>
+Branding: <intro, outro, thumbnail, colors, and logo>
+Privacy: <details to hide or screens to omit>
+Safety stops: <actions that must never be confirmed>
+Delivery: <resolution, frame rate, and files>
+
+Before recording, map every route, stable selector, visible result, privacy region, and safety stop. Prove the first interaction. Give each video one viewer problem to solve. Match the script to the viewer's knowledge level. For beginners, assume no prior knowledge, define each control or term when it first appears, explain where it is, what it does, and when it matters, and split dense topics into short parts. Start each instruction as the cursor moves toward its control, click during the instruction, and show the result before the line ends. Use one browser capture per video. Re-render voice, music, cards, pacing, and formats from that take. Review the exact final MP4. Do not deliver a video that fails action, privacy, branding, audio, or ending checks.`;
+  const veil = document.createElement('div');
+  veil.className = 'veil';
+  veil.dataset.retakeGuide = '';
+  veil.innerHTML = `<div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <h3 id="guideTitle">How to ask Retake</h3>
+    <p class="guide-intro">Say what the viewer should see. Then add the choices that matter.</p>
+    <div class="scroll guide-scroll">
+      <h4 style="margin:0 0 9px;font-size:13px">Starter prompt</h4>
+      <pre class="guide-prompt" id="guidePrompt">Use Retake to make a [recording type] for [audience].
+Show [one visible outcome].
+Use [format], [voice], [music], and [camera].
+Follow [branding]. Hide [private data].
+Never [unsafe action]. Deliver [files].</pre>
+      <div class="guide-rule"><b>One browser capture per workflow.</b> Change voice, music, title cards, pacing, and format from the same recording. Re-record only when the website interaction is wrong.</div>
+      <div class="guide-rule"><b>Set the viewer's knowledge level.</b> For beginners, assume no prior knowledge. Define each control or term, explain why it matters, and split dense topics into short parts.</div>
+      <h4 style="margin:0 0 9px;font-size:13px">Choose a recording type</h4>
+      <div class="guide-grid">
+        <div class="guide-card"><b>Demo</b><span>Show a person completing one task.</span></div>
+        <div class="guide-card"><b>Launch</b><span>Present a feature for a public post.</span></div>
+        <div class="guide-card"><b>Tutorial</b><span>Explain one task step by step.</span></div>
+        <div class="guide-card"><b>Bug proof</b><span>Reproduce a problem and show the evidence.</span></div>
+        <div class="guide-card"><b>Docs clip</b><span>Short MP4 or silent GIF for help pages.</span></div>
+        <div class="guide-card"><b>Series</b><span>Use one style across several tasks.</span></div>
+      </div>
+      <h4 style="margin:15px 0 9px;font-size:13px">What to specify</h4>
+      <div class="guide-grid">
+        <div class="guide-card"><b>Format</b><span>Wide, square, vertical, or GIF.</span></div>
+        <div class="guide-card"><b>Audience and depth</b><span>Beginner, familiar, or expert. Say what the viewer already knows.</span></div>
+        <div class="guide-card"><b>Voice and pace</b><span>Solve one viewer problem. Start the line as the cursor moves, click during it, and show the result before it ends.</span></div>
+        <div class="guide-card"><b>Music</b><span>None, or the energy and tempo you want.</span></div>
+        <div class="guide-card"><b>Camera</b><span>Keep it still unless a control is too small to read.</span></div>
+        <div class="guide-card"><b>Branding</b><span>Intro, outro, thumbnail, logo, and colors.</span></div>
+        <div class="guide-card"><b>Privacy and safety</b><span>What to hide and which action must never run.</span></div>
+      </div>
+      <h4 style="margin:15px 0 9px;font-size:13px">Complete copy-paste template</h4>
+      <pre class="guide-prompt" id="guideFullPrompt">${esc(prompt)}</pre>
+    </div>
+    <div class="guide-scroll-cue" id="guideScrollCue">Scroll for more ↓</div>
+    <div class="guide-actions"><span class="hint">Copy, paste into your agent, then replace the brackets.</span><span class="sp"></span><button class="btn" id="guideClose">Close</button><button class="btn primary" id="guideCopy">Copy prompt</button></div>
+  </div>`;
+  const close = () => { veil.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  veil.querySelector('#guideClose').onclick = close;
+  veil.querySelector('#guideCopy').onclick = () => {
+    veil.querySelector('#guideCopy').textContent = 'Copied';
+    navigator.clipboard.writeText(prompt).catch(() => {});
+  };
+  const guideScroll = veil.querySelector('.guide-scroll');
+  const guideCue = veil.querySelector('#guideScrollCue');
+  const updateGuideCue = () => {
+    guideCue.textContent = guideScroll.scrollTop + guideScroll.clientHeight >= guideScroll.scrollHeight - 4 ? 'End of guide' : 'Scroll for more ↓';
+  };
+  guideScroll.addEventListener('scroll', updateGuideCue);
+  veil.onclick = (e) => { if (e.target === veil) close(); };
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(veil);
+  updateGuideCue();
+  setTimeout(() => veil.querySelector('#guideCopy').focus(), 40);
+};
 
 // What's new — reads the same list the landing page does. The dot appears when
 // the newest entry is one this browser has not seen, and only until it is read;
@@ -632,9 +1327,13 @@ async function drawDemos() {
   try { demos = await api('/api/demos'); } catch { return; }
   demos.sort((a, b) => (b.lastTake ? new Date(b.lastTake.finishedAt).getTime() : 0) - (a.lastTake ? new Date(a.lastTake.finishedAt).getTime() : 0));
   const has = demos.length > 0;
-  $('empty').style.display = has ? 'none' : '';
-  $('lib').style.display = has ? '' : 'none';
-  document.body.classList.toggle('rail', has);
+  const onboardingOpen = !has || onboardingSubmitted;
+  $('onboarding').style.display = onboardingOpen ? '' : 'none';
+  $('lib').style.display = onboardingOpen ? 'none' : '';
+  document.querySelector('.wrap').classList.toggle('onboarding-only', onboardingOpen);
+  document.body.classList.toggle('rail', !onboardingOpen);
+  document.body.classList.toggle('first-run', onboardingOpen);
+  if (!has) showOnboarding();
   $('libTtl').textContent = `Library · ${demos.length}`;
   $('demos').innerHTML = '';
   const groups = new Map();

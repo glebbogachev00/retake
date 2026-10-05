@@ -22,11 +22,13 @@ import { capSecondsFor, restorePrevious } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { renderCard, renderCalloutOverlay, renderTitledCover } from "./cards.js";
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
-import { DEFAULT_VOICE, audioSeconds, synthesize } from "./voice.js";
-import { createRequire } from "node:module";
+import { holdFilterArgs, holdTake, planHolds } from "./hold.js";
+import { DEFAULT_VOICE, audioSeconds, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
 import { chromium } from "playwright";
-import { expandEnv, resolve, type Manifest, type Resolved, type Step } from "./manifest.js";
+import { expandEnv, resolve, Manifest, type Resolved, type Step } from "./manifest.js";
 import type { Take, TimelineEntry } from "./record.js";
+import { ffmpegBin } from "./media-bin.js";
+export { ffmpegBin } from "./media-bin.js";
 
 export type Artifacts = {
   master?: string;
@@ -80,24 +82,8 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro], idle: m.compressIdle, vo: m.voiceover, music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro, m.card, m.card ? [m.card.logo, m.card.font].map((f) => { try { const st = fs.statSync(path.resolve(f ?? "")); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } }) : null], idle: m.compressIdle, vo: m.voiceover, music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
-}
-
-const require = createRequire(import.meta.url);
-
-let cachedBin: string | undefined;
-/** The static build first: Homebrew's ffmpeg is often built without freetype (no drawtext). */
-export function ffmpegBin(): string {
-  if (cachedBin) return cachedBin;
-  try {
-    const p = require("ffmpeg-static") as string;
-    if (p && fs.existsSync(p)) return (cachedBin = p);
-  } catch {
-    /* fall through */
-  }
-  execFileSync("ffmpeg", ["-version"], { stdio: "ignore" });
-  return (cachedBin = "ffmpeg");
 }
 
 export function gifskiBin(): string | null {
@@ -154,7 +140,12 @@ export function applyManifest(m: Manifest, take: Take): Take {
     const out: TimelineEntry = { ...e, caption: st.caption, holdMs: st.holdMs };
     const cam = st.camera;
     if (cam === "static") out.camera = undefined;
-    else if (cam && typeof cam === "object" && cam.zoom && e.camera) out.camera = { ...e.camera, zoom: cam.zoom };
+    else if (cam && typeof cam === "object" && e.camera) out.camera = {
+      ...e.camera,
+      ...(cam.zoom ? { zoom: cam.zoom } : {}),
+      holdMs: cam.holdMs,
+      easeMs: cam.easeMs,
+    };
     return out;
   });
   const head = m.trim.head ?? 0;
@@ -225,56 +216,100 @@ export function captionWindows(take: Take): { text: string; from: number; to: nu
 
 // --- camera ------------------------------------------------------------------
 
-type Key = { t: number; z: number; cx: number; cy: number };
+export type CameraKey = { t: number; z: number; cx: number; cy: number };
 
-/** Piecewise-linear ffmpeg expression over `T` for one field of the keyframes. */
-function pw(keys: Key[], f: keyof Omit<Key, "t">, T = "t"): string {
+/** Piecewise smoothstep expression over `T` for one field of the keyframes.
+ * Linear camera travel starts and stops abruptly, which reads as a broken
+ * whole-screen zoom even when the focus box is correct. */
+function pw(keys: CameraKey[], f: keyof Omit<CameraKey, "t">, T = "t"): string {
   if (!keys.length) return "1";
-  const v = (k: Key) => k[f].toFixed(4);
+  const v = (k: CameraKey) => k[f].toFixed(4);
   let expr = v(keys[keys.length - 1]);
   for (let i = keys.length - 1; i >= 1; i--) {
     const a = keys[i - 1], b = keys[i];
-    const seg = b.t - a.t > 0.001 ? `(${v(a)}+(${v(b)}-${v(a)})*(${T}-${a.t.toFixed(3)})/${(b.t - a.t).toFixed(3)})` : v(b);
+    const d = b.t - a.t;
+    const p = `((${T}-${a.t.toFixed(3)})/${d.toFixed(3)})`;
+    const seg = d > 0.001 ? `(${v(a)}+(${v(b)}-${v(a)})*${p}*${p}*(3-2*${p}))` : v(b);
     expr = `if(lt(${T},${b.t.toFixed(3)}),${seg},${expr})`;
   }
   return `if(lt(${T},${keys[0].t.toFixed(3)}),${v(keys[0])},${expr})`;
 }
 
-/** Build the zoompan filter for the scenes that carry a camera. Camera eases in
-    over 0.6s at each scene start and holds until the next scene. */
-function cameraFilter(take: Take, W: number, H: number, fps: number): { filter: string; count: number } {
+/** Camera choreography in output time.
+ *
+ * One focused scene is a bounded shot: ease in, hold, ease back to wide.
+ * Adjacent focused scenes are one shot and reframe directly, rather than
+ * pumping wide between every click. A static scene (or the end of the take)
+ * closes the shot, so a missing hold can never leave the video locked zoomed.
+ */
+export function cameraKeys(take: Take, W: number, H: number): { keys: CameraKey[]; count: number } {
   const sc = scenes(take);
-  const keys: Key[] = [];
-  const centre: Key = { t: 0, z: 1, cx: W / 2, cy: H / 2 };
+  const centre: CameraKey = { t: 0, z: 1, cx: W / 2, cy: H / 2 };
+  const DEFAULT_EASE = 0.65;
+  const DEFAULT_HOLD = 1.2;
+  const MARGIN = 28;
+  const sourceScenes = sc
+    .map((s, index) => ({ s, rawNext: sc[index + 1]?.start ?? take.duration }))
+    // A scene whose whole interval was removed by the head trim cannot affect
+    // the retained camera. Keeping it would clamp both ends to t=0 and leave
+    // its zoom target as the final key forever.
+    .filter(({ rawNext }) => rawNext > take.trimBefore);
+  const prepared = sourceScenes.map(({ s, rawNext }) => {
+    const t0 = Math.max(0, s.start - take.trimBefore);
+    const next = Math.max(t0, rawNext - take.trimBefore);
+    if (!s.camera) return { s, t0, next, target: undefined as CameraKey | undefined, requestedEase: DEFAULT_EASE };
+    const fit = Math.min(s.camera.zoom, W / (s.camera.box.width + 2 * MARGIN), H / (s.camera.box.height + 2 * MARGIN));
+    if (fit < 1.08) {
+      s.camera = undefined; // focus already fills the frame; moving would only distract
+      return { s, t0, next, target: undefined as CameraKey | undefined, requestedEase: DEFAULT_EASE };
+    }
+    const z = Math.round(fit * 100) / 100;
+    const b = s.camera.box;
+    const halfW = W / (2 * z), halfH = H / (2 * z);
+    const cx = Math.min(Math.max(b.x + b.width / 2, halfW), W - halfW);
+    const cy = Math.min(Math.max(b.y + b.height / 2, halfH), H - halfH);
+    s.camera.zoom = z; // proof log records the crop-safe zoom actually used
+    return {
+      s,
+      t0,
+      next,
+      target: { t: t0, z, cx, cy },
+      requestedEase: Math.max(0.2, (s.camera.easeMs ?? DEFAULT_EASE * 1000) / 1000),
+    };
+  });
+
+  const keys: CameraKey[] = [];
   let cur = { ...centre };
   let count = 0;
-  const EASE = 0.6;
-  for (const s of sc) {
-    const t0 = Math.max(0, s.start - take.trimBefore);
-    let target: Key;
-    // A zoom may never crop the thing it points at: clamp so the focus box
-    // (plus a margin) fits the window. Full-width elements get no zoom.
-    const MARGIN = 28;
-    const fit = s.camera ? Math.min(s.camera.zoom, W / (s.camera.box.width + 2 * MARGIN), H / (s.camera.box.height + 2 * MARGIN)) : 1;
-    if (s.camera && fit >= 1.08) {
-      count++;
-      const b = s.camera.box;
-      const z = Math.round(fit * 100) / 100;
-      // Centre on the box, then clamp so the crop stays inside the frame.
-      const halfW = W / (2 * z), halfH = H / (2 * z);
-      const cx = Math.min(Math.max(b.x + b.width / 2, halfW), W - halfW);
-      const cy = Math.min(Math.max(b.y + b.height / 2, halfH), H - halfH);
-      target = { t: t0 + EASE, z, cx, cy };
-      s.camera.zoom = z; // record what was actually used (proof log)
-    } else {
-      if (s.camera) s.camera = undefined; // focus fills the frame — no move
+  for (const [index, item] of prepared.entries()) {
+    if (!item.target || !item.s.camera) continue;
+    count++;
+    const span = Math.max(0, item.next - item.t0);
+    // Preserve a complete in/out gesture in a short scene instead of clipping
+    // the release at the next marker. Normal scenes keep the requested ease.
+    const ease = Math.min(item.requestedEase, Math.max(0.05, span / 3));
+    const target = { ...item.target, t: item.t0 + ease };
+    keys.push({ ...cur, t: item.t0 }, target);
 
-      target = { ...centre, t: t0 + EASE };
+    const nextIsFocused = !!prepared[index + 1]?.target;
+    if (!nextIsFocused) {
+      const wantedHold = (item.s.camera.holdMs ?? DEFAULT_HOLD * 1000) / 1000;
+      const hold = Math.min(wantedHold, Math.max(0, item.next - target.t - ease));
+      const holdUntil = target.t + hold;
+      const releaseUntil = Math.min(item.next, holdUntil + ease);
+      if (holdUntil > target.t + 0.001) keys.push({ ...target, t: holdUntil });
+      if (releaseUntil > holdUntil + 0.001) keys.push({ ...centre, t: releaseUntil });
+      cur = { ...centre, t: releaseUntil };
+    } else {
+      cur = { ...target };
     }
-    keys.push({ ...cur, t: t0 });
-    keys.push(target);
-    cur = { ...target };
   }
+  return { keys, count };
+}
+
+/** Build the ffmpeg zoompan filter from the bounded camera choreography. */
+function cameraFilter(take: Take, W: number, H: number, fps: number): { filter: string; count: number } {
+  const { keys, count } = cameraKeys(take, W, H);
   if (!count) return { filter: "", count: 0 };
   const T = `(in/${fps})`;
   const z = pw(keys, "z", T);
@@ -316,6 +351,103 @@ export function joinGraph(segs: string[], tr: { style: string; ms: number }, fps
     prev = out;
   }
   return chain.join(";");
+}
+
+/** Join already-rendered outputs, never replaying a browser or synthesizing a voice.
+ * The first video defines the canvas and frame rate; other clips fit, not crop.
+ * Intermediates make timestamps, pixel format and time base identical for xfade.
+ */
+export function stitch(inputs: string[], output: string, options: {
+  transition?: { style?: string; ms?: number };
+  /** Preserve the first audio stream from each source; false explicitly mutes. */
+  audio?: boolean;
+  log?: (line: string) => void;
+} = {}): string {
+  const transition = Manifest.shape.transition.parse(options.transition);
+  if (inputs.length < 2) throw new Error("stitch needs at least two inputs");
+  const target = path.resolve(output);
+  if (path.extname(target).toLowerCase() !== ".mp4") throw new Error("stitch output must be an .mp4 file");
+  if (fs.existsSync(target)) throw new Error(`stitch output already exists: ${target} — choose a new file`);
+  const files = inputs.map((input) => {
+    let file = path.resolve(input);
+    if (!fs.existsSync(file)) throw new Error(`stitch: missing input ${file}`);
+    if (fs.statSync(file).isDirectory()) file = path.join(file, "demo.mp4");
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`stitch: missing input ${file}`);
+    return file;
+  });
+  const info = files.map((file) => {
+    const p = probe(file);
+    if (!(p.width > 0 && p.height > 0 && p.fps > 0 && p.duration > 0)) throw new Error(`stitch: no usable video in ${file}`);
+    return p;
+  });
+  const first = info[0];
+  if (first.width % 2 || first.height % 2) throw new Error("stitch needs an even-sized first canvas for H.264; choose another first clip or re-render it");
+  // Leave at least a frame outside each overlap. A middle clip participates
+  // in two joins; accepting only one overlap silently eats that whole clip.
+  const checkLength = (duration: number, i: number) => {
+    const overlap = transition.style === "cut" ? 0 : transition.ms / 1000 * (i > 0 && i < files.length - 1 ? 2 : 1);
+    if (duration < overlap + 1 / first.fps - 0.001) throw new Error(`stitch: too short: ${files[i]} (${duration}s) — needs more than ${overlap}s for the transitions; shorten --transition-ms or use cut`);
+  };
+  info.forEach((p, i) => checkLength(p.duration, i));
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const temp = fs.mkdtempSync(path.join(path.dirname(target), ".retake-stitch-"));
+  try {
+    const segments = files.map((file, i) => {
+      const segment = path.join(temp, `${i}.mp4`);
+      ff(["-i", file, "-map", "0:v:0", "-an", "-vf",
+        // The first clip fixes the encoded canvas, not its pixel shape.
+        // Fit every source (including the first) using display aspect (dar)
+        // before making pixels square; force_original_aspect_ratio fits iw/ih.
+        `setpts=PTS-STARTPTS,fps=${first.fps},scale=w='max(2,trunc(min(${first.width},${first.height}*dar)/2)*2)':h='max(2,trunc(min(${first.height},${first.width}/dar)/2)*2)',setsar=1,pad=${first.width}:${first.height}:(ow-iw)/2:(oh-ih)/2,format=yuv420p`,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "14", segment], options.log);
+      return segment;
+    });
+    const durations = segments.map((file, i) => {
+      const duration = probe(file).duration;
+      checkLength(duration, i); // fps conversion may round a marginal clip down
+      return duration;
+    });
+    // Read the first decoded video timestamp in the source clock. Subtract
+    // that SAME origin from audio, not its own STARTPTS: late audio needs
+    // leading silence and audio preceding the first picture must be trimmed.
+    // showinfo uses ffmpeg itself, so stitch does not require ffprobe.
+    const timing = options.audio === false ? [] : files.map((file) => {
+      const p = spawnSync(ffmpegBin(), ["-hide_banner", "-copyts", "-i", file, "-map", "0:v:0", "-an",
+        "-vf", "showinfo", "-frames:v", "1", "-f", "null", "-"], { encoding: "utf8" });
+      const start = /\bn:\s*0\s+pts:\s*\S+\s+pts_time:([-\d.e+]+)/.exec(p.stderr);
+      if (p.status !== 0 || !start || !Number.isFinite(Number(start[1]))) throw new Error(`stitch: cannot read video timestamp in ${file}`);
+      return { origin: Number(start[1]), audio: /Audio:/.test(p.stderr) };
+    });
+    const hasAudio = files.map((_, i) => timing[i]?.audio ?? false);
+    const audio = hasAudio.some(Boolean);
+    options.log?.(`stitch: ${files.length} clips · ${first.width}×${first.height} @ ${first.fps}fps · ${transition.style} · audio ${audio ? "preserved (first stream per clip; silence where absent)" : options.audio === false ? "explicitly muted" : "none"}`);
+    const graph = [joinGraph(segments, transition, first.fps)];
+    const audioInputs: string[] = [];
+    if (audio) {
+      let index = segments.length;
+      durations.forEach((duration, i) => {
+        const source = hasAudio[i] ? `[${index++}:a:0]` : "anullsrc=r=48000:cl=stereo,";
+        if (hasAudio[i]) audioInputs.push("-i", files[i]);
+        graph.push(`${source}${hasAudio[i] ? `asetpts=PTS-(${timing[i].origin})/TB,` : ""}aresample=48000:first_pts=0,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=duration=${duration}[a${i}]`);
+      });
+      if (transition.style === "cut") {
+        graph.push(`${files.map((_, i) => `[a${i}]`).join("")}concat=n=${files.length}:v=0:a=1[aout]`);
+      } else {
+        let previous = "[a0]";
+        for (let i = 1; i < files.length; i++) {
+          const next = i === files.length - 1 ? "[aout]" : `[ax${i}]`;
+          graph.push(`${previous}[a${i}]acrossfade=d=${transition.ms / 1000}:c1=tri:c2=tri${next}`);
+          previous = next;
+        }
+      }
+    }
+    const result = path.join(temp, "joined.mp4");
+    ff(["-copyts", ...segments.flatMap((file) => ["-i", file]), ...audioInputs, "-filter_complex", graph.join(";"),
+      "-map", "[out]", ...(audio ? ["-map", "[aout]", "-c:a", "aac", "-b:a", "160k"] : ["-an"]),
+      "-c:v", "libx264", "-preset", "fast", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", result], options.log);
+    fs.copyFileSync(result, target, fs.constants.COPYFILE_EXCL);
+    return target;
+  } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 }
 
 // --- card frame --------------------------------------------------------------
@@ -415,6 +547,25 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
       idleLines = describeIdle(take, segs);
       for (const l of idleLines) log?.(`idle: ${l}`);
       take = { ...warpTake(take, segs), video: paced };
+    }
+  }
+  // Narration holds: each narrated scene lasts as long as its paragraph. The
+  // performance is synthesized here (cached — the voice pass reuses it) so the
+  // picture can wait for the words instead of the words being cut short.
+  if (m.voiceover && m.voiceover !== true && m.voiceover.script && m.voiceover.align === "scenes" && take.video) {
+    const vo = m.voiceover;
+    const paragraphs = vo.script!.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    const probe = path.join(outDir, ".vo-plan.mp3");
+    const cues = synthesizeWithCues(paragraphs.join("\n\n"), vo.voice, probe, vo.ratePercent);
+    const spans = cuesPerParagraph(paragraphs, cues);
+    fs.rmSync(probe, { force: true });
+    const wins = captionWindows(take).map((w) => ({ from: w.from + take.trimBefore, to: w.to + take.trimBefore }));
+    const holds = planHolds(wins, spans.map((sp) => sp.end - sp.start), 0.1);
+    if (holds.length) {
+      const held = path.join(outDir, ".held.mp4");
+      ff([...holdFilterArgs(take.video, holds, take.duration, held).slice(0, -1), "-r", String(resolve(m).fps), "-c:v", "libx264", "-crf", "14", "-preset", "veryfast", "-pix_fmt", "yuv420p", held], log);
+      for (const h of holds) log?.(`hold: the picture rests ${h.seconds.toFixed(1)}s at ${(h.at - take.trimBefore).toFixed(1)}s so the line can finish`);
+      take = { ...holdTake(take, holds), video: held };
     }
   }
   // Tempo: the source is cut in its own time (-ss/-t below), then every
@@ -569,9 +720,9 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
   if ((m.intro || m.outro) && !o.scene) {
     const dims = probe(mp4);
     const segs: string[] = [];
-    if (m.intro) { const c = await renderCard(ffmpegBin(), outDir, "intro", m.intro, dims.width, dims.height, fps, q.theme); segs.push(c.mp4); cover = c.cover; }
+    if (m.intro) { const c = await renderCard(ffmpegBin(), outDir, "intro", m.intro, dims.width, dims.height, fps, q.theme, m.card); segs.push(c.mp4); cover = c.cover; }
     segs.push(mp4);
-    if (m.outro) segs.push((await renderCard(ffmpegBin(), outDir, "outro", m.outro, dims.width, dims.height, fps, q.theme)).mp4);
+    if (m.outro) segs.push((await renderCard(ffmpegBin(), outDir, "outro", m.outro, dims.width, dims.height, fps, q.theme, m.card)).mp4);
     if (segs.length > 1) {
       const joined = path.join(outDir, ".joined.mp4");
       const tr = m.transition ?? { style: "cut" as const, ms: 400 };
@@ -604,12 +755,47 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
       mixIns.push("[mus]"); idx++;
     }
     if (m.voiceover) {
-      const spec = m.voiceover === true ? { voice: DEFAULT_VOICE, gainDb: 0, script: undefined as string | undefined, fragments: true } : m.voiceover;
-      if (spec.script) {
+      const spec = m.voiceover === true ? { voice: DEFAULT_VOICE, gainDb: 0, ratePercent: 0, script: undefined as string | undefined, fragments: true, align: "start" as const } : m.voiceover;
+      if (spec.script && spec.align === "scenes") {
+        // One performance, placed line by line. Read once so the voice sounds
+        // like a person; cut at the sentence timings so each line lands when
+        // its action happens. Over-long lines are reported, never sped up.
+        const paragraphs = spec.script.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+        const wins = captionWindows(take);
+        const clip = path.join(outDir, ".vo-0.mp3");
+        const cues = synthesizeWithCues(paragraphs.join("\n\n"), spec.voice, clip, spec.ratePercent);
+        const spans = cuesPerParagraph(paragraphs, cues);
+        const n = Math.min(spans.length, wins.length);
+        if (paragraphs.length !== wins.length) log?.(`voiceover: ${paragraphs.length} paragraphs for ${wins.length} narrated scenes — each scene gets one paragraph, in order; the extra ${paragraphs.length > wins.length ? "paragraphs are dropped" : "scenes stay silent"}`);
+        // Cut in the middle of the pause between lines — never at the sentence
+        // timing itself, which sits against the next word — and fade each line
+        // in and out so it arrives and leaves like speech, not like a switch.
+        const total = audioSeconds(ffmpegBin(), clip);
+        const quiet = silences(ffmpegBin(), clip);
+        const inner = cutPoints(spans.slice(0, n - 1).map((sp, k) => (sp.end + spans[k + 1].start) / 2), quiet, total);
+        const firstSpeech = quiet.length && quiet[0].start <= 0.02 ? quiet[0].end : 0;
+        const bounds = [Math.max(0, firstSpeech - 0.05), ...inner, total];
+        const FADE_IN = 0.03, FADE_OUT = 0.12;
+        // The line starts as its scene starts: the scene marker sits BEFORE
+        // the action it describes, so the voice leads the cursor.
+        const LEAD = 0.1;
+        for (let k = 0; k < n; k++) {
+          const a = bounds[k], b = bounds[k + 1], len = b - a;
+          const at = wins[k].from + introShift + LEAD;
+          const limit = (k + 1 < wins.length ? wins[k + 1].from + introShift : dur - 0.5) - 0.2;
+          const over = at + len - limit;
+          // Under 50ms is inside the breathing room the limit already keeps.
+          if (over >= 0.05) log?.(`voiceover: line ${k + 1} (“${paragraphs[k].slice(0, 40)}…”) runs ${over.toFixed(2)}s into ${k + 1 < wins.length ? "the next scene" : "the closing card"} — shorten the line or hold the scene longer. Retake will not speed a voice up.`);
+          audioIn.push("-i", clip);
+          chains.push(`[${idx}:a]atrim=start=${a.toFixed(3)}:end=${b.toFixed(3)},asetpts=PTS-STARTPTS,afade=t=in:d=${FADE_IN},afade=t=out:st=${Math.max(0, len - FADE_OUT).toFixed(3)}:d=${FADE_OUT},volume=${spec.gainDb}dB,adelay=${Math.round(at * 1000)}:all=1[vo${k}]`);
+          mixIns.push(`[vo${k}]`);
+          idx++;
+        }
+      } else if (spec.script) {
         // One script, one performance: prosody carries across the whole
         // video the way a person reads. Starts after the title card.
         const clip = path.join(outDir, ".vo-0.mp3");
-        synthesize(spec.script, spec.voice, clip);
+        synthesize(spec.script, spec.voice, clip, spec.ratePercent);
         const spoken = audioSeconds(ffmpegBin(), clip);
         if (spoken > dur - introShift + 0.5) log?.(`voiceover: the script reads ${spoken.toFixed(1)}s but there are ${(dur - introShift).toFixed(1)}s of video after the title card — cut the script or lengthen the scenes, then re-render`);
         audioIn.push("-i", clip);
@@ -622,7 +808,7 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
         for (let i = 0; i < wins.length; i++) {
           const w = wins[i];
           const clip = path.join(outDir, `.vo-${i}.mp3`);
-          synthesize(w.text, spec.voice, clip);
+          synthesize(w.text, spec.voice, clip, spec.ratePercent);
           const spoken = audioSeconds(ffmpegBin(), clip);
           const at = w.from + introShift;
           if (spoken > w.to - w.from + 0.4) log?.(`voiceover: “${w.text.slice(0, 40)}…” runs ${spoken.toFixed(1)}s but its scene holds ${(w.to - w.from).toFixed(1)}s — lengthen the scene's holdMs or trailing wait and re-render`);
@@ -633,7 +819,10 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
       }
     }
     const mixed = path.join(outDir, ".with-audio.mp4");
-    const graph = `${chains.join(";")};${mixIns.join("")}amix=inputs=${mixIns.length}:duration=longest:normalize=0,atrim=0:${dur.toFixed(2)}[a]`;
+    // A narration can finish before the picture. Pad the mixed track to the
+    // exact video duration before `-shortest`; otherwise ffmpeg stops the
+    // deliverable when the voice stops and silently cuts off the final scene.
+    const graph = `${chains.join(";")};${mixIns.join("")}amix=inputs=${mixIns.length}:duration=longest:normalize=0,apad,atrim=0:${dur.toFixed(2)}[a]`;
     ff(["-i", mp4, ...audioIn, "-filter_complex", graph, "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-shortest", mixed], log);
     fs.renameSync(mixed, mp4);
     for (const f of fs.readdirSync(outDir)) if (/^\.vo-\d+\.mp3$/.test(f)) fs.rmSync(path.join(outDir, f), { force: true });
@@ -793,27 +982,38 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
  * as a moment rather than a picture. Per-scene stills cannot do this — they
  * cannot show a caption going false *inside* a scene, and they carry no clock.
  */
-export function contactSheet(outDir: string, everySec = 2, width = 420, log?: (l: string) => void): string {
-  const mp4 = path.join(outDir, "demo.mp4");
-  if (!fs.existsSync(mp4)) throw new Error(`no demo.mp4 in ${outDir} — render it first`);
+export function contactSheetFile(mp4: string, out: string, everySec = 2, width = 420, log?: (l: string) => void): string {
+  if (!fs.existsSync(mp4)) throw new Error(`video does not exist: ${mp4}`);
   const dur = probe(mp4).duration;
-  const cells = Math.max(1, Math.ceil(dur / everySec));
+  const last = Math.max(0, dur - 0.05);
+  const times: number[] = [];
+  for (let time = 0; time < last - 0.1; time += everySec) times.push(time);
+  if (!times.length || last - times[times.length - 1] > 0.1) times.push(last);
+  const cells = times.length;
   const cols = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(cells))));
   const rows = Math.ceil(cells / cols);
   const fontFile = DEFAULT_FONTS.find((f) => fs.existsSync(f));
   const font = fontFile ? `fontfile='${fontFile}':` : "";
-  const out = path.join(outDir, "contact.png");
-  // drawtext runs before tile, so each cell carries its own playback time.
+  const select = times.map((time) => `between(t\\,${time.toFixed(3)}\\,${Math.min(dur, time + 0.06).toFixed(3)})`).join("+");
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  // Select explicit source timestamps, including the final frame. The timestamp
+  // overlay runs before tiling and therefore preserves the source clock.
   const vf = [
-    `fps=1/${everySec}`,
+    `select='${select}'`,
     `scale=${width}:-2`,
     `drawtext=${font}text='%{pts\\:hms}':x=8:y=8:fontsize=${Math.round(width / 20)}:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=5`,
     `tile=${cols}x${rows}:margin=8:padding=6:color=#e6e9e2`,
   ].join(",");
   ff(["-i", mp4, "-vf", vf, "-frames:v", "1", out], log);
   if (!fs.existsSync(out)) throw new Error("ffmpeg produced no contact sheet");
-  log?.(`contact: ${cells} frames every ${everySec}s, ${cols}×${rows} → ${path.relative(process.cwd(), out)}`);
+  log?.(`contact: ${cells} explicit frames through ${last.toFixed(2)}s, ${cols}×${rows} → ${path.relative(process.cwd(), out)}`);
   return out;
+}
+
+export function contactSheet(outDir: string, everySec = 2, width = 420, log?: (l: string) => void): string {
+  const mp4 = path.join(outDir, "demo.mp4");
+  if (!fs.existsSync(mp4)) throw new Error(`no demo.mp4 in ${outDir} — render it first`);
+  return contactSheetFile(mp4, path.join(outDir, "contact.png"), everySec, width, log);
 }
 
 export function makeGif(outDir: string, width = 900, fps = 18, log?: (l: string) => void): string {
@@ -879,6 +1079,10 @@ export async function inBatches<T>(items: T[], limit: number, fn: (item: T) => P
   }));
 }
 
+export function isNonVisualResourceError(text: string): boolean {
+  return /^Failed to load resource:\s+net::ERR_(?:CONNECTION_CLOSED|CONNECTION_RESET|ABORTED|BLOCKED_BY_CLIENT)\b/.test(text.trim());
+}
+
 export function check(outDir: string, m?: Manifest): Check {
   const lines: string[] = [];
   let ok = true;
@@ -938,14 +1142,19 @@ export function check(outDir: string, m?: Manifest): Check {
   // frame-by-frame review found it. An error in the last stretch is the
   // shape that matters — earlier ones are usually recovered from.
   const errs = take.pageErrors ?? [];
-  if (errs.length) {
+  const actionableErrors = errs.filter((e) => !isNonVisualResourceError(e.text));
+  const ignoredResourceErrors = errs.length - actionableErrors.length;
+  if (actionableErrors.length) {
     const endsAt = take.duration;
-    const late = errs.filter((e) => e.at >= Math.max(0, endsAt - 6));
+    const late = actionableErrors.filter((e) => e.at >= Math.max(0, endsAt - 6));
     if (late.length) {
       say(false, `the app reported an error in the last seconds and the video ends on it: “${late[0].text.slice(0, 120)}” at ${late[0].at.toFixed(1)}s — watch the final frames before shipping this`);
     } else {
-      lines.push(`—     the app reported ${errs.length} error${errs.length > 1 ? "s" : ""} during the take (earliest “${errs[0].text.slice(0, 80)}”), none in the last 6s`);
+      lines.push(`—     the app reported ${actionableErrors.length} error${actionableErrors.length > 1 ? "s" : ""} during the take (earliest “${actionableErrors[0].text.slice(0, 80)}”), none in the last 6s`);
     }
+  }
+  if (ignoredResourceErrors) {
+    lines.push(`—     ignored ${ignoredResourceErrors} non-visual browser resource error${ignoredResourceErrors > 1 ? "s" : ""}; final-frame review is still required`);
   }
   if (stalled.length) {
     const worst = stalled[0];

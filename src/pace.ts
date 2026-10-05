@@ -28,6 +28,18 @@ const SLACK = 0.6;
 const TYPE_BUDGET = 2.4;
 const TYPE_HEAD = 0.8;
 const TYPE_TAIL = 0.7;
+/** A resolved target can still spend seconds under the pointer while a live
+ * page settles. Keep the approach and final hover at real speed, but do not
+ * make the viewer watch that invisible browser latency. */
+const HOVER_BUDGET = 1.8;
+const HOVER_HEAD = 0.55;
+const HOVER_TAIL = 0.45;
+/** A Playwright click can remain open while the browser waits for navigation.
+ * Preserve the cursor approach, click ripple, and the first settled result, but
+ * accelerate only the silent browser-latency middle. Normal clicks are untouched. */
+const CLICK_BUDGET = 1.8;
+const CLICK_HEAD = 1.1;
+const CLICK_TAIL = 0.45;
 
 /** Plan the warp: 1× everywhere except the tail of each long app-wait and the
     middle of each long typing run. */
@@ -47,6 +59,16 @@ export function planIdle(take: Take, keepSeconds: number): WarpSegment[] {
       const middle = dur - TYPE_HEAD - TYPE_TAIL;
       const shownMiddle = Math.max(0.3, TYPE_BUDGET - TYPE_HEAD - TYPE_TAIL);
       segs.push({ from: e.start + TYPE_HEAD, to: e.end - TYPE_TAIL, rate: middle / shownMiddle });
+    } else if (e.action === "hover") {
+      if (dur < HOVER_BUDGET + SLACK) continue;
+      const middle = dur - HOVER_HEAD - HOVER_TAIL;
+      const shownMiddle = HOVER_BUDGET - HOVER_HEAD - HOVER_TAIL;
+      segs.push({ from: e.start + HOVER_HEAD, to: e.end - HOVER_TAIL, rate: middle / shownMiddle });
+    } else if (e.action === "click") {
+      if (dur < CLICK_BUDGET + SLACK) continue;
+      const middle = dur - CLICK_HEAD - CLICK_TAIL;
+      const shownMiddle = CLICK_BUDGET - CLICK_HEAD - CLICK_TAIL;
+      segs.push({ from: e.start + CLICK_HEAD, to: e.end - CLICK_TAIL, rate: middle / shownMiddle });
     }
   }
   return segs.sort((a, b) => a.from - b.from);

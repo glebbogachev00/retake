@@ -56,36 +56,25 @@ say so in one line and stop.
 6. **`dry`** — ALWAYS before `run`. Seconds, no camera, strict; failures
    include what was on screen. Fix and repeat until it passes. Never record
    a manifest whose dry run fails.
-7. **While iterating, record at `--preset draft`** (CLI) — same layout as the
-   final at a quarter of the pixels, so a take costs ~real time instead of
-   real time plus an encoder. Switch to a post preset only for the take you
-   intend to keep.
-8. **`run` with `preview=true`**, then read the `receipts` AND `look` at
-   the take. Receipts say what happened; `look` shows how it looks — one
-   image per scene. Judge it like a viewer would: is the thing the caption
-   names actually on screen? Anything in shot that shouldn't be (dev
-   badges, leftover data, cut-off text)? Wrong story or failed step →
-   `edit`, run again. More than four rounds → ask the person.
-9. **Before the expensive take, if it is expensive, show them the draft.**
-   `run` prints an estimate before capture. If it said this is a long take
-   (over ~2.5 minutes), do not go straight to full quality: `ask` them,
-   naming the demo and pointing at the draft in the Retake window, and say
-   what the full take will cost. Something like *"Draft is ready — 40s, 6
-   scenes, in the window. Full quality is about 7 minutes of recording.
-   Worth spending, or change something first?"*
-   - **Their taste is the thing you cannot check.** Every mechanical
-     problem is already caught by `dry` and the take's own checks. What a
-     person sees that no checker will is whether the story lands, whether
-     the payoff reads, whether it looks right for their product. Getting
-     that verdict on a cheap draft is the whole point.
-   - **Short take?** Skip the gate. Asking someone to approve a 30-second
-     recording costs them more than just recording it.
-   - **Nobody there to ask?** Never block and never guess. Leave the draft,
-     `done` with what you have and what it would cost, and let them start
-     the expensive one when they are back.
-10. When they say go: `run` with `preview=false` once (full quality), then
-   `done` with one sentence. Outputs: `demo.mp4`, `stills/` (one PNG per
-   scene), `proof-log.md`.
+7. **Use the one-capture path.** For a client series, read
+   `docs/agent-production-guide.md` before recording. It defines the site map,
+   privacy, branding, audio, review, and approval gates. Run `run` with
+   `preview=true` once, then read `receipts` and inspect every scene with
+   `look`. Receipts prove what happened. The frames show whether the visible
+   story is true.
+8. **Correct by rendering whenever possible.** Captions, timing, cards, music,
+   narration, trim, layout, and delivery frame rate do not need another browser
+   capture. Edit the manifest and render the existing take. Record again only
+   when the browser action, route, fixture, focus target, or visible state
+   changed.
+9. **Show expensive previews before more capture.** If a changed browser flow
+   will take more than about 2.5 minutes, show the current preview in the Retake
+   window and ask whether the change is worth a new take. Do not spend another
+   capture on taste that a person has not approved.
+10. **Finish by rendering, not recording.** Render the preview take at
+   `post-landscape` with `no_master=true`, run the final checks, and call `done`
+   only after the final receipt and exact MP4 pass. Outputs include `demo.mp4`,
+   `stills/`, and `proof-log.md`.
 
 ### Leave the manifest where it lives
 
@@ -454,6 +443,7 @@ re-render would do. Almost nothing needs the camera twice.
 |---|---|---|
 | size, shape, format (landscape → square → vertical) | `render` with another preset | seconds |
 | a caption's words, the speed, a zoom, cards, music | edit the manifest, `render` | seconds |
+| join separate recorded outputs | `stitch` with existing outputs and one transition style | render only |
 | **where** a caption or still sits in time | `nudge: <ms>` on the scene, then `render` | seconds |
 | which frame is the poster | click a frame in the window, or `--scene` | seconds |
 | the ending, or any part of a demo you already recorded | `run --from <scene>` — it tells you which scene | only what changed |
@@ -483,7 +473,49 @@ earlier steps at full speed off camera so the app reaches the right state,
 then starts recording there; a seven-minute demo whose last third changed
 costs ninety seconds instead of seven minutes.
 
+## The very first call: `routine`
+
+Call `routine` before anything else. Besides the locked standard, it returns the product's full recording brief when one exists — environment, board contents, verified selectors, pitfalls. Everything in it was learned by losing a take; do not rediscover it.
+
+## Before anything: is the environment real? — `env`
+
+If the workspace has `demos/environment.yaml`, run `retake env up` before the
+first take and believe nothing until it says proven. It restarts the app (most
+cache their state, so take two otherwise inherits take one), clears what it
+owns, and asserts what must and must not be on screen. `routine run` does this
+on its own and refuses to record when it fails.
+
+The assertion that matters is `absent`. A present-only check cannot see real
+data reaching a demo instance, and a recording of someone's real notes is worse
+than no recording.
+
+## The standard is already decided — `routine`
+
+Call `routine` before you draft. If this workspace has one, it is the locked
+answer to format, captions, which voice narrates and how fast, and music —
+and those fields are **not yours to choose**. Write the steps, the captions
+and the story; call `routine_apply` once the manifest exists, before `dry`.
+
+Never set `preset`, `layout`, `captions`, `viewport`, `scale`,
+`voiceover.voice`, `voiceover.ratePercent` or `music` by hand when a routine
+is present. Deciding them per demo is how a workspace ends up with one video
+narrated too fast, the next too slow, and a third in a voice nobody picked.
+
+`routine_apply` will not turn narration on. Narration needs a script and a
+person who has heard it; the routine only says which voice, at what pace,
+once somebody has written one.
+
+If there is no routine, the advice below applies and nothing is locked.
+
 ## Style — how the person wants their videos to look
+
+To join separate recordings, use `stitch` or `retake stitch` with output
+folders or video files in playback order. The first clip sets the canvas
+and frame rate. Other clips fit without cropping. Source audio stays
+aligned and crossfades with non-cut joins. Use `--no-audio` for silence.
+Choose a new MP4 path. Stitch creates no recording or library entry and
+does not synthesize or approve narration. Change source manifests and
+re-render first if the clips need edits. See `docs/stitch.md`.
 
 Do not ask about knobs before the first take — nobody has opinions about
 zooms or caption tone until they have seen one. Two moves instead:

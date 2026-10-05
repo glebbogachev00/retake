@@ -26,6 +26,7 @@ function run(rt: string, name: string, take: Record<string, unknown>, used?: Rec
 }
 
 const flat = (rt: string) => collect(rt).notes.map((n) => `${n.kind}: ${n.line}`).join("\n");
+const isoAgo = (ms = 0) => new Date(Date.now() - ms).toISOString();
 
 test("a --from fragment is not called a failure", () => {
   // This one shipped wrong the first time: `partial` is set both by a
@@ -106,15 +107,16 @@ test("a take nobody has verified or swept is said out loud", () => {
   // The workspace-level version of "did the agent actually check it". Unlike
   // the agent's own answer, this one is on disk.
   const rt = root();
-  run(rt, "unlooked", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  run(rt, "unlooked", { finishedAt: isoAgo(60_000) }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
   assert.match(flat(rt), /nobody has looked at how/);
 });
 
 test("a take that HAS been looked at is not nagged about", () => {
   const rt = root();
-  const dir = run(rt, "looked", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  const finishedAt = isoAgo(60_000);
+  const dir = run(rt, "looked", { finishedAt }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
-    verify: { at: "now", takeFinishedAt: "2026-08-27T10:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+    verify: { at: "now", takeFinishedAt: finishedAt, ok: true, count: 1, summary: "1 answered yes" },
   }));
   assert.doesNotMatch(flat(rt), /nobody has looked at how/);
 });
@@ -123,9 +125,9 @@ test("a check answering an OLDER take does not count as looked at", () => {
   // A re-record makes every previous answer stale. Treating a stale pass as a
   // pass is the whole failure mode.
   const rt = root();
-  const dir = run(rt, "restale", { finishedAt: "2026-08-27T12:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
+  const dir = run(rt, "restale", { finishedAt: isoAgo(60_000) }, { steps: [{ action: "scene", label: "a", expect: "x" }] });
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
-    verify: { at: "then", takeFinishedAt: "2026-08-26T09:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+    verify: { at: "then", takeFinishedAt: isoAgo(120_000), ok: true, count: 1, summary: "1 answered yes" },
   }));
   assert.match(flat(rt), /nobody has looked at how/);
 });
@@ -143,9 +145,10 @@ test("a fresh lock is left alone; an hour-old one is a dead run holding the fold
 
 test("nothing to report says so in one line, and never invents a fifth", () => {
   const rt = root();
-  const dir = run(rt, "clean", { finishedAt: "2026-08-27T10:00:00Z" }, { steps: [{ action: "scene", label: "a", expect: "something" }] });
+  const finishedAt = isoAgo(60_000);
+  const dir = run(rt, "clean", { finishedAt }, { steps: [{ action: "scene", label: "a", expect: "something" }] });
   fs.writeFileSync(path.join(dir, "checks.json"), JSON.stringify({
-    verify: { at: "now", takeFinishedAt: "2026-08-27T10:00:00Z", ok: true, count: 1, summary: "1 answered yes" },
+    verify: { at: "now", takeFinishedAt: finishedAt, ok: true, count: 1, summary: "1 answered yes" },
   }));
   const out = notes(rt);
   assert.equal(out.notes.length, 0);

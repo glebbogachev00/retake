@@ -35,12 +35,18 @@ const HUMAN_ONLY = new Set([
   "list", "presets", "validate",         // the agent has read_manifest / write_manifest / the tool list
   "takes", "restore", "tidy",            // housekeeping over the whole workspace
   "describe", "contact", "gif", "check", // covered by draft / receipts / the run tool's own report
+  "golden",                                // explicit human approval; agents may not approve their own references
 ]);
 
-/** Everything the CLI exposes, straight from the source. */
+/**
+ * Every VERB the CLI exposes, straight from the source — the commands hung off
+ * `program`, not the sub-commands hung off them. `retake routine set` is not a
+ * verb an agent reaches for; `retake routine` is, and it is the one that has to
+ * have a tool and a mention in the docs.
+ */
 function cliVerbs(): string[] {
   const src = read("src/cli.ts");
-  return [...src.matchAll(/\.command\("([a-z-]+)"\)/g)].map((m) => m[1]).sort();
+  return [...src.matchAll(/\bprogram\s*\.command\("([a-z-]+)"/g)].map((m) => m[1]).sort();
 }
 
 /** Everything the MCP server exposes. */

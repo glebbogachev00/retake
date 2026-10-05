@@ -28,20 +28,20 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: node dist/cli.js validate demos/example.yaml
-      # The package is an operational file too: `retake init` copies the
-      # template out of it, and the template was once listed in package.json
-      # and absent from the repository — so a fresh install produced a broken
-      # workspace and nothing said so.
+      # A fresh install now starts empty and hands the first manifest to the
+      # onboarding operator. Package the agent contract and the voice previews
+      # that onboarding promises instead of an obsolete starter manifest.
       - name: the package contains what it promises
         run: |
           npm pack --dry-run 2>&1 | tee /tmp/pack.txt
-          for f in demos/example.yaml skill/SKILL.md AGENTS.md; do
+          for f in skill/SKILL.md AGENTS.md assets/voice-samples/aiden.mp4 assets/voice-samples/edge.mp4 assets/voice-samples/kokoro.mp4; do
             grep -q "$f" /tmp/pack.txt || { echo "missing from the tarball: $f"; exit 1; }
           done
-      - name: retake init makes a working workspace
+          ! grep -q "demos/example.yaml" /tmp/pack.txt
+      - name: retake init leaves a workspace ready for onboarding
         run: |
           d=$(mktemp -d); cd "$d"
           node "$GITHUB_WORKSPACE/dist/cli.js" init
-          test -f demos/example.yaml
-          node "$GITHUB_WORKSPACE/dist/cli.js" validate demos/example.yaml
+          test -d demos
+          test -d outputs
+          test ! -e demos/example.yaml

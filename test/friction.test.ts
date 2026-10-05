@@ -45,11 +45,12 @@ test("a file seed can opt into relative dates", () => {
 
 test("cursor.idleHide is accepted and carried through resolve", async () => {
   const { resolve } = await import("../src/manifest.js");
-  const r = Manifest.safeParse({ name: "t", url: "http://localhost:3000", steps: [{ action: "wait", ms: 100 }], cursor: { idleHide: false } });
+  const r = Manifest.safeParse({ name: "t", url: "http://localhost:3000", steps: [{ action: "wait", ms: 100 }], cursor: { idleHide: false, transitionMs: 850 } });
   assert.ok(r.success);
   const q = resolve(r.data!);
   assert.notEqual(q.cursor, false);
   assert.equal((q.cursor as { idleHide?: boolean }).idleHide, false);
+  assert.equal((q.cursor as { transitionMs?: number }).transitionMs, 850, "a demo can slow cursor travel without changing global playback speed");
   const plain = resolve(Manifest.parse({ name: "t", url: "http://localhost:3000", steps: [{ action: "wait", ms: 100 }] }));
   assert.equal((plain.cursor as { idleHide?: boolean }).idleHide, undefined, "unset means: decide by length at record time");
 });

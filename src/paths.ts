@@ -2,7 +2,7 @@
  * Where things are. Two roots, kept apart on purpose:
  *
  *   PKG_ROOT      the installed Retake package — its skill, landing page,
- *                 assets, example manifest, and the code itself
+ *                 assets and the code itself
  *   PROJECT_ROOT  the workspace Retake works in — demos/, outputs/, .env,
  *                 .auth/, the UI's drafts and trash
  *
@@ -37,3 +37,7 @@ export function entry(name: "cli" | "operator/tools"): { command: string; args: 
   const require = createRequire(import.meta.url);
   return { command: process.execPath, args: [require.resolve("tsx/cli"), file] };
 }
+
+/** A demo's manifest: any YAML in demos/ except the files that sit beside
+    the demos without being one — the workspace's recording environment. */
+export const isDemoFile = (f: string): boolean => /\.ya?ml$/.test(f) && !/^environment\.ya?ml$/.test(path.basename(f));
