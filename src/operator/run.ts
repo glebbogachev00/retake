@@ -149,9 +149,13 @@ export function startOperator(input: { describe: string; url?: string; project?:
     s.code = code;
     if (!s.demo && s.lastDemo) { s.demo = s.lastDemo; s.onDemo?.(s.demo); }
     if (!s.summary) {
+      // Say why, in the words the person can act on. The window shows only
+      // this summary when a run fails, so "the details above" pointed at
+      // nothing — while the real reason was an expired sign-in.
+      const said = [...s.lines].reverse().map((l) => String(l).replace(/^[·✓✗→\s]+/, "").trim()).find(Boolean) ?? "";
       s.summary = s.lastMessage || (code === 0
         ? "The operator finished without creating a demo. Please try the request again."
-        : "The operator stopped before the demo was ready. The details above show what failed.");
+        : operatorFailure(input.provider, said));
     }
     // A task that used Retake but never called `done` is incomplete, even if
     // the agent process itself happened to exit cleanly.
@@ -236,5 +240,15 @@ export function answerPending(s: Session, id: string, answer: string): boolean {
   push(s, "answered", { id, answer });
   return true;
 }
+/** Why the agent stopped, as something to do about it. */
+export function operatorFailure(provider: "claude-code" | "codex", said: string): string {
+  const agent = provider === "codex" ? "Codex" : "Claude Code";
+  if (/authenticat|oauth|sign(ed)? ?in|log(ged)? ?in|unauthori[sz]ed|\b401\b|token.*(expired|refresh)|session expired/i.test(said)) {
+    return `${agent} needs you to sign in again — its login has expired. Open a terminal, run \`${provider === "codex" ? "codex login" : "claude auth login"}\` and sign in, then press Try again.`;
+  }
+  if (/rate.?limit|usage limit|quota|\b429\b/i.test(said)) return `${agent} has hit its usage limit. Try again when it resets.`;
+  return said ? `${agent} stopped before the demo was ready: ${said.slice(0, 240)}` : `${agent} stopped before the demo was ready, without saying why. Press Try again.`;
+}
+
 export function markDone(s: Session, summary: string, demo?: string) { s.summary = summary; s.demo = demo; if (demo) s.onDemo?.(demo); push(s, "line", `✓ ${summary}`); }
 export function stopSession(s: Session) { s.proc?.kill("SIGTERM"); }
