@@ -1390,7 +1390,7 @@ routine
 
 routine
   .command("set")
-  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | intro | outro | logo | deliver | note (intro/outro: \"Title | subtitle\")")
+  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | intro | outro | logo | brand | deliver | note (intro/outro: \"Title | subtitle\")")
   .argument("<value>")
   .option("--as <name>", "which routine to change (default: the one in use)")
   .description("change the standard once, for every recording that follows")
@@ -1447,6 +1447,19 @@ routine
         if (k === "outro") next.cards = true;
         break;
       }
+      case "brand": {
+        // The product's colours in one place: ground (the card), matte (the
+        // frame, and the card's words), orb (the corner circles).
+        const pairs: Record<string, string> = Object.fromEntries(value.split(/[\s,]+/).filter(Boolean).map((kv) => kv.split("=") as [string, string]));
+        const bad = Object.entries(pairs).find(([k, v]) => !/^(ground|matte|orb)$/.test(k) || !/^#[0-9a-f]{6}$/i.test(v ?? ""));
+        if (bad || !Object.keys(pairs).length) throw new Error('brand is ground=#rrggbb matte=#rrggbb orb=#rrggbb — any of them, e.g. "ground=#f2efe6 matte=#191d19"');
+        const ground = pairs.ground ?? current.card?.background ?? current.theme?.ink;
+        const matte = pairs.matte ?? current.theme?.background ?? current.card?.ink;
+        if (!ground || !matte) throw new Error("give both ground and matte the first time");
+        next.theme = { background: matte, ink: ground };
+        next.card = { ...(current.card ?? { weight: 560, ornament: "none" }), background: ground, ink: matte, ...(pairs.orb ? { orb: pairs.orb } : {}) };
+        break;
+      }
       case "deliver":
         if (/^(none|off)$/i.test(value)) { delete next.deliver; break; }
         next.deliver = value.replace(/^~(?=\/|$)/, process.env.HOME ?? "~"); break;
@@ -1457,7 +1470,7 @@ routine
         next.card = { ...current.card, logo: value }; break;
       }
       default:
-        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, intro, outro, logo, deliver, note`);
+        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, intro, outro, logo, brand, deliver, note`);
     }
 
     const parsed = RoutineSchema.safeParse(next);
@@ -1550,6 +1563,7 @@ routine
         outro: grabFrame(ff, target, Math.max(0, facts.seconds - 0.8)),
       }, facts);
       next = { ...next, style: look.style, cards: look.cards, mode: look.cards ? "launch" : r.mode, ...(look.theme ? { theme: look.theme } : {}), ...(look.card ? { card: { ...look.card, weight: 560, ornament: "none" as const } } : {}) };
+      if (look.card || look.theme) say(`ℹ these colours are the north star's — if it is another product's video, \`retake routine set brand ground=#… matte=#…\` gives this product its own.`);
       say(`taken from it: ${look.style}${look.cards ? `, cards on ${look.card!.background} in ${look.card!.ink}` : ", no cards"}${look.theme ? `, inset on ${look.theme.background}` : ""}`);
       for (const n of look.notes) say(`  · ${n}`);
     }

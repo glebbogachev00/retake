@@ -392,6 +392,9 @@
   .rt-facts dt { color:var(--muted); }
   .rt-facts dd { margin:0; min-width:0; overflow-wrap:anywhere; }
   .rt-facts .miss { color:var(--bad); }
+  .rt-sw { display:inline-flex; align-items:center; gap:5px; margin:0 10px 3px 0; white-space:nowrap; }
+  .rt-sw i { width:14px; height:14px; border-radius:4px; border:1px solid var(--rule2); }
+  .rt-sw code { font-size:11.5px; color:var(--muted); }
   .rt-cmd { display:block; margin-top:8px; padding:9px 11px; border-radius:9px; background:var(--paper); border:1px solid var(--rule); font:12px/1.5 ui-monospace,Menlo,monospace; overflow-wrap:anywhere; }
   @media (max-width:560px) { .rt-shapes { grid-template-columns:1fr; } .rt-fig { height:52px; } .rt-cards { grid-template-columns:1fr; } }
   @media (prefers-reduced-motion:reduce) { .spin { animation:none; opacity:.9 } .live .bar i { transition:none } }
@@ -879,6 +882,10 @@ $('routineBtn').onclick = async () => {
       ? `<div class="rt-cards">${mini('Opens', cur.intro ? cur.intro.title : "Each video's own title")}${cur.outro ? mini('Closes', cur.outro.title) : ''}</div>`
       : '';
     const facts = [];
+    // The brand's colours, shown — the one thing about a routine that is
+    // easier to check by eye than by reading hex.
+    const sw = (c, label) => `<span class="rt-sw"><i style="background:${esc(c)}"></i>${label} <code>${esc(c)}</code></span>`;
+    if (card || cur.theme) facts.push(['Colours', [card && sw(card.background, 'card'), cur.theme && sw(cur.theme.background, 'frame'), card && card.orb && sw(card.orb, 'circles')].filter(Boolean).join(' ')]);
     if (about.deliver) facts.push(['Delivers to', `${esc(about.deliver.path)} · ${about.deliver.videos} video${about.deliver.videos === 1 ? '' : 's'} — only ones that match`]);
     if (about.brief) facts.push(['Brief', about.brief.exists ? `${esc(about.brief.path)} — what an agent reads before writing a step` : `<span class="miss">${esc(about.brief.path)} is missing</span>`]);
     if (name === data.use) facts.push(['Runs', data.schedule

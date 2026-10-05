@@ -747,6 +747,12 @@ async function ssim(ffmpeg: string, a: string, b: string): Promise<number> {
   return m ? Number(m[1]) : 0;
 }
 
+function hexToRgb(h: string): [number, number, number] {
+  const m = /^#?([0-9a-f]{6})$/i.exec(h.trim());
+  const n = m ? parseInt(m[1], 16) : 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 /** The average colour of a still, read through ffmpeg as one pixel. */
 function meanRgb(png: string): [number, number, number] {
   const { ffmpegBin } = mediaBin;
@@ -777,28 +783,61 @@ export async function compareToReference(ffmpeg: string, reference: string, cand
     const content = "drawbox=x=iw*0.14:y=ih*0.2:w=iw*0.72:h=ih*0.6:color=black:t=fill";
     const [ri, ci] = await Promise.all([frameAt(ffmpeg, reference, settle, false, path.join(work, "ref-intro.png"), content), frameAt(ffmpeg, candidate, settle, false, path.join(work, "cut-intro.png"), content)]);
     // Structure alone cannot see colour: a flat grey card and a flat white one
-    // are the same shape. The ground is compared as a colour too.
+    // are the same shape. So colour is checked too — against the product's
+    // own brand when the routine has one (the north star may be another
+    // product's video: its format is borrowed, never its colours), else
+    // against the north star.
     const shift = (a: string, b: string) => Math.hypot(...[0, 1, 2].map((i) => meanRgb(a)[i] - meanRgb(b)[i]));
+    const ground = r.card?.background;
+    const groundOk = async (cut: string, ref: string, fromEnd: boolean, name: string) => {
+      if (!ground) return shift(ref, cut) <= 8;
+      // A strip across the top, clear of the corner circles and the words.
+      const strip = await frameAt(ffmpeg, candidate, settle, fromEnd, path.join(work, `${name}-ground.png`), "crop=iw*0.4:ih*0.06:iw*0.3:ih*0.02");
+      return Math.hypot(...[0, 1, 2].map((i) => meanRgb(strip)[i] - hexToRgb(ground)[i])) <= 10;
+    };
+    const colourNote = ground ? `not the brand's ground ${ground}` : "a different colour from the reference's card";
     const si = await ssim(ffmpeg, ri, ci);
-    const ci2 = shift(ri, ci) <= 8;
-    out.push({ label: "opening card", score: si, pass: si >= 0.9 && ci2, note: !ci2 ? "a different colour from the reference's opening card" : si >= 0.9 ? "matches" : "does not look like the reference's opening card" });
+    const ci2 = await groundOk(ci, ri, false, "cut-intro");
+    out.push({ label: "opening card", score: si, pass: si >= 0.9 && ci2, note: !ci2 ? colourNote : si >= 0.9 ? "matches" : "does not look like the reference's opening card" });
     const [ro, co] = await Promise.all([frameAt(ffmpeg, reference, settle, true, path.join(work, "ref-outro.png"), content), frameAt(ffmpeg, candidate, settle, true, path.join(work, "cut-outro.png"), content)]);
     const so = await ssim(ffmpeg, ro, co);
-    const co2 = shift(ro, co) <= 8;
-    out.push({ label: "closing card", score: so, pass: so >= 0.9 && co2, note: !co2 ? "a different colour from the reference's closing card" : so >= 0.9 ? "matches" : "does not look like the reference's closing card" });
+    const co2 = await groundOk(co, ro, true, "cut-outro");
+    out.push({ label: "closing card", score: so, pass: so >= 0.9 && co2, note: !co2 ? colourNote : so >= 0.9 ? "matches" : "does not look like the reference's closing card" });
   }
   // The frame around the app — the matte and where the app sits — compared on
   // a body frame with the app's own contents blanked: only the border counts.
   const mid = async (v: string, name: string) => {
     const { execFile } = await import("node:child_process");
     const dur = await new Promise<number>((done) => execFile(ffmpeg, ["-hide_banner", "-i", v], (_e, _o, se) => { const m = /Duration:\s*(\d+):(\d+):([\d.]+)/.exec(String(se)); done(m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 10); }));
+    const run = (args: string[]) => new Promise<void>((done) => execFile(ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", ...args], () => done()));
+    const raw = path.join(work, `${name}-body-raw.png`);
+    await run(["-ss", String(dur / 2), "-i", v, "-frames:v", "1", raw]);
+    // Geometry, not colour: a map of where the matte is. Compared as pictures,
+    // a near-black matte and a green one differ in brightness alone, and a
+    // product whose north star is another product's video failed for being
+    // its own colour. Each frame is keyed on its own matte (read off its top
+    // edge, which the inset never reaches); the colour is checked separately,
+    // against the brand.
+    const edge = path.join(work, `${name}-edge.png`);
+    await run(["-i", raw, "-vf", "crop=iw*0.4:ih*0.03:iw*0.3:0", edge]);
+    const key = meanRgb(edge).map((n) => n.toString(16).padStart(2, "0")).join("");
     const f = path.join(work, `${name}-body.png`);
-    await new Promise<void>((done) => execFile(ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(dur / 2), "-i", v, "-frames:v", "1", "-vf", "drawbox=x=iw*0.08:y=ih*0.09:w=iw*0.84:h=ih*0.82:color=black:t=fill", f], () => done()));
+    await run(["-i", raw, "-vf", `format=rgba,colorkey=0x${key}:0.12:0,alphaextract,drawbox=x=iw*0.08:y=ih*0.09:w=iw*0.84:h=ih*0.82:color=white:t=fill`, f]);
     return f;
   };
   const [rb, cb] = await Promise.all([mid(reference, "ref"), mid(candidate, "cut")]);
   const sb = await ssim(ffmpeg, rb, cb);
-  out.push({ label: "frame around the app", score: sb, pass: sb >= 0.95, note: sb >= 0.95 ? "same matte, same inset" : "the matte or the inset differs from the reference" });
+  // The matte's colour is the brand's, checked on a strip of the body frame's
+  // top edge — the inset never reaches it.
+  let matteOk = true;
+  if (r.theme) {
+    const { execFile } = await import("node:child_process");
+    const dur = await new Promise<number>((done) => execFile(ffmpeg, ["-hide_banner", "-i", candidate], (_e, _o, se) => { const m = /Duration:\s*(\d+):(\d+):([\d.]+)/.exec(String(se)); done(m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 10); }));
+    const strip = await frameAt(ffmpeg, candidate, dur / 2, false, path.join(work, "cut-matte.png"), "crop=iw*0.4:ih*0.03:iw*0.3:0");
+    matteOk = Math.hypot(...[0, 1, 2].map((i) => meanRgb(strip)[i] - hexToRgb(r.theme!.background)[i])) <= 12;
+  }
+  const framePass = sb >= 0.95 && matteOk;
+  out.push({ label: "frame around the app", score: sb, pass: framePass, note: !matteOk ? `the frame is not the brand's ${r.theme!.background}` : sb >= 0.95 ? "same matte, same inset" : "the matte or the inset differs from the reference" });
   return out;
 }
 
