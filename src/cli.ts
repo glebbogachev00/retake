@@ -56,7 +56,7 @@ import { SHAPES, describePlan, describeTrials, planDestroy, refuseToRun, tryCand
 import { addGolden, assertGoldenApproval, goldenSetStatus, inspectMedia, loadGoldenLedger, scoreGolden, verifyGoldenIntegrity, writeGoldenScorecard, type GoldenRubric } from "./ext/golden.js";
 import { PKG_ROOT, VERSION, entry } from "./paths.js";
 import { bringUp, loadEnvSpec, stopEnvironment, verify as verifyEnv } from "./recording-env.js";
-import { STYLES, VOICES, RoutineSchema, applyToManifest, compare as compareRoutine, compareToReference, preflightAgainst, learnFrom, measure as measureOutputs, readPlan, describe as describeRoutine, pick as pickRoutine, readRoutines, runRoutine, routineFile, starter, voiceId, writeRoutines, type Routine } from "./routine.js";
+import { STYLES, VOICES, RoutineSchema, applyToManifest, environmentFor, compare as compareRoutine, compareToReference, preflightAgainst, learnFrom, measure as measureOutputs, readPlan, describe as describeRoutine, pick as pickRoutine, readRoutines, runRoutine, routineFile, starter, voiceId, writeRoutines, type Routine } from "./routine.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
 import { captureMatchesTake, notePreviewCapture, notePreviewRender, readPreviewReceipt } from "./preview.js";
 
@@ -1202,7 +1202,15 @@ const DEMOS_DIR = () => path.resolve("demos");
    Six takes in one session were lost to the environment, not the recorder.
    Declaring it is cheap; discovering it from a frame is not. */
 
-const ENV_FILE = () => path.resolve("demos", "environment.yaml");
+/** The environment to use: the one named, else the routine in use's own,
+    else the workspace's demos/environment.yaml. */
+function envFile(named?: string): string {
+  if (named) return path.resolve(named);
+  const file = readRoutines(DEMOS_DIR());
+  const found = environmentFor(DEMOS_DIR(), file ? file.routines[file.use] : undefined);
+  if (!found) throw new Error("no environment declared — `retake routine setup <app-url>` drafts one, or write demos/environment.yaml");
+  return found;
+}
 
 const env = program
   .command("env")
@@ -1210,11 +1218,11 @@ const env = program
 
 env
   .command("up", { isDefault: true })
-  .option("-f, --file <path>", "environment file", "demos/environment.yaml")
+  .option("-f, --file <path>", "environment file (default: the routine's, else demos/environment.yaml)")
   .option("--no-verify", "skip the proof (you will find out from a frame instead)")
   .description("start it clean and check it is what it claims")
-  .action(async (opts: { file: string; verify: boolean }) => {
-    const spec = loadEnvSpec(path.resolve(opts.file));
+  .action(async (opts: { file?: string; verify: boolean }) => {
+    const spec = loadEnvSpec(envFile(opts.file));
     say(`environment ${spec.name}`);
     const up = await bringUp(spec, say);
     say(`  up at ${up.url}${up.restarted ? " (restarted)" : ""}`);
@@ -1226,10 +1234,10 @@ env
 
 env
   .command("check")
-  .option("-f, --file <path>", "environment file", "demos/environment.yaml")
+  .option("-f, --file <path>", "environment file (default: the routine's, else demos/environment.yaml)")
   .description("prove the running app without restarting it")
-  .action(async (opts: { file: string }) => {
-    const spec = loadEnvSpec(path.resolve(opts.file));
+  .action(async (opts: { file?: string }) => {
+    const spec = loadEnvSpec(envFile(opts.file));
     say(`environment ${spec.name}`);
     const v = await verifyEnv(spec, say);
     if (!v.ok) process.exitCode = 2;
@@ -1238,10 +1246,10 @@ env
 
 env
   .command("down")
-  .option("-f, --file <path>", "environment file", "demos/environment.yaml")
+  .option("-f, --file <path>", "environment file (default: the routine's, else demos/environment.yaml)")
   .description("stop it")
-  .action((opts: { file: string }) => {
-    const spec = loadEnvSpec(path.resolve(opts.file));
+  .action((opts: { file?: string }) => {
+    const spec = loadEnvSpec(envFile(opts.file));
     stopEnvironment(spec, say);
     say("stopped.");
   });
@@ -1291,6 +1299,26 @@ routine
     say(describeRoutine(which, r));
     const others = Object.keys(file.routines).filter((n) => n !== which);
     if (others.length) say(`\n  also here: ${others.join(", ")} — \`retake routine use <name>\` to switch.`);
+  });
+
+routine
+  .command("setup")
+  .argument("<app-url>", "where the product runs — your local dev URL, or a live site")
+  .option("--like <video>", "one video you love: the cards, colours and shape every recording will match")
+  .option("--as <name>", "the routine's name (default: the project's)")
+  .option("--dir <project>", "the project folder, when the app is not running yet")
+  .description("a new product in one step: an isolated app, a north star, branded cards, a brief")
+  .action(async (url: string, opts: { like?: string; as?: string; dir?: string }) => {
+    const { setupProduct } = await import("./setup.js");
+    say(`setting up ${url}${opts.like ? ` to look like ${path.basename(opts.like)}` : ""}\n`);
+    const { name, routine: r, wrote, next } = await setupProduct({ url, like: opts.like, name: opts.as, dir: opts.dir, demosDir: DEMOS_DIR(), log: say });
+    say(`\n${describeRoutine(name, r)}`);
+    say(`\nwrote ${wrote.join(", ")}`);
+    if (next.length) {
+      say(`\nstill yours to decide:`);
+      for (const n of next) say(`  · ${n}`);
+    }
+    say(`\nnext: write the first demo — an agent calls the \`routine\` tool and reads the brief first.`);
   });
 
 routine
@@ -1362,7 +1390,7 @@ routine
 
 routine
   .command("set")
-  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | note")
+  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | intro | outro | logo | note (intro/outro: \"Title | subtitle\")")
   .argument("<value>")
   .option("--as <name>", "which routine to change (default: the one in use)")
   .description("change the standard once, for every recording that follows")
@@ -1410,8 +1438,23 @@ routine
       }
       case "note":
         next.note = value; break;
+      case "outro":
+      case "intro": {
+        const k = key.toLowerCase() as "outro" | "intro";
+        if (/^(none|off)$/i.test(value)) { delete next[k]; break; }
+        const [title, subtitle] = value.split(/\s*\|\s*/);
+        next[k] = { title, ...(subtitle ? { subtitle } : {}) };
+        if (k === "outro") next.cards = true;
+        break;
+      }
+      case "logo": {
+        if (!fs.existsSync(path.resolve(value))) throw new Error(`no such file: ${value}`);
+        if (!/\.(svg|png|jpe?g)$/i.test(value)) throw new Error("the card draws an SVG, PNG or JPEG mark");
+        if (!current.card) throw new Error("this routine has no card style yet — `retake routine setup` reads one off a north star");
+        next.card = { ...current.card, logo: value }; break;
+      }
       default:
-        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, note`);
+        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, intro, outro, logo, note`);
     }
 
     const parsed = RoutineSchema.safeParse(next);
@@ -1492,7 +1535,22 @@ routine
     const [facts] = await measureOutputs([{ name: path.basename(target), file: target }], ffmpegBin());
     say(`reference  ${target}`);
     say(`           ${facts.width}×${facts.height} · ${facts.fps}fps · ${facts.seconds.toFixed(1)}s · ${facts.hasAudio ? `narrated${facts.lufs !== null ? ` at ${facts.lufs.toFixed(1)} LUFS` : ""}` : "silent"}`);
-    const gaps = preflightAgainst(facts, r);
+    let next: Routine = video ? { ...r, reference: target } : r;
+    // A routine with no look of its own takes the north star's — the cards,
+    // their colours, the inset — rather than Retake's.
+    if (video && !r.card && !r.theme) {
+      const { grabFrame, readLook } = await import("./setup.js");
+      const ff = ffmpegBin();
+      const look = readLook({
+        intro: grabFrame(ff, target, Math.min(0.8, facts.seconds / 4)),
+        body: grabFrame(ff, target, facts.seconds / 2),
+        outro: grabFrame(ff, target, Math.max(0, facts.seconds - 0.8)),
+      }, facts);
+      next = { ...next, style: look.style, cards: look.cards, mode: look.cards ? "launch" : r.mode, ...(look.theme ? { theme: look.theme } : {}), ...(look.card ? { card: { ...look.card, weight: 560, ornament: "none" as const } } : {}) };
+      say(`taken from it: ${look.style}${look.cards ? `, cards on ${look.card!.background} in ${look.card!.ink}` : ", no cards"}${look.theme ? `, inset on ${look.theme.background}` : ""}`);
+      for (const n of look.notes) say(`  · ${n}`);
+    }
+    const gaps = preflightAgainst(facts, next);
     if (gaps.length) {
       say(`\n✗ before you record — routine ${name} cannot reproduce this yet:`);
       for (const g of gaps) say(`  · ${g}`);
@@ -1500,7 +1558,7 @@ routine
       say(`\n✓ nothing in the routine contradicts the reference. \`retake routine check\` scores each cut against it.`);
     }
     if (video) {
-      file.routines[name] = { ...r, reference: target };
+      file.routines[name] = next;
       writeRoutines(DEMOS_DIR(), file);
       say(`\nsaved as routine ${name}'s reference.`);
     }
@@ -1584,7 +1642,7 @@ routine
       only: opts.only?.split(",").map((s) => s.trim()).filter(Boolean),
       limit,
       previewOnly: opts.preview,
-      envFile: opts.env ? path.resolve(opts.env) : fs.existsSync(ENV_FILE()) ? ENV_FILE() : undefined,
+      envFile: opts.env ? path.resolve(opts.env) : environmentFor(DEMOS_DIR(), r),
       log: say,
     });
     if (results.some((x) => x.status === "failed")) process.exitCode = 2;

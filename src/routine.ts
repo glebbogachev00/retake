@@ -145,6 +145,10 @@ export const RoutineSchema = z.object({
       — its environment, seed, selectors and pitfalls. The \`routine\` tool
       returns it, so the first thing an agent sees is everything it needs. */
   brief: z.string().optional(),
+  /** The app this routine records, declared: how it starts, what it must and
+      must not show. Absent: demos/environment.yaml, if there is one. Two
+      products in one workspace each need their own. */
+  environment: z.string().optional(),
   /** How the cards look: the brand's ground, ink, mark and typeface. Without
       it they are Retake's own card, which is not what a north-star card is. */
   card: z.object({
@@ -163,6 +167,13 @@ const FileSchema = z.object({
   routines: z.record(z.string(), RoutineSchema),
 });
 export type RoutineFile = { use: string; routines: Record<string, Routine> };
+
+/** The environment a routine records against: its own, or the workspace's. */
+export function environmentFor(demosDir: string, r?: Routine): string | undefined {
+  if (r?.environment) return path.resolve(r.environment.replace(/^~/, os.homedir()));
+  const shared = path.join(demosDir, "environment.yaml");
+  return fs.existsSync(shared) ? shared : undefined;
+}
 
 export function routineFile(demosDir: string): string {
   return path.join(demosDir, "routine.json");
@@ -338,6 +349,7 @@ export function describe(name: string, r: Routine): string {
     ...(r.reference ? [`  north star ${r.reference}`] : []),
     ...(r.deliver ? [`  delivers  ${r.deliver} — only videos that match the north star`] : []),
     ...(r.brief ? [`  brief      ${r.brief} — read it before writing anything for this product`] : []),
+    ...(r.environment ? [`  app        ${r.environment} — \`retake env up\` starts it isolated and proves it`] : []),
     ``,
     `  Every demo recorded by this routine comes out this way. Change it here,`,
     `  never per video: \`retake routine set <key> <value>\`.`,

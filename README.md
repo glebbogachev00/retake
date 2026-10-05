@@ -169,6 +169,20 @@ A routine is the other half: format, captions, voice, speaking rate and music
 held as data and **stamped onto the manifest after it is drafted**. The model
 writes the story; the routine writes the settings; they never argue.
 
+**A new product in one step.** Point at the app and at one video you love:
+
+```bash
+retake routine setup http://localhost:3000/app --like "~/Videos/the-one-we-liked.mp4"
+```
+
+Everything that can be read off those two arrives decided: the shape, the
+cards and their colours from the video; the brand's mark from the page; an
+environment that starts your app on its own port with every token in `.env`
+blanked (names only — a value never leaves its file); and a brief with the
+selectors on the first screen, so the next agent starts informed. What cannot
+be read — the closing card's words, the one real thing that must never appear —
+is asked once, at the end. A live site works too; there is just nothing to start.
+
 **Start by reading, not by guessing.** The first routine used to be Retake's
 defaults — an opinion wearing the clothes of a standard, which `apply` then
 stamps over everything with confidence. Read it off demos you already shipped:

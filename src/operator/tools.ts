@@ -33,7 +33,7 @@ import { report as describeCalibration, type Stability } from "../ext/calibrate.
 import { checkFlags, flag, unflag } from "../ext/flags.js";
 import { describeOrphans, findOrphans, healOrphans } from "../ext/heal.js";
 import { describePlan, describeTrials, planDestroy, refuseToRun, tryCandidates } from "../ext/destroy.js";
-import { applyToManifest, describe as describeRoutine, manifestFor, pick as pickRoutine } from "../routine.js";
+import { applyToManifest, describe as describeRoutine, environmentFor, manifestFor, pick as pickRoutine, readRoutines } from "../routine.js";
 import { scout, draftManifest, suggestIdeas, pickProvider, loadDotenv, type Edit } from "../describe.js";
 import { digest } from "../digest.js";
 import { startApp as reallyStartApp, listeningPorts as ports, waitForUrl as waitUrl } from "../appserver.js";
@@ -269,8 +269,9 @@ server.registerTool("env", {
   inputSchema: {},
   annotations: READ_ONLY,
 }, async () => {
-  const file = path.join(DEMOS, "environment.yaml");
-  if (!fs.existsSync(file)) return text("No demos/environment.yaml — nothing is declared, so nothing can be proven. Whatever is on screen is what gets recorded.");
+  const routines = readRoutines(DEMOS);
+  const file = environmentFor(DEMOS, routines ? routines.routines[routines.use] : undefined);
+  if (!file || !fs.existsSync(file)) return text("No demos/environment.yaml — nothing is declared, so nothing can be proven. Whatever is on screen is what gets recorded.");
   try {
     const { loadEnvSpec, verify } = await import("../recording-env.js");
     const spec = loadEnvSpec(file);

@@ -93,6 +93,9 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
   // The same geometry the recorder uses — see pageGeometry(). A dry run that
   // lays the app out differently from the take proves nothing about the take.
   const geo = pageGeometry(q);
+  // Responsive apps lay out for the page width, not the video width. Say it,
+  // so a tablet layout at scale 2 is a known fact, not a surprise selector.
+  if (q.scale !== 1) log(`dry: the app sees a ${geo.viewport.width}×${geo.viewport.height} page, drawn at ${q.scale}× into ${geo.video.width}×${geo.video.height}`);
   const browser = await chromium.launch({ headless: true, ...(geo.args.length ? { args: geo.args } : {}) });
   // Start from the same session run would. Without this, a demo behind a
   // login was dry-run logged OUT — every selector "missing", or worse, a
