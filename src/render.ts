@@ -23,7 +23,7 @@ import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { renderCard, renderCalloutOverlay, renderPoster, renderTitledCover } from "./cards.js";
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
 import { holdFilterArgs, holdTake, planHolds } from "./hold.js";
-import { DEFAULT_VOICE, audioSeconds, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
+import { DEFAULT_VOICE, audioSeconds, cueGroups, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
 import { chromium } from "playwright";
 import { expandEnv, resolve, Manifest, type Resolved, type Step } from "./manifest.js";
 import type { Take, TimelineEntry } from "./record.js";
@@ -205,6 +205,49 @@ export function scenes(take: Take): TimelineEntry[] {
 }
 
 /** Caption windows in *trimmed* video time. */
+/** Where the one performance is cut into its paragraphs: in the middle of
+    the pause between lines, never on a sentence timing (which sits against
+    the next word). Shared by the voice and the captions that follow it. */
+function narrationBounds(clip: string, spans: { start: number; end: number }[], n: number): number[] {
+  const total = audioSeconds(ffmpegBin(), clip);
+  const quiet = silences(ffmpegBin(), clip);
+  const inner = cutPoints(spans.slice(0, n - 1).map((sp, k) => (sp.end + spans[k + 1].start) / 2), quiet, total);
+  const firstSpeech = quiet.length && quiet[0].start <= 0.02 ? quiet[0].end : 0;
+  return [Math.max(0, firstSpeech - 0.05), ...inner, total];
+}
+
+/** The line starts as its scene starts: the scene marker sits BEFORE the
+    action it describes, so the voice leads the cursor. */
+const NARRATION_LEAD = 0.1;
+
+/**
+ * Captions that follow the voice: each spoken sentence on screen while it is
+ * said, timed from the same performance and the same cuts the voice uses.
+ * A narrated video captioned with its scene labels shows one thing and says
+ * another; this shows what is said.
+ */
+function spokenCaptions(m: Manifest, take: Take, outDir: string): { text: string; from: number; to: number }[] | null {
+  const vo = m.voiceover;
+  if (!vo || vo === true || !vo.script || vo.align !== "scenes") return null;
+  const paragraphs = vo.script.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const wins = narrationWindows(take);
+  const clip = path.join(outDir, ".vo-0.mp3");
+  const cues = synthesizeWithCues(paragraphs.join("\n\n"), vo.voice, clip, vo.ratePercent);
+  const spans = cuesPerParagraph(paragraphs, cues);
+  const groups = cueGroups(paragraphs, cues);
+  const n = Math.min(spans.length, wins.length);
+  if (!n) return null;
+  const bounds = narrationBounds(clip, spans, n);
+  const out: { text: string; from: number; to: number }[] = [];
+  for (let k = 0; k < n; k++) {
+    const at = wins[k].from + NARRATION_LEAD - bounds[k];
+    for (const c of groups[k]) out.push({ text: c.text.trim(), from: Math.max(0, at + c.start), to: at + c.end + 0.2 });
+  }
+  // A caption leaves when the next one arrives, never overlapping it.
+  for (let i = 0; i + 1 < out.length; i++) out[i].to = Math.min(out[i].to, out[i + 1].from);
+  return out.filter((c) => c.text && c.to > c.from);
+}
+
 /** Where each paragraph of aligned narration may run: from its narrated
     scene to the NEXT NARRATED one, across any uncaptioned scenes between.
     Ending it at the next scene of any kind froze a home page for 5s so its
@@ -669,9 +712,16 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
   filters.push("setsar=1", "format=yuv420p");
 
   const captionFilters: string[] = [];
-  if (q.captions && layout !== "none") {
+  // Full bleed has no band to put words in: they sit over the picture, low,
+  // on a dark box, like subtitles.
+  if (q.captions && layout === "none") {
+    capY = "h-th-h*0.07";
+    capColor = q.captions.color ?? "white";
+    capBox = ":box=1:boxcolor=black@0.55:boxborderw=18";
+  }
+  if (q.captions) {
     const maxChars = maxCharsFor(W, capSize);
-    for (const w of captionWindows(take)) {
+    for (const w of spokenCaptions(m, take, outDir) ?? captionWindows(take)) {
       captionFilters.push(
         `drawtext=${font}text='${esc(wrap(w.text, maxChars))}':fontsize=${capSize}:fontcolor=${capColor}${capBox}:line_spacing=${Math.round(capSize * 0.25)}` +
           `:x=(w-tw)/2:y=${capY}:enable='between(t,${w.from.toFixed(2)},${w.to.toFixed(2)})'`,
@@ -790,15 +840,9 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
         // Cut in the middle of the pause between lines — never at the sentence
         // timing itself, which sits against the next word — and fade each line
         // in and out so it arrives and leaves like speech, not like a switch.
-        const total = audioSeconds(ffmpegBin(), clip);
-        const quiet = silences(ffmpegBin(), clip);
-        const inner = cutPoints(spans.slice(0, n - 1).map((sp, k) => (sp.end + spans[k + 1].start) / 2), quiet, total);
-        const firstSpeech = quiet.length && quiet[0].start <= 0.02 ? quiet[0].end : 0;
-        const bounds = [Math.max(0, firstSpeech - 0.05), ...inner, total];
+        const bounds = narrationBounds(clip, spans, n);
         const FADE_IN = 0.03, FADE_OUT = 0.12;
-        // The line starts as its scene starts: the scene marker sits BEFORE
-        // the action it describes, so the voice leads the cursor.
-        const LEAD = 0.1;
+        const LEAD = NARRATION_LEAD;
         for (let k = 0; k < n; k++) {
           const a = bounds[k], b = bounds[k + 1], len = b - a;
           const at = wins[k].from + introShift + LEAD;

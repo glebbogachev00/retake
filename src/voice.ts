@@ -107,6 +107,21 @@ export function synthesizeWithCues(text: string, voice: string, out: string, rat
 }
 
 /** Which consecutive sentences make up each paragraph of the script. */
+/** The sentence cues each paragraph is made of, matched by word count. */
+export function cueGroups(paragraphs: string[], cues: Cue[]): Cue[][] {
+  const words = (s: string) => s.toLowerCase().match(/[a-z0-9']+/g) ?? [];
+  const out: Cue[][] = [];
+  let c = 0;
+  for (const p of paragraphs) {
+    const need = words(p).length;
+    const group: Cue[] = [];
+    let have = 0;
+    while (c < cues.length && have < need) { have += words(cues[c].text).length; group.push(cues[c]); c++; }
+    out.push(group);
+  }
+  return out;
+}
+
 export function cuesPerParagraph(paragraphs: string[], cues: Cue[]): { start: number; end: number }[] {
   const words = (s: string) => s.toLowerCase().match(/[a-z0-9']+/g) ?? [];
   const out: { start: number; end: number }[] = [];
