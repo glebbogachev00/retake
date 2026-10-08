@@ -1092,6 +1092,21 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
   }
   if (!master) fs.rmSync(path.join(outDir, "master.mp4"), { force: true });
 
+  // The poster is also the file's own cover image — what Finder, QuickTime
+  // and most players show before anyone presses play. Last, so nothing above
+  // ever reads the picture instead of the video.
+  if (m.outputs.cover && thumbnail && fs.existsSync(thumbnail) && fs.existsSync(mp4)) {
+    const covered = path.join(outDir, ".covered.mp4");
+    try {
+      ff(["-i", mp4, "-i", thumbnail, "-map", "0", "-map", "1", "-c", "copy", "-c:v:1", "mjpeg", "-disposition:v:1", "attached_pic", "-movflags", "+faststart", covered], log);
+      fs.renameSync(covered, mp4);
+      mark("cover image");
+    } catch (e) {
+      fs.rmSync(covered, { force: true });
+      log?.(`cover image: not embedded (${(e as Error).message.split("\n")[0]}) — the video itself is fine`);
+    }
+  }
+
   const p = probe(mp4);
   const facts: Facts = {
     width: p.width, height: p.height, fps: p.fps || fps, duration: p.duration,
