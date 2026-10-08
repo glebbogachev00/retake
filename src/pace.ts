@@ -43,10 +43,16 @@ const CLICK_TAIL = 0.45;
 
 /** Plan the warp: 1× everywhere except the tail of each long app-wait and the
     middle of each long typing run. */
-export function planIdle(take: Take, keepSeconds: number): WarpSegment[] {
+export function planIdle(take: Take, keepSeconds: number, pauses: (number | undefined)[] = []): WarpSegment[] {
   const segs: WarpSegment[] = [];
-  for (const e of take.timeline) {
-    if (!e.ok) continue;
+  for (const entry of take.timeline) {
+    if (!entry.ok) continue;
+    // A step's own `pauseAfter` is the author's pacing, like a `wait`: never
+    // compressed. It is the tail of the step's timeline entry, so cut it off
+    // before judging what is the app's. A green-flag click held 14.8s for an
+    // animation to play came out 1.5s long.
+    const pause = Math.max(0, pauses[entry.index] ?? 0);
+    const e = { ...entry, end: Math.max(entry.start, entry.end - pause) };
     const dur = e.end - e.start;
     if (WAITING.has(e.action)) {
       if (dur < keepSeconds + SLACK) continue;

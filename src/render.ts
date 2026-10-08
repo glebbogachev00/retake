@@ -20,7 +20,7 @@ import YAML from "yaml";
 import { execFile, execFileSync, spawnSync } from "node:child_process";
 import { capSecondsFor, restorePrevious } from "./record.js";
 import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
-import { renderCard, renderCalloutOverlay, renderTitledCover } from "./cards.js";
+import { renderCard, renderCalloutOverlay, renderPoster, renderTitledCover } from "./cards.js";
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
 import { holdFilterArgs, holdTake, planHolds } from "./hold.js";
 import { DEFAULT_VOICE, audioSeconds, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
@@ -82,7 +82,7 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro, m.card, m.card ? [m.card.logo, m.card.font].map((f) => { try { const st = fs.statSync(path.resolve(f ?? "")); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } }) : null], idle: m.compressIdle, vo: m.voiceover, music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: m.outputs.thumbnail, stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro, m.card, m.card ? [m.card.logo, m.card.font].map((f) => { try { const st = fs.statSync(path.resolve(f ?? "")); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } }) : null], idle: m.compressIdle, vo: m.voiceover, music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: [m.outputs.thumbnail, m.outputs.cover], stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -193,6 +193,11 @@ export function nudgeScenes(take: Take, m?: Manifest): { take: Take; applied: { 
     timeline[i].end = to + span;
   }
   return { take: { ...take, timeline }, applied };
+}
+
+/** Each step's declared pause, in seconds, by its index in the timeline. */
+function pausesOf(m: Manifest | undefined): (number | undefined)[] {
+  return (m?.steps ?? []).map((st) => { const p = (st as { pauseAfter?: number }).pauseAfter; return p ? p / 1000 : undefined; });
 }
 
 export function scenes(take: Take): TimelineEntry[] {
@@ -540,7 +545,7 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
   let idleLines: string[] = [];
   if (m.compressIdle && take.video) {
     const keep = m.compressIdle === true ? 1.5 : m.compressIdle.keepSeconds;
-    const segs = planIdle(take, keep);
+    const segs = planIdle(take, keep, pausesOf(m));
     if (segs.length) {
       const paced = path.join(outDir, ".paced.mp4");
       ff([...warpFilterArgs(take.video, segs, take.duration, paced).slice(0, -1), "-r", String(resolve(m).fps), "-c:v", "libx264", "-crf", "14", "-preset", "veryfast", "-pix_fmt", "yuv420p", paced], log);
@@ -869,6 +874,17 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
     log?.("thumbnail: keeping the poster you chose (delete .poster to go back to the scene default)");
   } else if (m.outputs.thumbnail) {
     const sc = scenes(take);
+    const end = take.duration - take.trimBefore;
+    // A scene's last moment, like its -end still: one second in, the click
+    // that starts it has not landed — a poster for the control room showed
+    // the guide page it was leaving.
+    const settled = (pick: TimelineEntry | undefined) => {
+      if (!pick) return Math.max(0, end - 0.5);
+      const i = sc.indexOf(pick);
+      const from = pick.start - take.trimBefore;
+      const next = sc[i + 1] ? sc[i + 1].start - take.trimBefore : end;
+      return Math.min(Math.max(from + 0.4, next - 0.6), Math.max(0, end - 0.2));
+    };
     let at: number;
     if (typeof m.outputs.thumbnail === "object") {
       const want = m.outputs.thumbnail.scene;
@@ -876,11 +892,10 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
       // On a take that stopped early the chosen scene may never have happened;
       // fall back to the last scene that did rather than failing the render.
       const pick = s ?? sc.at(-1);
-      at = pick ? pick.start - take.trimBefore + 1.0 : Math.max(0, take.duration - take.trimBefore - 0.5);
+      at = settled(pick);
       if (!s) log?.(`thumbnail: scene "${want}" never happened — using ${pick ? `"${pick.label}"` : "the end"}`);
     } else {
-      const last = sc.at(-1);
-      at = last ? last.start - take.trimBefore + 1.0 : Math.max(0, take.duration - take.trimBefore - 0.5);
+      at = settled(sc.at(-1));
     }
     thumbnail = path.join(outDir, "thumbnail.png");
     // Clamp inside the file. The default is "last scene + 1s", which lands
@@ -898,6 +913,17 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
     // A launch cut gets a second candidate: this frame with the title on it.
     // The person picks between them (or any still, or their own file) in the
     // window; both are just PNGs, and the poster is whichever is thumbnail.png.
+    if (m.outputs.cover && thumbnail) {
+      // The designed poster takes the thumbnail's place; the bare frame stays.
+      const d = probe(mp4);
+      const frame = path.join(outDir, "frame.png");
+      fs.copyFileSync(thumbnail, frame);
+      await renderPoster(frame, thumbnail, m.outputs.cover, d.width, d.height, {
+        matte: m.card?.ink ?? q.theme.background, ground: m.card?.background ?? q.theme.ink,
+        logo: m.card?.logo ? path.resolve(m.card.logo) : undefined, font: m.card?.font ? path.resolve(m.card.font) : undefined,
+      });
+      mark("poster");
+    }
     if (m.mode === "launch" && m.intro && thumbnail) {
       const d = probe(mp4);
       await renderTitledCover(ffmpegBin(), thumbnail, path.join(outDir, "cover-titled.png"), m.intro, d.width, d.height, q.theme);
@@ -1129,12 +1155,14 @@ export function check(outDir: string, m?: Manifest): Check {
   // viewer never sees — and a check that cries wolf teaches you to skim
   // past the one that matters.
   const idleSegs = m?.compressIdle && take.video
-    ? planIdle(take, m.compressIdle === true ? 1.5 : m.compressIdle.keepSeconds)
+    ? planIdle(take, m.compressIdle === true ? 1.5 : m.compressIdle.keepSeconds, pausesOf(m))
     : [];
   const shownTake = idleSegs.length ? warpTake(take, idleSegs) : take;
   const stalled = (shownTake.timeline || [])
     .filter((t) => t.action !== "wait" && t.action !== "scene" && t.action !== "stub")
-    .map((t) => ({ ...t, took: t.end - t.start }))
+    // A pause the manifest asked for is pacing, not a stall: a green-flag
+    // click held for 14.8s while an animation played was failed as "frozen".
+    .map((t) => ({ ...t, took: t.end - t.start - ((m?.steps[t.index] as { pauseAfter?: number } | undefined)?.pauseAfter ?? 0) / 1000 }))
     .filter((t) => t.took > PATIENCE)
     .sort((a, b) => b.took - a.took);
   // Did the app break, and was it still broken when the video stopped? A

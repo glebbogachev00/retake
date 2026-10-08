@@ -250,6 +250,52 @@ export async function renderTitledCover(
   }
 }
 
+/**
+ * A poster that stops a scroll: the strongest frame of the video, the
+ * brand's colour sweeping in from the left behind big type, the product's
+ * mark on a light badge so it reads on any frame, and who made it. The bare
+ * frame (the old thumbnail) is honest but anonymous; this one says whose it
+ * is and what it is before anyone presses play.
+ */
+export async function renderPoster(
+  frame: string, out: string,
+  spec: { title: string; subtitle?: string; kicker?: string },
+  w: number, h: number,
+  brand: { matte: string; ground: string; logo?: string; font?: string },
+): Promise<string> {
+  const b64 = fs.readFileSync(frame).toString("base64");
+  const rgb = (hex: string) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim()); const n = m ? parseInt(m[1], 16) : 0; return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`; };
+  const m = rgb(brand.matte);
+  const face = brand.font ? `@font-face{font-family:poster;src:url(${dataUri(brand.font)})}` : "";
+  const family = `${brand.font ? "poster," : ""}-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif`;
+  const titleSize = Math.round(h * (spec.title.length > 16 ? 0.088 : 0.108));
+  const html = `<!doctype html><meta charset="utf-8"><style>${face}
+  html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden;background:${brand.matte};font-family:${family}}
+  .shot{position:absolute;inset:0;background:url(data:image/png;base64,${b64}) center/cover no-repeat;transform:scale(1.04);transform-origin:70% 50%}
+  .veil{position:absolute;inset:0;background:linear-gradient(90deg,rgba(${m},.97) 0%,rgba(${m},.93) 30%,rgba(${m},.6) 50%,rgba(${m},0) 70%)}
+  .foot{position:absolute;left:0;right:0;bottom:0;height:${Math.round(h * 0.22)}px;background:linear-gradient(0deg,rgba(${m},.55),rgba(${m},0))}
+  .badge{position:absolute;left:${Math.round(w * 0.055)}px;top:${Math.round(h * 0.075)}px;background:${brand.ground};border-radius:${Math.round(h * 0.022)}px;padding:${Math.round(h * 0.018)}px ${Math.round(h * 0.028)}px;box-shadow:0 ${Math.round(h * 0.01)}px ${Math.round(h * 0.035)}px rgba(0,0,0,.28)}
+  .badge img{display:block;height:${Math.round(h * 0.052)}px;width:auto}
+  .txt{position:absolute;left:${Math.round(w * 0.055)}px;bottom:${Math.round(h * 0.12)}px;width:${Math.round(w * 0.46)}px;color:${brand.ground}}
+  .k{display:inline-block;font-size:${Math.round(h * 0.024)}px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;padding:${Math.round(h * 0.009)}px ${Math.round(h * 0.016)}px;border:${Math.max(2, Math.round(h * 0.0022))}px solid rgba(255,255,255,.55);border-radius:999px;margin-bottom:${Math.round(h * 0.03)}px}
+  .t{font-size:${titleSize}px;line-height:.98;font-weight:800;letter-spacing:-.035em;margin:0;text-shadow:0 ${Math.round(h * 0.004)}px ${Math.round(h * 0.02)}px rgba(0,0,0,.25)}
+  .bar{width:${Math.round(h * 0.085)}px;height:${Math.max(4, Math.round(h * 0.008))}px;border-radius:99px;background:${brand.ground};opacity:.9;margin:${Math.round(h * 0.034)}px 0 ${Math.round(h * 0.026)}px}
+  .s{font-size:${Math.round(h * 0.04)}px;font-weight:600;margin:0;opacity:.95}
+  </style>
+  <div class="shot"></div><div class="veil"></div><div class="foot"></div>
+  ${brand.logo ? `<div class="badge"><img src="${dataUri(brand.logo)}" alt=""></div>` : ""}
+  <div class="txt">${spec.kicker ? `<div class="k">${escapeHtml(spec.kicker)}</div>` : ""}<p class="t">${escapeHtml(spec.title)}</p>${spec.subtitle ? `<div class="bar"></div><p class="s">${escapeHtml(spec.subtitle)}</p>` : ""}</div>`;
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: w, height: h } });
+    await page.setContent(html, { waitUntil: "load" });
+    await page.screenshot({ path: out });
+    return out;
+  } finally {
+    await browser.close();
+  }
+}
+
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** @internal The card template, exported so test/cards.test.ts can prove the
