@@ -238,10 +238,24 @@ function spokenCaptions(m: Manifest, take: Take, outDir: string): { text: string
   const n = Math.min(spans.length, wins.length);
   if (!n) return null;
   const bounds = narrationBounds(clip, spans, n);
+  // A translation shows its own sentences over the spoken ones: one for one
+  // when they line up, else spread over the paragraph by length.
+  const shown = vo.captionScript?.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const sentences = (p: string) => p.split(/(?<=[.!?…])\s+/).map((x) => x.trim()).filter(Boolean);
   const out: { text: string; from: number; to: number }[] = [];
   for (let k = 0; k < n; k++) {
     const at = wins[k].from + NARRATION_LEAD - bounds[k];
-    for (const c of groups[k]) out.push({ text: c.text.trim(), from: Math.max(0, at + c.start), to: at + c.end + 0.2 });
+    const group = groups[k];
+    if (!group.length) continue;
+    const own = shown?.[k] ? sentences(shown[k]) : null;
+    if (!own || own.length === group.length) {
+      group.forEach((c, i) => out.push({ text: (own ? own[i] : c.text).trim(), from: Math.max(0, at + c.start), to: at + c.end + 0.2 }));
+    } else {
+      const from = group[0].start, to = group[group.length - 1].end;
+      const total = own.reduce((s, x) => s + x.length, 0) || 1;
+      let t = from;
+      for (const line of own) { const len = (to - from) * line.length / total; out.push({ text: line, from: Math.max(0, at + t), to: at + t + len }); t += len; }
+    }
   }
   // A caption leaves when the next one arrives, never overlapping it.
   for (let i = 0; i + 1 < out.length; i++) out[i].to = Math.min(out[i].to, out[i + 1].from);
@@ -976,7 +990,13 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
       // The designed poster takes the thumbnail's place; the bare frame stays.
       const d = probe(mp4);
       const frame = path.join(outDir, "frame.png");
+      // The picture under the words: from the recording before captions are
+      // burned in — a poster never carries a subtitle. Same moment, same size.
       fs.copyFileSync(thumbnail, frame);
+      if (q.captions && take.video && fs.existsSync(take.video)) {
+        try { ff(["-ss", (seek - cardShift + take.trimBefore).toFixed(2), "-i", take.video, "-frames:v", "1", "-vf", `scale=${d.width}:${d.height}:force_original_aspect_ratio=increase,crop=${d.width}:${d.height}`, "-y", frame], log); }
+        catch { fs.copyFileSync(thumbnail, frame); }
+      }
       await renderPoster(frame, thumbnail, m.outputs.cover, d.width, d.height, {
         matte: m.card?.ink ?? q.theme.background, ground: m.card?.background ?? q.theme.ink,
         logo: m.card?.logo ? path.resolve(m.card.logo) : undefined, font: m.card?.font ? path.resolve(m.card.font) : undefined,

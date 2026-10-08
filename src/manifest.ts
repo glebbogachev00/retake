@@ -337,6 +337,10 @@ const ManifestShape = z.object({
             narrated scene. A paragraph that runs into the next scene is
             reported, never sped up: shorten the line. */
         align: z.enum(["start", "scenes"]).default("start"),
+        /** The words the captions show, when they are not the words spoken —
+            a translation. Same paragraphs, and ideally the same sentences, as
+            `script`: each line is shown while its spoken sentence is said. */
+        captionScript: z.string().optional(),
         fragments: z.boolean().default(false),
         /** A person has heard this voice and this script and approved them.
             Synthesis succeeding is not approval. */
@@ -486,6 +490,10 @@ export const Manifest = ManifestShape.superRefine((m, ctx) => {
   if (m.voiceover && m.voiceover !== true && m.voiceover.align === "scenes" && m.voiceover.script) {
     const paragraphs = m.voiceover.script.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean).length;
     const narrated = m.steps.filter((st) => st.action === "scene" && !!st.caption?.trim()).length;
+    if (m.voiceover.captionScript) {
+      const shown = m.voiceover.captionScript.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean).length;
+      if (shown !== paragraphs) ctx.addIssue({ code: "custom", path: ["voiceover", "captionScript"], message: `the caption script has ${shown} paragraph${shown === 1 ? "" : "s"}, the spoken script ${paragraphs} — they are shown paragraph for paragraph` });
+    }
     if (paragraphs !== narrated) {
       ctx.addIssue({ code: "custom", path: ["voiceover", "script"], message: `aligned narration needs one paragraph per narrated scene, in order — the script has ${paragraphs}, the demo has ${narrated}. Separate paragraphs with a blank line.` });
     }
