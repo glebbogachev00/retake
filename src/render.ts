@@ -116,6 +116,11 @@ export function probe(file: string): { duration: number; width: number; height: 
 }
 export const videoDuration = (file: string) => probe(file).duration;
 
+/** Whether a file carries a sound track at all. */
+export function probeHasAudio(file: string): boolean {
+  return /Stream #\d+:\d+.*: Audio:/.test(String(spawnSync(ffmpegBin(), ["-hide_banner", "-i", file], { encoding: "utf8" }).stderr));
+}
+
 /** ffmpeg drawtext needs a few characters escaped inside the filter graph. */
 function esc(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/'/g, "\u2019").replace(/:/g, "\\:").replace(/%/g, "\\%").replace(/,/g, "\\,");
@@ -936,6 +941,8 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
   // Cards are spliced onto the front of the deliverable, so every timestamp
   // in the take is that much later in the file frames are pulled from.
   const cardShift = !o.scene && m.intro ? m.intro.ms / 1000 : 0;
+  // How much later the recording starts once the video opens on its poster.
+  let openShift = 0;
 
   // --- 4. thumbnail ----------------------------------------------------------
   // A person's chosen poster (the window's "Use this frame" / a still / an
@@ -1002,6 +1009,26 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
         logo: m.card?.logo ? path.resolve(m.card.logo) : undefined, font: m.card?.font ? path.resolve(m.card.font) : undefined,
       });
       mark("poster");
+      // The video opens on its poster, then fades into the recording; the
+      // voice and captions move with the recording. Where a video is posted,
+      // its first frame is its thumbnail.
+      if (m.outputs.cover.open > 0) {
+        const T = m.outputs.cover.open / 1000, X = Math.min(0.4, T / 2);
+        const fpsOut = d.fps || resolve(m).fps;
+        const opened = path.join(outDir, ".opened.mp4");
+        const hasAudio = probeHasAudio(mp4);
+        ff([
+          "-loop", "1", "-framerate", String(fpsOut), "-t", T.toFixed(3), "-i", thumbnail, "-i", mp4,
+          "-filter_complex",
+          `[0:v]scale=${d.width}:${d.height},setsar=1,format=yuv420p,fps=${fpsOut}[p];[1:v]fps=${fpsOut},setsar=1,format=yuv420p[b];[p][b]xfade=transition=fade:duration=${X.toFixed(3)}:offset=${(T - X).toFixed(3)}[v]` +
+            (hasAudio ? `;[1:a]adelay=${Math.round((T - X) * 1000)}:all=1[a]` : ""),
+          "-map", "[v]", ...(hasAudio ? ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"] : ["-an"]),
+          "-c:v", "libx264", "-crf", "17", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y", opened,
+        ], log);
+        fs.renameSync(opened, mp4);
+        openShift = T - X;
+        log?.(`poster: the video opens on it for ${T.toFixed(1)}s`);
+      }
     }
     if (m.mode === "launch" && m.intro && thumbnail) {
       const d = probe(mp4);
@@ -1036,12 +1063,12 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
       const at = Math.min(Math.max(0, from + Math.max(0.8, (next - from) / 2)), Math.max(0, end - 0.2));
       const base = `${String(i + 1).padStart(2, "0")}-${(sce.label || "scene").replace(/[^a-z0-9-]+/gi, "-")}`;
       const file = path.join(dir, `${base}.png`);
-      shots.push({ at: at + cardShift, file });
+      shots.push({ at: at + cardShift + openShift, file });
       stills.push(file);
       // And the scene's last moment: the caption names what the scene
       // achieves, and that is usually on screen at the end, not the middle.
       const atEnd = Math.min(Math.max(from + 0.4, next - 0.6), Math.max(0, end - 0.2));
-      if (atEnd - at > 0.5) { const fe = path.join(dir, `${base}-end.png`); shots.push({ at: atEnd + cardShift, file: fe }); stills.push(fe); }
+      if (atEnd - at > 0.5) { const fe = path.join(dir, `${base}-end.png`); shots.push({ at: atEnd + cardShift + openShift, file: fe }); stills.push(fe); }
     }
     if (shots.length) {
       // Each still is its own ffmpeg with an INPUT-side seek: `-ss` before

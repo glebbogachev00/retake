@@ -475,6 +475,10 @@ const ManifestShape = z.object({
         subtitle: z.string().max(70).optional(),
         /** A short line above the title — "Student project". */
         kicker: z.string().max(32).optional(),
+        /** How long the video opens on the poster before fading into the
+            recording, in ms. A poster beside the file is never seen once the
+            video is posted; the first frame is. 0 keeps it beside only. */
+        open: z.number().int().min(0).max(5000).default(1500),
       }).strict().optional(),
       /** One PNG per scene, into outputs/<name>/stills/. */
       stills: z.boolean().default(true),
