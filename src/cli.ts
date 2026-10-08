@@ -1390,7 +1390,7 @@ routine
 
 routine
   .command("set")
-  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | intro | outro | logo | brand | deliver | note (intro/outro: \"Title | subtitle\")")
+  .argument("<key>", "style | voice | rate | music | captions | mode | theme | typing | compressIdle | intro | outro | logo | brand | scale | deliver | note (intro/outro: \"Title | subtitle\")")
   .argument("<value>")
   .option("--as <name>", "which routine to change (default: the one in use)")
   .description("change the standard once, for every recording that follows")
@@ -1447,6 +1447,10 @@ routine
         if (k === "outro") next.cards = true;
         break;
       }
+      case "scale":
+        if (/^(style|default|none)$/i.test(value)) { delete next.scale; break; }
+        if (!/^\d+(\.\d+)?$/.test(value)) throw new Error("scale is how large the page is drawn, 1 to 3 — e.g. 1.5 (a 1280×720 page in a 1080p video)");
+        next.scale = Number(value); break;
       case "brand": {
         // The product's colours in one place: ground (the card), matte (the
         // frame, and the card's words), orb (the corner circles).
@@ -1470,7 +1474,7 @@ routine
         next.card = { ...current.card, logo: value }; break;
       }
       default:
-        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, intro, outro, logo, brand, deliver, note`);
+        throw new Error(`no such setting "${key}" — style, voice, rate, music, captions, mode, theme, typing, compressIdle, intro, outro, logo, brand, scale, deliver, note`);
     }
 
     const parsed = RoutineSchema.safeParse(next);

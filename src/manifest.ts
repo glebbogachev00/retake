@@ -460,6 +460,16 @@ const ManifestShape = z.object({
       gif: z.union([z.boolean(), z.object({ width: z.number().int().optional(), fps: z.number().int().optional() })]).default(false),
       /** Which scene's frame becomes the thumbnail; default = last scene. */
       thumbnail: z.union([z.boolean(), z.object({ scene: z.string() })]).default(true),
+      /** A designed poster instead of a bare frame: the thumbnail scene's
+          frame in the brand's colour, with the title, a credit line and the
+          product's mark. It becomes thumbnail.png; the bare frame is kept as
+          frame.png. */
+      cover: z.object({
+        title: z.string().min(1).max(48),
+        subtitle: z.string().max(70).optional(),
+        /** A short line above the title — "Student project". */
+        kicker: z.string().max(32).optional(),
+      }).strict().optional(),
       /** One PNG per scene, into outputs/<name>/stills/. */
       stills: z.boolean().default(true),
     })

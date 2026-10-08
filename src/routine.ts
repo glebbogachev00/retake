@@ -147,6 +147,11 @@ export const RoutineSchema = z.object({
       — its environment, seed, selectors and pitfalls. The \`routine\` tool
       returns it, so the first thing an agent sees is everything it needs. */
   brief: z.string().optional(),
+  /** How large the page is drawn, overriding the style's. A product's
+      density decides it, not a video's: Scratch's editor needs a 1024×640
+      page and a style at 2× gives it 960×540, where it falls apart. Set once
+      per product, so every take of it still comes out the same size. */
+  scale: z.number().min(1).max(3).optional(),
   /** The app this routine records, declared: how it starts, what it must and
       must not show. Absent: demos/environment.yaml, if there is one. Two
       products in one workspace each need their own. */
@@ -267,7 +272,7 @@ export function applyToManifest(file: string, r: Routine): Stamped {
   const style = STYLES[r.style];
   set("preset", style.preset);
   set("layout", style.layout);
-  set("scale", style.scale);
+  set("scale", r.scale ?? style.scale);
   set("captions", r.captions);
   set("mode", r.mode);
   set("typing", r.typing);
@@ -290,11 +295,13 @@ export function applyToManifest(file: string, r: Routine): Stamped {
     }
     if (r.outro) set("outro", { ...r.outro, ms: r.cardMs });
     set("cardTransition", { style: r.cardTransition, ms: 450 });
-    if (r.card) set("card", { ...r.card });
     // Cards are launch furniture; `mode: demo` warns about them, correctly.
     if (doc.getIn(["mode"], false) !== "launch") { doc.setIn(["mode"], "launch"); changed.push("mode: launch (cards belong to a launch cut)"); }
   }
   if (r.theme) set("theme", { background: r.theme.background, ink: r.theme.ink });
+  // The brand travels with every video, cards or not: the poster carries the
+  // same mark and colours as the cards would.
+  if (r.card) set("card", { ...r.card });
   // A pinned viewport silently beats the preset; `scale` is the style's, so a
   // hand-set one is dropped by being overwritten above rather than removed.
   drop("viewport");
@@ -339,7 +346,7 @@ export function describe(name: string, r: Routine): string {
   return [
     `routine ${name}${r.note ? ` — ${r.note}` : ""}`,
     ``,
-    `  style      ${s.label.toLowerCase()} · ${s.preset} · ${s.layout === "card" ? "inset on your colour" : s.layout === "none" ? "full bleed" : "caption band"}`,
+    `  style      ${s.label.toLowerCase()} · ${s.preset} · ${s.layout === "card" ? "inset on your colour" : s.layout === "none" ? "full bleed" : "caption band"}${r.scale ? ` · page drawn at ${r.scale}×` : ""}`,
     `  captions   ${r.captions ? "on" : "off"}`,
     `  voice      ${voice}`,
     `  music      ${r.music === false ? "none" : r.music}`,
@@ -599,6 +606,9 @@ export async function runRoutine(o: RoutineRun): Promise<ItemResult[]> {
       const dest = path.join(o.routine.deliver.replace(/^~/, os.homedir()), `${item.name}.mp4`);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.copyFileSync(mp4, dest);
+      // The poster goes with it, under the same name — the two are posted together.
+      const poster = path.join(out, "thumbnail.png");
+      if (fs.existsSync(poster)) fs.copyFileSync(poster, dest.replace(/\.mp4$/, ".png"));
       o.log(`   ✓ delivered → ${dest}`);
     }
     finish(item, "final");

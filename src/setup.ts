@@ -519,7 +519,7 @@ export async function readBrand(url: string, outBase: string, o: { shot?: boolea
   const { chromium } = await import("playwright");
   const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage({ colorScheme: "light", viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2 });
+    const page = await browser.newPage({ colorScheme: "light", viewport: { width: 1280, height: 720 }, deviceScaleFactor: 4 });
     await page.goto(url, { waitUntil: "networkidle", timeout: 25_000 }).catch(() => undefined);
     const colours = (await page.evaluate(COLOR_FACTS).catch(() => null)) as Omit<BrandFacts, "mark"> | null;
     const title = await page.title().catch(() => "");
