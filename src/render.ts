@@ -205,6 +205,21 @@ export function scenes(take: Take): TimelineEntry[] {
 }
 
 /** Caption windows in *trimmed* video time. */
+/** Where each paragraph of aligned narration may run: from its narrated
+    scene to the NEXT NARRATED one, across any uncaptioned scenes between.
+    Ending it at the next scene of any kind froze a home page for 5s so its
+    line could finish while the tour's next, wordless scene waited. */
+export function narrationWindows(take: Take): { text: string; from: number; to: number }[] {
+  const sc = scenes(take);
+  const end = take.duration - take.trimBefore;
+  const said = sc.filter((s) => !!s.caption);
+  return said.map((s, i) => ({
+    text: s.caption!,
+    from: Math.max(0, s.start - take.trimBefore),
+    to: said[i + 1] ? said[i + 1].start - take.trimBefore : end,
+  }));
+}
+
 export function captionWindows(take: Take): { text: string; from: number; to: number }[] {
   const sc = scenes(take);
   const end = take.duration - take.trimBefore;
@@ -564,7 +579,7 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
     const cues = synthesizeWithCues(paragraphs.join("\n\n"), vo.voice, probe, vo.ratePercent);
     const spans = cuesPerParagraph(paragraphs, cues);
     fs.rmSync(probe, { force: true });
-    const wins = captionWindows(take).map((w) => ({ from: w.from + take.trimBefore, to: w.to + take.trimBefore }));
+    const wins = narrationWindows(take).map((w) => ({ from: w.from + take.trimBefore, to: w.to + take.trimBefore }));
     const holds = planHolds(wins, spans.map((sp) => sp.end - sp.start), 0.1);
     if (holds.length) {
       const held = path.join(outDir, ".held.mp4");
@@ -766,7 +781,7 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
         // like a person; cut at the sentence timings so each line lands when
         // its action happens. Over-long lines are reported, never sped up.
         const paragraphs = spec.script.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-        const wins = captionWindows(take);
+        const wins = narrationWindows(take);
         const clip = path.join(outDir, ".vo-0.mp3");
         const cues = synthesizeWithCues(paragraphs.join("\n\n"), spec.voice, clip, spec.ratePercent);
         const spans = cuesPerParagraph(paragraphs, cues);
@@ -1105,8 +1120,19 @@ export async function inBatches<T>(items: T[], limit: number, fn: (item: T) => P
   }));
 }
 
-export function isNonVisualResourceError(text: string): boolean {
-  return /^Failed to load resource:\s+net::ERR_(?:CONNECTION_CLOSED|CONNECTION_RESET|ABORTED|BLOCKED_BY_CLIENT)\b/.test(text.trim());
+/** Ad, analytics and tracking hosts. Their requests fail all the time on
+    public sites (a gd.games take logged SSL failures from its ad partners) and
+    never put anything the viewer sees on screen. */
+const BACKGROUND_HOSTS = /(^|\.)(doubleclick\.net|googlesyndication\.com|googleadservices\.com|google-analytics\.com|googletagmanager\.com|adnxs\.com|criteo\.(com|net)|rubiconproject\.com|pubmatic\.com|indexww\.com|4dex\.io|the-ozone-project\.com|amazon-adsystem\.com|adsrvr\.org|casalemedia\.com|openx\.net|taboola\.com|outbrain\.com|scorecardresearch\.com|quantserve\.com|hotjar\.com|segment\.(io|com)|facebook\.net|clarity\.ms|sentry\.io|id5-sync\.com|lijit\.com|sharethrough\.com|smartadserver\.com|teads\.tv|yieldmo\.com|bidswitch\.net|vntsm\.io|venatusmedia\.com)$/i;
+/** Paths that only report: analytics, beacons, tracking pixels. */
+const BACKGROUND_PATHS = /\/(analytics|collect|beacon|pixel|track|telemetry|usync|user_sync)(\/|\?|$|\.)/i;
+
+export function isNonVisualResourceError(text: string, url?: string): boolean {
+  if (/^Failed to load resource:\s+net::ERR_(?:CONNECTION_CLOSED|CONNECTION_RESET|ABORTED|BLOCKED_BY_CLIENT)\b/.test(text.trim())) return true;
+  if (url && /^Failed to load resource:/.test(text.trim())) {
+    try { const u = new URL(url); return BACKGROUND_HOSTS.test(u.hostname) || BACKGROUND_PATHS.test(u.pathname); } catch { return false; }
+  }
+  return false;
 }
 
 export function check(outDir: string, m?: Manifest): Check {
@@ -1170,7 +1196,7 @@ export function check(outDir: string, m?: Manifest): Check {
   // frame-by-frame review found it. An error in the last stretch is the
   // shape that matters — earlier ones are usually recovered from.
   const errs = take.pageErrors ?? [];
-  const actionableErrors = errs.filter((e) => !isNonVisualResourceError(e.text));
+  const actionableErrors = errs.filter((e) => !isNonVisualResourceError(e.text, e.url));
   const ignoredResourceErrors = errs.length - actionableErrors.length;
   if (actionableErrors.length) {
     const endsAt = take.duration;

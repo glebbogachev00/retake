@@ -136,7 +136,9 @@ export const Step = z.discriminatedUnion("action", [
     y: z.number().optional(),
     duration: z.number().positive().optional(),
   }).strict(),
-  Base.extend({ action: z.literal("keyboard"), key: z.string().min(1) }).strict(),
+  /** A key: tapped, or held for `holdMs` — how a game is walked, not typed.
+      Movement in a game is a key held down; a tap moves nothing. */
+  Base.extend({ action: z.literal("keyboard"), key: z.string().min(1), holdMs: z.number().int().min(1).max(10_000).optional() }).strict(),
   Base.extend({ action: z.literal("navigate"), url: z.string().min(1) }).strict(),
   Base.extend({ action: z.literal("screenshot"), name: z.string().optional() }).strict(),
   /** Attach local files to a file input (no OS dialog is involved). */

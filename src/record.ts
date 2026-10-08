@@ -49,7 +49,7 @@ export type TimelineEntry = {
 export type Take = {
   /** Errors the APP reported while the camera was rolling, with timestamps.
       An error still on screen at the end means the video ends broken. */
-  pageErrors?: { at: number; text: string }[];
+  pageErrors?: { at: number; text: string; url?: string }[];
   video?: string;
   screenshots: string[];
   timeline: TimelineEntry[];
@@ -653,7 +653,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   const ctx: StepCtx = { outDir: opts.outDir, manifestDir: opts.manifestDir, downloads: [], stub: armStub };
   let ok = true;
   let partial: string | undefined;
-  const pageErrors: { at: number; text: string }[] = [];
+  const pageErrors: { at: number; text: string; url?: string }[] = [];
   let video: string | undefined;
   let screenshots: string[] = [];
   let layoutWidth: number | undefined;
@@ -680,7 +680,9 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // `check` can ask the only question that matters: was it still broken
     // when the video stopped?
     page.on("pageerror", (e) => pageErrors.push({ at: sec(Date.now() - t0), text: String(e.message ?? e).slice(0, 300) }));
-    page.on("console", (msg) => { if (msg.type() === "error") pageErrors.push({ at: sec(Date.now() - t0), text: msg.text().slice(0, 300) }); });
+    // A failed load names the resource that failed, so `check` can tell an ad
+    // server's hiccup from the app's own picture going missing.
+    page.on("console", (msg) => { if (msg.type() === "error") pageErrors.push({ at: sec(Date.now() - t0), text: msg.text().slice(0, 300), ...(msg.location()?.url ? { url: msg.location().url.slice(0, 300) } : {}) }); });
 
     // --- setup phase (still inside the video; trimmed later by `trimBefore`) ---
     // Document first; idle only if it comes quickly. Busy public sites never
@@ -1407,7 +1409,14 @@ export async function runStep(rec: PageRecorder, page: Page, step: Step, m: Mani
       await rec.zoom({ selector: step.selector, scale: step.scale, x: step.x, y: step.y, duration: step.duration });
       break;
     case "keyboard":
-      await rec.keyboard(step.key);
+      if (step.holdMs) {
+        // Held, not tapped: the page sees one keydown, then keyup holdMs later.
+        await page.keyboard.down(step.key);
+        await page.waitForTimeout(step.holdMs);
+        await page.keyboard.up(step.key);
+      } else {
+        await rec.keyboard(step.key);
+      }
       break;
     case "navigate":
       await rec.navigate(expandEnv(step.url));
@@ -1499,7 +1508,7 @@ export function describe(step: Step): string {
     case "zoom":
       return `zoom ${step.scale}x ${step.selector ?? ""}`.trim();
     case "keyboard":
-      return `key ${step.key}`;
+      return step.holdMs ? `hold ${step.key} ${step.holdMs}ms` : `key ${step.key}`;
     case "navigate":
       return `go ${step.url}`;
     case "screenshot":

@@ -269,7 +269,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
         }
         case "evaluate": await page.evaluate(step.script); break;
         case "stub": await arm({ url: step.url, method: step.method, status: step.status ?? 200, json: step.json, from: step.from, contentType: "application/json; charset=utf-8" }); break;
-        case "keyboard": await page.keyboard.press(step.key); break;
+        case "keyboard": await page.keyboard.press(step.key, step.holdMs ? { delay: Math.min(step.holdMs, 400) } : undefined); break;
         // Pacing does not matter in a dry run, so step waits are compressed.
         // Setup waits are not: they are usually giving a navigation or a login
         // time to finish, and cutting them changes the outcome.
