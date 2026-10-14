@@ -6,6 +6,10 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Retake keeps its browser in its own folder unless this is set; pinning it
+    # here keeps the install, the cache below and the tests on one folder.
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

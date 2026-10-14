@@ -7,6 +7,7 @@
  *   - `scene`    step markers that become burned-in captions + the proof log
  *   - `outputs`  which artifacts to produce and how
  */
+import { LOGIN_FIELDS, readLogin, siteOf } from "./logins.js";
 import fs from "node:fs";
 import { createHmac } from "node:crypto";
 import path from "node:path";
@@ -707,10 +708,20 @@ export function warnings(m: Manifest): string[] {
   return w;
 }
 
-/** `${VAR}` substitution against process.env, like testreel. */
+/** The site whose saved login ${LOGIN_*} reads: the demo being recorded.
+    Set once at the start of a take or a dry run. */
+let loginSite: string | null = null;
+export function signInAt(url: string | null): void { loginSite = url ? siteOf(url) : null; }
+
+/** `${VAR}` substitution against process.env, like testreel — and
+    ${LOGIN_USER} / ${LOGIN_PASSWORD} / ${LOGIN_TOTP} from the login saved
+    for the demo's site, when .env does not set them itself. */
 export function expandEnv(s: string): string {
   return s.replace(/\$\{(TOTP:)?([A-Z0-9_]+)\}/g, (_, fn: string | undefined, k: string) => {
-    const v = process.env[k];
+    let v = process.env[k];
+    const field = LOGIN_FIELDS[k as keyof typeof LOGIN_FIELDS];
+    if ((v === undefined || v.trim() === "") && field && loginSite) v = readLogin(loginSite, field);
+    if ((v === undefined || v.trim() === "") && field) throw new Error(`manifest references \${${k}} but no login is saved${loginSite ? ` for ${loginSite}` : ""} — save one in the Retake window, or run \`retake login ${loginSite ?? "<url>"}\` (a demo account, never a real one)`);
     // `APP_USER=` with nothing after it is the template, not a value — a blank
     // login that "succeeds" is worse than a loud stop.
     if (v === undefined || v.trim() === "") throw new Error(`manifest references \${${k}} but it is not set — add it to .env (a demo account, never a real one)`);

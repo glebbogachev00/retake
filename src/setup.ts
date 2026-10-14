@@ -9,6 +9,7 @@
    colour that is not clearly there stays Retake's, a logo that is not an
    image the card can draw stays out. */
 
+import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -516,8 +517,7 @@ export function svgColours(svg: string): string[] {
     sit on a 1080p card (a 16px favicon is not a mark) — and the colours the
     page is painted with. One visit to the page for both. */
 export async function readBrand(url: string, outBase: string, o: { shot?: boolean } = {}): Promise<{ logo: string | null; facts: BrandFacts | null; title: string; shot?: Buffer; phone?: Buffer }> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchChromium({ headless: true });
   try {
     const page = await browser.newPage({ colorScheme: "light", viewport: { width: 1280, height: 720 }, deviceScaleFactor: 4 });
     await page.goto(url, { waitUntil: "networkidle", timeout: 25_000 }).catch(() => undefined);

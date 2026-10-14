@@ -10,6 +10,7 @@
  * If a template's animation is ever extended past what it declares in
  * `__still`, this fails.
  */
+import "../src/browser-home.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

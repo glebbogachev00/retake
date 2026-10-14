@@ -350,36 +350,33 @@ Think in the publishing format, not the browser window.
 
 Most real demos start on the far side of a sign-in. You never put a password anywhere an agent can read it.
 
-**With the window open** (`retake ui`): when the agent sees the app needs a login, a small form appears in the window asking for a demo account by name — `APP_USER`, `APP_PASSWORD`. You type them; they are written to one local file, the workspace `.env` (readable by you only), and never sent to the agent, to any server, or to anyone. The agent learns only that the names are set.
+**Save a login once per site.** When the agent sees the app needs a login, a small form appears in the window: *Sign in to app.example.com*. Type a demo account's username and password; Retake keeps them in your Mac's Keychain (the system keyring on Linux), never in a file the agent can read, and never sends them anywhere. Every demo of that site — in any workspace — signs in with it from then on, and signs in again by itself whenever its session runs out.
 
-**Without the window:** the agent relays one line — run this in your workspace and type the values (hidden):
+**Without the window**, the agent relays one line — run it and type the login (hidden):
 
 ```bash
-retake secret APP_USER APP_PASSWORD
+retake login https://app.example.com
 ```
+
+`retake logins` lists the sites with a saved login (names only); `retake login <url> --forget` removes one.
 
 **Then:** the login runs *before the camera* and is trimmed off the front; the video starts signed in. The session is saved to `.auth/`, so later takes skip the login. A wrong password stops the take instead of recording a logged-out one.
 
-**Two-factor.** Authenticator apps: add the enrolment secret as `APP_TOTP_SECRET` and the manifest uses `${TOTP:APP_TOTP_SECRET}` — Retake computes the current code when it fills the field. SMS codes, SSO, captchas — anything only a person can do:
-
-```bash
-retake signin demos/<name>.yaml
-```
-
-opens a real browser; you log in by hand, press Enter, and Retake keeps the session (not the password) for every later take.
+**Two-factor.** If the site asks for an authenticator code, choose *It asks for a code* and paste the setup key; Retake computes the current code when it fills the field. SMS codes, SSO, captchas — anything only a person can do — choose *Sign in by hand*: a real browser opens, you sign in, press Done, and Retake keeps the session (not the password). From a terminal: `retake login <url> --by-hand`.
 
 What the agent writes:
 
 ```yaml
 auth:
-  storageState: .auth/myapp.json   # session saved here, reused until stale
-  maxAgeHours: 8
+  storageState: ../.auth/app.example.com.json   # the site's session, reused until stale
   setup:
-    - { action: fill, selector: "#user", text: "${APP_USER}" }
-    - { action: fill, selector: "#password", text: "${APP_PASSWORD}", secret: true }
-    - { action: fill, selector: "#code", text: "${TOTP:APP_TOTP_SECRET}", secret: true }   # only if asked
+    - { action: fill, selector: "#user", text: "${LOGIN_USER}", secret: true }
+    - { action: fill, selector: "#password", text: "${LOGIN_PASSWORD}", secret: true }
+    - { action: fill, selector: "#code", text: "${TOTP:LOGIN_TOTP}", secret: true }   # only if asked
     - { action: click, selector: "button[type=submit]" }
 ```
+
+A value of the same name in the workspace `.env` still wins, so demos written with `${APP_USER}`-style names and `retake secret` keep working.
 
 `secret: true` keeps a value out of the terminal, the window and the proof log — but not out of the video, which is why `validate` warns when a secret step is in `steps` rather than `auth.setup`. Use a demo account: the output is a video you may publish. Apps that keep their session in IndexedDB (Firebase) can't be restored from a saved session; put the login under plain `setup` instead.
 

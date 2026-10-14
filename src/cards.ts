@@ -9,10 +9,10 @@
  *
  * All of it is render-time: change a title, `retake render`, seconds.
  */
+import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
 
 type Theme = { background: string; ink: string };
@@ -154,7 +154,7 @@ function calloutHtml(w: number, h: number, box: { x: number; y: number; width: n
  * `__still` gets every frame shot — the slow path is the safe default. */
 async function renderFrames(html: string, w: number, h: number, ms: number, fps: number, transparent: boolean): Promise<string> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "retake-frames-"));
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     await page.setContent(html, { waitUntil: "load" });
@@ -239,7 +239,7 @@ export async function renderTitledCover(
   </style>
   <div class="shot"></div><div class="veil"></div>
   <div class="txt"><p class="t">${escapeHtml(spec.title)}</p><div class="r"></div>${spec.subtitle ? `<p class="s">${escapeHtml(spec.subtitle)}</p>` : ""}</div>`;
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     await page.setContent(html, { waitUntil: "load" });
@@ -285,7 +285,7 @@ export async function renderPoster(
   <div class="shot"></div><div class="veil"></div><div class="foot"></div>
   ${brand.logo ? `<div class="badge"><img src="${dataUri(brand.logo)}" alt=""></div>` : ""}
   <div class="txt">${spec.kicker ? `<div class="k">${escapeHtml(spec.kicker)}</div>` : ""}<p class="t">${escapeHtml(spec.title)}</p>${spec.subtitle ? `<div class="bar"></div><p class="s">${escapeHtml(spec.subtitle)}</p>` : ""}</div>`;
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     await page.setContent(html, { waitUntil: "load" });

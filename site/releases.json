@@ -2,6 +2,21 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.14.0",
+      "date": "2026-10-14",
+      "headline": "Videos that look like one you love, in your own colours, and logins you save once",
+      "notes": [
+        "Routines. Show Retake one video you love and your app, and every video after it matches: the same shape, voice, pace, captions and title cards. A routine can run on a schedule, so fresh videos are waiting when you come back.",
+        "Your colours, not ours. Paste your site and Retake reads your brand off it — the colours your buttons and logo use — then shows you what your videos will look like before anything is recorded.",
+        "Every video gets a designed poster. The video opens on it, the poster is saved next to it, and it is the file's own cover image, so it shows up wherever the file goes.",
+        "Captions that follow the voice, line by line, and can be translated — the same video with captions in another language.",
+        "Logins are saved once per site, in your Mac's Keychain, and every demo of that site signs in with them — in any folder, again by itself whenever the session runs out. Sites with SSO or a code from your phone: choose Sign in by hand, sign in once in a real browser window, and Retake keeps that session.",
+        "Retake now keeps its own browser, so another project on your computer can no longer delete it, and if it is ever missing Retake downloads it again by itself. No more being told to run an install command.",
+        "Questions your agent asks you in the window now reach you. Before, a question could wait forever without an answer getting back, and the agent could think the window was closed when it was open.",
+        "If your agent's sign-in runs out, the window shows one button to sign in again, and the draft starts over by itself."
+      ]
+    },
+    {
       "version": "0.13.2",
       "date": "2026-08-28",
       "headline": "The thing that measures the checks was not measuring",

@@ -32,6 +32,7 @@
  * Run from a clone, the `.ts` source goes through tsx (`npm run retake -- …`);
  * installed from npm, dist/cli.js is the `retake` binary. Same file.
  */
+import { BROWSERS, chromiumPath, installChromium, launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -716,25 +717,6 @@ function initWorkspace(root: string, say: (l: string) => void): void {
   say(made.length ? `✓ workspace ${root}: ${made.join(", ")}` : `✓ workspace ${root}: already set up`);
 }
 
-function chromiumPath(): string | null {
-  try {
-    const require = createRequire(import.meta.url);
-    const { chromium } = require("playwright") as typeof import("playwright");
-    const p = chromium.executablePath();
-    return fs.existsSync(p) ? p : null;
-  } catch { return null; }
-}
-
-/** `npx playwright install chromium`, but from wherever playwright actually is. */
-function installChromium(say: (l: string) => void): boolean {
-  const require = createRequire(import.meta.url);
-  let cli: string;
-  try { cli = path.join(path.dirname(require.resolve("playwright/package.json")), "cli.js"); } catch { return false; }
-  say("… downloading Chromium for Playwright (one time, ~150 MB)");
-  const r = spawnSync(process.execPath, [cli, "install", "chromium"], { stdio: "inherit" });
-  return r.status === 0;
-}
-
 /** The MCP server entry, for every config format. */
 function mcpServer(ui: string): { command: string; args: string[]; env: Record<string, string> } {
   const tools = entry("operator/tools");
@@ -762,7 +744,7 @@ program
     const major = Number(process.versions.node.split(".")[0]);
     (major >= 20 ? ok : no)(`node ${process.versions.node}${major < 20 ? " — Retake needs 20 or newer" : ""}`);
     const chrome = chromiumPath();
-    chrome ? ok(`chromium ${chrome}`) : no("chromium not downloaded — run: retake install  (or: npx playwright install chromium)");
+    chrome ? ok(`chromium ${chrome}`) : say(`· chromium not downloaded yet — the first recording fetches it into ${BROWSERS} (or run: retake install)`);
     try {
       const require = createRequire(import.meta.url);
       const ff = require("ffmpeg-static") as string;
@@ -856,7 +838,9 @@ function promptLine(label: string, hide: boolean): Promise<string> {
       const i = stdinBuf.search(/\r|\n/);
       if (i < 0) return false;
       const line = stdinBuf.slice(0, i);
-      stdinBuf = stdinBuf.slice(i + 1).replace(/^\n/, "");
+      // A \r\n ends one line, not two — but a \n after a \n is an empty answer.
+      const crlf = stdinBuf[i] === "\r" && stdinBuf[i + 1] === "\n";
+      stdinBuf = stdinBuf.slice(i + (crlf ? 2 : 1));
       finish(line);
       return true;
     };
@@ -895,6 +879,48 @@ program
   });
 
 program
+  .command("login")
+  .description("save a site's demo login once — kept in your Keychain — so every demo of that site signs in by itself")
+  .argument("<url>", "the app, e.g. https://app.example.com or localhost:3000")
+  .option("--by-hand", "sign in yourself in a real window instead (codes, SSO, captcha) and keep that session")
+  .option("--forget", "remove the saved login for this site")
+  .action(async (url: string, o: { byHand?: boolean; forget?: boolean }) => {
+    const { forgetLogin, loginNames, loginStoreName, saveLogin, siteOf } = await import("./logins.js");
+    const full = /^[a-z]+:\/\//i.test(url) ? url : (/^(localhost|127\.|\[::1\])/.test(url) ? "http://" : "https://") + url;
+    const site = siteOf(full);
+    if (o.forget) { say(forgetLogin(site) ? `✓ forgot the login for ${site}` : `no login was saved for ${site}`); return; }
+    if (o.byHand) {
+      const { openHandSignIn, sessionPathFor } = await import("./signin.js");
+      const statePath = sessionPathFor(process.cwd(), full);
+      const w = await openHandSignIn(full, statePath);
+      say(`A browser is open at ${full}. Sign in there — codes, SSO, captcha, whatever it asks.`);
+      say("When you can see the signed-in app, come back here and press Enter. (Nothing is recorded.)");
+      await promptLine("", false);
+      const kept = await w.keep();
+      say(`✓ session kept → ${path.relative(process.cwd(), kept)}. Demos of ${site} start signed in with auth.storageState: ${path.relative(process.cwd(), kept)}`);
+      process.exit(0);
+    }
+    say(`Saving a login for ${site} in ${loginStoreName()}. It is never sent anywhere and never shown to an agent. Use a demo account: the result is a video.`);
+    const user = await promptLine("Username or email: ", false);
+    const password = await promptLine("Password (hidden): ", true);
+    const totp = await promptLine("Authenticator key, if it asks for a code (Enter to skip, hidden): ", true);
+    if (!user || !password) { say("nothing saved — it needs both a username and a password"); process.exitCode = 1; return; }
+    saveLogin(site, { user, password, totp: totp || undefined });
+    say(`✓ saved. Every demo of ${site} signs in with ${loginNames(site).join(", ")} inside auth.setup (secret: true).`);
+  });
+
+program
+  .command("logins")
+  .description("the sites with a saved login (names only, never the values)")
+  .action(async () => {
+    const { listLogins, loginStoreName } = await import("./logins.js");
+    const all = listLogins();
+    if (!all.length) { say("no saved logins — `retake login <url>` saves one"); return; }
+    for (const l of all) say(`${l.site}  ·  ${l.fields.join(", ")}  ·  saved ${l.saved.slice(0, 10)}`);
+    say(`(kept in ${loginStoreName()} — \`retake login <url> --forget\` removes one)`);
+  });
+
+program
   .command("signin")
   .description("sign in by hand once — 2FA, SSO, captcha, anything — and keep the session for every later take")
   .argument("<manifest>", "the demo whose auth.storageState should be saved")
@@ -902,10 +928,9 @@ program
     const { manifest, dir } = loadManifest(file);
     if (!manifest.auth?.storageState) throw new Error(`${file} has no auth.storageState — add:\n  auth:\n    storageState: .auth/${manifest.name}.json\n    maxAgeHours: 24`);
     const { resolve, expandEnv } = await import("./manifest.js");
-    const { chromium } = await import("playwright");
     const q = resolve(manifest);
     const statePath = path.resolve(dir, expandEnv(manifest.auth.storageState));
-    const browser = await chromium.launch({ headless: false });
+    const browser = await launchChromium({ headless: false });
     const context = await browser.newContext({ viewport: q.viewport });
     const page = await context.newPage();
     await page.goto(manifest.url, { waitUntil: "domcontentloaded" }).catch(() => {});

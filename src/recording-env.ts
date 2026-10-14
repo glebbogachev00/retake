@@ -14,6 +14,7 @@
  * take that starts without proof is a take you will watch before you learn
  * anything — and the watching is the slow part.
  */
+import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -153,9 +154,8 @@ export type Verdict = { ok: boolean; lines: string[] };
 /** Prove it, with a real browser, before the camera is worth starting. */
 export async function verify(spec: EnvSpec, log: (l: string) => void): Promise<Verdict> {
   if (!spec.expect) return { ok: true, lines: ["no expectations declared — nothing was proven"] };
-  const { chromium } = await import("playwright");
   const url = `http://localhost:${spec.start.port}${spec.expect.path}`;
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   const lines: string[] = [];
   let ok = true;
   try {

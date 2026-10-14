@@ -21,6 +21,9 @@
  *   GET  /api/take/:name            outputs/<name>/take.json (+ proof-log text)
  *   GET  /out/:name/<file>          artifacts (mp4/gif/png/md)
  */
+import "../browser-home.js";
+import { hasLogin, loginStoreName, saveLogin, siteOf } from "../logins.js";
+import { openHandSignIn, sessionAgeHours, sessionPathFor, type HandSignIn } from "../signin.js";
 import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
@@ -475,6 +478,12 @@ function withStaleness(a: Activity): Activity & { stale?: boolean } {
 /** An agent asking for credentials BY NAME. The window collects the values
     and they go straight into .env here — the agent only ever learns "set". */
 type SecretRequest = { id: string; names: string[]; why: string; filled: boolean; at: number };
+/** A demo needs to be signed in to a site. Answered once per site: a saved
+    login (Keychain), or a session kept after signing in by hand. */
+type LoginRequest = { id: string; url: string; site: string; why: string; filled: false | "login" | "session"; at: number };
+const loginRequests = new Map<string, LoginRequest>();
+const openLoginRequests = () => [...loginRequests.values()].filter((r) => !r.filled).map(({ id, url, site, why }) => ({ id, url, site, why, store: loginStoreName() }));
+const handSignIns = new Map<string, HandSignIn>();
 const secretRequests = new Map<string, SecretRequest>();
 const openSecretRequests = () => [...secretRequests.values()].filter((r) => !r.filled).map(({ id, names, why }) => ({ id, names, why }));
 
@@ -882,6 +891,63 @@ export function serve(port: number) {
       if (p === "/api/running" && req.method === "GET") return json(res, 200, { running: running(outRoot()) });
       if (p === "/api/activity" && req.method === "GET") return json(res, 200, withStaleness(activity));
 
+      // ---------- logins: one per site, saved in the Keychain or kept as a session ----------
+      if (p === "/api/logins/request" && req.method === "POST") {
+        const b = JSON.parse(await readBody(req)) as { url?: string; why?: string };
+        let url: URL;
+        try { url = new URL(String(b.url ?? "")); if (!/^https?:$/.test(url.protocol)) throw new Error(); } catch { return json(res, 400, { error: "url must be an http(s) address" }); }
+        const site = siteOf(url.href);
+        const dup = [...loginRequests.values()].find((x) => !x.filled && x.site === site);
+        if (dup) return json(res, 200, { id: dup.id });
+        const r: LoginRequest = { id: "l" + Date.now().toString(36), url: url.href, site, why: String(b.why ?? "").slice(0, 300), filled: false, at: Date.now() };
+        loginRequests.set(r.id, r);
+        for (const w of activityWatchers) w({ type: "login", data: openLoginRequests().find((x) => x.id === r.id) });
+        return json(res, 200, { id: r.id });
+      }
+      if (p === "/api/logins/pending" && req.method === "GET") return json(res, 200, openLoginRequests());
+      const mlog = /^\/api\/logins\/(l[a-z0-9]+)(?:\/(save|by-hand|keep|cancel))?$/.exec(p);
+      if (mlog) {
+        const r = loginRequests.get(mlog[1]);
+        if (!r) return json(res, 404, { error: "no such request" });
+        const done = (how: "login" | "session") => {
+          r.filled = how;
+          for (const w of activityWatchers) w({ type: "login-done", data: { id: r.id, filled: how } });
+        };
+        if (!mlog[2] && req.method === "GET") {
+          const session = sessionPathFor(ROOT, r.url);
+          return json(res, 200, { filled: r.filled, site: r.site, saved: hasLogin(r.site), session: sessionAgeHours(session) === null ? null : path.relative(ROOT, session) });
+        }
+        if (req.method !== "POST") return json(res, 405, { error: "POST" });
+        if (mlog[2] === "save") {
+          const b = JSON.parse(await readBody(req)) as { user?: string; password?: string; totp?: string };
+          const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+          if (!str(b.user) || !str(b.password)) return json(res, 400, { error: "a username and a password are both needed" });
+          try { saveLogin(r.site, { user: str(b.user), password: str(b.password), totp: str(b.totp) || undefined }); }
+          catch (e) { return json(res, 500, { error: String((e as Error).message ?? e) }); }
+          done("login");
+          return json(res, 200, { ok: true, where: loginStoreName() });
+        }
+        if (mlog[2] === "by-hand") {
+          if (!handSignIns.has(r.id)) {
+            try { handSignIns.set(r.id, await openHandSignIn(r.url, sessionPathFor(ROOT, r.url))); }
+            catch (e) { return json(res, 500, { error: `could not open a browser: ${String((e as Error).message ?? e)}` }); }
+          }
+          return json(res, 200, { ok: true });
+        }
+        if (mlog[2] === "keep") {
+          const w = handSignIns.get(r.id);
+          if (!w) return json(res, 409, { error: "no sign-in window is open — press “Sign in by hand” first" });
+          handSignIns.delete(r.id);
+          try { const kept = await w.keep(); done("session"); return json(res, 200, { ok: true, session: path.relative(ROOT, kept) }); }
+          catch (e) { return json(res, 500, { error: String((e as Error).message ?? e) }); }
+        }
+        if (mlog[2] === "cancel") {
+          await handSignIns.get(r.id)?.close();
+          handSignIns.delete(r.id);
+          return json(res, 200, { ok: true });
+        }
+      }
+
       // ---------- secrets: asked for by name, typed into the window, written here ----------
       if (p === "/api/secrets/request" && req.method === "POST") {
         const b = JSON.parse(await readBody(req)) as { names?: string[]; why?: string };
@@ -915,7 +981,7 @@ export function serve(port: number) {
       }
       if (p === "/api/activity/stream" && req.method === "GET") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-        res.write(`event: state\ndata: ${JSON.stringify({ ...activity, boot: BOOT, secrets: openSecretRequests() })}\n\n`);
+        res.write(`event: state\ndata: ${JSON.stringify({ ...activity, boot: BOOT, secrets: openSecretRequests(), logins: openLoginRequests() })}\n\n`);
         const send = (ev: { type: string; data: unknown }) => res.write(`event: ${ev.type}\ndata: ${JSON.stringify(ev.data)}\n\n`);
         activityWatchers.add(send);
         const beat = setInterval(() => res.write(": ping\n\n"), 25_000);

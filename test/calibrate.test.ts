@@ -8,6 +8,7 @@
  * proof could never be true was counted as one of eight for two releases. A
  * `--only` typo produced a clean report about no defects at all.
  */
+import "../src/browser-home.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

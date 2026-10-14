@@ -188,6 +188,8 @@
   .modal p { margin:0 0 18px; color:var(--muted); font-size:14px; line-height:1.55; }
   .modal .row { display:flex; gap:8px; justify-content:flex-end; }
   .modal .btn { border:1px solid var(--rule2); background:#fff; border-radius:10px; padding:8px 15px; cursor:pointer; font-size:14px; }
+  .modal .linkish { background:none; border:0; padding:0; font:inherit; color:var(--muted); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+  .modal .linkish:hover { color:var(--ink); }
   .modal .btn:hover { border-color:var(--ink); }
   .modal .btn.danger { background:var(--bad); border-color:var(--bad); color:#fff; }
   .modal .btn.danger:hover { filter:brightness(.92); }
@@ -1684,6 +1686,75 @@ function askSecrets(r) {
   setTimeout(() => veil.querySelector('input')?.focus(), 40);
 }
 
+// ---- logins: one per site, saved where this computer keeps passwords ----
+const loginOpen = new Set();
+function askLogin(r) {
+  if (!r || loginOpen.has(r.id)) return;
+  loginOpen.add(r.id);
+  const field = 'width:100%;border:1px solid var(--rule2);border-radius:10px;padding:10px 12px;font:inherit';
+  const label = 'display:block;margin:10px 0 4px;font-size:12.5px;letter-spacing:.04em;color:var(--muted)';
+  const primary = 'background:var(--accent);border-color:var(--accent);color:#fff';
+  const veil = document.createElement('div');
+  veil.className = 'veil';
+  veil.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle" style="width:min(92vw,440px)">
+    <h3 id="loginTitle">Sign in to ${esc(r.site)}</h3>
+    <p>${esc(r.why || 'The demo starts behind a login.')}</p>
+    <form id="loginForm" data-step="save">
+      <label style="${label}" for="loginUser">Username or email</label>
+      <input id="loginUser" name="username" autocomplete="username" style="${field}" />
+      <label style="${label}" for="loginPass">Password</label>
+      <input id="loginPass" name="password" type="password" autocomplete="current-password" style="${field}" />
+      <div id="loginCode" hidden>
+        <label style="${label}" for="loginTotp">Authenticator key (the setup key, not a six-digit code)</label>
+        <input id="loginTotp" type="password" autocomplete="off" style="${field}" />
+      </div>
+      <p style="font-size:12.5px;color:var(--muted);margin:12px 0 0">Saved in ${esc(r.store || 'this computer')}, for every demo of this site. Never sent to the agent or anywhere else. Use a demo account: the result is a video.</p>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" type="button" data-no>Not now</button>
+        <button class="btn" type="submit" style="${primary}">Save login</button>
+      </div>
+      <p style="margin:14px 0 0;font-size:13px"><span data-code-wrap><button type="button" class="linkish" data-code>It asks for a code</button> · </span><button type="button" class="linkish" data-hand>Sign in by hand instead</button></p>
+    </form>
+    <div id="loginHand" hidden>
+      <p>A browser window opened at <b>${esc(r.site)}</b>. Sign in there — codes, SSO, anything it asks. When you can see the signed-in app, press Done.</p>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" type="button" data-hand-cancel>Cancel</button>
+        <button class="btn" type="button" data-keep style="${primary}">Done</button>
+      </div>
+    </div>
+  </div>`;
+  const $q = (sel) => veil.querySelector(sel);
+  const say = (t) => { $q('h3').textContent = t; };
+  const close = () => { veil.remove(); loginOpen.delete(r.id); };
+  $q('[data-no]').onclick = close;
+  $q('[data-code]').onclick = () => { $q('#loginCode').hidden = false; $q('[data-code-wrap]').remove(); $q('#loginTotp').focus(); };
+  $q('[data-hand]').onclick = async () => {
+    say('Opening a browser…');
+    try {
+      await api(`/api/logins/${r.id}/by-hand`, { method: 'POST', body: '{}' });
+      $q('#loginForm').hidden = true; $q('#loginHand').hidden = false; say(`Sign in to ${r.site}`);
+      $q('[data-keep]').focus();
+    } catch (err) { say('Could not open a browser: ' + err.message); }
+  };
+  $q('[data-hand-cancel]').onclick = async () => {
+    await api(`/api/logins/${r.id}/cancel`, { method: 'POST', body: '{}' }).catch(() => {});
+    $q('#loginHand').hidden = true; $q('#loginForm').hidden = false; say(`Sign in to ${r.site}`);
+  };
+  $q('[data-keep]').onclick = async () => {
+    try { await api(`/api/logins/${r.id}/keep`, { method: 'POST', body: '{}' }); close(); }
+    catch (err) { say(err.message); }
+  };
+  $q('#loginForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const user = $q('#loginUser').value, password = $q('#loginPass').value, totp = $q('#loginTotp').value;
+    if (!user.trim() || !password) { (user.trim() ? $q('#loginPass') : $q('#loginUser')).focus(); return; }
+    try { await api(`/api/logins/${r.id}/save`, { method: 'POST', body: JSON.stringify({ user, password, totp }) }); close(); }
+    catch (err) { say('Could not save: ' + err.message); }
+  };
+  document.body.appendChild(veil);
+  setTimeout(() => $q('#loginUser')?.focus(), 40);
+}
+
 // ---- the live feed: an agent working shows up here as it works -------------
 function watchActivity() {
 
@@ -1877,10 +1948,13 @@ setInterval(pollRunning, 2000);
     window.__boot = d.boot || window.__boot;
     apply(d);
     for (const r of d.secrets || []) askSecrets(r);
+    for (const r of d.logins || []) askLogin(r);
   });
   es.addEventListener('line', (ev) => apply(JSON.parse(ev.data)));
   es.addEventListener('progress', (ev) => apply(JSON.parse(ev.data)));
   es.addEventListener('secrets', (ev) => askSecrets(JSON.parse(ev.data)));
+  es.addEventListener('login', (ev) => askLogin(JSON.parse(ev.data)));
+  es.addEventListener('login-done', (ev) => { const d = JSON.parse(ev.data); if (loginOpen.has(d.id)) document.querySelector('[aria-labelledby="loginTitle"]')?.closest('.veil')?.remove(), loginOpen.delete(d.id); });
   es.addEventListener('finished', async (ev) => { apply(JSON.parse(ev.data)); await drawDemos(); await newest(); setTimeout(() => $('live').classList.remove('show'), 8000); });
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };
 }

@@ -1,6 +1,7 @@
 /** dry must predict run. That means one wait, and a wait that works with
     every selector a manifest is allowed to use — including Playwright's own,
     which are not CSS. Real browser, real page. */
+import "../src/browser-home.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chromium, type Browser, type Page } from "playwright";

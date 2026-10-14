@@ -12,6 +12,7 @@
  * The card frame (rounded corners, shadow, soft background) is a PNG rendered
  * by a headless page, overlaid with a transparent hole where the video shows.
  */
+import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,7 +25,6 @@ import { renderCard, renderCalloutOverlay, renderPoster, renderTitledCover } fro
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
 import { holdFilterArgs, holdTake, planHolds } from "./hold.js";
 import { DEFAULT_VOICE, audioSeconds, cueGroups, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
-import { chromium } from "playwright";
 import { expandEnv, resolve, Manifest, type Resolved, type Step } from "./manifest.js";
 import type { Take, TimelineEntry } from "./record.js";
 import { ffmpegBin } from "./media-bin.js";
@@ -561,7 +561,7 @@ async function renderCardFrame(file: string, W: number, H: number, g: CardGeom, 
     x.globalCompositeOperation='destination-out';rr(${g.vx},${g.vy},${g.vw},${g.vh},r);x.fill();
     x.globalCompositeOperation='source-over';x.strokeStyle='rgba(0,0,0,0.10)';x.lineWidth=1;rr(${g.vx}+0.5,${g.vy}+0.5,${g.vw}-1,${g.vh}-1,r);x.stroke();
   </script></body>`;
-  const browser = await chromium.launch();
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage({ viewport: { width: W, height: H } });
     await page.setContent(html, { waitUntil: "load" });

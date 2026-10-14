@@ -16,11 +16,11 @@
  * If RETAKE_MODEL is unset, the first available in the order above is used.
  * A `.env` in the Retake root is loaded at startup (KEY=value lines).
  */
+import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chromium } from "playwright";
 import YAML from "yaml";
 import { Manifest } from "./manifest.js";
 import { digest, type Digest } from "./digest.js";
@@ -190,7 +190,7 @@ export type Scout = {
 };
 
 export async function scout(url: string, opts: { viewport?: { width: number; height: number }; timeoutMs?: number } = {}): Promise<Scout> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchChromium({ headless: true });
   try {
     const page = await browser.newPage({ viewport: opts.viewport ?? { width: 1000, height: 700 } });
     await page.goto(url, { waitUntil: "networkidle", timeout: opts.timeoutMs ?? 20_000 });

@@ -231,24 +231,29 @@ Full reference: `README.md` → "Demo-as-code". The short version:
 
 Most real demos start behind a sign-in. The agent never sees a password:
 
-- **Ask by name, not for the value.** Over MCP, call `secrets` with the
-  variable names (`APP_USER`, `APP_PASSWORD`, `APP_TOTP_SECRET` for an
-  authenticator) and a one-line why. With the Retake window open, a form
-  appears there and the values go straight into the workspace `.env` — the
-  tool returns "set". Without a window, the tool returns the sentence to
-  relay: the person runs `retake secret APP_USER APP_PASSWORD` (typed into
-  their terminal, hidden, kept on their machine) and the agent calls
-  `secrets` again. From the CLI only, say the same sentence yourself.
-- **Put the sign-in under `auth.setup`** with `${APP_USER}` / `${APP_PASSWORD}`
-  and `secret: true`, plus `auth.storageState: .auth/<name>.json`. It runs
-  before the camera, is trimmed off, and the session is reused by later takes.
-  A failed sign-in never saves a session.
-- **Authenticator codes:** `${TOTP:APP_TOTP_SECRET}` is the current six-digit
-  code, computed when the field is filled.
-- **SMS, SSO, captcha:** a script cannot; a person can, once.
-  `retake signin demos/<name>.yaml` opens a real window, they log in, press
-  Enter, and the session is saved. Leave `auth.setup` empty; a take with no
-  fresh session and no setup refuses to run rather than record logged out.
+- **Ask for the site, not for the value.** Over MCP, call `login` with the
+  app's URL and a one-line why. A login is saved once per site (in the
+  person's Keychain) and reused by every demo of that site, so it often
+  answers "Ready" at once, with the exact manifest lines. Otherwise a form
+  opens in the Retake window — relay the sentence the tool returns, link
+  included, wait for "done", call `login` again. Without a window the
+  person runs `retake login <url>` (typed into their terminal, hidden). From
+  the CLI only, say the same sentence yourself.
+- **Put the sign-in under `auth.setup`** with `${LOGIN_USER}` /
+  `${LOGIN_PASSWORD}` and `secret: true`, plus the per-site
+  `auth.storageState` that `login` gives you. It runs before the camera, is
+  trimmed off, and the session is reused by later takes; when it runs out,
+  Retake signs in again by itself. A failed sign-in never saves a session.
+- **Authenticator codes:** `${TOTP:LOGIN_TOTP}` is the current six-digit
+  code, computed when the field is filled — present when the person saved
+  an authenticator key.
+- **SMS, SSO, captcha:** a script cannot; a person can, once. The same form
+  has "Sign in by hand" (or `retake login <url> --by-hand`): a real window
+  opens, they sign in, press Done, and the session is kept. Leave
+  `auth.setup` empty; a take with no fresh session and no setup refuses to
+  run rather than record logged out.
+- **Other values** (API tokens, keys) still go through `secrets` into the
+  workspace `.env` by name, referenced as `${NAME}` with `secret: true`.
 - **Firebase-style sessions** (IndexedDB) cannot be restored from a saved
   session: put the login under plain `setup` so it runs every take.
 - **Demo accounts only.** The output is a video.

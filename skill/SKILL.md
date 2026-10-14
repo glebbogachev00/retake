@@ -642,25 +642,27 @@ You will never see a password, and you never need to. The whole method:
 1. **Notice it early.** `read_project` reports sign-in fields; `scout` shows a
    password input; or the person says so. Do not draft a manifest that
    pretends the app is open.
-2. **Call `secrets` with the NAMES** you will use — `APP_USER`, `APP_PASSWORD`,
-   and `APP_TOTP_SECRET` if the site asks for an authenticator code — and one
-   sentence of why. It returns immediately with the words to say: a form is
-   open in the window at a link, or a one-line terminal command. **Relay
-   those words in full, link included**, then stop and wait for "done". Call
-   `secrets` again; it answers "set" and you carry on. The values went
-   straight into the workspace `.env` — you never saw them.
-3. **Write the sign-in under `auth.setup`**, referencing `${APP_USER}` and
-   `${APP_PASSWORD}` with `secret: true`, and set `auth.storageState` to
-   `.auth/<name>.json`. The login runs before the camera and is trimmed off;
-   the session is saved and later takes skip the login entirely. A failed
-   sign-in is never saved as a session, so a wrong password stops the take
-   instead of recording a logged-out one.
-4. **Authenticator codes:** `text: "${TOTP:APP_TOTP_SECRET}"` — Retake
-   computes the six-digit code at the moment it fills the field.
+2. **Call `login` with the app's URL** and one sentence of why. A login is
+   saved once per site — in the person's Keychain — and every demo of that
+   site reuses it, so often it answers at once: "Ready", with the exact
+   manifest lines. Otherwise it returns the words to say: a form is open in
+   the window at a link, or a one-line terminal command. **Relay those words
+   in full, link included**, then stop and wait for "done". Call `login`
+   again; it answers "Ready" and you carry on. You never see a value.
+3. **Write the sign-in under `auth.setup`**, as `login` shows:
+   `${LOGIN_USER}` and `${LOGIN_PASSWORD}` with `secret: true`, and
+   `auth.storageState` set to the per-site session path it gives you. The
+   login runs before the camera and is trimmed off; the session is saved and
+   later takes skip the login entirely. When it runs out, Retake signs in
+   again by itself. A failed sign-in is never saved as a session, so a wrong
+   password stops the take instead of recording a logged-out one.
+4. **Authenticator codes:** if the person saved an authenticator key, `login`
+   adds `text: "${TOTP:LOGIN_TOTP}"` — Retake computes the six-digit code at
+   the moment it fills the field.
 5. **SMS codes, SSO, captchas, anything only a human can do:** do not try.
-   Tell the person: "run `retake signin demos/<name>.yaml` and log in once by
-   hand — Retake keeps the session." Then run as normal. The manifest still
-   needs `auth.storageState`; `auth.setup` can be empty.
+   The same form offers "Sign in by hand": a real browser window opens, they
+   sign in, Retake keeps the session. `login` then answers with
+   `auth.storageState` and no setup.
 6. **Firebase-style apps** keep the session in IndexedDB, which a saved
    session cannot restore: put the login under plain `setup` instead, so it
    runs every take (still before the camera, still trimmed).
@@ -840,8 +842,10 @@ up to the end of that scene.
 
 - Real interactions read as real: type actual text, scroll to what you use,
   hold on the result. No zoom tricks unless asked.
-- Secrets never go in a manifest and never into chat: the `secrets` tool
-  gets them into `.env` by name; you reference `${NAME}` with `secret: true`.
+- Credentials never go in a manifest and never into chat: `login` saves a
+  site's login in the Keychain (`${LOGIN_USER}` / `${LOGIN_PASSWORD}`), and
+  `secrets` gets other values into `.env` by name (`${NAME}`), always with
+  `secret: true`.
 - Never invent selectors — only what scout/read_project returned.
 - If the backend is down, prefer a `stub:` block over giving up.
 - Starting the person's app needs their explicit say-so, every time.

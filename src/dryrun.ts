@@ -6,12 +6,13 @@
  * not: it runs as fast as the app responds. So the cheap thing should happen
  * first, and the camera should only roll on a manifest that already works.
  */
+import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import path from "node:path";
 import { applyPageSetup, authState, dragPoints, gateOnApp, pageGeometry, resolvePoint, scrollPanel, runEvaluateSeed, runFileOrCommandSeed } from "./record.js";
-import { chromium, type Page, type BrowserContext } from "playwright";
+import type { Page, BrowserContext } from "playwright";
 import { waitForStep } from "./waiting.js";
-import { expandEnv, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
+import { expandEnv, signInAt, resolve, type Manifest, type Step, type Stub } from "./manifest.js";
 import { assessActionProof, proofMatches, snapshotActionProof, waitForActionProof } from "./action-proof.js";
 
 /** The longest a dry run will wait for anything. Long enough for a real app
@@ -73,6 +74,8 @@ export function actionFits(action: string, el: ElInfo): string | null {
 }
 
 export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean; outRoot?: string } = {}): Promise<DryResult> {
+  // ${LOGIN_*} reads the login saved for this demo's own site.
+  signInAt(m.url.includes("${") ? (() => { try { return expandEnv(m.url); } catch { return m.url; } })() : m.url);
   const q = resolve(m);
   const lines: string[] = [];
   let failures = 0;
@@ -96,7 +99,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
   // Responsive apps lay out for the page width, not the video width. Say it,
   // so a tablet layout at scale 2 is a known fact, not a surprise selector.
   if (q.scale !== 1) log(`dry: the app sees a ${geo.viewport.width}×${geo.viewport.height} page, drawn at ${q.scale}× into ${geo.video.width}×${geo.video.height}`);
-  const browser = await chromium.launch({ headless: true, ...(geo.args.length ? { args: geo.args } : {}) });
+  const browser = await launchChromium({ headless: true, ...(geo.args.length ? { args: geo.args } : {}) });
   // Start from the same session run would. Without this, a demo behind a
   // login was dry-run logged OUT — every selector "missing", or worse, a
   // green dry against a marketing page and a failed take against the app.
@@ -339,7 +342,7 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
 async function resolvesWiderThan(m: Manifest, selectors: string[], narrowPx: number, manifestDir: string): Promise<string[]> {
   const unique = [...new Set(selectors)].filter((s) => s && !s.startsWith("http"));
   if (!unique.length || narrowPx >= 1280) return [];
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchChromium({ headless: true });
   try {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: m.colorScheme });
     const page = await ctx.newPage();

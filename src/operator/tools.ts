@@ -11,6 +11,9 @@
  * the UI over HTTP (RETAKE_UI + RETAKE_SESSION) so the person sees what is
  * happening in plain sentences.
  */
+import "../browser-home.js";
+import { hasLogin, loginStoreName, readLogin, siteOf } from "../logins.js";
+import { sessionAgeHours, sessionPathFor } from "../signin.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -88,7 +91,7 @@ async function waitForHuman(kind: "question" | "approve", text: string, detail?:
   const { id } = (await r.json()) as { id: string };
   for (;;) {
     await new Promise((ok) => setTimeout(ok, 1200));
-    const s = await fetch(`${UI}/api/operator/${SESSION}/pending/${id}`).then((x) => x.json()).catch(() => null) as { answered?: boolean; answer?: string } | null;
+    const s = await fetch(`${UI}/api/operator/${SESSION}/pending/${id}`, { headers: uiHeaders() }).then((x) => x.json()).catch(() => null) as { answered?: boolean; answer?: string } | null;
     if (s?.answered) return s.answer ?? "";
   }
 }
@@ -100,7 +103,7 @@ async function progress(p: { phase: string; step: number; total: number; label: 
   if (!UI) return;
   const body = JSON.stringify({ progress: { ...p, demo: LAST_DEMO || undefined } });
   const url = SESSION ? `${UI}/api/operator/${SESSION}/log` : `${UI}/api/activity`;
-  await fetch(url, { method: "POST", body }).catch(() => {});
+  await fetch(url, { method: "POST", headers: uiHeaders(), body }).catch(() => {});
 }
 
 
@@ -194,7 +197,7 @@ server.registerTool("start_app", {
 
 server.registerTool("secrets", {
   description: [
-    "Get the person's demo-account credentials into place WITHOUT ever seeing them. Call this the moment a demo needs a login (read_project found sign-in fields, scout found a password field, or they said so): pass the variable NAMES you will use (APP_USER, APP_PASSWORD, and APP_TOTP_SECRET if the site asks for an authenticator code).",
+    "Get values a demo needs (API tokens, keys) into the workspace .env WITHOUT ever seeing them. For a SIGN-IN use `login` instead — it saves one login per site, reused by every demo. Pass the variable NAMES you will use.",
     "It returns at once with what to tell the person — ALWAYS relay it in full, with the link: assume they have never seen the Retake window and do not know it exists. They type the values into a form there (or into their terminal); the values go straight into the workspace .env; you only ever learn 'set'. When they say they are done, call this tool again with the same names.",
     "Then the manifest references them as ${APP_USER} / ${APP_PASSWORD} with `secret: true`, inside auth.setup. Never ask for a password in chat, never put a literal credential in a manifest, never invent values. For logins a script cannot do (SMS code, SSO, captcha): `retake signin demos/<name>.yaml` — the person signs in once in a real window and Retake keeps the session.",
   ].join(" "),
@@ -214,17 +217,17 @@ server.registerTool("secrets", {
   const list = missing.join(" and ");
   // Is the window actually there? A dead URL must not leave the person
   // staring at a link that does nothing.
-  const windowUp = UI ? await fetch(`${UI}/api/settings`).then((r) => r.ok).catch(() => false) : false;
+  const windowUp = UI ? await fetch(`${UI}/api/settings`, { headers: uiHeaders() }).then((r) => r.ok).catch(() => false) : false;
   if (windowUp) {
     // One open form per set of names — calling again must not stack forms.
-    const pending = await fetch(`${UI}/api/secrets/pending`).then((r) => r.json()).catch(() => []) as { id: string; names: string[] }[];
+    const pending = await fetch(`${UI}/api/secrets/pending`, { headers: uiHeaders() }).then((r) => r.json()).catch(() => []) as { id: string; names: string[] }[];
     let req = pending.find((r) => r.names.join() === missing.join());
     if (req) {
       // Second call: they said "done" (or we are checking). Give the form a
       // short moment, then report — never sit here in silence.
       const deadline = Date.now() + 20_000;
       while (Date.now() < deadline) {
-        const st = await fetch(`${UI}/api/secrets/${req.id}`).then((x) => x.json()).catch(() => null) as { filled?: boolean } | null;
+        const st = await fetch(`${UI}/api/secrets/${req.id}`, { headers: uiHeaders() }).then((x) => x.json()).catch(() => null) as { filled?: boolean } | null;
         if (st?.filled) break;
         await new Promise((ok) => setTimeout(ok, 2000));
       }
@@ -239,7 +242,76 @@ server.registerTool("secrets", {
       return text(`A form is now open in the Retake window. Tell the person this, including the link: “Open ${link} in your browser — a form is waiting there for ${list}. Use a demo account for the app (the result is a video). What you type is saved to one local file on your computer and never sent to me or anywhere else. Press Save to .env, then tell me it's done.” When they say done, call secrets again with the same names.`);
     } catch { /* fall through to the terminal route */ }
   }
-  return text(`The Retake window is not open. Tell the person this, exactly: “Retake needs a demo account for this app. Either run \`retake ui\` and open ${link} — I'll ask you there — or run \`retake secret ${missing.join(" ")}\` in your Retake workspace folder and type the values into the terminal (hidden, kept on your machine). If the sign-in needs a code from your phone, SSO or a captcha, run \`retake signin demos/<name>.yaml\` instead and log in once by hand. Tell me when it's done.” Then call secrets again with the same names.`);
+  return text(`The Retake window is not open. Tell the person this, exactly: “Retake needs a demo account for this app. Either run \`retake ui\` and open ${link} — I'll ask you there — or run \`retake secret ${missing.join(" ")}\` in your Retake workspace folder and type the values into the terminal (hidden, kept on your machine). For a sign-in, use \`retake login <url>\` instead — it saves the login once for the whole site. Tell me when it's done.” Then call secrets again with the same names.`);
+});
+
+server.registerTool("login", {
+  description: [
+    "Get a demo signed in to a site WITHOUT ever seeing the credentials. Call it the moment a demo needs a login (read_project found sign-in fields, scout found a password field, or they said so), with the app's URL.",
+    "A login is saved once per site — in the person's Keychain — and reused by every demo of that site, in every workspace. If one is saved (or they signed in by hand recently), this answers at once with the exact manifest lines to use.",
+    "If not, a form opens in the Retake window and this returns what to tell the person — ALWAYS relay it in full, with the link. They either save a username and password (and an authenticator key, if the site asks for a code) or sign in by hand in a real browser window (SSO, captcha, SMS codes). When they say done, call login again with the same URL.",
+    "Never ask for a password in chat, never put a literal credential in a manifest. Prefer this over `secrets` for any sign-in; `secrets` is for other values, like API tokens.",
+  ].join(" "),
+  inputSchema: {
+    url: z.string().describe("the app's URL — the same one the manifest records"),
+    why: z.string().describe("one sentence the person will read: what the login is for, e.g. 'The dashboard demo starts behind the admin sign-in.'"),
+  },
+  annotations: RETAKE_WRITE,
+}, async ({ url, why }) => {
+  let full: string;
+  try { full = new URL(/^[a-z]+:\/\//i.test(url) ? url : `http://${url}`).href; } catch { return text(`"${url}" is not a URL — pass the app's address, e.g. http://localhost:3000`); }
+  const site = siteOf(full);
+  const session = sessionPathFor(ROOT, full);
+  const fromDemos = path.relative(DEMOS, session);
+  const ready = (): string | null => {
+    if (hasLogin(site)) {
+      const code = readLogin(site, "totp");
+      return [
+        `Ready: a login for ${site} is saved (${loginStoreName()}). Sign in with it under auth.setup — Retake fills in the values; you never see them:`,
+        `auth:`,
+        `  storageState: ${fromDemos}`,
+        `  setup:`,
+        `    - { action: fill, selector: "<the username field>", text: "\${LOGIN_USER}", secret: true }`,
+        `    - { action: fill, selector: "<the password field>", text: "\${LOGIN_PASSWORD}", secret: true }`,
+        ...(code ? [`    - { action: fill, selector: "<the code field>", text: "\${TOTP:LOGIN_TOTP}", secret: true }`] : []),
+        `    - { action: click, selector: "<the sign-in button>" }`,
+        `Scout the sign-in page for the selectors. The session is kept and reused; when it runs out, Retake signs in again by itself.`,
+      ].join("\n");
+    }
+    const age = sessionAgeHours(session);
+    if (age !== null && age < 72) {
+      return `Ready: ${site} was signed into by hand ${age < 1 ? "just now" : `${Math.round(age)}h ago`}. In the manifest:\nauth:\n  storageState: ${fromDemos}\n  maxAgeHours: 72\nNo setup steps — the take starts signed in. When the session runs out (72h), call login again.`;
+    }
+    return null;
+  };
+  const now = ready();
+  if (now) return text(now);
+
+  const link = UI || "http://localhost:4310";
+  const windowUp = UI ? await fetch(`${UI}/api/settings`, { headers: uiHeaders() }).then((r) => r.ok).catch(() => false) : false;
+  if (windowUp) {
+    const pending = await fetch(`${UI}/api/logins/pending`, { headers: uiHeaders() }).then((r) => r.json()).catch(() => []) as { id: string; site: string }[];
+    const req = pending.find((r) => r.site === site);
+    if (req) {
+      // Second call: they said "done". Give the form a short moment, then report.
+      const deadline = Date.now() + 20_000;
+      while (Date.now() < deadline) {
+        const st = await fetch(`${UI}/api/logins/${req.id}`, { headers: uiHeaders() }).then((x) => x.json()).catch(() => null) as { filled?: string | false } | null;
+        if (st?.filled) break;
+        await new Promise((ok) => setTimeout(ok, 2000));
+      }
+      const after = ready();
+      if (after) return text(after);
+      return text(`Not yet — nothing is saved for ${site}. The form is still open in the Retake window. Tell them again, with the link: “Open ${link} — Retake is waiting for you to sign in to ${site}. Save a demo account's login there, or choose Sign in by hand. Tell me when it's done.” Then call login again.`);
+    }
+    try {
+      const r = await fetch(`${UI}/api/logins/request`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ url: full, why }) });
+      if (!r.ok) throw new Error(String(r.status));
+      await tell(`Waiting for you: sign in to ${site} — a form is open in the window.`);
+      return text(`A form is now open in the Retake window. Tell the person this, including the link: “Open ${link} — Retake needs to sign in to ${site}. Save a demo account's login there (it is kept in your ${loginStoreName().replace(/^your /, "")}, never sent to me), or choose Sign in by hand if it uses SSO or a code from your phone. Tell me when it's done.” When they say done, call login again with the same URL.`);
+    } catch { /* fall through to the terminal route */ }
+  }
+  return text(`The Retake window is not open. Tell the person this, exactly: “Retake needs to sign in to ${site}. In your Retake workspace folder, run \`retake login ${full}\` and type a demo account's login (hidden, kept in your ${loginStoreName().replace(/^your /, "")}) — or \`retake login ${full} --by-hand\` to sign in yourself in a real window. Tell me when it's done.” Then call login again with the same URL.`);
 });
 
 server.registerTool("ask", { description: "Ask the person ONE question and wait for the answer. Use only when genuinely blocked (which app, a choice between two things). Keep it one sentence, with the evidence. NEVER for passwords or tokens — that is what `secrets` is for.", inputSchema: { question: z.string() }, annotations: RETAKE_WRITE }, async ({ question }) => {

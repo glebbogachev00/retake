@@ -14,6 +14,7 @@
  * this: boot the real server, load the real page, click the things a person
  * clicks, and fail on any console error.
  */
+import "../src/browser-home.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";

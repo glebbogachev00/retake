@@ -2,6 +2,7 @@
     must move that panel. The recorder used to move the page behind it, so the
     narration described cards the viewer never saw, while the dry run (which
     used the browser's own scrollIntoView) passed. */
+import "../src/browser-home.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";

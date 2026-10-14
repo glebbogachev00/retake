@@ -7,6 +7,8 @@
  * guessed: for AI-driven apps the next screen arrives whenever the model
  * answers, so no one can script timings up front.
  */
+import { siteOf } from "./logins.js";
+import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
 import os from "node:os";
 import { createHash } from "node:crypto";
@@ -15,9 +17,9 @@ import { describeWait, waitForStep } from "./waiting.js";
 import path from "node:path";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import YAML from "yaml";
-import { chromium, type BrowserContext, type Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import { recordPage, moveCursorToPoint, type PageRecorder } from "testreel";
-import { expandEnv, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
+import { expandEnv, signInAt, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
 import { ffmpegBin, videoDuration } from "./render.js";
 import { assessActionProof, proofMatches, snapshotActionProof, waitForActionProof } from "./action-proof.js";
 
@@ -573,6 +575,8 @@ async function acquireNamedLock(outRoot: string, name: string, log: (l: string) 
 }
 
 export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
+  // ${LOGIN_*} reads the login saved for this demo's own site.
+  signInAt(m.url.includes("${") ? (() => { try { return expandEnv(m.url); } catch { return m.url; } })() : m.url);
   let releaseNamed: (() => void) | null = null;
   const log = opts.log ?? noop;
   const startedAt = new Date().toISOString();
@@ -598,7 +602,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   }
 
   const geo = pageGeometry(q);
-  const browser = await chromium.launch(browserLaunchOptions(process.platform, opts.headed, geo.args));
+  const browser = await launchChromium(browserLaunchOptions(process.platform, opts.headed, geo.args));
   const size = { ...q.viewport };
   // A saved session (auth.storageState) means the login already happened on an
   // earlier run: load it and the setup login steps can be skipped.
@@ -606,7 +610,7 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   if (statePath) log(stateFresh ? `auth: reusing session ${path.relative(process.cwd(), statePath)}` : `auth: no fresh session — running setup to sign in`);
   // No session and nothing that could create one: stop here rather than record
   // a logged-out take that passes every check.
-  if (statePath && !stateFresh && !(m.auth?.setup?.length)) throw new Error(`no fresh session at ${path.relative(process.cwd(), statePath)} and no auth.setup to sign in with — run \`retake signin ${path.relative(process.cwd(), path.join(opts.manifestDir, m.name + ".yaml"))}\` and log in once by hand, or add the sign-in steps under auth.setup`);
+  if (statePath && !stateFresh && !(m.auth?.setup?.length)) throw new Error(`no fresh session at ${path.relative(process.cwd(), statePath)} and no auth.setup to sign in with — sign in by hand once from the Retake window (or \`retake login ${siteOf(m.url)} --by-hand\`), or add the sign-in steps under auth.setup with \${LOGIN_USER} / \${LOGIN_PASSWORD}`);
   const context = await browser.newContext({
     viewport: geo.viewport,
     deviceScaleFactor: geo.deviceScaleFactor,

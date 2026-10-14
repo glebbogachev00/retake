@@ -31,7 +31,7 @@ const read = (f: string) => fs.readFileSync(path.join(ROOT, f), "utf8");
  */
 const HUMAN_ONLY = new Set([
   "install", "init", "doctor", "ui", "mcp", "agent", "help",
-  "signin", "secret",                    // the person types the password, never the agent
+  "signin", "secret", "login", "logins",  // the person types the password, never the agent
   "list", "presets", "validate",         // the agent has read_manifest / write_manifest / the tool list
   "takes", "restore", "tidy",            // housekeeping over the whole workspace
   "describe", "contact", "gif", "check", // covered by draft / receipts / the run tool's own report
