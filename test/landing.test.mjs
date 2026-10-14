@@ -61,9 +61,12 @@ test('landing examples, setup, keyboard, FAQ, media, and responsive layouts', { 
       await page.waitForFunction(() => document.querySelector('#copy-status').textContent.startsWith('Copied'));
       assert.equal(await page.evaluate(() => navigator.clipboard.readText()), code);
     }
-    await page.getByText('Does anything leave my machine?', { exact: true }).click();
+    // The summary also holds its "+" icon, so it is found by containing the
+    // question, not by matching it exactly.
+    const leave = page.locator('summary', { hasText: 'Does anything leave my machine?' });
+    await leave.click();
     assert.equal(await page.locator('details').filter({ hasText: 'Does anything leave my machine?' }).getAttribute('open'), '');
-    await page.getByText('Does anything leave my machine?', { exact: true }).click();
+    await leave.click();
     await page.locator('#tab-product').click();
     for (const width of [1440, 1024, 768, 760, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 });

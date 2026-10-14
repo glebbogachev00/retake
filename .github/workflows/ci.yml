@@ -27,6 +27,14 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - run: npm run typecheck
       - run: npm test
+      # The landing page has its own checks: static ones, and one that drives
+      # the real page in a browser against the local preview server.
+      - name: the landing page works in a real browser
+        run: |
+          npm run site:dev &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4387/ >/dev/null && break; sleep 1; done
+          npm run site:test
+          npm run site:test:browser
       - run: npm run build
       # A fresh install now starts empty and hands the first manifest to the
       # onboarding operator. Package the agent contract and the voice previews

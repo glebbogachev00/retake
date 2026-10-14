@@ -1145,13 +1145,21 @@ export function contactSheetFile(mp4: string, out: string, everySec = 2, width =
   fs.mkdirSync(path.dirname(out), { recursive: true });
   // Select explicit source timestamps, including the final frame. The timestamp
   // overlay runs before tiling and therefore preserves the source clock.
-  const vf = [
+  const stamp = `drawtext=${font}text='%{pts\\:hms}':x=8:y=8:fontsize=${Math.round(width / 20)}:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=5`;
+  const sheet = (withTime: boolean) => [
     `select='${select}'`,
     `scale=${width}:-2`,
-    `drawtext=${font}text='%{pts\\:hms}':x=8:y=8:fontsize=${Math.round(width / 20)}:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=5`,
+    ...(withTime ? [stamp] : []),
     `tile=${cols}x${rows}:margin=8:padding=6:color=#e6e9e2`,
   ].join(",");
-  ff(["-i", mp4, "-vf", vf, "-frames:v", "1", out], log);
+  // Some ffmpeg builds (the static Linux one among them) have no drawtext.
+  // A sheet without timestamps still shows every frame, ending included.
+  try { ff(["-i", mp4, "-vf", sheet(true), "-frames:v", "1", out], log); }
+  catch (e) {
+    if (!/Filter not found|No such filter|drawtext/i.test(String((e as Error).message))) throw e;
+    log?.("contact: this ffmpeg has no drawtext — the sheet carries no timestamps");
+    ff(["-i", mp4, "-vf", sheet(false), "-frames:v", "1", out], log);
+  }
   if (!fs.existsSync(out)) throw new Error("ffmpeg produced no contact sheet");
   log?.(`contact: ${cells} explicit frames through ${last.toFixed(2)}s, ${cols}×${rows} → ${path.relative(process.cwd(), out)}`);
   return out;
