@@ -236,11 +236,15 @@
    them. They now stand a gutter outside it; section lines and the header
    line run rail to rail, and the crosshairs sit on the rails. Phones have
    no room for a gutter, so there the frame is left out. */
-.split-layout { --g: 40px; }
+/* The gap is whatever room the screen leaves beside the content, less 12px,
+   up to 40px — so the lines never land on the screen's edge, at any width. */
+.split-layout { --g: clamp(8px, calc((100vw - min(1120px, 100vw - 64px)) / 2 - 12px), 40px); }
+.split-layout main { overflow-x: clip; }
+/* Below 760px the content keeps 20px each side (landing.css): 8px of gap. */
+@media (max-width: 760px) { .split-layout { --g: 8px; } }
 .split-layout main::before { width: calc(min(1120px, 100% - 64px) + 2 * var(--g)); }
 .split-layout .section-marker { margin-inline: calc(-1 * var(--g)); padding-inline: var(--g); }
 .split-layout .header { width: calc(min(1120px, 100% - 64px) + 2 * var(--g)); padding-inline: var(--g); }
-@media (max-width: 1200px) { .split-layout { --g: 20px; } }
 @media (max-width: 640px) {
   .split-layout main::before { display: none; }
   .split-layout .section-marker { margin-inline: 0; padding-inline: 0; }
