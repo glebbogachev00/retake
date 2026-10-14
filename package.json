@@ -51,7 +51,10 @@
     "retake": "tsx src/cli.ts",
     "ui": "tsx src/cli.ts ui",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "site:dev": "node scripts/serve-landing.mjs",
+    "site:test": "node --test test/*-static.test.mjs",
+    "site:test:browser": "node --test test/landing.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

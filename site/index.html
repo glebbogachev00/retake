@@ -1,482 +1,127 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Retake — demos that re-record themselves</title>
-<meta name="description" content="Give Retake to your coding agent. It records a reusable product demo, then reruns it when your app changes." />
-<meta property="og:type" content="website" />
-<meta property="og:site_name" content="Retake" />
-<meta property="og:title" content="Retake — demos that re-record themselves" />
-<meta property="og:description" content="Your coding agent records the flow. You review the finished take locally." />
-<meta property="og:url" content="https://www.useretake.app/" />
-<meta property="og:image" content="https://www.useretake.app/og.png" />
-<meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="Retake local video library with a finished product demo" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Retake — demos that re-record themselves" />
-<meta name="twitter:description" content="Your coding agent records the flow. You review the finished take locally." />
-<meta name="twitter:image" content="https://www.useretake.app/og.png" />
-<meta name="twitter:image:alt" content="Retake local video library with a finished product demo" />
-<link rel="canonical" href="https://www.useretake.app/" />
-<link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-<style>
-:root {
-  --paper:#f2efe6;
-  --card:#fbf9f3;
-  --ink:#191d19;
-  --muted:#575e54;
-  --rule:#e2ddcf;
-  --rule-strong:#d3cdbb;
-  --accent:#1a1c1e;
-  --amber:#e8b04b;
-}
-* { box-sizing:border-box; }
-html { scroll-behavior:smooth; }
-body {
-  margin:0;
-  background:var(--paper);
-  color:var(--ink);
-  font:16px/1.62 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Inter,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;
-}
-a { color:inherit; }
-.top {
-  display:flex;
-  align-items:center;
-  gap:10px;
-  max-width:960px;
-  margin:0 auto;
-  padding:18px 26px;
-}
-.mark {
-  width:26px;
-  height:26px;
-  border-radius:8px;
-  background:var(--accent);
-  position:relative;
-  flex:none;
-}
-.mark i { position:absolute;left:6.5px;height:3px;border-radius:2px;background:#eceee9; }
-.mark i:nth-child(1){top:5px;width:5px;opacity:.55}
-.mark i:nth-child(2){top:10px;width:8px;opacity:.8}
-.mark i:nth-child(3){top:15px;width:13px;background:var(--amber)}
-.mark i:nth-child(4){top:20px;width:8px;opacity:.8}
-.top b { font-size:17px;letter-spacing:-.01em; }
-.top .sp { flex:1; }
-.top a { color:var(--muted);text-decoration:none;font-size:14px; }
-.top a:hover { color:var(--ink); }
-main { max-width:960px;margin:0 auto;padding:0 26px 84px; }
-.hero { padding:46px 0 34px;text-align:center; }
-.kicker {
-  margin:0 0 13px;
-  color:var(--muted);
-  font:12px ui-monospace,SFMono-Regular,Menlo,monospace;
-  letter-spacing:.08em;
-  text-transform:uppercase;
-}
-h1,h2 { letter-spacing:-.025em; }
-h1 { max-width:780px;margin:0 auto 18px;font-size:clamp(40px,6.4vw,68px);line-height:1.04; }
-h1 em { color:#bf8324;font-style:normal; }
-.lede { max-width:650px;margin:0 auto;font-size:19px;color:var(--muted); }
-.steps {
-  list-style:none;
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:12px;
-  margin:30px 0 26px;
-  padding:0;
-  text-align:left;
-}
-.steps li { border-top:2px solid var(--rule-strong);padding:10px 4px 0; }
-.steps b { display:block;font-size:14px;margin-bottom:2px; }
-.steps span { color:var(--muted);font-size:13.5px;line-height:1.45; }
-.actions { display:flex;flex-wrap:wrap;justify-content:center;gap:10px; }
-.btn {
-  display:inline-block;
-  border-radius:14px;
-  padding:12px 20px;
-  text-decoration:none;
-  font-size:15px;
-  font-weight:600;
-}
-.btn.primary { background:var(--accent);color:var(--paper); }
-.btn.secondary { background:var(--card);border:1px solid var(--rule-strong); }
-.btn:hover { opacity:.88; }
-section { margin-top:74px;text-align:center; }
-h2 { margin:0 0 8px;font-size:29px;line-height:1.18; }
-.section-copy { max-width:650px;margin:0 auto 20px;color:var(--muted); }
-.frame {
-  margin:0;
-  overflow:hidden;
-  border:1px solid var(--rule-strong);
-  border-radius:16px;
-  background:var(--card);
-  box-shadow:0 14px 40px rgba(24,28,24,.10);
-}
-.frame img,.frame video { display:block;width:100%;height:auto; }
-.frame figcaption { padding:12px 18px 14px;color:var(--muted);font-size:14px; }
-.frame figcaption b { color:var(--ink); }
-.demo video { background:#111; }
-.cases { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }
-.case {
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  min-width:0;
-  padding:20px;
-  border:1px solid var(--rule);
-  border-radius:16px;
-  background:var(--card);
-}
-.wordmark { min-height:34px;margin-bottom:10px;font-size:23px;font-weight:700;display:flex;align-items:center;justify-content:center; }
-.wordmark .serif { font-family:Georgia,"Times New Roman",serif;font-weight:600; }
-.wordmark.techbash { font-weight:900;letter-spacing:-.03em; }
-.caselogo { width:auto;max-width:155px;height:25px;object-fit:contain;object-position:center; }
-.case p { margin:0; }
-.case .result { flex:1;font-size:14.5px;line-height:1.56; }
-.case .meta { margin-top:14px;color:var(--muted);font-size:12.5px; }
-.case img.proof { width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;margin-top:14px;border:1px solid var(--rule);border-radius:10px; }
-.maker {
-  display:grid;
-  grid-template-columns:1fr;
-  justify-items:center;
-  gap:16px 18px;
-  padding:24px;
-  border-radius:18px;
-  background:var(--card);
-  border-left:4px solid var(--amber);
-}
-.maker img { width:48px;height:48px;border-radius:50%;object-fit:cover; }
-.maker h2 { margin:0 0 6px;font-size:23px; }
-.maker p { max-width:700px;margin:0 auto;color:var(--muted); }
-.start {
-  padding:28px;
-  border-radius:18px;
-  background:var(--card);
-  border:1px solid var(--rule);
-}
-.start .section-copy { margin-bottom:18px; }
-.prompt {
-  display:grid;
-  grid-template-columns:1fr auto;
-  overflow:hidden;
-  border:1px solid var(--rule-strong);
-  border-radius:14px;
-  background:var(--paper);
-}
-.prompt blockquote { margin:0;padding:18px;font-size:15px;line-height:1.55;overflow-wrap:anywhere; }
-.prompt blockquote,pre { text-align:left; }
-.copybtn {
-  border:0;
-  border-left:1px solid var(--rule-strong);
-  padding:0 22px;
-  background:transparent;
-  color:var(--ink);
-  font:600 14px inherit;
-  cursor:pointer;
-}
-.copybtn:hover { background:var(--accent);color:var(--paper); }
-.manual { margin:18px 0 0;color:var(--muted);font-size:14px; }
-pre {
-  margin:8px 0 0;
-  padding:14px 17px;
-  overflow-x:auto;
-  border-radius:12px;
-  background:var(--accent);
-  color:#eceee9;
-  font:13.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;
-}
-.foot {
-  display:flex;
-  justify-content:center;
-  flex-wrap:wrap;
-  gap:10px 18px;
-  margin-top:64px;
-  padding-top:20px;
-  border-top:1px solid var(--rule);
-  color:var(--muted);
-  font-size:13px;
-  text-align:center;
-}
-.foot span { flex:1 1 100%; }
-@media (max-width:760px) {
-  .steps { grid-template-columns:repeat(2,1fr); }
-  .cases { grid-template-columns:1fr; }
-}
-@media (max-width:560px) {
-  .top { padding:12px 20px; }
-  main { padding:0 20px 64px; }
-  .hero { padding:26px 0 24px; }
-  h1 { font-size:38px;line-height:1.06; }
-  .lede { font-size:17px; }
-  .steps { grid-template-columns:1fr;gap:8px;margin:24px 0 22px; }
-  .steps li { display:grid;grid-template-columns:66px 1fr;gap:8px;padding-top:8px; }
-  .steps b { margin:0; }
-  section { margin-top:52px; }
-  h2 { font-size:25px; }
-  .actions { flex-direction:column; }
-  .btn { text-align:center; }
-  .frame { border-radius:12px; }
-  .maker { grid-template-columns:1fr;padding:20px; }
-  .maker img { width:44px;height:44px; }
-  .start { padding:20px; }
-  .prompt { grid-template-columns:1fr; }
-  .copybtn { border-left:0;border-top:1px solid var(--rule-strong);padding:12px 18px; }
-  pre { white-space:pre-wrap;overflow-wrap:anywhere; }
-}
-/* Enhancements leave the original reading order and static content intact. */
-:focus-visible { outline:3px solid #bf8324;outline-offset:4px; }
-.steps li { position:relative; }
-.step-trigger { display:block;width:100%;min-height:44px;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer; }
-.steps li:has([aria-pressed="true"]) { border-color:#bf8324; }
-.step-trigger[aria-pressed="true"] b { color:#986514; }
-.step-example { margin:-10px 0 22px;padding:10px 14px;border-left:3px solid var(--amber);background:var(--card);color:var(--muted);font-size:13.5px;text-align:left;min-height:64px; }
-.steps li.step-pulse::before { content:'';position:absolute;top:-2px;left:0;height:2px;width:100%;background:var(--amber);transform-origin:left;animation:step-connect .55s ease-out; }
-@keyframes step-connect { from { transform:scaleX(0); } to { transform:scaleX(1); } }
-@media (max-width:560px) { .steps li { display:block; } .step-trigger { display:grid;grid-template-columns:66px 1fr;gap:8px;align-items:start; } }
-.mark-button { display:grid;place-items:center;flex:none;width:44px;height:44px;margin:-9px;border:0;padding:0;border-radius:10px;background:none;cursor:pointer; }
-.mark.replay i { animation:mark-replay .48s ease-in-out;transform-origin:left; }
-.mark.replay i:nth-child(2) { animation-delay:.06s; }
-.mark.replay i:nth-child(3) { animation-delay:.12s; }
-.mark.replay i:nth-child(4) { animation-delay:.18s; }
-@keyframes mark-replay { 0%,100% { transform:scaleX(1); } 40% { transform:scaleX(.4) translateX(2px); } 70% { transform:scaleX(1.15); } }
-.cases { align-items:start; }
-.case details { width:100%;margin-top:12px;border-top:1px solid var(--rule);text-align:left;font-size:13.5px; }
-.case summary { cursor:pointer;min-height:44px;padding:12px 0 8px;font-weight:600; }
-.case summary::marker { color:#986514; }
-.case details p { padding:0 0 8px;color:var(--muted); }
-.case:has(details[open]) { border-color:var(--rule-strong); }
-.btn,.copybtn { transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease; }
-@media (hover:hover) { .btn:hover { transform:translateY(-2px);box-shadow:0 5px 12px #191d1918; } }
-.btn:active,.copybtn:active { transform:translateY(1px);box-shadow:none; }
-.copybtn { min-width:100px;min-height:44px;font-family:inherit;font-size:14px;font-weight:600; }
-.copy-status { min-height:22px;margin:8px 0 0;font-size:13.5px;color:var(--muted); }
-@media (prefers-reduced-motion:reduce) { .btn,.copybtn { transform:none !important; } }
-main > section { transition:opacity .32s ease,transform .32s ease; }
-main > section.reveal-pending { opacity:.65;transform:translateY(8px); }
-@media print, (prefers-reduced-motion:reduce) { main > section.reveal-pending { opacity:1;transform:none; } }
-@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { animation:none !important;transition:none !important; } }
-</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retake | Video recording for your coding agent</title>
+<meta name="description" content="Give your coding agent the tools to record real web apps. Make product videos, tutorials, and walkthroughs, with optional voiceover and captions. Review each take locally.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Retake">
+<meta property="og:title" content="Retake | Video recording for your coding agent">
+<meta property="og:description" content="A real app. A reusable walkthrough. A video you can review.">
+<meta property="og:url" content="https://www.useretake.app/">
+<meta property="og:image" content="https://www.useretake.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Retake's local recording library and video player">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Retake | Video recording for your coding agent">
+<meta name="twitter:description" content="Record real web apps with your coding agent. Review, correct, and rerun.">
+<meta name="twitter:image" content="https://www.useretake.app/og.png">
+<link rel="canonical" href="https://www.useretake.app/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/landing.css">
+<link rel="stylesheet" href="/split.css">
+<script src="/landing.js" defer></script>
+<script src="/split.js" defer></script>
 </head>
-<body>
-<header class="top">
-  <div class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-  <b>Retake</b>
-  <span class="sp"></span>
-  <a href="https://github.com/glebbogachev00/retake">GitHub</a>
+<body class="split-layout">
+<a class="skip" href="#main">Skip to content</a>
+<header class="header wrap">
+  <a class="brand" href="#" aria-label="Retake home"><svg class="mark" viewBox="0 0 64 64" width="29" height="29" aria-hidden="true" focusable="false"><rect class="mark-tile" width="64" height="64" rx="14"/><rect class="take t1" x="16" y="12" width="12" height="6" rx="3"/><rect class="take t2" x="16" y="21" width="20" height="6" rx="3"/><rect class="take t4" x="16" y="39" width="20" height="6" rx="3"/><rect class="take t5" x="16" y="48" width="12" height="6" rx="3"/><rect class="take keep" x="16" y="30" width="36" height="6" rx="3"/></svg><span>Retake</span></a>
+  <nav aria-label="Main navigation"><a href="#examples">Examples</a><a href="#workflow">How it works</a><a href="/docs/">Docs <span aria-hidden="true">↗</span></a></nav>
+  <div class="header-actions"><a class="mobile-docs" href="/docs/">Docs</a><a class="nav-cta" href="#connect"><span class="desktop-setup-label">Connect your agent</span><span class="mobile-setup-label">Setup</span><span aria-hidden="true">↗</span></a></div>
 </header>
-<main>
-  <div class="hero">
-    <p class="kicker">A reusable demo your coding agent records</p>
-    <h1>Demos that<br><em>re-record themselves.</em></h1>
-    <p class="lede">Describe the walkthrough once. Your agent records the real app, then reruns the same flow after the UI changes.</p>
-    <ol class="steps">
-      <li><b>Describe</b><span>Tell your agent what to show.</span></li>
-      <li><b>Record</b><span>It runs the real app and makes the MP4.</span></li>
-      <li><b>Review</b><span>Watch every take in the local Retake UI.</span></li>
-      <li><b>Correct</b><span>Give notes. Your agent updates and reruns it.</span></li>
-    </ol>
-    <div class="actions">
-      <a class="btn primary" href="#start" id="heroCopy">Copy the prompt for your agent</a>
-      <a class="btn secondary" href="#demo">Watch the 14-second demo</a>
+<main id="main">
+  <section class="hero wrap" aria-labelledby="hero-title">
+    <div class="hero-cells" aria-hidden="true"></div>
+    <span class="frame-label fl-tl" aria-hidden="true">[ REC ]</span><span class="frame-label fl-tr" aria-hidden="true">[ 1920 × 1080 ]</span><span class="frame-label fl-bl" aria-hidden="true">[ .YAML ]</span><span class="frame-label fl-br" aria-hidden="true">[ .MP4 ]</span>
+    <div class="hero-copy">
+    <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> An open-source tool for coding agents</p>
+    <h1 id="hero-title">Video recording<br>for your <span class="agent-word">coding agent<span class="bracket left" aria-hidden="true"></span><span class="bracket right" aria-hidden="true"></span></span>.</h1>
+    <p class="lede">Tell your agent what to show in a web app.<br class="wide-only"> It records the walkthrough. You review the take.</p>
+    <div class="hero-actions"><a class="button primary" href="#connect">Connect your agent <span aria-hidden="true">↗</span></a><a class="button quiet" href="#examples" id="watch-demo"><span class="play-triangle" aria-hidden="true"></span> Watch the narrated demo</a></div>
+    <p class="hero-note">Voiceover optional <span>·</span> Captions optional <span>·</span> Runs on your machine</p>
     </div>
-  </div>
-
-  <section aria-labelledby="library-title">
-    <h2 id="library-title">Review every take in one place</h2>
-    <p class="section-copy">Retake opens a private library at <code>localhost:4310</code>. Each demo keeps its MP4, stills, and proof log together in one output folder.</p>
-    <figure class="frame">
-      <img src="retake-ui.png" alt="Retake's local library showing recorded demos, a video player, output details, and frame stills" width="2880" height="1800">
-      <figcaption>Pick a demo, watch the result, then tell your agent what to correct.</figcaption>
-    </figure>
+    <aside class="session" aria-label="Illustration: a coding agent recording a walkthrough with Retake">
+      <div class="session-top"><span class="player-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="session-title">your agent <b>·</b> retake</span><span class="rec-pill" aria-hidden="true"><i></i>REC</span></div>
+      <div class="session-body">
+        <p class="session-prompt"><span class="prompt-mark" aria-hidden="true">&gt;</span><span class="session-brief" id="session-brief">Show what Capture does: turn a mixed thought into structure.</span><span class="caret" aria-hidden="true"></span></p>
+        <ol class="session-steps" aria-hidden="true">
+          <li data-phase="scout"><span class="s-icon"></span><span class="s-name">Scout the app</span><span class="s-meta">real browser</span></li>
+          <li data-phase="dry"><span class="s-icon"></span><span class="s-name">Dry run</span><span class="s-meta">every step resolves</span></li>
+          <li data-phase="rec"><span class="s-icon"></span><span class="s-name">Record the take</span><span class="s-meta session-timer" id="session-timer">00:00</span></li>
+          <li data-phase="render"><span class="s-icon"></span><span class="s-name">Render</span><span class="s-meta" id="session-render">with voiceover</span></li>
+        </ol>
+        <button class="session-result" type="button" id="session-result" aria-label="Watch the Capture product overview"><span class="session-thumb"><img id="session-thumb" src="/media/capture-x-2102280223316471854-v1.jpg" alt="" width="1280" height="720"></span><span class="session-file"><strong id="session-file">capture-product-overview.mp4</strong><small id="session-length">57 sec · ready to review</small></span><span class="session-watch"><span class="play-triangle" aria-hidden="true"></span>Watch</span></button>
+      </div>
+      <div class="session-takes" aria-label="Example takes"><button type="button" data-take="product" aria-pressed="true"><span>01</span> Product</button><button type="button" data-take="teaching" aria-pressed="false"><span>02</span> Education</button><button type="button" data-take="content" aria-pressed="false"><span>03</span> For X</button><span class="session-note">Illustrative</span></div>
+    </aside>
+    <div class="timeline" aria-hidden="true"><div class="timeline-ticks"></div><span class="timeline-head"></span><span class="tl-time t0">00:00</span><span class="tl-time t1">00:15</span><span class="tl-time t2">00:30</span><span class="tl-time t3">00:45</span><span class="tl-time t4">01:00</span></div>
   </section>
 
-  <section id="demo" class="demo" aria-labelledby="demo-title">
-    <h2 id="demo-title">One file produced this take</h2>
-    <p class="section-copy">When the product changes, the agent reruns the same flow instead of opening a screen recorder.</p>
-    <figure class="frame">
-      <video src="media/capture-two-places.mp4" poster="media/capture-two-places.jpg" width="1920" height="1180" controls muted playsinline preload="metadata"></video>
-      <figcaption><b>Capture, 14 seconds.</b> One rough sentence becomes an action and a continuing thread.</figcaption>
-    </figure>
-  </section>
-
-  <section aria-labelledby="cases-title">
-    <h2 id="cases-title">Used inside three real products</h2>
-    <p class="section-copy">Retake was built while recording these workflows, not as a landing-page concept.</p>
-    <div class="cases">
-      <article class="case">
-        <div class="wordmark"><span class="serif">capture<span style="color:#2f5d3f">.</span></span></div>
-        <p class="result">Five launch videos were drafted, corrected, and recut in one afternoon.</p>
-        <img class="proof" src="media/mark-done.jpg" alt="Frame from a Capture demo made with Retake" loading="lazy">
-        <details><summary>Capture workflow</summary><p>One rough sentence becomes an action and a continuing thread. Watch that flow in the 14-second take above.</p></details>
-        <p class="meta"><a href="https://www.trycapture.app">trycapture.app</a></p>
-      </article>
-      <article class="case">
-        <div class="wordmark"><img src="logos/avexjets.png" alt="AvexJets" class="caselogo"></div>
-        <p class="result">One repeatable flow replaced a twenty-minute live walkthrough across three client portals.</p>
-        <img class="proof" src="media/avex-public.jpg" alt="Public AvexJets charter request page recorded with Retake" loading="lazy">
-        <details><summary>AvexJets workflow</summary><p>The repeatable flow covers three client portals. The image shows the public charter request page, not the private client recording.</p></details>
-        <p class="meta">Client recording kept private · <a href="https://www.avex-jets.com">avex-jets.com</a></p>
-      </article>
-      <article class="case">
-        <div class="wordmark techbash"><span style="color:#193b92">Tech</span><span style="color:#2c7a7b">Bash</span></div>
-        <p class="result">The same file can repeat a real Scratch lesson when the lesson changes.</p>
-        <img class="proof" src="media/scratch-mini-project.jpg" alt="Frame from a Scratch lesson made with Retake" loading="lazy">
-        <details><summary>TechBash workflow</summary><p>Record a real Scratch lesson. When the lesson changes, use the same file to repeat the walkthrough.</p></details>
-        <p class="meta"><a href="https://bash.techtutor.academy">bash.techtutor.academy</a></p>
-      </article>
+  <section class="example-section wrap" id="examples" aria-labelledby="examples-title">
+    <div class="section-marker"><span id="examples-title">One tool. Different things to show.</span><span class="mono marker-right">Real recordings, not mockups</span></div>
+    <div class="example-shell">
+      <div class="example-tabs" role="tablist" aria-label="Recording examples">
+        <button id="tab-product" role="tab" aria-selected="true" aria-controls="example-panel" tabindex="0" data-example="product"><span class="tab-index">01</span> Product videos</button>
+        <button id="tab-teaching" role="tab" aria-selected="false" aria-controls="example-panel" tabindex="-1" data-example="teaching"><span class="tab-index">02</span> Education</button>
+        <button id="tab-content" role="tab" aria-selected="false" aria-controls="example-panel" tabindex="-1" data-example="content"><span class="tab-index">03</span> Content for X</button>
+      </div>
+      <div class="example-body" id="example-panel" role="tabpanel" aria-labelledby="tab-product" tabindex="0">
+        <div class="brief-column">
+          <div class="micro-label"><span class="tiny-prompt" aria-hidden="true">&gt;_</span> Example brief</div>
+          <p class="example-request" id="example-request">“Show what Capture does: turn a mixed thought into structure, ask about saved thoughts, and share context with an agent.”</p>
+          <div class="request-bottom"><div class="flow-path" aria-hidden="true"><span>Brief</span><i></i><span>Browser</span><i></i><span>MP4</span></div><p id="example-description">A full product overview, with the original voiceover.</p><span class="local-tag">Recorded with Retake</span></div>
+        </div>
+        <figure class="example-video">
+          <div class="player-top"><span class="player-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="video-file">capture-product-overview.mp4</span><span class="video-format" id="video-format">1280 × 720</span></div>
+          <div class="video-stage"><video id="example-video" controls playsinline preload="metadata" width="1920" height="1080" poster="/media/capture-x-2102280223316471854-v1.jpg" aria-label="Capture product overview with its original voiceover"><source src="/media/capture-x-2102280223316471854-v1.mp4" type="video/mp4"><p>Your browser cannot play this video. <a href="/media/capture-x-2102280223316471854-v1.mp4">Download the recording</a>.</p></video></div>
+          <figcaption><span id="example-title">Capture <span class="caption-muted">/ Product video</span></span><span id="example-duration">57 sec · With voiceover</span></figcaption>
+        </figure>
+      </div>
     </div>
+    <div class="example-meta"><p class="example-footnote" id="example-footnote">The full Capture video published on X, with its original voiceover. The example brief is illustrative.</p><a id="example-source" href="https://x.com/trycapturez/status/2102280223316471854">View on X ↗</a></div><div class="usecase-tags" aria-label="Recording use cases"><span>Product demos</span><span>Content for X</span><span>Lessons &amp; tutorials</span><span>Client walkthroughs</span></div>
+    <div class="proof-strip"><p>Built while recording<br><strong>real work.</strong></p><a href="https://www.trycapture.app" class="capture-wordmark">capture<span>.</span></a><a href="https://techtutor.academy" class="techtutor-wordmark">Tech<span>Tutor</span><small>Lessons &amp; coding projects</small></a><a href="https://github.com/glebbogachev00/retake" class="retake-wordmark"><img src="/favicon.svg" width="23" height="23" alt="">Retake<small>Product walkthroughs</small></a></div>
   </section>
 
-  <section class="maker" aria-labelledby="maker-title">
-    <img src="gleb.jpg" alt="" width="48" height="48">
-    <div>
-      <h2 id="maker-title">Made because I was tired of recording the same demo again</h2>
-      <p>I built Retake for my own launches and client walkthroughs, and I use it most days. The three products above are the proof so far.</p>
+  <section class="workflow-section wrap" id="workflow" aria-labelledby="workflow-title">
+    <div class="section-marker"><span>01 / The workflow</span><span class="mono marker-right">You direct. Your agent records.</span></div>
+    <div class="section-heading"><h2 id="workflow-title">Record it once.<br><span>Keep the walkthrough.</span></h2><p>The recording is a video. The flow behind it lives in your project, ready for your agent to edit and run again.</p></div>
+    <div class="workflow-grid">
+      <div class="workflow-steps" role="tablist" aria-label="How recording works" aria-orientation="vertical">
+        <button id="step-record" role="tab" aria-selected="true" aria-controls="workflow-panel" tabindex="0" data-step="record"><span class="step-number">01</span><span><strong>Describe &amp; record</strong><small>Choose the flow. Let your agent run it.</small></span><span class="step-arrow" aria-hidden="true">↗</span></button>
+        <button id="step-review" role="tab" aria-selected="false" aria-controls="workflow-panel" tabindex="-1" data-step="review"><span class="step-number">02</span><span><strong>Review the actual take</strong><small>Watch the video before calling it finished.</small></span><span class="step-arrow" aria-hidden="true">↗</span></button>
+        <button id="step-rerun" role="tab" aria-selected="false" aria-controls="workflow-panel" tabindex="-1" data-step="rerun"><span class="step-number">03</span><span><strong>Correct. Then rerun.</strong><small>Changed the interface? Use the same flow.</small></span><span class="step-arrow" aria-hidden="true">↗</span></button>
+      </div>
+      <div class="workflow-panel" id="workflow-panel" role="tabpanel" aria-labelledby="step-record" tabindex="0">
+        <div class="workflow-visual" id="workflow-visual"><div class="mini-filebar"><span class="file-dot" aria-hidden="true"></span>demos/your-walkthrough.yaml <span>saved in your project</span></div><div class="file-lines" aria-label="Illustrative workflow"><p><span>01</span><b>Open</b> your web app</p><p><span>02</span><b>Follow</b> the steps you chose</p><p><span>03</span><b>Wait</b> for the result</p><p><span>04</span><b>Record</b> the interaction</p></div><div class="file-result"><span class="file-icon" aria-hidden="true">▶</span><div><strong>demo.mp4</strong><small>Plus scene stills and a proof log</small></div><span class="result-arrow" aria-hidden="true">↗</span></div></div>
+        <div class="workflow-copy"><h3 id="workflow-detail-title">Start with something worth showing.</h3><p id="workflow-detail-copy">Your agent turns the brief into a reusable flow, checks the steps with a dry run, and records the real browser.</p><a id="workflow-detail-link" href="/docs/#record-review-rerun">Read the recording guide <span aria-hidden="true">↗</span></a></div>
+      </div>
     </div>
+    <div class="feature-row"><article><span class="feature-symbol" aria-hidden="true">{ voice }</span><h3>Silent or with voiceover.</h3><p>Keep it silent, or add narration. Review the take and script with your agent before adding the voiceover.</p></article><article><span class="feature-symbol" aria-hidden="true">Aa</span><h3>With or without captions.</h3><p>Add on-screen captions when they help explain the flow. Leave them off when the interaction speaks for itself.</p></article><article><span class="feature-symbol" aria-hidden="true">↻</span><h3>Keep the flow with the code.</h3><p>Update the steps when your product changes, then ask your agent for a new take.</p></article></div>
   </section>
 
-  <section id="start" class="start" aria-labelledby="start-title">
-    <h2 id="start-title">Give Retake to your coding agent</h2>
-    <p class="section-copy">Paste this inside your app project. The agent installs Retake and opens its local first-run flow.</p>
-    <div class="prompt">
-      <blockquote id="pasteline">Set up Retake from https://github.com/glebbogachev00/retake in this project and open its local UI. Let the first-run questions collect the app URL, workflow, and sound preference; use those answers instead of asking me twice. Dry-run the workflow, record a silent preview, and show it in the Retake UI. Wait for my review, then apply my corrections and rerun it. Add voiceover only after I approve both the recording and narration script. Tell me where the finished MP4 is. Do not deploy, commit, or ask me to paste secrets into chat.</blockquote>
-      <button class="copybtn" type="button" data-copy="pasteline" hidden>Copy</button>
-    </div>
-    <noscript><p class="manual">Select the prompt and copy it into your coding agent.</p></noscript>
-    <p class="manual">Or install it yourself:</p>
-    <pre>npm install -g retake-demos
-mkdir demos && cd demos && retake install</pre>
+  <section class="connect-section wrap" id="connect" aria-labelledby="connect-title">
+    <div class="section-marker"><span>02 / Get started</span><a href="https://github.com/glebbogachev00/retake">Open source on GitHub <span aria-hidden="true">↗</span></a></div>
+    <div class="connect-layout"><div class="connect-intro"><p class="eyebrow">Works with the agent you use</p><h2 id="connect-title">Give your agent<br>the recording tools.</h2><p>Start inside your app project. Your agent handles setup; you choose what gets recorded.</p><div class="agent-labels"><span>Claude Code</span><span>Codex</span><span>Cursor</span></div><p class="small-note">Use the CLI, or connect through MCP: the tool interface coding agents can call.</p><a class="setup-docs-link" href="/docs/#agents">Agent setup guide ↗</a></div>
+    <div class="setup-shell"><div class="setup-top"><div role="tablist" aria-label="Setup method"><button id="setup-prompt" role="tab" aria-selected="true" aria-controls="setup-panel" tabindex="0" data-setup="prompt">Prompt</button><button id="setup-cli" role="tab" aria-selected="false" aria-controls="setup-panel" tabindex="-1" data-setup="cli">CLI</button><button id="setup-mcp" role="tab" aria-selected="false" aria-controls="setup-panel" tabindex="-1" data-setup="mcp">MCP</button></div><button class="copy-button" id="copy-setup" type="button"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="6" y="6" width="10" height="11" rx="2"/><path d="M12 6V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg><span>Copy</span></button></div><div id="setup-panel" role="tabpanel" aria-labelledby="setup-prompt" tabindex="0"><p class="setup-label" id="setup-label">Paste this into your coding agent</p><pre id="setup-code">Set up Retake from https://github.com/glebbogachev00/retake in this project and open its local UI. Use the first-run questions to collect the app URL and workflow. Dry-run the flow, record a silent preview, and show me the video and local review link. Wait for my review before making corrections or adding narration. Keep secrets out of chat. Do not commit or deploy anything.</pre><p class="setup-hint" id="setup-hint">The first preview is a starting point. Watch it and tell your agent what to change.</p></div><p class="copy-status" id="copy-status" role="status" aria-live="polite"></p></div></div>
   </section>
 
-  <footer class="foot">
-    <span>MIT licensed. Recording runs on your machine. Optional visual checks send only the reviewed frames to the model you choose.</span>
-    <a href="https://github.com/glebbogachev00/retake">Source</a>
-    <a href="https://github.com/glebbogachev00/retake/issues/new?template=bug.md">Report a bug</a>
-  </footer>
+  <section class="faq-section wrap" aria-labelledby="faq-title"><div class="section-marker"><span>03 / A few practical answers</span></div><div class="faq-layout"><h2 id="faq-title">Before you <br>press record.</h2><div class="faq-list">
+    <details><summary>Is this an AI video generator?<span aria-hidden="true">+</span></summary><p>Retake records a real web app in a browser. Your coding agent plans and runs the walkthrough; the footage comes from the app, not generated scenes.</p></details>
+    <details><summary>Can I add voiceover and captions?<span aria-hidden="true">+</span></summary><p>Yes. Choose voiceover, captions, both, or neither when your agent makes the video. Start with a silent preview, then review the take and narration script before adding voiceover.</p></details>
+    <details><summary>What can I record?<span aria-hidden="true">+</span></summary><p>Browser-based product videos, tutorials, content clips, and walkthroughs. Retake drives Chromium with Playwright. It is not a general desktop or native mobile screen recorder.</p></details>
+    <details><summary>Do I need a Retake account or API key?<span aria-hidden="true">+</span></summary><p>No Retake account or Retake API key is needed for local recording. You need Node.js 20 or newer and a coding agent or the CLI. Setup downloads Chromium. Optional model features may need their own provider configuration.</p></details>
+    <details><summary>Does anything leave my machine?<span aria-hidden="true">+</span></summary><p>The recording and local review library run on your machine. Your coding agent may use its own model provider. Optional visual checks send frames to the model you configure, and some narration options use external services. Review those settings before recording sensitive workflows.</p></details>
+    <details><summary>Will the video update automatically?<span aria-hidden="true">+</span></summary><p>The flow is reusable, not self-healing. Ask your agent to rerun it after a change. If buttons, selectors, or the workflow have changed, it may need to update the steps first.</p></details>
+    <details><summary>Is Retake free?<span aria-hidden="true">+</span></summary><p>Retake is open source under the MIT license. Recording uses your computer. Your coding agent and any optional model or narration services may have their own costs.</p></details>
+  </div></div></section>
+  <section class="closing wrap"><div class="closing-mark" aria-hidden="true"><svg class="mark" viewBox="0 0 64 64" width="38" height="38" aria-hidden="true" focusable="false"><rect class="mark-tile" width="64" height="64" rx="14"/><rect class="take t1" x="16" y="12" width="12" height="6" rx="3"/><rect class="take t2" x="16" y="21" width="20" height="6" rx="3"/><rect class="take t4" x="16" y="39" width="20" height="6" rx="3"/><rect class="take t5" x="16" y="48" width="12" height="6" rx="3"/><rect class="take keep" x="16" y="30" width="36" height="6" rx="3"/></svg></div><h2>What should your<br>agent record next?</h2><a class="button primary" href="#connect">Connect your agent <span aria-hidden="true">↗</span></a><p>Pick one flow. Start with a preview.</p></section>
 </main>
-<script>
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const mark = document.querySelector('.mark');
-const replayMark = document.createElement('button');
-replayMark.type = 'button';
-replayMark.className = 'mark-button';
-replayMark.setAttribute('aria-label', 'Replay the Retake mark');
-mark.before(replayMark);
-replayMark.append(mark);
-replayMark.addEventListener('click', () => {
-  mark.classList.remove('replay');
-  if (reducedMotion.matches) return;
-  void mark.offsetWidth;
-  mark.classList.add('replay');
-});
-const examples = [
-  'Describe: Ask your agent to show one rough sentence becoming an action in Capture.',
-  'Record: Run the real workflow and save the result as an MP4.',
-  'Review: Watch the take in the local library, then check its stills and proof log.',
-  'Correct: Give your agent notes, then rerun the same flow. Return to Describe for a different walkthrough.'
-];
-const stepExample = document.createElement('p');
-stepExample.id = 'step-example';
-stepExample.className = 'step-example';
-stepExample.setAttribute('aria-live', 'polite');
-stepExample.setAttribute('aria-atomic', 'true');
-stepExample.textContent = examples[0];
-document.querySelector('.steps').after(stepExample);
-const stepButtons = [];
-document.querySelectorAll('.steps li').forEach((item, index) => {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'step-trigger';
-  button.setAttribute('aria-pressed', String(index === 0));
-  button.setAttribute('aria-controls', 'step-example');
-  button.append(...item.childNodes);
-  item.append(button);
-  stepButtons.push(button);
-  const select = () => {
-    stepButtons.forEach(step => {
-      step.setAttribute('aria-pressed', String(step === button));
-      step.parentElement.classList.remove('step-pulse');
-    });
-    stepExample.textContent = examples[index];
-    if (!reducedMotion.matches) {
-      void item.offsetWidth;
-      item.classList.add('step-pulse');
-    }
-  };
-  button.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') select(); });
-  button.addEventListener('focus', select);
-  button.addEventListener('click', select);
-});
-const promptText = () => document.getElementById('pasteline')?.textContent.trim() || '';
-const copyStatus = document.createElement('p');
-copyStatus.id = 'copy-status';
-copyStatus.className = 'copy-status';
-copyStatus.setAttribute('role', 'status');
-copyStatus.setAttribute('aria-atomic', 'true');
-document.querySelector('.prompt').after(copyStatus);
-const copyTimers = new WeakMap();
-async function copyPrompt(button) {
-  if (button.getAttribute('aria-busy') === 'true') return false;
-  const previous = button.dataset.label || button.textContent;
-  button.dataset.label = previous;
-  clearTimeout(copyTimers.get(button));
-  button.setAttribute('aria-busy', 'true');
-  button.textContent = 'Copying…';
-  copyStatus.textContent = '';
-  try {
-    await navigator.clipboard.writeText(promptText());
-    button.textContent = 'Copied — paste it to your agent';
-    copyStatus.textContent = 'Copied. Paste the prompt into your coding agent.';
-    copyTimers.set(button, window.setTimeout(() => { button.textContent = previous; }, 2200));
-    return true;
-  } catch {
-    button.textContent = previous;
-    copyStatus.textContent = 'Could not copy. Select the prompt and copy it manually.';
-    const prompt = document.getElementById('pasteline');
-    prompt.setAttribute('tabindex', '-1');
-    prompt.focus({ preventScroll:true });
-    document.getElementById('start').scrollIntoView({ behavior:reducedMotion.matches ? 'instant' : 'smooth' });
-    return false;
-  } finally {
-    button.removeAttribute('aria-busy');
-  }
-}
-const heroCopy = document.getElementById('heroCopy');
-heroCopy?.addEventListener('click', async (event) => {
-  event.preventDefault();
-  await copyPrompt(heroCopy);
-});
-document.querySelectorAll('.copybtn').forEach((button) => {
-  button.hidden = false;
-  button.addEventListener('click', () => copyPrompt(button));
-});
-if ('IntersectionObserver' in window && !reducedMotion.matches) {
-  const reveal = section => section.classList.remove('reveal-pending');
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) { reveal(entry.target); observer.unobserve(entry.target); }
-    });
-  }, { threshold:0, rootMargin:'0px 0px -24px 0px' });
-  document.querySelectorAll('main > section').forEach(section => {
-    if (section.getBoundingClientRect().top > window.innerHeight) {
-      section.classList.add('reveal-pending');
-      observer.observe(section);
-    }
-    section.addEventListener('focusin', () => { reveal(section); observer.unobserve(section); });
-  });
-  reducedMotion.addEventListener('change', () => {
-    if (reducedMotion.matches) {
-      observer.disconnect();
-      document.querySelectorAll('.reveal-pending').forEach(reveal);
-    }
-  });
-}
-</script>
+<footer class="footer wrap"><a class="brand" href="#"><img src="/favicon.svg" width="23" height="23" alt=""><span>Retake</span></a><span>Built by <a href="https://x.com/Peaceful_HN">Gleb</a>. Used for real recordings.</span><div><a href="/docs/">Docs ↗</a><a href="https://github.com/glebbogachev00/retake">GitHub ↗</a><a href="https://github.com/glebbogachev00/retake/issues">Report a bug ↗</a><a href="https://github.com/glebbogachev00/retake/blob/main/LICENSE">MIT license</a></div></footer>
+<noscript><p class="noscript wrap">The first video and setup prompt work without JavaScript. Enable JavaScript to switch examples and copy setup instructions.</p></noscript>
 </body>
 </html>

@@ -1,0 +1,97 @@
+/* Version B: centered hierarchy with balanced component grids. Version A keeps landing.css. */
+.centered-layout .hero { padding-top: 66px; padding-bottom: 42px; }
+.centered-layout .example-section { max-width: 1040px; }
+.centered-layout .example-section > .section-marker { border-top: 0; justify-content: center; padding-bottom: 21px; }
+.centered-layout .marker-right { display: none; }
+.centered-layout .example-shell { border-radius: 10px; box-shadow: 0 14px 48px -32px #30281938; }
+.centered-layout .example-tabs { justify-content: center; gap: 28px; background: #f7f6f1; }
+.centered-layout .example-tabs button { padding: 16px 7px 14px; }
+.centered-layout .example-body { display: block; }
+.centered-layout .brief-column { display: none; }
+.centered-layout .example-video { width: 100%; }
+.centered-layout .player-top { padding-inline: 22px; }
+.centered-layout .example-video figcaption { justify-content: center; gap: 24px; padding: 15px 22px; }
+.centered-layout .example-meta { display: block; text-align: center; margin-top: 16px; }
+.centered-layout .example-meta .example-footnote { display: none; }
+.centered-layout .example-meta > a { font-size: 11px; }
+.centered-layout .usecase-tags { justify-content: center; gap: 0; margin-top: 23px; }
+.centered-layout .usecase-tags span { border: 0; border-radius: 0; padding: 0 15px; font-size: 10px; }
+.centered-layout .usecase-tags span + span { border-left: 1px solid var(--line-dark); }
+.centered-layout .proof-strip { justify-content: center; gap: 55px; max-width: 840px; margin: 38px auto 0; }
+.centered-layout .proof-strip > p { text-align: center; }
+.centered-layout .workflow-section, .centered-layout .connect-section, .centered-layout .faq-section { padding-top: 74px; }
+.centered-layout .section-marker { justify-content: center; }
+.centered-layout .section-heading { display: block; text-align: center; padding: 0; margin: 25px 0 32px; }
+.centered-layout .section-heading h2 { max-width: none; }
+.centered-layout .section-heading > p { max-width: 550px; margin: 21px auto 0; }
+.centered-layout .workflow-grid { display: grid; grid-template-columns: minmax(220px,.72fr) minmax(0,1.28fr); gap: 25px; max-width: 1000px; margin-inline: auto; border: 0; background: transparent; overflow: visible; }
+.centered-layout .workflow-steps { display: flex; flex-direction: column; gap: 10px; border: 0; }
+.centered-layout .workflow-steps button { display: grid; grid-template-columns: 25px minmax(0,1fr) 12px; gap: 12px; align-items: start; text-align: left; padding: 24px 21px; min-height: 118px; border: 1px solid transparent; border-radius: 7px; background: transparent; transition: background .18s,border-color .18s; }
+.centered-layout .workflow-steps button:hover { background: #f3f2ea; }
+.centered-layout .workflow-steps button[aria-selected="true"] { background: #f4f0e5; border-color: #e7dcc5; }
+.centered-layout .step-number { width: auto; font-size: 10px; padding-top: 2px; }
+.centered-layout .workflow-steps strong { font-size: 13px; }
+.centered-layout .workflow-steps small { display: block; font-size: 11px; margin-top: 8px; }
+.centered-layout .step-arrow { display: inline; }
+.centered-layout .workflow-panel { border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+.centered-layout .workflow-visual { height: 207px; min-height: 207px; }
+.centered-layout .workflow-copy { text-align: left; padding: 0; margin-top: 20px; }
+.centered-layout .workflow-copy h3 { font-size: 18px; }
+.centered-layout .workflow-copy p { max-width: 590px; margin: 12px 0 15px; }
+.centered-layout .feature-row { max-width: 860px; margin: 30px auto 0; }
+.centered-layout .feature-row article, .centered-layout .feature-row article + article { text-align: center; padding: 12px 24px 0; border: 0; }
+.centered-layout .feature-symbol { margin-bottom: 12px; }
+.centered-layout .feature-row p { margin-inline: auto; }
+.centered-layout .connect-section > .section-marker { flex-direction: column; gap: 9px; }
+.centered-layout .connect-layout { display: flex; flex-direction: column; align-items: center; gap: 31px; padding-top: 30px; }
+.centered-layout .connect-intro { text-align: center; max-width: 650px; }
+.centered-layout .connect-intro > p { max-width: 510px; margin-inline: auto; }
+.centered-layout .agent-labels { justify-content: center; }
+.centered-layout .setup-shell { width: min(760px, 100%); align-self: center; margin-inline: auto; text-align: left; }
+.centered-layout #setup-panel { min-height: 0; padding-bottom: 20px; }
+.centered-layout #setup-code { min-height: 0; }
+.centered-layout .setup-hint { margin-bottom: 0; }
+.centered-layout .faq-layout { display: block; max-width: 760px; margin-inline: auto; }
+.centered-layout .faq-layout > h2 { text-align: center; margin-bottom: 37px; }
+.centered-layout .closing { padding-top: 85px; }
+@media (max-width: 900px) {
+  .centered-layout .proof-strip { gap: 35px; }
+  .centered-layout .workflow-steps small { max-width: 190px; }
+}
+@media (max-width: 760px) {
+  .centered-layout .hero { padding-top: 46px; padding-bottom: 31px; }
+  .centered-layout .example-tabs { gap: 16px; padding-inline: 12px; }
+  .centered-layout .example-tabs button { padding: 14px 5px 12px; }
+  .centered-layout .example-video figcaption { gap: 16px; padding: 12px 14px; flex-wrap: wrap; }
+  .centered-layout .player-top { padding-inline: 15px; }
+  .centered-layout .usecase-tags { row-gap: 9px; }
+  .centered-layout .usecase-tags span { font-size: 9px; padding-inline: 9px; }
+  .centered-layout .proof-strip { gap: 22px; justify-content: center; }
+  .centered-layout .workflow-section, .centered-layout .connect-section, .centered-layout .faq-section { padding-top: 61px; }
+  .centered-layout .section-heading { padding: 0; margin: 22px 0 26px; }
+  .centered-layout .workflow-grid { grid-template-columns: 1fr; gap: 14px; }
+  .centered-layout .workflow-steps { flex-direction: row; gap: 6px; }
+  .centered-layout .workflow-steps button { display: flex; flex: 1; flex-direction: column; text-align: center; align-items: center; padding: 15px 5px 13px; gap: 6px; min-height: 80px; }
+  .centered-layout .step-arrow { display: none; }
+  .centered-layout .workflow-steps strong { font-size: 10px; }
+  .centered-layout .workflow-steps small { display: none; }
+  .centered-layout .workflow-visual { min-height: 207px; }
+  .centered-layout .workflow-copy { padding: 0; margin-top: 18px; }
+  .centered-layout .workflow-copy h3 { font-size: 16px; }
+  .centered-layout .feature-row { gap: 21px; }
+  .centered-layout .feature-row article, .centered-layout .feature-row article + article { padding: 0; border: 0; }
+  .centered-layout .feature-row p { max-width: 360px; }
+  .centered-layout .connect-layout { gap: 24px; }
+  .centered-layout .closing { padding-top: 58px; }
+}
+@media (max-width: 420px) {
+  .centered-layout .example-tabs { gap: 10px; padding-inline: 8px; }
+  .centered-layout .example-tabs button { font-size: 10px; padding-inline: 4px; }
+  .centered-layout .proof-strip { column-gap: 23px; row-gap: 20px; flex-wrap: wrap; }
+  .centered-layout .proof-strip > p { flex-basis: 100%; }
+  .centered-layout .usecase-tags span { padding-inline: 6px; font-size: 8px; }
+  .centered-layout .workflow-steps strong { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .centered-layout .workflow-steps button { transition: none; }
+}

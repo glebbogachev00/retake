@@ -1,0 +1,259 @@
+/* Split layout (A). The hero is two columns: the promise on the left, an
+   agent at work on the right. The page sits inside a drawn frame — rails,
+   crosshairs, bracket labels — so it reads as a recording tool rather than
+   a brochure. Motion means one thing here: something is being recorded.
+   All of it stands still under prefers-reduced-motion. */
+
+.split-layout { --rec: #cf513c; --cell: 112px; }
+
+/* ---------- the frame: rails down the page, crosshairs at each section ---------- */
+.split-layout main { position: relative; }
+.split-layout main::before {
+  content: ""; position: absolute; inset: 0 auto 0 50%; transform: translateX(-50%);
+  width: min(1120px, calc(100% - 64px)); border-inline: 1px solid var(--line);
+  pointer-events: none; z-index: 0;
+}
+.split-layout main > section { position: relative; z-index: 1; }
+.split-layout .section-marker { position: relative; }
+.split-layout .section-marker::before,
+.split-layout .section-marker::after {
+  content: ""; position: absolute; top: 0; width: 11px; height: 11px;
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 11px 1px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) center / 1px 11px no-repeat;
+  transform: translate(-50%, -50%);
+}
+.split-layout .section-marker::before { left: 0; }
+.split-layout .section-marker::after { left: 100%; }
+.split-layout .section-marker > span:first-child {
+  font: 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.split-layout .section-marker > span:first-child::before { content: "[ "; color: #b9b8ad; }
+.split-layout .section-marker > span:first-child::after { content: " ]"; color: #b9b8ad; }
+
+/* ---------- the logo: the takes arrive, the kept one records across ---------- */
+.mark { display: block; overflow: visible; }
+.mark .mark-tile { fill: #1a1c1e; }
+.mark .take { fill: #eceee9; transform-box: fill-box; transform-origin: left center; }
+.mark .t1, .mark .t5 { opacity: .55; }
+.mark .t2, .mark .t4 { opacity: .8; }
+.mark .keep { fill: #e8b04b; transform-box: fill-box; transform-origin: left center; }
+.brand .mark { border-radius: 7px; }
+@media (prefers-reduced-motion: no-preference) {
+  .mark .take { animation: take-in .55s cubic-bezier(.2, .8, .2, 1) both; }
+  .mark .t1 { animation-delay: .08s; }
+  .mark .t2 { animation-delay: .16s; }
+  .mark .t4 { animation-delay: .24s; }
+  .mark .t5 { animation-delay: .32s; }
+  .mark .keep { animation: take-keep 1.15s cubic-bezier(.65, 0, .35, 1) .42s both; }
+  /* A replay swaps to identical keyframes under another name, which restarts them. */
+  .mark.replay .take { animation-name: take-in-again; }
+  .mark.replay .keep { animation-name: take-keep-again; }
+}
+@keyframes take-in { from { transform: scaleX(0); opacity: 0; } }
+@keyframes take-in-again { from { transform: scaleX(0); opacity: 0; } }
+@keyframes take-keep { 0% { transform: scaleX(0); } 72% { transform: scaleX(1.07); } 100% { transform: scaleX(1); } }
+@keyframes take-keep-again { 0% { transform: scaleX(0); } 72% { transform: scaleX(1.07); } 100% { transform: scaleX(1); } }
+
+/* ---------- hero: split ---------- */
+.split-layout .hero {
+  display: grid; grid-template-columns: minmax(0, 1.04fr) minmax(0, .96fr); gap: 56px; align-items: center;
+  text-align: left; padding: 92px 44px 112px; overflow: hidden;
+}
+.split-layout .hero-copy { position: relative; z-index: 1; }
+.split-layout .hero h1 { font-size: clamp(42px, 4.6vw, 66px); letter-spacing: -3.2px; margin-bottom: 22px; }
+.split-layout .hero .lede { max-width: 470px; }
+.split-layout .hero .lede .wide-only { display: none; }
+.split-layout .hero-actions { justify-content: flex-start; flex-wrap: wrap; }
+.split-layout .hero-note { text-align: left; }
+.split-layout .hero .status-dot { box-shadow: 0 0 0 0 rgba(110, 125, 91, .5); }
+@media (prefers-reduced-motion: no-preference) {
+  .split-layout .hero .status-dot { animation: pulse 2.4s ease-out infinite; }
+}
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(110, 125, 91, .45); } 70%, 100% { box-shadow: 0 0 0 7px rgba(110, 125, 91, 0); } }
+
+/* The grid behind the hero, fading out from the session card. */
+.hero-cells {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: var(--cell) var(--cell); background-position: -1px -1px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 75% at 72% 45%, #000 15%, transparent 72%);
+  mask-image: radial-gradient(ellipse 70% 75% at 72% 45%, #000 15%, transparent 72%);
+}
+.hero-cells::before, .hero-cells::after {
+  content: ""; position: absolute; width: var(--cell); height: var(--cell); background: var(--tint); opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-cells::before { animation: cell-a 9s steps(1) infinite; }
+  .hero-cells::after { animation: cell-b 11s steps(1) infinite; }
+}
+@keyframes cell-a {
+  0% { left: calc(var(--cell) * 6); top: calc(var(--cell) * 0); opacity: .9; }
+  25% { left: calc(var(--cell) * 8); top: calc(var(--cell) * 3); opacity: .6; }
+  50% { left: calc(var(--cell) * 5); top: calc(var(--cell) * 4); opacity: .8; }
+  75% { left: calc(var(--cell) * 9); top: calc(var(--cell) * 1); opacity: .5; }
+}
+@keyframes cell-b {
+  0% { left: calc(var(--cell) * 9); top: calc(var(--cell) * 4); opacity: .55; }
+  33% { left: calc(var(--cell) * 4); top: calc(var(--cell) * 1); opacity: .8; }
+  66% { left: calc(var(--cell) * 7); top: calc(var(--cell) * 2); opacity: .5; }
+}
+
+.frame-label { position: absolute; z-index: 1; font: 10px/1 var(--mono); letter-spacing: .08em; color: #bcbbb0; pointer-events: none; }
+.fl-tl { top: 22px; left: 22px; }
+.fl-tr { top: 22px; right: 22px; }
+.fl-bl { bottom: 70px; left: 22px; }
+.fl-br { bottom: 70px; right: 22px; }
+.fl-tl::first-letter { color: var(--rec); }
+
+/* ---------- the session card: an agent recording a take ---------- */
+.session {
+  position: relative; z-index: 1; background: var(--panel); border: 1px solid var(--line-dark); border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .02), 0 30px 70px -30px rgba(37, 39, 32, .32); overflow: hidden;
+}
+.session-top { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--soft); font: 11px var(--mono); color: var(--muted); }
+.session-top .player-dots { display: inline-flex; gap: 5px; }
+.session-top .player-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-dark); }
+.session-title b { color: #bdbcb0; font-weight: 400; padding-inline: 2px; }
+.rec-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font: 10px var(--mono); letter-spacing: .1em; color: var(--rec); opacity: .3; transition: opacity .3s; }
+.rec-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--rec); }
+.session[data-phase="rec"] .rec-pill { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .session[data-phase="rec"] .rec-pill i { animation: blink 1s steps(2, start) infinite; }
+}
+@keyframes blink { to { visibility: hidden; } }
+
+.session-body { padding: 20px 20px 18px; }
+.session-prompt { display: flex; font: 13px/1.6 var(--mono); color: var(--ink); min-height: 63px; margin: 0 0 14px; }
+.prompt-mark { color: var(--accent-ink); margin-right: 9px; flex: none; }
+.session-brief { white-space: pre-wrap; }
+.caret { flex: none; display: inline-block; width: 7px; height: 16px; margin: 3px 0 0 2px; background: var(--ink); opacity: 0; }
+.session[data-phase="type"] .caret { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .session[data-phase="type"] .caret { animation: blink .9s steps(2, start) infinite; }
+}
+
+.session-steps { list-style: none; margin: 0 0 16px; padding: 0; border-top: 1px dashed var(--line-dark); }
+.session-steps li { display: grid; grid-template-columns: 16px 1fr auto; gap: 11px; align-items: center; padding: 9px 2px; border-bottom: 1px dashed var(--line); font: 12px var(--mono); color: #b3b2a8; transition: color .3s; }
+.session-steps li.on, .session-steps li.done { color: var(--ink); }
+.session-steps .s-meta { font-size: 11px; color: inherit; opacity: .75; }
+.session-steps li.done .s-meta { color: var(--muted); opacity: 1; }
+.s-icon { position: relative; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #cfcec4; transition: background .25s, border-color .25s; }
+.session-steps li.on .s-icon { border-color: var(--accent); border-top-color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  .session-steps li.on .s-icon { animation: spin .8s linear infinite; }
+}
+.session-steps li[data-phase="rec"].on .s-icon { border: 0; background: var(--rec); animation: none; box-shadow: 0 0 0 0 rgba(207, 81, 60, .45); }
+@media (prefers-reduced-motion: no-preference) {
+  .session-steps li[data-phase="rec"].on .s-icon { animation: rec-pulse 1.2s ease-out infinite; }
+}
+.session-steps li.done .s-icon { background: var(--green); border-color: var(--green); animation: none; }
+.session-steps li.done .s-icon::after { content: ""; position: absolute; left: 4.5px; top: 2.5px; width: 3px; height: 6px; border: solid #fffefa; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.session-timer { font-variant-numeric: tabular-nums; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rec-pulse { 0% { box-shadow: 0 0 0 0 rgba(207, 81, 60, .45); } 80%, 100% { box-shadow: 0 0 0 6px rgba(207, 81, 60, 0); } }
+
+.session-result {
+  width: 100%; display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 10px; border: 1px solid var(--line-dark); border-radius: 9px; background: #fff; color: var(--ink); text-align: left;
+  opacity: .35; transform: translateY(6px); transition: opacity .45s, transform .45s, border-color .2s, box-shadow .2s;
+}
+.session[data-phase="done"] .session-result { opacity: 1; transform: none; }
+.session-result:hover { border-color: var(--ink); box-shadow: 0 10px 24px -14px rgba(37, 39, 32, .4); }
+.session-thumb { display: block; aspect-ratio: 16 / 9; border-radius: 5px; overflow: hidden; background: var(--soft); }
+.session-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.session-file { min-width: 0; }
+.session-file strong { display: block; font: 600 12px/1.4 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-file small { color: var(--muted); font-size: 12px; }
+.session-watch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; padding: 9px 12px; border-radius: 6px; background: var(--ink); color: #fffefa; }
+.session-watch .play-triangle { border-left-color: #fffefa; }
+
+.session-takes { display: flex; align-items: center; gap: 4px; padding: 9px 12px; border-top: 1px solid var(--line); background: var(--soft); }
+.session-takes button { position: relative; overflow: hidden; border: 1px solid transparent; background: none; color: var(--muted); font: 11px var(--mono); padding: 6px 10px 7px; border-radius: 5px; }
+.session-takes button span { color: #b9b8ad; margin-right: 2px; }
+.session-takes button:hover { color: var(--ink); }
+.session-takes button[aria-pressed="true"] { background: #fff; border-color: var(--line-dark); color: var(--ink); }
+.session-takes button[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: calc(var(--p, 0) * 100%); background: var(--accent); }
+.session-note { margin-left: auto; font: 10px var(--mono); color: #b9b8ad; letter-spacing: .04em; }
+
+/* ---------- the timeline under the hero: a playhead crossing the take ---------- */
+.timeline { grid-column: 1 / -1; position: absolute; left: 0; right: 0; bottom: 0; height: 46px; border-top: 1px solid var(--line); z-index: 1; }
+.timeline-ticks { position: absolute; inset: 0 0 auto; height: 11px;
+  background-image: repeating-linear-gradient(90deg, var(--line-dark) 0 1px, transparent 1px 22px), repeating-linear-gradient(90deg, #c3c2b7 0 1px, transparent 1px 110px);
+  background-size: 100% 6px, 100% 11px; background-repeat: no-repeat; }
+.timeline-head { position: absolute; top: -4px; left: 0; width: 1px; height: 30px; background: var(--rec); }
+.timeline-head::before { content: ""; position: absolute; top: -3px; left: -4px; width: 9px; height: 9px; border-radius: 2px; background: var(--rec); }
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-head { animation: playhead 14s linear infinite; }
+}
+@keyframes playhead { from { left: 0; } to { left: 100%; } }
+.tl-time { position: absolute; top: 18px; font: 10px var(--mono); color: #b3b2a8; transform: translateX(4px); }
+.tl-time.t0 { left: 0; } .tl-time.t1 { left: 25%; } .tl-time.t2 { left: 50%; } .tl-time.t3 { left: 75%; } .tl-time.t4 { left: auto; right: 6px; transform: none; }
+
+/* ---------- surfaces that answer the pointer ---------- */
+.split-layout .feature-row article,
+.split-layout .workflow-steps button,
+.split-layout .faq-list details {
+  background-image: radial-gradient(260px circle at var(--mx, -400px) var(--my, -400px), rgba(221, 165, 71, .11), transparent 62%);
+}
+.split-layout .feature-row article { transition: transform .25s, border-color .25s; }
+.split-layout .feature-row article:hover { transform: translateY(-2px); }
+.split-layout .example-shell { transition: box-shadow .3s; }
+.split-layout .example-shell:hover { box-shadow: 0 30px 70px -40px rgba(37, 39, 32, .35); }
+
+/* ---------- arriving as you scroll (only with JavaScript and motion) ---------- */
+.split-js .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .2, 1); }
+.split-js .reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .split-js .reveal { opacity: 1; transform: none; transition: none; } }
+
+/* ---------- narrower screens: the session drops under the promise ---------- */
+@media (max-width: 1080px) {
+  .split-layout .hero { gap: 40px; padding-inline: 28px; }
+  .split-layout .hero h1 { letter-spacing: -2.4px; }
+}
+@media (max-width: 920px) {
+  .split-layout .hero { grid-template-columns: minmax(0, 1fr); padding: 64px 22px 96px; }
+  .split-layout .hero .lede { max-width: 560px; }
+  .hero-cells { -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 70%, #000 10%, transparent 70%); mask-image: radial-gradient(ellipse 90% 60% at 50% 70%, #000 10%, transparent 70%); }
+}
+@media (max-width: 640px) {
+  .split-layout { --cell: 80px; }
+  .split-layout .hero { padding: 48px 0 86px; }
+  .frame-label { display: none; }
+  .session-body { padding: 16px 14px 14px; }
+  .session-result { grid-template-columns: 76px minmax(0, 1fr); }
+  .session-watch { grid-column: 1 / -1; justify-content: center; }
+  .session-note { display: none; }
+  .split-layout .section-marker::before, .split-layout .section-marker::after { display: none; }
+  .tl-time.t1, .tl-time.t3 { display: none; }
+}
+
+/* The closing mark is centred, like the words under it. */
+.split-layout .closing-mark .mark { margin-inline: auto; border-radius: 9px; }
+
+/* ---------- the frame stands clear of the content ----------
+   The rails sat on the content's own edge, so headings and text ran into
+   them. They now stand a gutter outside it; section lines and the header
+   line run rail to rail, and the crosshairs sit on the rails. Phones have
+   no room for a gutter, so there the frame is left out. */
+.split-layout { --g: 40px; }
+.split-layout main::before { width: calc(min(1120px, 100% - 64px) + 2 * var(--g)); }
+.split-layout .section-marker { margin-inline: calc(-1 * var(--g)); padding-inline: var(--g); }
+.split-layout .header { width: calc(min(1120px, 100% - 64px) + 2 * var(--g)); padding-inline: var(--g); }
+@media (max-width: 1200px) { .split-layout { --g: 20px; } }
+@media (max-width: 640px) {
+  .split-layout main::before { display: none; }
+  .split-layout .section-marker { margin-inline: 0; padding-inline: 0; }
+  .split-layout .header { width: min(1120px, calc(100% - 64px)); padding-inline: 0; }
+}
+
+/* ---------- small phones ---------- */
+/* The feature symbols stay on one line; "{ voice }" broke in two. */
+.split-layout .feature-symbol { white-space: nowrap; }
+@media (max-width: 760px) { .split-layout .feature-row article, .split-layout .feature-row article + article { grid-template-columns: 76px 1fr; } }
+/* The take switches fit one row at 320px. */
+@media (max-width: 380px) {
+  .session-takes { gap: 2px; padding-inline: 8px; }
+  .session-takes button { padding-inline: 7px; }
+  .session-takes button span { display: none; }
+}

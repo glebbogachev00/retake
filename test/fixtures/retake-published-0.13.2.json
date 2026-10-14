@@ -1,0 +1,36 @@
+{
+  "package": "retake-demos",
+  "version": "0.13.2",
+  "gitHead": "69c6059677ce1c7b008c806b3d82535df43e7041",
+  "scope": "Only command, flag and manifest facts used by public docs tests, extracted from this published gitHead. Not the complete CLI API.",
+  "sources": {
+    "cli": "https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/cli.ts",
+    "manifest": "https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/manifest.ts",
+    "readme": "https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/README.md"
+  },
+  "commands": {
+    "install": { "flags": [], "sourceLines": "644-647" },
+    "doctor": { "flags": [], "sourceLines": "619-621" },
+    "ui": { "flags": [], "sourceLines": "928-932" },
+    "agent": { "flags": [], "sourceLines": "681-696" },
+    "validate": { "flags": [], "sourceLines": "883-886" },
+    "dry": { "flags": [], "sourceLines": "796-800" },
+    "run": { "flags": ["--no-master"], "sourceLines": "102-117" },
+    "check": { "flags": [], "sourceLines": "808-811" },
+    "render": { "flags": ["--preset", "--no-master"], "sourceLines": "497-506" },
+    "secret": { "flags": [], "sourceLines": "743-746" },
+    "signin": { "flags": [], "sourceLines": "761-764" }
+  },
+  "shellSetup": ["npm install -g retake-demos", "mkdir my-demos && cd my-demos"],
+  "agentConfiguration": {
+    "codexTable": "[mcp_servers.retake]",
+    "cursorPath": ".cursor/mcp.json",
+    "sourceLines": "607, 694"
+  },
+  "manifest": {
+    "voiceover": { "allowsBoolean": true, "default": false, "sourceLines": "266-285" },
+    "music": { "optional": true, "types": ["string", "object"], "sourceLines": "286-289" },
+    "captions": { "disableValue": false, "cliSourceLines": "879" }
+  },
+  "unsupportedPublicFlags": ["--preview", "--final", "--fresh"]
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Retake | A/B layout comparison</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/compare/compare.css">
+<script src="/compare/compare.js" defer></script>
+</head>
+<body>
+<header class="compare-header">
+  <a class="compare-brand" href="/">Retake <span>Layout review</span></a>
+  <div class="compare-tabs" role="tablist" aria-label="Layout variant">
+    <button id="variant-a" type="button" role="tab" aria-selected="false" aria-controls="layout-preview" tabindex="-1" data-variant="a">A: Split</button>
+    <button id="variant-b" type="button" role="tab" aria-selected="true" aria-controls="layout-preview" tabindex="0" data-variant="b">B: Centered</button>
+  </div>
+  <div class="compare-widths" role="group" aria-label="Preview width">
+    <button type="button" data-width="fit" aria-pressed="true">Fit</button>
+    <button type="button" data-width="768" aria-pressed="false">768px</button>
+    <button type="button" data-width="390" aria-pressed="false">390px</button>
+  </div>
+  <a id="open-variant" href="/" target="_blank" rel="noopener">Open page ↗</a>
+</header>
+<p class="compare-note">Same videos and copy, different layouts. Manual comparison only: no visitor assignment or conversion tracking.</p>
+<main class="compare-stage">
+  <div id="layout-preview" role="tabpanel" aria-labelledby="variant-b">
+    <iframe id="variant-frame" src="/" title="Retake Version B: centered layout"></iframe>
+  </div>
+</main>
+<noscript><p class="compare-note">Open <a href="/">Version A</a> or <a href="/layout-b/">Version B</a> directly. Enable JavaScript to switch within this view.</p></noscript>
+</body>
+</html>
