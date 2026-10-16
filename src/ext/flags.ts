@@ -26,27 +26,8 @@ import { judgeWith } from "./verify.js";
 import { clipFor, type Clip } from "./clip.js";
 import { noteCheck } from "./checked.js";
 
-export type Flag = {
-  /** Short and stable: scene + a slug of the expectation. Survives a
-      re-record, which "the price thing" does not. */
-  id: string;
-  scene: string;
-  /** What was originally raised, in the words it was raised in. */
-  question: string;
-  /** What has to be true now — the sentence written into the manifest. */
-  expect: string;
-  flaggedAt: string;
-  source: "sense" | "verify" | "you";
-};
-
-export const flagsPath = (manifestFile: string) => manifestFile.replace(/\.(ya?ml|json)$/i, "") + ".flags.json";
-
-export function readFlags(manifestFile: string): Flag[] {
-  try {
-    const v = JSON.parse(fs.readFileSync(flagsPath(manifestFile), "utf8")) as { flags?: Flag[] };
-    return Array.isArray(v.flags) ? v.flags : [];
-  } catch { return []; }
-}
+export { flagsPath, readFlags, type Flag } from "./flag-store.js";
+import { flagsPath, readFlags, type Flag } from "./flag-store.js";
 
 function writeFlags(manifestFile: string, flags: Flag[]) {
   fs.writeFileSync(flagsPath(manifestFile), JSON.stringify({

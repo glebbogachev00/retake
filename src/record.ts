@@ -20,7 +20,7 @@ import YAML from "yaml";
 import type { BrowserContext, Page } from "playwright";
 import { recordPage, moveCursorToPoint, type PageRecorder } from "testreel";
 import { expandEnv, signInAt, resolve, type Manifest, type Point, type Resolved, type Seed, type Step, type Stub } from "./manifest.js";
-import { ffmpegBin, videoDuration } from "./render.js";
+import { ffmpegBin, videoDuration } from "./media-bin.js";
 import { assessActionProof, proofMatches, snapshotActionProof, waitForActionProof } from "./action-proof.js";
 
 export type TimelineEntry = {

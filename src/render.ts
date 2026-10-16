@@ -101,20 +101,8 @@ function ff(args: string[], log?: (l: string) => void) {
   execFileSync(ffmpegBin(), ["-hide_banner", "-loglevel", "error", "-y", ...args], { stdio: "inherit" });
 }
 
-/** ffmpeg -i probe: duration and stream size, no ffprobe needed. */
-export function probe(file: string): { duration: number; width: number; height: number; fps: number } {
-  const out = String(spawnSync(ffmpegBin(), ["-hide_banner", "-i", file], { encoding: "utf8" }).stderr);
-  const d = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(out);
-  const v = /Video:.*?\s(\d{2,5})x(\d{2,5})[\s,].*?(\d+(?:\.\d+)?)\s*fps/.exec(out) ?? /Video:.*?\s(\d{2,5})x(\d{2,5})/.exec(out);
-  if (!d) throw new Error(`could not read duration of ${file}`);
-  return {
-    duration: Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]),
-    width: v ? Number(v[1]) : 0,
-    height: v ? Number(v[2]) : 0,
-    fps: v && v[3] ? Number(v[3]) : 0,
-  };
-}
-export const videoDuration = (file: string) => probe(file).duration;
+export { probe, videoDuration } from "./media-bin.js";
+import { probe } from "./media-bin.js";
 
 /** Whether a file carries a sound track at all. */
 export function probeHasAudio(file: string): boolean {

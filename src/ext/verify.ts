@@ -25,7 +25,7 @@ import path from "node:path";
 import type { Manifest } from "../manifest.js";
 import type { Take } from "../record.js";
 import { askAsync, pickJudge, pool, readJson, why as short } from "./judge.js";
-import { readFlags } from "./flags.js";
+import { readFlags } from "./flag-store.js";
 import { NO_INTENT_NOTE, intentBlock } from "./intent.js";
 import { tag, type Evidence } from "./evidence.js";
 import { noteCheck } from "./checked.js";
