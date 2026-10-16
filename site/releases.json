@@ -2,6 +2,18 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.14.2",
+      "date": "2026-10-16",
+      "headline": "The local voices you can pick are now the voices you get",
+      "notes": [
+        "Kokoro and Aiden, the two local voices offered when you first open Retake, now narrate your videos. Before, choosing one only told your agent your preference: Retake itself could speak only Edge. They run on your Mac (Apple Silicon), so your script never leaves it, and they come out exactly as loud as Edge.",
+        "Pick them by name: heart (Kokoro, female), michael (Kokoro, male) or aiden. The model downloads once, the first time a video is narrated: about 300 MB for Kokoro, 1.8 GB for Aiden.",
+        "Kokoro now says demo words the demo way: “press record” as re-CORD, not the music kind, and “demos” as deh-mohz.",
+        "Hearing a voice before you pick it never downloads anything, and never freezes the window.",
+        "On a busy computer, a recording could still start on a blank frame. Retake now checks the picture itself and starts on the first real frame."
+      ]
+    },
+    {
       "version": "0.14.1",
       "date": "2026-10-16",
       "headline": "Videos of real websites open on the website, and installing just works",

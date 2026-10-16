@@ -3,15 +3,19 @@
  * scene's line is synthesized once and placed at the scene's start, so the
  * narration is honest to the take by construction.
  *
- * Engine: edge-tts (Microsoft's neural voices — free, network). Found as a
- * CLI (`edge-tts`, pipx/pip) or module (`python3 -m edge_tts`). Retake does
- * not bundle a voice engine; the error says how to install one.
+ * Engines: edge-tts (Microsoft's neural voices — free, network), found as a
+ * CLI (`edge-tts`, pipx/pip) or module (`python3 -m edge_tts`); and two local
+ * voices that run on this Mac and send nothing anywhere — Kokoro
+ * (`kokoro:af_heart`) and Qwen3 (`qwen:aiden`) — through scripts/local-voice.py
+ * under uv. Retake bundles neither; the errors say how to get them.
  */
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { PKG_ROOT } from "./paths.js";
 
 export const DEFAULT_VOICE = "en-US-JennyNeural";
 
@@ -19,8 +23,37 @@ export const DEFAULT_VOICE = "en-US-JennyNeural";
  * inputs, so generating the same line again is pure wasted network time. */
 export function voiceCachePath(text: string, voice: string, ratePercent = 0): string {
   const root = process.env.RETAKE_TTS_CACHE || path.join(os.homedir(), ".cache", "retake-tts", "edge");
-  const key = createHash("sha256").update(`${voice}\0${ratePercent}\0${text}`).digest("hex");
+  // A local voice's output changes when its pronunciation or levelling does;
+  // the version is part of the key so an improvement is heard, not cached away.
+  const v = LOCAL_VOICE.test(voice) ? `${voice}\0${LOCAL_VOICE_VERSION}` : voice;
+  const key = createHash("sha256").update(`${v}\0${ratePercent}\0${text}`).digest("hex");
   return path.join(root, `${key}.mp3`);
+}
+
+/** Voices that run on this Mac: `kokoro:<voice>` and `qwen:<speaker>`. */
+export const LOCAL_VOICE = /^(kokoro|qwen):[a-z_]+$/;
+/** Bump when local pronunciation or levelling changes: it re-renders them. */
+export const LOCAL_VOICE_VERSION = "local-voice-1";
+const LOCAL_MODEL = { kokoro: { repo: "models--mlx-community--Kokoro-82M-8bit", size: "~300 MB" }, qwen: { repo: "models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit", size: "~1.8 GB" } };
+
+/** The local voice engine: Retake's script under uv, with the MLX audio stack. */
+export function localEngine(voice: string, platform = process.platform, arch = process.arch): { cmd: string; args: string[] } {
+  if (platform !== "darwin" || arch !== "arm64") throw new Error(`voiceover: ${voice} is a local voice, and local voices run on Apple Silicon Macs for now — use an Edge voice here (andrew, ava, emma…)`);
+  if (spawnSync("uvx", ["--version"], { stdio: "ignore" }).status !== 0) throw new Error(`voiceover: ${voice} runs locally through uv, which is not installed — install it once (\`brew install uv\`), then re-render`);
+  const kind = voice.split(":")[0] as keyof typeof LOCAL_MODEL;
+  if (!localModelReady(voice)) process.stderr.write(`… first use of ${voice}: downloading its voice model (${LOCAL_MODEL[kind].size}, one time). Nothing you narrate leaves this computer.\n`);
+  return { cmd: "uvx", args: ["--quiet", "--python", "3.12", "--from", "mlx-audio==0.5.5", "--with", "soundfile", "--with", "misaki[en]", "python", path.join(PKG_ROOT, "scripts", "local-voice.py")] };
+}
+
+/** Whether a local voice's model is already on this computer. */
+export function localModelReady(voice: string): boolean {
+  const kind = voice.split(":")[0] as keyof typeof LOCAL_MODEL;
+  if (!LOCAL_MODEL[kind]) return false;
+  return fs.existsSync(path.join(process.env.HF_HOME || path.join(os.homedir(), ".cache", "huggingface"), "hub", LOCAL_MODEL[kind].repo));
+}
+
+function engineFor(voice: string): { cmd: string; args: string[] } {
+  return LOCAL_VOICE.test(voice) ? localEngine(voice) : engine();
 }
 
 function engine(): { cmd: string; args: string[] } {
@@ -45,13 +78,24 @@ export function edgeFailure(stderr: string, cmd: string): string {
 }
 
 function runEdge(e: { cmd: string; args: string[] }, args: string[], timeout: number): void {
+  const local = e.cmd === "uvx";
   try {
-    execFileSync(e.cmd, [...e.args, ...args], { stdio: "pipe", timeout });
+    execFileSync(e.cmd, [...e.args, ...args], { stdio: "pipe", timeout: local ? Math.max(timeout, 900_000) : timeout, env: local ? { ...process.env, FFMPEG_BIN: ffmpegPath() } : process.env });
   } catch (err) {
     const x = err as { stderr?: Buffer | string; code?: string; signal?: string };
+    if (local) {
+      const last = String(x.stderr ?? "").trim().split("\n").filter(Boolean).pop() ?? "";
+      throw new Error(`voiceover: the local voice failed${last ? ` — ${last.slice(0, 240)}` : ""}`);
+    }
     if (x.code === "ETIMEDOUT" || x.signal === "SIGTERM") throw new Error("voiceover: Microsoft's voice service did not answer in time — try again in a minute");
     throw new Error(edgeFailure(String(x.stderr ?? ""), e.cmd));
   }
+}
+
+/** ffmpeg for the local voice's levelling: the one Retake renders with. */
+function ffmpegPath(): string {
+  try { const require = createRequire(import.meta.url); const p = require("ffmpeg-static") as string; if (p && fs.existsSync(p)) return p; } catch { /* system ffmpeg */ }
+  return "ffmpeg";
 }
 
 export function synthesize(text: string, voice: string, out: string, ratePercent = 0): void {
@@ -60,7 +104,7 @@ export function synthesize(text: string, voice: string, out: string, ratePercent
     fs.copyFileSync(cached, out);
     return;
   }
-  const e = engine();
+  const e = engineFor(voice);
   const temp = `${out}.tmp-${process.pid}`;
   try {
     runEdge(e, ["--voice", voice, "--rate", `${ratePercent >= 0 ? "+" : ""}${ratePercent}%`, "--text", text, "--write-media", temp], 60_000);
@@ -110,7 +154,7 @@ export function synthesizeWithCues(text: string, voice: string, out: string, rat
     fs.copyFileSync(cached, out);
     return parseSrt(fs.readFileSync(cachedSrt, "utf8"));
   }
-  const e = engine();
+  const e = engineFor(voice);
   const temp = `${out}.tmp-${process.pid}`, srt = `${out}.srt`;
   try {
     runEdge(e, ["--voice", voice, "--rate", `${ratePercent >= 0 ? "+" : ""}${ratePercent}%`, "--text", text, "--write-media", temp, "--write-subtitles", srt], 120_000);

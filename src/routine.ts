@@ -84,10 +84,15 @@ export const VOICES: Record<string, { id: string; note: string }> = {
   brian: { id: "en-US-BrianNeural", note: "Casual and sincere — least like a narrator." },
   emma: { id: "en-US-EmmaNeural", note: "Clear and conversational, good over fast UI." },
   aria: { id: "en-US-AriaNeural", note: "A news read: even, flat, no colour." },
+  // Local: these run on this Mac (Apple Silicon) and send nothing anywhere.
+  heart: { id: "kokoro:af_heart", note: "Local (Kokoro). Warm, natural, female. First use downloads ~300 MB." },
+  michael: { id: "kokoro:am_michael", note: "Local (Kokoro). Steady, male. Shares Heart's ~300 MB download." },
+  aiden: { id: "qwen:aiden", note: "Local (Qwen3). Natural, male. First use downloads ~1.8 GB." },
 };
 
-/** A routine's `voice` is a name above, "silent", or a raw edge-tts voice id
- *  (`vi-VN-HoaiMyNeural`) for a language the named set does not cover. */
+/** A routine's `voice` is a name above, "silent", a raw edge-tts voice id
+ *  (`vi-VN-HoaiMyNeural`) for a language the named set does not cover, or a
+ *  raw local id (`kokoro:af_bella`, `qwen:ryan`). */
 export function voiceId(voice: string): string {
   return VOICES[voice]?.id ?? voice;
 }

@@ -1520,8 +1520,8 @@ routine
 
     const parsed = RoutineSchema.safeParse(next);
     if (!parsed.success) throw new Error(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
-    if (key === "voice" && value !== "silent" && !VOICES[value] && !/^[a-z]{2}-[A-Z]{2}-/.test(value)) {
-      say(`ℹ "${value}" is not one of ${Object.keys(VOICES).join(", ")} and does not look like an edge-tts id (en-US-AriaNeural). \`retake routine voices\` lists what is here.`);
+    if (key === "voice" && value !== "silent" && !VOICES[value] && !/^[a-z]{2}-[A-Z]{2}-/.test(value) && !/^(kokoro|qwen):[a-z_]+$/.test(value)) {
+      say(`ℹ "${value}" is not one of ${Object.keys(VOICES).join(", ")} and does not look like an edge-tts id (en-US-AriaNeural) or a local one (kokoro:af_heart). \`retake routine voices\` lists what is here.`);
     }
     if (typeof parsed.data.music === "string" && !fs.existsSync(path.resolve(parsed.data.music))) {
       say(`ℹ ${parsed.data.music} is not there yet — the render will fail until it is. It ships inside your video, so it must be a track you may use.`);
@@ -1537,7 +1537,7 @@ routine
   .option("--line <text>", "what they should say", "This is the voice your demos will use, at the pace they will use it.")
   .option("--rate <percent>", "try a speed", "0")
   .action(async (opts: { line: string; rate: string }) => {
-    const { synthesize } = await import("./voice.js");
+    const { synthesize, LOCAL_VOICE, localModelReady } = await import("./voice.js");
     const dir = path.resolve("outputs", ".voices");
     fs.mkdirSync(dir, { recursive: true });
     const rate = Number(opts.rate);
@@ -1545,6 +1545,8 @@ routine
     for (const [name, v] of Object.entries(VOICES)) {
       const out = path.join(dir, `${name}.mp3`);
       process.stdout.write(`  ${name.padEnd(14)} ${v.id} … `);
+      // A sample is not worth a download: local voices are heard once chosen.
+      if (LOCAL_VOICE.test(v.id) && !localModelReady(v.id)) { process.stdout.write(`local, not downloaded yet — ${v.note}\n`); continue; }
       try { synthesize(opts.line, v.id, out, rate); process.stdout.write(`${path.relative(process.cwd(), out)}\n`); }
       catch (e) { process.stdout.write(`✗ ${(e as Error).message}\n`); break; }
     }

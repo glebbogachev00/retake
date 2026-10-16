@@ -520,16 +520,16 @@
           <p class="ob-lead">The first draft stays silent. Narration comes after you approve the recording and script.</p>
           <div class="voice-grid" role="radiogroup" aria-label="Narration choice">
             <button class="voice-card selected" type="button" data-voice="silent" role="radio" aria-checked="true">
-              <span class="vicon" aria-hidden="true">×</span><b>No voiceover</b><small>Skip this for now. You can add your own voice later.</small><span class="tag">No setup</span>
+              <span class="vicon" aria-hidden="true">×</span><b>No voiceover</b><small>Skip this for now. You can choose a voice later.</small><span class="tag">No setup</span>
             </button>
             <button class="voice-card" type="button" data-voice="edge" data-sample="edge" role="radio" aria-checked="false">
               <span class="vicon" aria-hidden="true">∞</span><b>Edge</b><small>Online. Small install, many voices, and fast generation. Your script goes to Microsoft's service.</small><span class="tag">Tap to hear</span>
             </button>
             <button class="voice-card" type="button" data-voice="aiden" data-sample="aiden" role="radio" aria-checked="false">
-              <span class="vicon" aria-hidden="true">A</span><b>Aiden</b><small>Local Qwen voice. The natural voice tested and selected for Retake. About 2 GB.</small><span class="tag">Tap to hear</span>
+              <span class="vicon" aria-hidden="true">A</span><b>Aiden</b><small>Local Qwen voice. The most natural one, and the biggest: about 1.8 GB. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
             </button>
             <button class="voice-card" type="button" data-voice="kokoro" data-sample="kokoro" role="radio" aria-checked="false">
-              <span class="vicon" aria-hidden="true">K</span><b>Kokoro</b><small>Local and much smaller. Roughly 100–200 MB with many voices. This is Retake's first Kokoro test.</small><span class="tag">Tap to hear</span>
+              <span class="vicon" aria-hidden="true">K</span><b>Kokoro</b><small>Local and much smaller: about 300 MB, many voices. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
             </button>
           </div>
           <div class="voice-demo" id="voice-demo"><video id="voice-demo-video" controls playsinline preload="metadata"></video><small id="voice-demo-label"></small></div>
@@ -642,8 +642,8 @@ function renderOnboarding() {
   consent.classList.toggle('show', needsConsent);
   box.checked = onboardingState.consent;
   if (onboardingState.voice === 'edge') $('voice-consent-copy').textContent = 'I understand that Edge sends the narration script to Microsoft’s online speech service.';
-  if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a separate local model download of about 2 GB. Nothing downloads on this screen.';
-  if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a separate local model download of roughly 100–200 MB. Nothing downloads on this screen.';
+  if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a one-time local model download of about 1.8 GB, the first time a video is narrated. Nothing downloads on this screen.';
+  if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a one-time local model download of about 300 MB, the first time a video is narrated. Nothing downloads on this screen.';
   $('onboard-next').disabled =
     (onboardingStep === 1 && !normalUrl($('onboard-url').value)) ||
     (onboardingStep === 2 && brandRead.state === 'reading') ||

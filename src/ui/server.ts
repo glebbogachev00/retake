@@ -54,7 +54,7 @@ import { captureMatchesTake, readPreviewReceipt } from "../preview.js";
 import { STYLES, VOICES, RoutineSchema, environmentFor, readRoutines, starter, voiceId, writeRoutines, type Routine } from "../routine.js";
 import { loadEnvSpec } from "../recording-env.js";
 import { describeSchedule, readSchedule, scheduleLoaded } from "../schedule.js";
-import { synthesize, voiceCachePath } from "../voice.js";
+import { synthesize, voiceCachePath, LOCAL_VOICE, localModelReady } from "../voice.js";
 
 const ROOT = PROJECT_ROOT;
 const DEMOS = path.join(ROOT, "demos");
@@ -689,6 +689,15 @@ export function serve(port: number) {
         if (!voice || voice === "silent") return json(res, 400, { error: "pick a voice" });
         if (!Number.isInteger(rate) || rate < -50 || rate > 50) return json(res, 400, { error: "rate is a whole percent, -50 to 50" });
         const id = voiceId(voice);
+        // A local voice is never downloaded just to be previewed (and Aiden is
+        // ~30s to speak even when present, which would hold this whole window
+        // up): play the sample that ships with Retake instead.
+        if (LOCAL_VOICE.test(id) && (id.startsWith("qwen:") || !localModelReady(id))) {
+          const f = path.join(PKG_ROOT, "assets", "voice-samples", id.startsWith("qwen:") ? "aiden.mp4" : "kokoro.mp4");
+          if (!fs.existsSync(f)) return json(res, 404, { error: "no sample for this voice yet" });
+          res.writeHead(200, { "content-type": "video/mp4", "content-length": fs.statSync(f).size, "cache-control": "no-store" });
+          return stream(f, res);
+        }
         const line = "This is the voice your demos will use, at the pace they will use it.";
         const out = voiceCachePath(line, id, rate);
         try {
@@ -1008,8 +1017,8 @@ export function serve(port: number) {
           : narration === "edge"
             ? "Make the first draft silent and do not add captions. The person chose Edge for the final narration. Do not synthesize it until they approve both the recording and one continuous script."
             : narration === "aiden"
-              ? "Make the first draft silent and do not add captions. The person chose the local Aiden Qwen voice for the final narration. Do not download a model or synthesize speech until they separately approve the install, recording, and one continuous script."
-              : "Make the first draft silent and do not add captions. The person chose the compact local Kokoro voice for the final narration. Do not download a model or synthesize speech until they separately approve the install, recording, and one continuous script.";
+              ? "Make the first draft silent and do not add captions. The person chose the local Aiden voice for the final narration: `voiceover.voice: qwen:aiden` (a routine says `voice: aiden`). It runs on their Mac; its first use downloads a ~1.8 GB model. Do not narrate until they approve the recording and one continuous script, and say the download is coming before the first narrated render."
+              : "Make the first draft silent and do not add captions. The person chose the local Kokoro voice for the final narration: `voiceover.voice: kokoro:af_heart` (a routine says `voice: heart`). It runs on their Mac; its first use downloads a ~300 MB model. Do not narrate until they approve the recording and one continuous script, and say the download is coming before the first narrated render.";
         const describe = `${b.describe.trim()}\n\n${sound}`;
         const prov = pickProvider();
         const which = prov?.name === "codex" ? "codex" : prov?.name === "claude-code" ? "claude-code" : null;

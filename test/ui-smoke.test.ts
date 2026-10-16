@@ -305,8 +305,10 @@ test("a first-time user can describe one demo and make an honest narration choic
 
   assert.ok(await p.locator("#onboarding").isVisible(), "an empty library should open the first-run flow");
   assert.equal(await p.locator("[data-voice]").count(), 4, "silent, Edge, Aiden, and Kokoro should be visible choices");
-  assert.match(await p.locator("[data-voice=aiden]").innerText(), /about 2 GB/i);
-  assert.match(await p.locator("[data-voice=kokoro]").innerText(), /first Kokoro test/i);
+  assert.match(await p.locator("[data-voice=aiden]").innerText(), /about 1\.8 GB/i);
+  assert.match(await p.locator("[data-voice=kokoro]").innerText(), /about 300 MB/i);
+  // A local voice is spoken on this Mac, which the card says plainly.
+  assert.match(await p.locator("[data-voice=kokoro]").innerText(), /never leaves/i);
   assert.match(await p.locator("[data-voice=edge]").innerText(), /online/i);
   assert.match(await p.locator("[data-voice=silent]").innerText(), /No voiceover/i);
 

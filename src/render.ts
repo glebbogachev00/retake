@@ -24,7 +24,7 @@ import { bandHeightFor, maxCharsFor, wrap } from "./captions.js";
 import { renderCard, renderCalloutOverlay, renderPoster, renderTitledCover } from "./cards.js";
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
 import { holdFilterArgs, holdTake, planHolds } from "./hold.js";
-import { DEFAULT_VOICE, audioSeconds, cueGroups, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
+import { DEFAULT_VOICE, LOCAL_VOICE, LOCAL_VOICE_VERSION, audioSeconds, cueGroups, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
 import { expandEnv, resolve, Manifest, type Resolved, type Step } from "./manifest.js";
 import type { Take, TimelineEntry } from "./record.js";
 import { ffmpegBin } from "./media-bin.js";
@@ -82,7 +82,7 @@ export function renderHash(m: Manifest, take: Take): string {
   const src = take.video && fs.existsSync(take.video) ? fs.statSync(take.video) : null;
   const h = createHash("sha1");
   const merged = applyManifest(m, take);
-  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro, m.card, m.card ? [m.card.logo, m.card.font].map((f) => { try { const st = fs.statSync(path.resolve(f ?? "")); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } }) : null], idle: m.compressIdle, vo: m.voiceover, music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: [m.outputs.thumbnail, m.outputs.cover], stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
+  h.update(JSON.stringify({ q, tempo: m.tempo, cap: m.captions, theme: m.theme, camera: m.camera, cards: [m.intro, m.outro, m.card, m.card ? [m.card.logo, m.card.font].map((f) => { try { const st = fs.statSync(path.resolve(f ?? "")); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } }) : null], idle: m.compressIdle, vo: m.voiceover, voEngine: typeof m.voiceover === "object" && LOCAL_VOICE.test(m.voiceover.voice) ? LOCAL_VOICE_VERSION : undefined, music: m.music ? [m.music, (() => { try { const f = typeof m.music === "string" ? m.music : m.music.file; const st = fs.statSync(path.resolve(f)); return [st.size, Math.round(st.mtimeMs)]; } catch { return null; } })()] : null, gif: m.outputs.gif, thumb: [m.outputs.thumbnail, m.outputs.cover], stills: m.outputs.stills, video: src ? [src.size, Math.round(src.mtimeMs)] : null, tl: merged.timeline.map((t) => [t.start, t.end, t.label, t.caption, t.holdMs, t.camera, t.callout]), trim: [merged.trimBefore, merged.duration] }));
   return h.digest("hex").slice(0, 12);
 }
 
