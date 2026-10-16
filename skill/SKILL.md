@@ -338,7 +338,7 @@ typed, chose and clicked, against the frames that came out.
 Nothing needs declaring. The inputs are already in the take — this is the half
 of the recording nothing has ever read.
 
-It found a real one on its first outing. An Avex quote entered two legs:
+It found a real one on its first outing. A flight-booking demo's quote entered two legs:
 
 ```
 type "SGN" → #leg-from-0      type "SIN" → #leg-to-0

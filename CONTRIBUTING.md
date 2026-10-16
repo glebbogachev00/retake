@@ -8,9 +8,13 @@ it, with the proof log attached.
 ```bash
 git clone https://github.com/glebbogachev00/retake && cd retake
 npm install                   # builds dist/ too
-npx playwright install chromium
-npm run retake -- run demos/todo-basics.yaml --preset draft
+npm test                      # 400+ checks; several drive a real browser
+npm run retake -- ui          # the window, at http://localhost:4310
 ```
+
+The browser downloads itself the first time something needs it (into
+Retake's own folder, so another project's Playwright cannot delete it). In
+the window, paste any public URL to record a first demo.
 
 `npm run retake -- …` runs `src/` through tsx. `node dist/cli.js …` is what the
 npm package ships. Same code; the only difference is `src/paths.ts` deciding
@@ -36,8 +40,9 @@ CI runs exactly that. There is no lint step; match the surrounding code.
   read by models, not people: say what it returns and when *not* to call it.
 - **Render-time** things (captions, camera, layout, speed) go in `render.ts`
   and must stay render-time — never make the browser run again for them.
-- The **UI** is one http server and three HTML files with no build step. Keep
-  it that way; it is a window onto the work, not the product.
+- The **UI** is one http server and one HTML file (`src/ui/chat.html`) with
+  no build step. Keep it that way; it is a window onto the work, not the
+  product.
 
 ## Principles that have held up
 
@@ -53,7 +58,13 @@ CI runs exactly that. There is no lint step; match the surrounding code.
 
 ## Demos in this repo
 
-`demos/` ships a few public manifests (TodoMVC, saucedemo, Scratch, GDevelop)
-so anyone can record something without setting up an app. Manifests for
-private apps are gitignored by pattern; add yours to the allow-list in
-`.gitignore` only if the app is public.
+None ship: a new workspace starts empty so the window's first run can guide
+someone to their own app. To try a change, record a public site from the
+window, or the small pages in `test/fixtures/` (served by the tests that use
+them). Manifests and outputs for private apps are gitignored; keep them
+that way.
+
+## Notes
+
+`docs/notes/` holds working notes written while building Retake. They are a
+record of why things are the way they are, not current documentation.

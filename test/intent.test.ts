@@ -41,11 +41,11 @@ test("a demo's own note wins over the workspace one", () => {
   // wrong for two of them every time it was read.
   const d = demos();
   writeIntent(d, "the whole workspace");
-  writeIntent(d, "just this app", "avex");
-  assert.match(readIntent(d, "avex") ?? "", /just this app/);
+  writeIntent(d, "just this app", "booking");
+  assert.match(readIntent(d, "booking") ?? "", /just this app/);
   assert.match(readIntent(d, "other") ?? "", /the whole workspace/);
   assert.equal(readIntent(d), "the whole workspace");
-  assert.match(intentPath(d, "avex"), /avex\.product\.md$/);
+  assert.match(intentPath(d, "booking"), /booking\.product\.md$/);
 });
 
 test("every evidence kind has words a person can read, in order of strength", () => {
@@ -92,7 +92,7 @@ test("a demo name cannot escape the demos folder", async () => {
   for (const bad of ["../../escaped", "../x", "a/b", "/etc/passwd", "..", "Name", "a b", "a.b", "-lead"]) {
     assert.throws(() => writeIntent(d, "owned", bad), /not a demo name|refusing to write/, `accepted ${JSON.stringify(bad)}`);
   }
-  assert.equal(safeDemo("avex-usecases"), "avex-usecases");
+  assert.equal(safeDemo("booking-usecases"), "booking-usecases");
   assert.equal(safeDemo("one-thought"), "one-thought");
   // Nothing was created anywhere.
   assert.deepEqual(fs.readdirSync(d), []);

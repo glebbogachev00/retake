@@ -328,7 +328,7 @@ the one tool in a position to say so.
 
 ## 3. What saved a lost manifest
 
-`demos/avex-manifest-check.yaml` was deleted from disk mid-session, along with
+`demos/booking-manifest-check.yaml` was deleted from disk mid-session, along with
 its output folder, and it had never been committed. I rebuilt it from context
 and the dry run came back at exactly 49 steps, matching the original.
 

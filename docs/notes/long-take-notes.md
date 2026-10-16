@@ -1,6 +1,6 @@
 # Notes from recording a 5-minute product walkthrough
 
-Written while recording `demos/avex-full-flow.yaml` — one charter request
+Written while recording `demos/booking-full-flow.yaml` — one charter request
 through three portals, 171 steps, ~80 interactions, 5m09s of finished video.
 Retake had only ever been asked for short takes before this one, and almost
 everything below is a limit that only shows up past about the two-minute mark.
@@ -40,7 +40,7 @@ The run reports success anyway:
 
 ```
 ■ take done in 313.5s · all steps ok
-✓ outputs/avex-full-flow/demo.mp4
+✓ outputs/booking-full-flow/demo.mp4
 check: pass
 ```
 

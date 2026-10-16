@@ -68,7 +68,7 @@ export function findOrphans(outRoot: string, demosDir: string): Orphan[] {
  * came from, and this is not cosmetic. A take recorded with `--from` or
  * `--until` keeps the PARENT demo's name in its used manifest, so restoring
  * two fragments of one demo produced three files all declaring
- * `name: avex-full-flow` — and the window, which keys on that name, showed the
+ * `name: booking-full-flow` — and the window, which keys on that name, showed the
  * same demo three times. It looked broken because it was.
  */
 export function healOrphans(orphans: Orphan[], demosDir: string): string[] {

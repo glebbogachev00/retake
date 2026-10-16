@@ -113,7 +113,7 @@ test("it will not run a demo whose state is not reproducible", () => {
 });
 
 test("stubbing counts as taking control of the state, the same as seeding", () => {
-  // The Avex demos stub what they read instead of seeding a database. That is
+  // The flight-booking demos stub what they read instead of seeding a database. That is
   // the author having decided what the app sees, which is the thing the rule
   // is actually about.
   assert.equal(refuseToRun({ ...base, seed: [] } as unknown as Manifest, {}), null);
@@ -137,7 +137,7 @@ test("reading a take: a failed step and an app error are findings, a --from frag
 });
 
 test("a failed second press is the app WINNING, not a bug", () => {
-  // The first version of this reported it as a finding. On the real Avex app
+  // The first version of this reported it as a finding. On the real booking app
   // that produced one false alarm out of eight, on the most valuable shape
   // there is — which is how a tool like this gets ignored.
   const s = shape("double-submit");

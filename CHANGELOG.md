@@ -1,5 +1,9 @@
 # Changelog
 
+From 0.12 on, release notes live in [`site/releases.json`](site/releases.json) —
+the same list the website's and the Retake window's "What's new" show. This
+file keeps the notes up to 0.4.0.
+
 ## 0.4.0 — 2026-08-25
 
 Sizes stop moving, failures explain themselves, and a cut can be reviewed.
@@ -126,7 +130,7 @@ proof for each (`demos/cursor-hundred.yaml`, `demos/zoom-probe.yaml`).
 - Idle fade is no longer forced off above 60 steps — that was a workaround for
   the same cap.
 - **The CSS-zoom focus bug is gone** and is now a regression demo: typing
-  lands on the AvexJets forms at scale 1.8, 2 and 2.5. Earlier engine changes
+  lands on a client booking app's forms at scale 1.8, 2 and 2.5. Earlier engine changes
   (zoom via a `<style>` tag, bring-into-view safe zone) had fixed it without
   anyone re-testing the claim.
 

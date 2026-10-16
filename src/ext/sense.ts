@@ -4,7 +4,7 @@
  * `verify` judges one frame: is the button readable, is the card inside its
  * box. This judges the whole run: what went IN against what came OUT.
  *
- * The bug that produced it: an Avex demo entered two legs — SGN→SIN and
+ * The bug that produced it: a flight-booking demo entered two legs — SGN→SIN and
  * SIN→SGN — and quoted a single price of 17,400. Nothing caught it. Every
  * step passed, every frame looked fine, and the take recorded both halves:
  *

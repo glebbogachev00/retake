@@ -25,17 +25,17 @@ function recording(out: string, folder: string, innerName: string) {
 test("a restored fragment is renamed to its own folder, not the demo it came from", () => {
   // This shipped wrong: a --from take keeps the PARENT demo's name in its used
   // manifest, so restoring two fragments of one demo wrote three files all
-  // saying `name: avex-full-flow`, and the window showed that demo three
+  // saying `name: booking-full-flow`, and the window showed that demo three
   // times. It looked broken because it was.
   const { out, demos } = workspace();
-  recording(out, "avex-full-flow", "avex-full-flow");
-  recording(out, "avex-draft-check", "avex-full-flow");   // a --from fragment
-  recording(out, "avex-tail-check", "avex-full-flow");    // another one
+  recording(out, "booking-full-flow", "booking-full-flow");
+  recording(out, "booking-draft-check", "booking-full-flow");   // a --from fragment
+  recording(out, "booking-tail-check", "booking-full-flow");    // another one
   healOrphans(findOrphans(out, demos), demos);
 
   const names = fs.readdirSync(demos).map((f) => /^name:\s*(.+)$/m.exec(fs.readFileSync(path.join(demos, f), "utf8"))![1]);
   assert.equal(new Set(names).size, names.length, `every restored demo needs its own name, got: ${names.join(", ")}`);
-  assert.deepEqual(names.sort(), ["avex-draft-check", "avex-full-flow", "avex-tail-check"]);
+  assert.deepEqual(names.sort(), ["booking-draft-check", "booking-full-flow", "booking-tail-check"]);
 });
 
 test("a manifest whose name already matches is left byte-for-byte alone", () => {
@@ -62,12 +62,12 @@ test("a demo file a person already wrote is never overwritten", () => {
 
 test("a --from fragment is never restored as a demo of its own", () => {
   // Restoring two of them put two rows in the library that were not demos at
-  // all — pieces of avex-full-flow, recorded while iterating, showing up as
+  // all — pieces of booking-full-flow, recorded while iterating, showing up as
   // failed demos next to it.
   const { out, demos } = workspace();
-  const dir = path.join(out, "avex-tail-check");
+  const dir = path.join(out, "booking-tail-check");
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "manifest.used.yaml"), "name: avex-full-flow\nurl: http://x\nsteps: []\n");
+  fs.writeFileSync(path.join(dir, "manifest.used.yaml"), "name: booking-full-flow\nurl: http://x\nsteps: []\n");
   fs.writeFileSync(path.join(dir, "take.json"), JSON.stringify({ finishedAt: "2026-08-25T12:20:00Z", duration: 96, trimBefore: 0, partial: 'recorded from scene "x" (from) — a fragment for iteration, not a finished cut' }));
   fs.writeFileSync(path.join(dir, "demo.mp4"), "x");
 

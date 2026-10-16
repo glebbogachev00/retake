@@ -69,7 +69,7 @@ test("names come from the project folder, or the site", () => {
   assert.equal(productName("https://www.useretake.app/"), "useretake");
   assert.equal(isLocal("http://localhost:3179/app"), true);
   assert.equal(isLocal("http://app.test/"), true);
-  assert.equal(isLocal("https://bingx.com/"), false);
+  assert.equal(isLocal("https://example.com/"), false);
 });
 
 test("the isolated instance is a different port — a different origin", () => {

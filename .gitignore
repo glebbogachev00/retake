@@ -8,14 +8,8 @@ outputs/*
 .auth/
 ideas/
 
-# Demos of private apps stay local; demos/example.yaml is the public template.
+# Demos of private apps stay local. Only the small probes below may be committed.
 demos/*.yaml
-!demos/example.yaml
-!demos/todo-basics.yaml
-!demos/store-checkout.yaml
-!demos/scratch-first-move.yaml
-!demos/scratch-first-script.yaml
-!demos/gdevelop-scene-and-events.yaml
 !demos/cursor-hundred.yaml
 !demos/callout-probe.yaml
 !demos/scratch-mini-project.yaml
@@ -42,3 +36,7 @@ dist/
 .env*
 .retake/
 __pycache__/
+
+# Internal working briefs: kept locally for agents, not published
+AGENT-HANDOFF.md
+VIDEO-CRITIQUE-FIX-BRIEF.md
