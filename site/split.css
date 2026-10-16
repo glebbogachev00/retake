@@ -261,3 +261,7 @@
   .session-takes button { padding-inline: 7px; }
   .session-takes button span { display: none; }
 }
+
+/* The quiet second door: done-for-you, after the visitor has seen it all. */
+.split-layout .faq-list details p a, .split-layout .closing-alt a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; }
+.split-layout .closing-alt { margin-top: 6px; }
