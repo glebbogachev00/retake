@@ -2,6 +2,7 @@
     — the app and one loved video — so these pin the reading: a card is told
     from an app, an inset from a dark site, and a secret's VALUE never leaves
     its file. */
+import "../src/browser-home.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -183,3 +184,12 @@ test("the north star lends its format, the brand its colours", () => {
   assert.notEqual(r.card?.orb, "#edf5f0", "the circles are tinted with this brand, not the north star's");
   assert.deepEqual(r.theme, { background: "#191d19", ink: "#f2efe6" });
 });
+
+test("a site with no header logo is read in seconds, not after a 30-second wait", async () => {
+  const { readBrand } = await import("../src/setup.js");
+  const html = `<title>Plain</title><body style="background:#fafafa;color:#111"><main><h1>Hello</h1><button style="background:#193b92;color:#fff">Start</button></main></body>`;
+  const t = Date.now();
+  const r = await readBrand("data:text/html," + encodeURIComponent(html), path.join(fs.mkdtempSync(path.join(os.tmpdir(), "retake-brand-")), "mark"), { shot: true });
+  assert.ok(Date.now() - t < 15_000, `took ${Date.now() - t}ms`);
+  assert.ok(r.shot, "the page was still photographed");
+}, );

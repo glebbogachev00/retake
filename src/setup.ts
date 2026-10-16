@@ -547,7 +547,10 @@ export async function readBrand(url: string, outBase: string, o: { shot?: boolea
     // school's site it was a cartoon character, not the TechBash wordmark.
     // A wordmark set in text is captured as a picture, background removed.
     const head = page.locator(HEADER_LOGO).first();
-    const box = await head.boundingBox().catch(() => null);
+    // No header logo is common, and boundingBox() on nothing waits out
+    // Playwright's 30 seconds — a first-run screen that sat on "Reading your
+    // site…" for half a minute. Ask whether it exists first.
+    const box = (await head.count().catch(() => 0)) ? await head.boundingBox({ timeout: 2000 }).catch(() => null) : null;
     if (box && box.width >= 40 && box.height >= 14 && box.height <= 140 && box.y < 200) {
       const inner = await head.evaluate(`(el) => { const i = el.querySelector('img[src$=".svg"], img'); const s = el.querySelector('svg'); return { img: i ? i.src : null, svg: s && !i ? s.outerHTML : null }; }`).catch(() => null) as { img: string | null; svg: string | null } | null;
       fs.mkdirSync(path.dirname(outBase), { recursive: true });

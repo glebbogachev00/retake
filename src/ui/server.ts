@@ -22,6 +22,7 @@
  *   GET  /out/:name/<file>          artifacts (mp4/gif/png/md)
  */
 import "../browser-home.js";
+import "../self-repair.js";
 import { hasLogin, loginStoreName, saveLogin, siteOf } from "../logins.js";
 import { openHandSignIn, sessionAgeHours, sessionPathFor, type HandSignIn } from "../signin.js";
 import http from "node:http";
