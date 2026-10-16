@@ -67,7 +67,7 @@ retake ui</code></pre></div>
         <p>Keep that terminal open, then open <a href="http://localhost:4310">http://localhost:4310</a>. This is the Retake window, not your app. Your app must be reachable at its own public or localhost URL.</p>
         <p><code>retake install</code> creates <code>demos/</code>, <code>outputs/</code>, <code>.env</code> and ignore rules. It attempts to register Retake with Claude Code and installs its recording skill. Read the terminal output: registration can fail even when the workspace was created.</p>
         <details class="docs-detail"><summary>Prefer not to install globally?</summary><p>Use <code>npx retake-demos install</code> inside your workspace. The other commands on this page assume the global install. With npx, replace the <code>retake</code> prefix with <code>npx retake-demos</code>.</p></details>
-        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake#install">README: Install</a> · <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/cli.ts">CLI setup and doctor</a></p>
+        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake#install">README: Install</a> · <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts">CLI setup and doctor</a></p>
       </section>
       <section id="agents" data-doc-section>
         <h2>Connect your coding agent</h2>
@@ -84,7 +84,7 @@ it prints for this client. Preserve existing MCP servers and settings.
 Tell me what changed and whether I need to restart.
 Do not start my app or record anything yet.</code></pre></div>
         <p class="docs-note">A client session does not gain new tools mid-conversation. Restart it after setup. Outside the Retake window, starting your app requires explicit permission and the <code>RETAKE_ALLOW_START=1</code> MCP environment setting. Leave that disabled unless you want it.</p>
-        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/cli.ts">CLI: install, agent and mcpServer</a> · <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/operator/tools.ts">Tool permissions</a></p>
+        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts">CLI: install, agent and mcpServer</a> · <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/operator/tools.ts">Tool permissions</a></p>
       </section>
       <section id="first-demo" data-doc-section>
         <h2>Ask for your first demo</h2>
@@ -98,13 +98,13 @@ before recording. Show me the preview and proof log for review.
 Do not add narration until I approve the recording and its script.</code></pre></div>
         <p>This is an illustrative request, not a tested workflow for your app. The agent must inspect your actual routes and selectors. Ask it to save the manifest in <code>demos/&lt;name&gt;.yaml</code>, where the Retake window can find it.</p>
         <p>Use the Retake window to watch progress and review the result. Ask your agent for a silent first take explicitly; the CLI records and renders according to the manifest’s settings.</p>
-        <p class="docs-source">Read more: <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/skill/SKILL.md">Recording skill</a></p>
+        <p class="docs-source">Read more: <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/skill/SKILL.md">Recording skill</a></p>
       </section>
       <section id="record-review-rerun" data-doc-section>
         <p class="docs-eyebrow">02 / MAKE A KEEPABLE TAKE</p>
         <h2>Record, review &amp; rerun</h2>
         <p>First prove the browser steps. Then record a silent first take, inspect it, and render presentation changes from the saved recording. The commands below use an <strong>existing, agent-authored</strong> manifest named <code>demos/my-demo.yaml</code> with <code>name: my-demo</code>. They do not create that file.</p>
-        <p class="docs-note">CLI examples are aligned with published <strong>Retake 0.13.2</strong>. <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/cli.ts">Read the release’s CLI source</a>. Before a silent take, set <code>voiceover: false</code> in the existing manifest and omit <code>music</code>. Music is an optional file string or object, not a boolean. <code>run</code> follows the manifest; it does not automatically force silence.</p>
+        <p class="docs-note">CLI examples are aligned with published <strong>Retake 0.14.1</strong>. <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts">Read the release’s CLI source</a>. Before a silent take, set <code>voiceover: false</code> in the existing manifest and omit <code>music</code>. Music is an optional file string or object, not a boolean. <code>run</code> follows the manifest; it does not automatically force silence.</p>
         <div class="docs-code"><div class="docs-code-head"><span>Terminal · validate, dry-run, record</span></div><pre><code>retake validate demos/my-demo.yaml
 retake dry demos/my-demo.yaml
 retake run demos/my-demo.yaml --no-master
@@ -120,7 +120,7 @@ retake check outputs/my-demo</code></pre></div>
 retake dry demos/my-demo.yaml
 retake run demos/my-demo.yaml --no-master
 retake check outputs/my-demo</code></pre></div><p>This <code>run</code> performs a new browser recording. Confirm that another take is wanted before running it, and keep any approved deliverable safe before changing its output.</p></div>
-        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/cli.ts">Published 0.13.2: run and render</a> · <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/operator/tools.ts">run, render, receipts and look tools</a></p>
+        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts">Published 0.14.1: run and render</a> · <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/operator/tools.ts">run, render, receipts and look tools</a></p>
       </section>
       <section id="voice-captions" data-doc-section>
         <h2>Voiceover &amp; captions</h2>
@@ -133,7 +133,7 @@ Wait for my script and voice approval before generating any speech.
 Use the existing take for narration and presentation changes.
 Review the final MP4 for audio timing and a complete ending.</code></pre></div>
         <p>For manifest editing, <code>captions: false</code> disables visible captions. Do not use a voice setting as a substitute for script approval. Ask your agent to follow the current voice setup in your workspace rather than guessing a provider configuration.</p>
-        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/manifest.ts">Published sound and caption settings</a> · <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/cli.ts">Caption controls</a></p>
+        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/manifest.ts">Published sound and caption settings</a> · <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts">Caption controls</a></p>
       </section>
       <section id="outputs" data-doc-section>
         <h2>Find your files</h2>
@@ -155,13 +155,13 @@ outputs/my-demo/
         <p>The workspace and rendering are local. That does <strong>not</strong> make the whole workflow offline or free: installation downloads packages and Chromium, recording contacts the target app, and your coding agent may send context to its provider under that provider’s plan.</p>
         <p>Optional model-backed drafting, suggestions and visual judgments can use a configured provider. Visual checks can send frames to a model. Speech choices can need network access or model downloads. Confirm providers, data boundaries and any charges before enabling them. Local capture is not permission to use a paid model key.</p>
         <h3 id="login">Record behind a login</h3>
-        <p>Use a demo account. With the Retake window open, enter credentials into its local secret form when requested. Without the window, type values in your own terminal with this command. Do not paste passwords into agent chat.</p>
-        <div class="docs-code"><div class="docs-code-head"><span>Terminal · enter your own demo credentials privately</span></div><pre><code>retake secret APP_USER APP_PASSWORD</code></pre></div>
-        <p>The agent references variable names such as <code>${APP_PASSWORD}</code> with <code>secret: true</code> in <code>auth.setup</code>, before the camera. Values live in the local <code>.env</code>; saved sessions live in <code>.auth/</code>. Keep both out of version control.</p>
-        <p>For a login that needs a person, such as SSO or an SMS code, use an existing manifest:</p>
-        <div class="docs-code"><div class="docs-code-head"><span>Terminal · human sign-in</span></div><pre><code>retake signin demos/my-demo.yaml</code></pre></div>
-        <p>A real browser opens. Sign in yourself, then press Enter in the terminal to save the session. <strong><code>secret: true</code> hides logged values, not pixels in the video.</strong> Omit unsafe screens or cover private regions and review navigation transitions. Never approve a paid action just to make a demo pass.</p>
-        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake#behind-a-login">README: login and secrets</a> · <a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/operator/tools.ts">Agent tools and visual checks</a></p>
+        <p>Use a demo account. A login is saved once per site and every demo of that site signs in with it. When a demo needs one, the Retake window asks with a small form; without the window, save it in your own terminal. Do not paste passwords into agent chat.</p>
+        <div class="docs-code"><div class="docs-code-head"><span>Terminal · save a demo login for one site</span></div><pre><code>retake login https://app.example.com</code></pre></div>
+        <p>On a Mac the login is kept in your Keychain, not in a project file. The agent signs in with <code>${LOGIN_USER}</code> and <code>${LOGIN_PASSWORD}</code> marked <code>secret: true</code> in <code>auth.setup</code>, before the camera, and never sees the values. The session is kept in <code>.auth/</code> and Retake signs in again by itself when it runs out. <code>retake logins</code> lists the saved sites; <code>retake login &lt;url&gt; --forget</code> removes one. Older demos that use <code>${APP_PASSWORD}</code> from <code>.env</code> keep working.</p>
+        <p>For a login that needs a person, such as SSO or an SMS code, choose Sign in by hand in the window's form, or:</p>
+        <div class="docs-code"><div class="docs-code-head"><span>Terminal · human sign-in</span></div><pre><code>retake login https://app.example.com --by-hand</code></pre></div>
+        <p>A real browser opens. Sign in yourself, then press Enter in the terminal to keep the session. <strong><code>secret: true</code> hides logged values, not pixels in the video.</strong> Omit unsafe screens or cover private regions and review navigation transitions. Never approve a paid action just to make a demo pass.</p>
+        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake#behind-a-login">README: login and secrets</a> · <a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/operator/tools.ts">Agent tools and visual checks</a></p>
       </section>
       <section id="troubleshooting" data-doc-section>
         <h2>Troubleshooting</h2>
@@ -176,8 +176,8 @@ outputs/my-demo/
       </section>
       <section id="reference" data-doc-section>
         <h2>Source reference</h2>
-        <p>The CLI examples follow published Retake 0.13.2; the linked production guides also describe review practices and may evolve separately. Setup and recording examples are documentation, not proof that your app or client configuration has been tested.</p>
-        <ul class="docs-reference"><li><a href="https://github.com/glebbogachev00/retake#readme">README</a><span>Installation, workspace, login, outputs and limits.</span></li><li><a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/cli.ts">CLI source</a><span>Actual commands, flags and generated client configuration.</span></li><li><a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/src/operator/tools.ts">MCP tools</a><span>Tool behavior, recording review and permissions.</span></li><li><a href="https://github.com/glebbogachev00/retake/blob/69c6059677ce1c7b008c806b3d82535df43e7041/skill/SKILL.md">Recording skill</a><span>The agent’s recording and review method.</span></li></ul>
+        <p>The CLI examples follow published Retake 0.14.1; the linked production guides also describe review practices and may evolve separately. Setup and recording examples are documentation, not proof that your app or client configuration has been tested.</p>
+        <ul class="docs-reference"><li><a href="https://github.com/glebbogachev00/retake#readme">README</a><span>Installation, workspace, login, outputs and limits.</span></li><li><a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts">CLI source</a><span>Actual commands, flags and generated client configuration.</span></li><li><a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/operator/tools.ts">MCP tools</a><span>Tool behavior, recording review and permissions.</span></li><li><a href="https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/skill/SKILL.md">Recording skill</a><span>The agent’s recording and review method.</span></li></ul>
       </section>
       <footer class="docs-footer"><a href="/">← Back to Retake</a><a href="#overview">Back to top ↑</a></footer>
     </main>

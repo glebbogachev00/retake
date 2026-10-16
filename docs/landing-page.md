@@ -32,7 +32,7 @@ Gleb prefers the split layout. Layout A now has its own layer, `site/split.css` 
 
 ## Documentation
 
-The local `/docs/` page covers first setup, agent connection, recording/review, optional presentation, privacy, and troubleshooting, with local search and copyable examples. CLI examples are checked against a committed fixture of published Retake 0.13.2, rather than assuming the newer local branch has shipped. Unpublished preview/fresh/final lifecycle flags are not advertised.
+The local `/docs/` page covers first setup, agent connection, recording/review, optional presentation, privacy, and troubleshooting, with local search and copyable examples. CLI examples are checked against a committed fixture of published Retake 0.14.1 (its npm gitHead), rather than assuming the newer local branch has shipped. The preview/fresh/final lifecycle flags are published but deliberately left out: the agent drives them.
 
 ## Selected published media
 

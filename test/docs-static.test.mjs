@@ -6,7 +6,7 @@ const read = relative => fs.readFile(new URL('../' + relative, import.meta.url),
 const [html, js, css] = await Promise.all(['site/docs/index.html', 'site/docs/docs.js', 'site/docs/docs.css'].map(read));
 // A compact checked-in release snapshot keeps compatibility checks independent
 // of git history, network access and the newer local implementation.
-const published = JSON.parse(await read('test/fixtures/retake-published-0.13.2.json'));
+const published = JSON.parse(await read('test/fixtures/retake-published-0.14.1.json'));
 const release = published.gitHead;
 const decode = text => text.replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 
@@ -36,10 +36,10 @@ test('stylesheet and script assets exist and page needs no external assets', asy
   assert.ok(!/<(?:script|link|img)[^>]+(?:src|href)="https?:/i.test(html));
 });
 
-test('every copyable CLI command and flag matches the published 0.13.2 fixture', () => {
+test('every copyable CLI command and flag matches the published 0.14.1 fixture', () => {
   assert.equal(published.package, 'retake-demos');
-  assert.equal(published.version, '0.13.2');
-  assert.equal(release, '69c6059677ce1c7b008c806b3d82535df43e7041');
+  assert.equal(published.version, '0.14.1');
+  assert.equal(release, '0a74668c8f2a15a03951621c1a8bbd9232a4aa59');
   for (const url of Object.values(published.sources)) assert.ok(url.includes('/blob/' + release + '/'));
   assert.ok(html.includes(published.sources.cli));
   const blocks = [...html.matchAll(/<pre><code>([\s\S]*?)<\/code><\/pre>/g)].map(match => decode(match[1]));
@@ -98,12 +98,13 @@ test('content separates optional presentation, approval, local privacy and costs
 });
 
 
-test('public CLI copy excludes unpublished preview lifecycle flags and guarantees', () => {
-  assert.deepEqual(published.unsupportedPublicFlags, ['--preview', '--final', '--fresh']);
-  assert.ok(!/--(?:preview|final|fresh)\b/.test(html), 'Unpublished lifecycle flag in public HTML');
+test('beginner docs leave out the preview lifecycle flags and their guarantees', () => {
+  assert.ok(Array.isArray(published.unsupportedPublicFlags));
+  // Published since 0.14, but the agent drives them; a first reader does not need them.
+  assert.ok(!/--(?:preview|final|fresh)\b/.test(html), 'Lifecycle flag in the beginner docs');
   for (const flag of published.unsupportedPublicFlags) assert.ok(!html.includes(flag), 'Unpublished flag in public HTML: ' + flag);
   assert.ok(!/one[- ]capture|correction budget|already finalized|capture[- ]hash|capture-relevant.*rejects/i.test(html));
-  assert.match(html, /published <strong>Retake 0\.13\.2<\/strong>/);
+  assert.match(html, /published <strong>Retake 0\.14\.1<\/strong>/);
   assert.ok(html.includes('/blob/' + release + '/src/cli.ts'));
   assert.match(html, /retake run demos\/my-demo\.yaml --no-master/);
   assert.match(html, /retake render outputs\/my-demo demos\/my-demo\.yaml --preset post-landscape --no-master/);

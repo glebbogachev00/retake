@@ -1,0 +1,102 @@
+{
+  "package": "retake-demos",
+  "version": "0.14.1",
+  "gitHead": "0a74668c8f2a15a03951621c1a8bbd9232a4aa59",
+  "scope": "Only command, flag and manifest facts used by public docs tests, extracted from this published gitHead. Not the complete CLI API.",
+  "sources": {
+    "cli": "https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts",
+    "manifest": "https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/manifest.ts",
+    "readme": "https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/README.md"
+  },
+  "commands": {
+    "install": {
+      "flags": [],
+      "sourceLines": "765-769"
+    },
+    "doctor": {
+      "flags": [],
+      "sourceLines": "738-741"
+    },
+    "ui": {
+      "flags": [],
+      "sourceLines": "1197-1200"
+    },
+    "agent": {
+      "flags": [],
+      "sourceLines": "815-819"
+    },
+    "validate": {
+      "flags": [],
+      "sourceLines": "1152-1155"
+    },
+    "dry": {
+      "flags": [],
+      "sourceLines": "973-978"
+    },
+    "run": {
+      "flags": [
+        "--no-master"
+      ],
+      "sourceLines": "147-165"
+    },
+    "check": {
+      "flags": [],
+      "sourceLines": "985-989"
+    },
+    "render": {
+      "flags": [
+        "--preset",
+        "--no-master"
+      ],
+      "sourceLines": "581-593"
+    },
+    "secret": {
+      "flags": [],
+      "sourceLines": "879-883"
+    },
+    "signin": {
+      "flags": [],
+      "sourceLines": "939-943"
+    },
+    "login": {
+      "flags": [
+        "--by-hand",
+        "--forget"
+      ],
+      "sourceLines": "897-903"
+    },
+    "logins": {
+      "flags": [],
+      "sourceLines": "928-931"
+    }
+  },
+  "shellSetup": [
+    "npm install -g retake-demos",
+    "mkdir my-demos && cd my-demos"
+  ],
+  "agentConfiguration": {
+    "codexTable": "[mcp_servers.retake]",
+    "cursorPath": ".cursor/mcp.json",
+    "sourceLines": "727, 829"
+  },
+  "manifest": {
+    "voiceover": {
+      "allowsBoolean": true,
+      "default": false,
+      "sourceLines": "317-354"
+    },
+    "music": {
+      "optional": true,
+      "types": [
+        "string",
+        "object"
+      ],
+      "sourceLines": "355-358"
+    },
+    "captions": {
+      "disableValue": false,
+      "cliSourceLines": "1149"
+    }
+  },
+  "unsupportedPublicFlags": []
+}
