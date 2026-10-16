@@ -11,7 +11,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { blankLead, record } from "../src/record.js";
 import { loadManifest } from "../src/manifest.js";
 import { ffmpegBin } from "../src/media-bin.js";
@@ -45,7 +45,13 @@ test("a slow server does not leave blank frames at the front of the take", async
   // 0.4s in: the old cut left ~1.5s of blank here, so this still catches it,
   // while a busy machine's slow first paint is not mistaken for the bug.
   const opening = contrastAt(take.video!, take.trimBefore + 0.4);
-  assert.ok(opening > 60, `the take opens on a blank frame (contrast ${opening}) — the cut is ${take.trimBefore.toFixed(2)}s, too early`);
+  if (opening <= 60) {
+    // Say everything needed to tell a wrong cut from a page that never drew.
+    const along = [0, 0.4, 1, 2, 3, 4, 6].map((d) => `${(take.trimBefore + d).toFixed(1)}s:${contrastAt(take.video!, take.trimBefore + d)}`).join(" ");
+    const lead = blankLead(take.video!, take.trimBefore);
+    const len = spawnSync(ffmpegBin(), ["-hide_banner", "-i", take.video!], { encoding: "utf8" }).stderr ?? "";
+    assert.fail(`the take opens on a blank frame — cut ${take.trimBefore.toFixed(2)}s · blankLead now ${lead} · contrast ${along} · video ${take.video} ${/Duration: [\d:.]+/.exec(len)?.[0] ?? ""}`);
+  }
 });
 
 test("a flat opening is measured from the picture, and a real one is left alone", () => {
