@@ -32,6 +32,28 @@ function engine(): { cmd: string; args: string[] } {
   throw new Error("voiceover needs edge-tts — install it once with `pipx install edge-tts` (or `pip install edge-tts`), then re-render");
 }
 
+/** Run edge-tts, and when it fails say why in a sentence a person can act on —
+    not the whole command line with the script pasted into it. The usual
+    failure is Microsoft's service refusing an out-of-date edge-tts (a 403):
+    it worked yesterday, it stops today, and upgrading fixes it. */
+export function edgeFailure(stderr: string, cmd: string): string {
+  const upgrade = cmd === "python3" ? "`pip install -U edge-tts`" : "`pipx upgrade edge-tts` (or `pip install -U edge-tts`)";
+  if (/\b403\b|WSServerHandshakeError/.test(stderr)) return `voiceover: Microsoft's voice service refused the request (403). That almost always means edge-tts is out of date — run ${upgrade}, then re-render. If it is already current, check that this computer's clock is right.`;
+  if (/getaddrinfo|ClientConnectorError|Cannot connect|Network is unreachable|TimeoutError/i.test(stderr)) return "voiceover: could not reach Microsoft's voice service — is the network up? (edge-tts is a network service)";
+  const last = stderr.trim().split("\n").filter(Boolean).pop() ?? "";
+  return `voiceover: edge-tts failed${last ? ` — ${last.slice(0, 200)}` : ""}`;
+}
+
+function runEdge(e: { cmd: string; args: string[] }, args: string[], timeout: number): void {
+  try {
+    execFileSync(e.cmd, [...e.args, ...args], { stdio: "pipe", timeout });
+  } catch (err) {
+    const x = err as { stderr?: Buffer | string; code?: string; signal?: string };
+    if (x.code === "ETIMEDOUT" || x.signal === "SIGTERM") throw new Error("voiceover: Microsoft's voice service did not answer in time — try again in a minute");
+    throw new Error(edgeFailure(String(x.stderr ?? ""), e.cmd));
+  }
+}
+
 export function synthesize(text: string, voice: string, out: string, ratePercent = 0): void {
   const cached = voiceCachePath(text, voice, ratePercent);
   if (fs.existsSync(cached) && fs.statSync(cached).size >= 200) {
@@ -41,7 +63,7 @@ export function synthesize(text: string, voice: string, out: string, ratePercent
   const e = engine();
   const temp = `${out}.tmp-${process.pid}`;
   try {
-    execFileSync(e.cmd, [...e.args, "--voice", voice, "--rate", `${ratePercent >= 0 ? "+" : ""}${ratePercent}%`, "--text", text, "--write-media", temp], { stdio: "pipe", timeout: 60_000 });
+    runEdge(e, ["--voice", voice, "--rate", `${ratePercent >= 0 ? "+" : ""}${ratePercent}%`, "--text", text, "--write-media", temp], 60_000);
     if (!fs.existsSync(temp) || fs.statSync(temp).size < 200) throw new Error(`voiceover: nothing came back for “${text.slice(0, 40)}…” — is the network up? (edge-tts is a network service)`);
     fs.mkdirSync(path.dirname(cached), { recursive: true });
     fs.copyFileSync(temp, cached);
@@ -91,7 +113,7 @@ export function synthesizeWithCues(text: string, voice: string, out: string, rat
   const e = engine();
   const temp = `${out}.tmp-${process.pid}`, srt = `${out}.srt`;
   try {
-    execFileSync(e.cmd, [...e.args, "--voice", voice, "--rate", `${ratePercent >= 0 ? "+" : ""}${ratePercent}%`, "--text", text, "--write-media", temp, "--write-subtitles", srt], { stdio: "pipe", timeout: 120_000 });
+    runEdge(e, ["--voice", voice, "--rate", `${ratePercent >= 0 ? "+" : ""}${ratePercent}%`, "--text", text, "--write-media", temp, "--write-subtitles", srt], 120_000);
     if (!fs.existsSync(temp) || fs.statSync(temp).size < 200) throw new Error("voiceover: nothing came back — is the network up? (edge-tts is a network service)");
     const cues = parseSrt(fs.readFileSync(srt, "utf8"));
     if (!cues.length) throw new Error("voiceover: the voice came back without sentence timings, so it cannot be placed on the scenes");

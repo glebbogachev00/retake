@@ -12,6 +12,7 @@
  * happening in plain sentences.
  */
 import "../browser-home.js";
+import "../self-repair.js";
 import { hasLogin, loginStoreName, readLogin, siteOf } from "../logins.js";
 import { sessionAgeHours, sessionPathFor } from "../signin.js";
 import fs from "node:fs";

@@ -2,6 +2,19 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.14.1",
+      "date": "2026-10-16",
+      "headline": "Videos of real websites open on the website, and installing just works",
+      "notes": [
+        "Recording a live website (not one on your own computer) used to start with a second or two of blank white, and the cursor, captions and scene cuts ran that much late. Retake now marks the true start of every recording, so the video opens on the page and everything lands on its moment.",
+        "Pasting your site now shows your colours in a few seconds. On sites without a logo in their header, Retake used to sit on “Reading your site…” for half a minute first.",
+        "Installing gets exactly the versions Retake was tested with, instead of whatever was newest that day.",
+        "If npm skips Retake's install steps — newer versions of npm ask before running them — Retake now finishes them itself the first time it runs: it fetches ffmpeg and applies its recorder fix.",
+        "Running the install command again (after an update, or in a new folder) now updates your agent's connection instead of reporting a failure.",
+        "When Microsoft's voice service refuses a voiceover, Retake now says what fixes it — usually updating the voice tool — instead of showing the whole command it ran."
+      ]
+    },
+    {
       "version": "0.14.0",
       "date": "2026-10-14",
       "headline": "Videos that look like one you love, in your own colours, and logins you save once",

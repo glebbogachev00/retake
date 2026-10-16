@@ -184,6 +184,23 @@ export function persistentCssScript(css: string): string {
   })();`;
 }
 
+/** Present in the DOM is not the same as on screen. A page whose stylesheet
+    or web font is still on its way has every element the manifest waits for
+    and paints nothing: an agent's demo of a public site opened on two seconds
+    of blank page, and every check passed. So before the camera's clock
+    starts, let the page finish loading what it draws with — bounded, because
+    a busy site may never be "done", and the manifest's own gate already
+    proved the app is there. */
+export async function untilPainted(page: Page): Promise<void> {
+  await page.waitForLoadState("load", { timeout: 8000 }).catch(() => {});
+  await page.evaluate(() => Promise.race([
+    (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready,
+    new Promise((ok) => setTimeout(ok, 4000)),
+  ])).catch(() => {});
+  // Two frames: the first after fonts swap in, the second actually drawn.
+  await page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))).catch(() => {});
+}
+
 /** The session a take should start from, and whether it is still good.
     Shared so `dry` starts signed in exactly when `run` would — a dry run
     against a logged-out app "proving" a manifest is a wasted take waiting
@@ -691,6 +708,13 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
     // --- setup phase (still inside the video; trimmed later by `trimBefore`) ---
     // Document first; idle only if it comes quickly. Busy public sites never
     // go network-idle, and the manifest's waitForSelector is the real gate.
+    // The video starts at the first frame the tab paints. Left to itself that
+    // is somewhere between the empty tab and the site's first paint — on a
+    // real site, measured, up to 1.5s after the moment we took for it, which
+    // left blank white frames at the front and every cursor move, scene cut
+    // and caption that late. So paint the tab once, now, and take THAT as
+    // the start: measured within ~0.1s on local and public sites alike.
+    const paintedAt = await paintFirstFrame(page);
     await page.goto(expandEnv(m.url), { waitUntil: "domcontentloaded", timeout: 60000 });
     // The manifest's readiness selectors are authoritative. Busy public apps
     // may never become network-idle; paying a fixed 8s before every take made
@@ -713,11 +737,12 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
       }
     }
     await gateOnApp(page, m, opts.outDir);
+    await untilPainted(page);
 
     // Playwright's video begins at the first *painted* frame, not at newPage().
     // On a dev server that can be seconds later; if testreel's cursor overlay is
     // told the wrong start it draws every cursor move that many seconds late.
-    const videoStartedAt = await firstPaintWallClock(page);
+    const videoStartedAt = paintedAt ?? await firstPaintWallClock(page);
     t0 = videoStartedAt;
 
 
@@ -1532,6 +1557,17 @@ export function describe(step: Step): string {
     case "scene":
       return `scene: ${step.label}`;
   }
+}
+
+/** Paint the empty tab and return the wall-clock ms of that paint — the
+    video's first frame. Null if the page would not paint (then the old
+    estimate stands). It happens during setup, so it is trimmed away. */
+export async function paintFirstFrame(page: Page): Promise<number | null> {
+  try {
+    await page.setContent('<html style="background:#fff;height:100%"><body></body></html>');
+    return Math.round(await page.evaluate(() => new Promise<number>((ok) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => ok(performance.timeOrigin + performance.now()))))));
+  } catch { return null; }
 }
 
 /** Wall-clock ms when the recorded page's document committed — empirically

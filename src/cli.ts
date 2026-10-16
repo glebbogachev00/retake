@@ -33,6 +33,7 @@
  * installed from npm, dist/cli.js is the `retake` binary. Same file.
  */
 import { BROWSERS, chromiumPath, installChromium, launchChromium } from "./browser-home.js";
+import { bundledFfmpeg, recorderPatched } from "./self-repair.js";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -748,8 +749,10 @@ program
     try {
       const require = createRequire(import.meta.url);
       const ff = require("ffmpeg-static") as string;
-      fs.existsSync(ff) ? ok(`ffmpeg ${ff}`) : no("ffmpeg-static is missing its binary — reinstall retake-demos");
+      fs.existsSync(ff) ? ok(`ffmpeg ${ff}`) : say("· ffmpeg not downloaded yet — the first render fetches it (or run: retake install)");
     } catch { no("ffmpeg-static not found — reinstall retake-demos"); }
+    const patched = recorderPatched();
+    if (patched === false) no("Retake's recorder patch is not applied — run any retake command once and it applies itself");
     const which = (bin: string) => spawnSync("which", [bin], { encoding: "utf8" }).stdout.trim();
     say(which("gifski") ? `✓ gifski (better GIFs)` : `· gifski not installed — GIFs fall back to ffmpeg (brew install gifski)`);
     say(which("claude") ? `✓ claude CLI — \`retake install\` can register the tools` : `· claude CLI not found — paste the config from \`retake agent\` into your agent`);
@@ -769,15 +772,28 @@ program
     // 1. the workspace: demos/ and outputs/ live where the command was run
     initWorkspace(process.cwd(), say);
     // 2. the browser
+    if (bundledFfmpeg()) say("✓ ffmpeg present");
+    else say("✗ could not get ffmpeg — install it once (brew install ffmpeg) and try again");
     if (chromiumPath()) say("✓ chromium present");
     else if (!installChromium(say)) say("✗ could not download Chromium — run `npx playwright install chromium` and try again");
     // 3. the tools, registered with Claude Code for every project
     const server = mcpServer(o.ui);
+    // Running install again (an upgrade, a new workspace) finds the tools
+    // already registered — replace that registration rather than calling it
+    // a failure, so it points at this install and this folder.
+    const add = () => execFileSync("claude", ["mcp", "add-json", "retake", JSON.stringify(server), "--scope", "user"], { stdio: "pipe", encoding: "utf8" });
     try {
-      execFileSync("claude", ["mcp", "add-json", "retake", JSON.stringify(server), "--scope", "user"], { stdio: "pipe" });
+      add();
       say("✓ Claude Code: retake tools registered (user scope)");
-    } catch {
-      say("✗ Claude Code CLI not found or refused — run `retake agent` and paste the config yourself");
+    } catch (e) {
+      const why = String((e as { stderr?: string }).stderr ?? (e as Error).message ?? "");
+      let fixed = false;
+      if (/already exists/i.test(why)) {
+        try { execFileSync("claude", ["mcp", "remove", "retake", "--scope", "user"], { stdio: "pipe" }); add(); fixed = true; } catch { /* fall through */ }
+      }
+      say(fixed ? "✓ Claude Code: retake tools re-registered for this folder (user scope)"
+        : /ENOENT/.test(why) ? "✗ Claude Code CLI not found — run `retake agent` and paste the config yourself"
+        : `✗ Claude Code refused to register the tools${why.trim() ? ` (${why.trim().split("\n").pop()})` : ""} — run \`retake agent\` and paste the config yourself`);
     }
     // 4. the skill: when to reach for the tools, and in what order
     const skillSrc = path.join(PKG_ROOT, "skill", "SKILL.md");
