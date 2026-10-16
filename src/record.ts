@@ -1025,7 +1025,22 @@ export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
   // The take finished, so there is nothing to resume: leaving the hint would
   // send someone back into the middle of a demo they already have.
   try { fs.rmSync(path.join(opts.outDir, "reached.json"), { force: true }); } catch { /* fine */ }
-  const trimBefore = sec(setupEnd - t0);
+  // The start is marked by painting the empty tab (paintFirstFrame), which
+  // holds on an ordinary machine. On a loaded one — CI, a laptop running a
+  // test suite — the browser can begin the video before that paint lands,
+  // and the cut falls on the blank page. So check the picture itself: if the
+  // take's first frame is flat while the page was proven painted, move the
+  // start to the first real frame and every step with it.
+  let late = 0;
+  if (video) {
+    late = blankLead(video, sec(setupEnd - t0));
+    if (late > 0) {
+      for (const e of timeline) { e.start = sec(e.start + late); e.end = sec(e.end + late); }
+      for (const e of pageErrors) e.at = sec(e.at + late);
+      log(`start: the video began ${late.toFixed(2)}s before the marked start — every step moved to match the picture`);
+    }
+  }
+  const trimBefore = sec(setupEnd - t0 + late);
   // The recording keeps rolling while the browser is torn down, so the raw
   // video always has a tail of nothing after the last step. The take ends
   // where the demo ends (plus a breath), never where the recorder stopped —
@@ -1557,6 +1572,20 @@ export function describe(step: Step): string {
     case "scene":
       return `scene: ${step.label}`;
   }
+}
+
+/** Seconds of flat, empty picture from `at` onward, before the first frame
+    with anything on it — 0 when `at` already shows the page. Bounded: past
+    4s it is the app, not the clock, and the take is left alone. */
+export function blankLead(video: string, at: number, maxSeconds = 4): number {
+  try {
+    const out = execFileSync(ffmpegBin(), ["-hide_banner", "-ss", at.toFixed(3), "-t", String(maxSeconds), "-i", video,
+      "-vf", "fps=20,signalstats,metadata=print:file=-", "-f", "null", "-"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 });
+    const frames = [...out.matchAll(/pts_time:([\d.]+)[\s\S]*?YMIN=(\d+)[\s\S]*?YMAX=(\d+)/g)].map((m) => ({ t: Number(m[1]), flat: Number(m[3]) - Number(m[2]) <= 8 }));
+    if (!frames.length || !frames[0].flat) return 0;
+    const first = frames.find((f) => !f.flat);
+    return first ? Math.round(first.t * 1000) / 1000 : 0;
+  } catch { return 0; }
 }
 
 /** Paint the empty tab and return the wall-clock ms of that paint — the

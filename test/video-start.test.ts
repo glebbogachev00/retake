@@ -12,7 +12,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { record } from "../src/record.js";
+import { blankLead, record } from "../src/record.js";
 import { loadManifest } from "../src/manifest.js";
 import { ffmpegBin } from "../src/media-bin.js";
 
@@ -46,4 +46,16 @@ test("a slow server does not leave blank frames at the front of the take", async
   // while a busy machine's slow first paint is not mistaken for the bug.
   const opening = contrastAt(take.video!, take.trimBefore + 0.4);
   assert.ok(opening > 60, `the take opens on a blank frame (contrast ${opening}) — the cut is ${take.trimBefore.toFixed(2)}s, too early`);
+});
+
+test("a flat opening is measured from the picture, and a real one is left alone", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "blank-lead-"));
+  const v = path.join(dir, "v.mp4");
+  // One second of blank white, then a picture with something in it.
+  execFileSync(ffmpegBin(), ["-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi", "-i", "color=white:s=320x180:r=30:d=1", "-f", "lavfi", "-i", "testsrc=s=320x180:r=30:d=2",
+    "-filter_complex", "[0:v][1:v]concat=n=2:v=1[o]", "-map", "[o]", "-pix_fmt", "yuv420p", v]);
+  const lead = blankLead(v, 0);
+  assert.ok(lead >= 0.9 && lead <= 1.1, `measured ${lead}s of blank, wanted ~1s`);
+  assert.equal(blankLead(v, 1.2), 0, "a take that opens on the page is not moved");
 });
