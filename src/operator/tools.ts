@@ -358,7 +358,7 @@ server.registerTool("env", {
 });
 
 server.registerTool("routine", {
-  description: "Call this FIRST in any session. The workspace's locked standard — output format, captions, voice and speaking rate, music — and, when the product has one, its full recording brief: where the app runs, how to seed it, the selectors that hold, and what breaks. READ THIS BEFORE DRAFTING and do not set `preset`, `layout`, `captions`, `viewport`, `scale`, `voiceover.voice`, `voiceover.ratePercent` or `music` yourself — they are not yours to choose, and choosing them is how two videos from the same workspace come back looking and sounding different. Write the steps and the captions; call routine_apply when the manifest exists.",
+  description: "Call this FIRST in any session. The workspace's locked standard — output format, captions, voice and speaking rate, music — and, when the product has one, its full recording brief: where the app runs, how to seed it, the selectors that hold, and what breaks. READ THIS BEFORE DRAFTING and do not set `preset`, `layout`, `captions`, `viewport`, `scale`, `voiceover.voice`, `voiceover.ratePercent` or `music` yourself — they are not yours to choose, and choosing them is how two videos from the same workspace come back looking and sounding different. Write the steps and the captions; call routine_apply when the manifest exists. Voices are names (andrew, ava, brian, emma, aria, ryan online; heart, michael, aiden local on the person's Mac): if the routine says silent and they want narration, ask which one.",
   inputSchema: {},
   annotations: READ_ONLY,
 }, async () => {

@@ -39,6 +39,37 @@ def pronounce(text: str) -> str:
     return "".join(out)
 
 
+def short_espeak_data() -> None:
+    """espeak-ng keeps its data path in a fixed-size buffer: past ~150
+    characters it silently falls back to the path it was built with
+    (/Users/runner/work/…) and exits the process. uv's cache path plus
+    site-packages reaches that with a long username or a custom cache
+    folder. So espeak reads a copy of its data (~20 MB, made once) from a
+    short folder. A link would not do: phonemizer resolves it back to the
+    long path. Set after misaki has imported, which sets the long path."""
+    import shutil
+    import espeakng_loader
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper
+    try:
+        import misaki.espeak  # noqa: F401  (sets the long path; overridden below)
+    except Exception:
+        pass
+    data = espeakng_loader.get_data_path()
+    if len(data) > 100:
+        short = os.path.join(os.path.expanduser("~/Library/Caches/retake"), "espeak-ng-data")
+        marker = os.path.join(short, ".copied-from")
+        fresh = os.path.isfile(marker) and open(marker).read() == data
+        if not fresh:
+            if os.path.lexists(short):
+                shutil.rmtree(short) if os.path.isdir(short) and not os.path.islink(short) else os.remove(short)
+            shutil.copytree(data, short)
+            with open(marker, "w") as f:
+                f.write(data)
+        data = short
+    EspeakWrapper.set_library(espeakng_loader.get_library_path())
+    EspeakWrapper.set_data_path(data)
+
+
 EDGE_LUFS = -19.8   # measured: Edge's Andrew reading the same lines
 SR = 24000
 MODELS = {"kokoro": "mlx-community/Kokoro-82M-8bit", "qwen": "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"}
@@ -57,6 +88,8 @@ def main() -> None:
     from mlx_audio.tts.utils import load_model
 
     engine, name = a.voice.split(":", 1)
+    if engine == "kokoro":
+        short_espeak_data()
     speed = 1 + int(re.sub(r"[%+]", "", a.rate) or 0) / 100
     model = load_model(MODELS[engine])
 

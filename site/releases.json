@@ -2,6 +2,19 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.14.3",
+      "date": "2026-10-19",
+      "headline": "Choosing Kokoro or Aiden now works for someone starting from nothing",
+      "notes": [
+        "The voice you pick when you first open Retake is now remembered. Before, only the agent that made your first draft was told; the next one had to ask which voice you meant.",
+        "When your first draft is ready, the window shows the exact sentence to give your agent to add a voiceover, with a copy button.",
+        "Kokoro no longer fails to start when your Mac's user name or cache folder makes its files' path long.",
+        "Agents can name a voice the way they naturally would — heart, aiden, or Kokoro's own af_heart — and a voice name Retake does not know now says which names work.",
+        "The first use of a local voice downloads its engine as well as the voice: about 2.6 GB for Kokoro and 4 GB for Aiden. The window now says so, and allows up to an hour for it on a slow connection.",
+        "If an install was interrupted part-way through downloading ffmpeg, Retake now notices the broken copy and fetches it again instead of failing every render."
+      ]
+    },
+    {
       "version": "0.14.2",
       "date": "2026-10-16",
       "headline": "The local voices you can pick are now the voices you get",

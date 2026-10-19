@@ -30,11 +30,37 @@ export function voiceCachePath(text: string, voice: string, ratePercent = 0): st
   return path.join(root, `${key}.mp3`);
 }
 
+export const VOICES: Record<string, { id: string; note: string }> = {
+  ryan: { id: "en-GB-RyanNeural", note: "British, easy, positive. The one the Capture demos use." },
+  andrew: { id: "en-US-AndrewNeural", note: "Warm, confident, unhurried." },
+  ava: { id: "en-US-AvaNeural", note: "Expressive and friendly, a little closer in." },
+  brian: { id: "en-US-BrianNeural", note: "Casual and sincere — least like a narrator." },
+  emma: { id: "en-US-EmmaNeural", note: "Clear and conversational, good over fast UI." },
+  aria: { id: "en-US-AriaNeural", note: "A news read: even, flat, no colour." },
+  // Local: these run on this Mac (Apple Silicon) and send nothing anywhere.
+  heart: { id: "kokoro:af_heart", note: "Local (Kokoro). Warm, natural, female. First use downloads ~2.6 GB (voice engine and model)." },
+  michael: { id: "kokoro:am_michael", note: "Local (Kokoro). Steady, male. Shares Heart's download." },
+  aiden: { id: "qwen:aiden", note: "Local (Qwen3). Natural, male. First use downloads ~4 GB (voice engine and model; ~1.8 GB if Kokoro is already set up)." },
+};
+
+/** A routine's `voice` is a name above, "silent", a raw edge-tts voice id
+ *  (`vi-VN-HoaiMyNeural`) for a language the named set does not cover, or a
+ *  raw local id (`kokoro:af_bella`, `qwen:ryan`). */
+export function voiceId(voice: string): string {
+  // The names a person or an agent reaches for: a name above, Kokoro's own
+  // id (`af_heart` — what an agent guessed first, and Retake handed to Edge),
+  // or the full form. Anything else is taken as an edge-tts id.
+  if (VOICES[voice]) return VOICES[voice].id;
+  if (/^[a-z][fm]_[a-z]+$/.test(voice)) return `kokoro:${voice}`;
+  return voice;
+}
+
+
 /** Voices that run on this Mac: `kokoro:<voice>` and `qwen:<speaker>`. */
 export const LOCAL_VOICE = /^(kokoro|qwen):[a-z_]+$/;
 /** Bump when local pronunciation or levelling changes: it re-renders them. */
 export const LOCAL_VOICE_VERSION = "local-voice-1";
-const LOCAL_MODEL = { kokoro: { repo: "models--mlx-community--Kokoro-82M-8bit", size: "~300 MB" }, qwen: { repo: "models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit", size: "~1.8 GB" } };
+const LOCAL_MODEL = { kokoro: { repo: "models--mlx-community--Kokoro-82M-8bit", size: "~2.6 GB with the voice engine, once" }, qwen: { repo: "models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit", size: "~4 GB with the voice engine, once" } };
 
 /** The local voice engine: Retake's script under uv, with the MLX audio stack. */
 export function localEngine(voice: string, platform = process.platform, arch = process.arch): { cmd: string; args: string[] } {
@@ -72,6 +98,7 @@ function engine(): { cmd: string; args: string[] } {
 export function edgeFailure(stderr: string, cmd: string): string {
   const upgrade = cmd === "python3" ? "`pip install -U edge-tts`" : "`pipx upgrade edge-tts` (or `pip install -U edge-tts`)";
   if (/\b403\b|WSServerHandshakeError/.test(stderr)) return `voiceover: Microsoft's voice service refused the request (403). That almost always means edge-tts is out of date — run ${upgrade}, then re-render. If it is already current, check that this computer's clock is right.`;
+  if (/Invalid voice/i.test(stderr)) return `voiceover: Edge does not know that voice. Use a name — ${Object.keys(VOICES).join(", ")} (heart, michael and aiden run on this Mac) — or an edge-tts id like en-US-AriaNeural. Local voices can also be written kokoro:<voice> or qwen:<speaker>.`;
   if (/getaddrinfo|ClientConnectorError|Cannot connect|Network is unreachable|TimeoutError/i.test(stderr)) return "voiceover: could not reach Microsoft's voice service — is the network up? (edge-tts is a network service)";
   const last = stderr.trim().split("\n").filter(Boolean).pop() ?? "";
   return `voiceover: edge-tts failed${last ? ` — ${last.slice(0, 200)}` : ""}`;
@@ -79,13 +106,26 @@ export function edgeFailure(stderr: string, cmd: string): string {
 
 function runEdge(e: { cmd: string; args: string[] }, args: string[], timeout: number): void {
   const local = e.cmd === "uvx";
+  // The first use of a local voice downloads its engine and model (~2.6 GB
+  // for Kokoro): on a slow line that is far past 15 minutes. Allow an hour
+  // then, keep the downloaders' progress bars out of the captured output
+  // (they overflowed it), and say which of the two went wrong.
+  const voice = args[args.indexOf("--voice") + 1] ?? "";
+  const firstUse = local && !localModelReady(voice);
   try {
-    execFileSync(e.cmd, [...e.args, ...args], { stdio: "pipe", timeout: local ? Math.max(timeout, 900_000) : timeout, env: local ? { ...process.env, FFMPEG_BIN: ffmpegPath() } : process.env });
+    execFileSync(e.cmd, [...e.args, ...args], {
+      stdio: "pipe", maxBuffer: 64 * 1024 * 1024,
+      timeout: local ? (firstUse ? 3_600_000 : Math.max(timeout, 900_000)) : timeout,
+      env: local ? { ...process.env, FFMPEG_BIN: ffmpegPath(), HF_HUB_DISABLE_PROGRESS_BARS: "1", TQDM_DISABLE: "1" } : process.env,
+    });
   } catch (err) {
     const x = err as { stderr?: Buffer | string; code?: string; signal?: string };
     if (local) {
+      if (x.code === "ETIMEDOUT" || x.signal === "SIGTERM") throw new Error(firstUse
+        ? "voiceover: the local voice's one-time setup (downloading its engine and model) did not finish within an hour — check the connection, then render again; what was downloaded is kept"
+        : "voiceover: the local voice took too long to speak — render again; if it keeps happening, use an Edge voice for now");
       const last = String(x.stderr ?? "").trim().split("\n").filter(Boolean).pop() ?? "";
-      throw new Error(`voiceover: the local voice failed${last ? ` — ${last.slice(0, 240)}` : ""}`);
+      throw new Error(`voiceover: the local voice failed${last ? ` — ${last.slice(0, 240)}` : " without saying why"}${firstUse ? " (during its one-time setup)" : ""}`);
     }
     if (x.code === "ETIMEDOUT" || x.signal === "SIGTERM") throw new Error("voiceover: Microsoft's voice service did not answer in time — try again in a minute");
     throw new Error(edgeFailure(String(x.stderr ?? ""), e.cmd));
@@ -99,6 +139,7 @@ function ffmpegPath(): string {
 }
 
 export function synthesize(text: string, voice: string, out: string, ratePercent = 0): void {
+  voice = voiceId(voice);
   const cached = voiceCachePath(text, voice, ratePercent);
   if (fs.existsSync(cached) && fs.statSync(cached).size >= 200) {
     fs.copyFileSync(cached, out);
@@ -148,6 +189,7 @@ function parseSrt(srt: string): Cue[] {
  * performance at those points. edge-tts writes the sentence timings itself.
  */
 export function synthesizeWithCues(text: string, voice: string, out: string, ratePercent = 0): Cue[] {
+  voice = voiceId(voice);
   const cached = voiceCachePath(`cues\0${text}`, voice, ratePercent);
   const cachedSrt = cached.replace(/\.mp3$/, ".srt");
   if (fs.existsSync(cached) && fs.statSync(cached).size >= 200 && fs.existsSync(cachedSrt)) {

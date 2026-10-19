@@ -20,6 +20,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { execFileSync } from "node:child_process";
 import * as mediaBin from "./media-bin.js";
+import { VOICES, voiceId } from "./voice.js";
 import { z } from "zod";
 
 /* ─── the three styles ───────────────────────────────────────────────────────
@@ -77,25 +78,8 @@ export const STYLES: Record<StyleName, Style> = {
    on the voice — a Vietnamese routine is a Vietnamese voice id, not a separate
    setting that would have to agree with this one. */
 
-export const VOICES: Record<string, { id: string; note: string }> = {
-  ryan: { id: "en-GB-RyanNeural", note: "British, easy, positive. The one the Capture demos use." },
-  andrew: { id: "en-US-AndrewNeural", note: "Warm, confident, unhurried." },
-  ava: { id: "en-US-AvaNeural", note: "Expressive and friendly, a little closer in." },
-  brian: { id: "en-US-BrianNeural", note: "Casual and sincere — least like a narrator." },
-  emma: { id: "en-US-EmmaNeural", note: "Clear and conversational, good over fast UI." },
-  aria: { id: "en-US-AriaNeural", note: "A news read: even, flat, no colour." },
-  // Local: these run on this Mac (Apple Silicon) and send nothing anywhere.
-  heart: { id: "kokoro:af_heart", note: "Local (Kokoro). Warm, natural, female. First use downloads ~300 MB." },
-  michael: { id: "kokoro:am_michael", note: "Local (Kokoro). Steady, male. Shares Heart's ~300 MB download." },
-  aiden: { id: "qwen:aiden", note: "Local (Qwen3). Natural, male. First use downloads ~1.8 GB." },
-};
+export { VOICES, voiceId } from "./voice.js";
 
-/** A routine's `voice` is a name above, "silent", a raw edge-tts voice id
- *  (`vi-VN-HoaiMyNeural`) for a language the named set does not cover, or a
- *  raw local id (`kokoro:af_bella`, `qwen:ryan`). */
-export function voiceId(voice: string): string {
-  return VOICES[voice]?.id ?? voice;
-}
 
 /* ─── the file ─────────────────────────────────────────────────────────────── */
 
@@ -196,6 +180,17 @@ export function routineFile(demosDir: string): string {
  *  first video should exist before anyone is asked about narration. */
 export function starter(): RoutineFile {
   return { use: "default", routines: { default: RoutineSchema.parse({ note: "The house standard. Change it here, not per video." }) } };
+}
+
+/** The narration chosen in the window's first run, kept in the routine so
+    every later agent reads it — not only the one that was told. It sets
+    whose voice reads a script; nothing is narrated until one is approved. */
+export function rememberNarration(demosDir: string, narration: "silent" | "edge" | "aiden" | "kokoro"): void {
+  if (narration === "silent") return;
+  const voice = { edge: "andrew", kokoro: "heart", aiden: "aiden" }[narration];
+  const file = readRoutines(demosDir) ?? starter();
+  const merged = RoutineSchema.safeParse({ ...(file.routines[file.use] ?? {}), voice });
+  if (merged.success) { file.routines[file.use] = merged.data; writeRoutines(demosDir, file); }
 }
 
 export function readRoutines(demosDir: string): RoutineFile | null {

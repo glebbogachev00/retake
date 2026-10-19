@@ -44,12 +44,23 @@ export function bundledFfmpeg(): string | null {
   let bin: string | null = null;
   try { bin = require("ffmpeg-static") as string; } catch { return null; }
   if (!bin) return null;
-  if (fs.existsSync(bin)) return bin;
+  if (runs(bin)) return bin;
+  // Missing, or there but not working: an install cut off mid-download
+  // leaves a partial file that is not executable, and "it exists" used to be
+  // enough to hand it to every render (EACCES, nothing could render).
   const installer = path.join(path.dirname(require.resolve("ffmpeg-static/package.json")), "install.js");
   if (!fs.existsSync(installer)) return null;
-  say("… downloading ffmpeg (one time, ~45 MB — npm skipped it at install)");
+  const broken = fs.existsSync(bin);
+  if (broken) fs.rmSync(bin, { force: true });
+  say(broken ? "… ffmpeg was only partly downloaded — fetching it again (~45 MB)" : "… downloading ffmpeg (one time, ~45 MB — npm skipped it at install)");
   spawnSync(process.execPath, [installer], { cwd: path.dirname(installer), stdio: ["ignore", "ignore", "inherit"] });
-  return fs.existsSync(bin) ? bin : null;
+  return runs(bin) ? bin : null;
+}
+
+/** Whether this is an ffmpeg that actually starts. */
+function runs(bin: string): boolean {
+  if (!fs.existsSync(bin)) return false;
+  return spawnSync(bin, ["-version"], { stdio: "ignore", timeout: 15_000 }).status === 0;
 }
 
 patchRecorder();

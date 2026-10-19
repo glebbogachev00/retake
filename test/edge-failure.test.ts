@@ -18,5 +18,5 @@ test("a refused voice request names the upgrade, not the script", () => {
 
 test("no network says so; anything else keeps its last line", () => {
   assert.match(edgeFailure("aiohttp.client_exceptions.ClientConnectorError: Cannot connect to host", "edge-tts"), /could not reach/);
-  assert.equal(edgeFailure("ValueError: Invalid voice 'xx'\n", "edge-tts"), "voiceover: edge-tts failed — ValueError: Invalid voice 'xx'");
+  assert.equal(edgeFailure("KeyError: 'Content-Type'\n", "edge-tts"), "voiceover: edge-tts failed — KeyError: 'Content-Type'");
 });

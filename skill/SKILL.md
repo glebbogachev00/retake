@@ -505,6 +505,12 @@ narrated too fast, the next too slow, and a third in a voice nobody picked.
 person who has heard it; the routine only says which voice, at what pace,
 once somebody has written one.
 
+Voices are names: `andrew`, `ava`, `brian`, `emma`, `aria`, `ryan` (Edge,
+online) and `heart`, `michael`, `aiden` (local: they run on the person's Mac
+and the first narrated render downloads the model). The voice a person picked
+when they first opened Retake is the routine's voice. If the routine says
+`silent` and they want narration, ask which voice — never guess an id.
+
 If there is no routine, the advice below applies and nothing is locked.
 
 ## Style — how the person wants their videos to look

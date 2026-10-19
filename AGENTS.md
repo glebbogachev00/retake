@@ -122,6 +122,12 @@ a person who has heard it. It only fixes the voice and rate of narration that
 already exists, and strips any `viewport`/`scale` pin, which silently beats the
 preset and is the one way two takes of the same app come out different shapes.
 
+Voices are names: `andrew`, `ava`, `brian`, `emma`, `aria`, `ryan` (Edge,
+online) and `heart`, `michael`, `aiden` (local: they run on the person's Mac
+and the first narrated render downloads the model). The voice a person picked
+when they first opened Retake is the routine's voice. If the routine says
+`silent` and they want narration, ask which voice — never guess an id.
+
 Writing the steps, the captions and the story is still entirely your job.
 `demos/style.md` is the taste that needs judgement; the routine is the part
 that only needs to be the same every time.

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { VOICES, voiceId } from "../src/routine.js";
-import { LOCAL_VOICE, localEngine, localModelReady, synthesizeWithCues, voiceCachePath } from "../src/voice.js";
+import { LOCAL_VOICE, edgeFailure, localEngine, localModelReady, synthesizeWithCues, voiceCachePath } from "../src/voice.js";
 import { ffmpegBin } from "../src/media-bin.js";
 
 const SCRIPT = path.resolve("scripts/local-voice.py");
@@ -92,4 +92,32 @@ test("Aiden speaks through Retake too", { skip: canSpeakAiden ? false : "needs a
   } finally {
     if (prev === undefined) delete process.env.RETAKE_TTS_CACHE; else process.env.RETAKE_TTS_CACHE = prev;
   }
+});
+
+/** Found by the final fresh-install test: a second agent session asked
+    "which Kokoro voice?", then wrote `voice: af_heart`, which Retake handed
+    to Edge, which rejected it — and the agent decided Kokoro was missing. */
+test("the names an agent reaches for all reach the right voice", () => {
+  assert.equal(voiceId("af_heart"), "kokoro:af_heart");
+  assert.equal(voiceId("am_michael"), "kokoro:am_michael");
+  assert.equal(voiceId("heart"), "kokoro:af_heart");
+  assert.equal(voiceId("aiden"), "qwen:aiden");
+  assert.equal(voiceId("kokoro:bf_emma"), "kokoro:bf_emma");
+  assert.equal(voiceId("en-US-AriaNeural"), "en-US-AriaNeural");
+});
+
+test("a voice Edge does not know says which names work", () => {
+  assert.match(edgeFailure("ValueError: Invalid voice 'xx'", "edge-tts"), /Use a name — .*heart.*aiden/);
+});
+
+test("the voice chosen in onboarding is kept in the routine", async () => {
+  const { rememberNarration, readRoutines } = await import("../src/routine.js");
+  const demos = fs.mkdtempSync(path.join(os.tmpdir(), "remember-"));
+  rememberNarration(demos, "silent");
+  assert.equal(readRoutines(demos), null, "silent changes nothing");
+  rememberNarration(demos, "kokoro");
+  const file = readRoutines(demos)!;
+  assert.equal(file.routines[file.use].voice, "heart");
+  rememberNarration(demos, "aiden");
+  assert.equal(readRoutines(demos)!.routines[file.use].voice, "aiden");
 });

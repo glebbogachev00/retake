@@ -352,6 +352,9 @@
   .ob-operator-question button, .ob-retry { min-height:42px; border:1px solid var(--ink); border-radius:11px; padding:0 15px; color:#fff; background:var(--ink); font-weight:600; cursor:pointer; }
   .ob-operator-question button.secondary { color:var(--ink); background:#fff; }
   .ob-operator-result { margin-top:18px; }
+  .ob-next { margin:18px auto 0; max-width:520px; color:var(--muted); font-size:13px; line-height:1.6; }
+  .ob-next code { display:inline-block; margin-top:4px; padding:3px 8px; border-radius:7px; background:#fff; border:1px solid var(--rule); color:var(--ink); font:12.5px ui-monospace,Menlo,monospace; }
+  .ob-copy { border:1px solid var(--rule2); border-radius:8px; background:#fff; padding:3px 9px; font:inherit; font-size:12px; cursor:pointer; }
   .ob-operator-result.bad { color:var(--bad); }
   @media (max-width:700px) {
     .wrap.onboarding-only { padding:14px 12px 36px; }
@@ -526,10 +529,10 @@
               <span class="vicon" aria-hidden="true">∞</span><b>Edge</b><small>Online. Small install, many voices, and fast generation. Your script goes to Microsoft's service.</small><span class="tag">Tap to hear</span>
             </button>
             <button class="voice-card" type="button" data-voice="aiden" data-sample="aiden" role="radio" aria-checked="false">
-              <span class="vicon" aria-hidden="true">A</span><b>Aiden</b><small>Local Qwen voice. The most natural one, and the biggest: about 1.8 GB. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
+              <span class="vicon" aria-hidden="true">A</span><b>Aiden</b><small>Local Qwen voice. The most natural one, and the biggest: about 4 GB, once. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
             </button>
             <button class="voice-card" type="button" data-voice="kokoro" data-sample="kokoro" role="radio" aria-checked="false">
-              <span class="vicon" aria-hidden="true">K</span><b>Kokoro</b><small>Local and much smaller: about 300 MB, many voices. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
+              <span class="vicon" aria-hidden="true">K</span><b>Kokoro</b><small>Local and smaller: about 2.6 GB once, many voices. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
             </button>
           </div>
           <div class="voice-demo" id="voice-demo"><video id="voice-demo-video" controls playsinline preload="metadata"></video><small id="voice-demo-label"></small></div>
@@ -642,8 +645,8 @@ function renderOnboarding() {
   consent.classList.toggle('show', needsConsent);
   box.checked = onboardingState.consent;
   if (onboardingState.voice === 'edge') $('voice-consent-copy').textContent = 'I understand that Edge sends the narration script to Microsoft’s online speech service.';
-  if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a one-time local model download of about 1.8 GB, the first time a video is narrated. Nothing downloads on this screen.';
-  if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a one-time local model download of about 300 MB, the first time a video is narrated. Nothing downloads on this screen.';
+  if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a one-time download of about 4 GB (its voice engine and model), the first time a video is narrated. Nothing downloads on this screen.';
+  if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a one-time download of about 2.6 GB (its voice engine and model), the first time a video is narrated. Nothing downloads on this screen.';
   $('onboard-next').disabled =
     (onboardingStep === 1 && !normalUrl($('onboard-url').value)) ||
     (onboardingStep === 2 && brandRead.state === 'reading') ||
@@ -798,7 +801,12 @@ function finishOnboardingOperator(data) {
   if (ok) {
     localStorage.removeItem(ONBOARD_KEY);
     sessionStorage.removeItem(ONBOARD_SIGNED_KEY);
-    card.innerHTML = `<div class="ob-success" data-operator-done><div class="ob-icon" aria-hidden="true">✓</div><h2>Your first draft is ready</h2><p class="ob-lead">${esc(data.summary || 'Open it from the library.')}</p><button type="button" data-open-first>Open first draft</button></div>`;
+    card.innerHTML = `<div class="ob-success" data-operator-done><div class="ob-icon" aria-hidden="true">✓</div><h2>Your first draft is ready</h2><p class="ob-lead">${esc(data.summary || 'Open it from the library.')}</p><button class="ob-retry" type="button" data-open-first>Open first draft</button>${onboardingState.voice && onboardingState.voice !== 'silent' ? `<p class="ob-next">To add a voiceover, tell your coding agent: <code data-next-ask>Add a voiceover to my Retake demo “${esc(data.demo)}”, using the voice in my Retake routine.</code> <button type="button" class="ob-copy" data-copy-next>Copy</button></p>` : ''}</div>`;
+    const copyNext = card.querySelector('[data-copy-next]');
+    if (copyNext) copyNext.onclick = async () => {
+      try { await navigator.clipboard.writeText(card.querySelector('[data-next-ask]').textContent); copyNext.textContent = 'Copied'; }
+      catch { copyNext.textContent = 'Select and copy it'; }
+    };
     card.querySelector('[data-open-first]').onclick = async () => {
       onboardingSubmitted = false;
       await drawDemos();

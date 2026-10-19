@@ -51,7 +51,7 @@ import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry, isDemoFile } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
 import { captureMatchesTake, readPreviewReceipt } from "../preview.js";
-import { STYLES, VOICES, RoutineSchema, environmentFor, readRoutines, starter, voiceId, writeRoutines, type Routine } from "../routine.js";
+import { STYLES, VOICES, RoutineSchema, environmentFor, readRoutines, rememberNarration, starter, voiceId, writeRoutines, type Routine } from "../routine.js";
 import { loadEnvSpec } from "../recording-env.js";
 import { describeSchedule, readSchedule, scheduleLoaded } from "../schedule.js";
 import { synthesize, voiceCachePath, LOCAL_VOICE, localModelReady } from "../voice.js";
@@ -1012,13 +1012,17 @@ export function serve(port: number) {
         const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; project?: string; name?: string; narration?: "silent" | "edge" | "aiden" | "kokoro" };
         if (!b.describe?.trim()) return json(res, 400, { error: "say what the demo should show" });
         const narration = (["silent", "edge", "aiden", "kokoro"] as const).includes(b.narration as never) ? b.narration! : "silent";
+        // The choice outlives this session: it goes into the routine, which is
+        // what any later agent reads. A video still stays silent until someone
+        // approves a script; this only settles whose voice reads it.
+        rememberNarration(DEMOS, narration);
         const sound = narration === "silent"
           ? "Make the first draft silent and do not add captions."
           : narration === "edge"
-            ? "Make the first draft silent and do not add captions. The person chose Edge for the final narration. Do not synthesize it until they approve both the recording and one continuous script."
+            ? "Make the first draft silent and do not add captions. The person chose Edge for the final narration; the workspace routine now says `voice: andrew`. Do not synthesize it until they approve both the recording and one continuous script."
             : narration === "aiden"
-              ? "Make the first draft silent and do not add captions. The person chose the local Aiden voice for the final narration: `voiceover.voice: qwen:aiden` (a routine says `voice: aiden`). It runs on their Mac; its first use downloads a ~1.8 GB model. Do not narrate until they approve the recording and one continuous script, and say the download is coming before the first narrated render."
-              : "Make the first draft silent and do not add captions. The person chose the local Kokoro voice for the final narration: `voiceover.voice: kokoro:af_heart` (a routine says `voice: heart`). It runs on their Mac; its first use downloads a ~300 MB model. Do not narrate until they approve the recording and one continuous script, and say the download is coming before the first narrated render.";
+              ? "Make the first draft silent and do not add captions. The person chose the local Aiden voice for the final narration: `voiceover.voice: qwen:aiden` (the workspace routine now says `voice: aiden`). It runs on their Mac; its first use downloads about 4 GB (the voice engine and the model, once). Do not narrate until they approve the recording and one continuous script, and say the download is coming before the first narrated render."
+              : "Make the first draft silent and do not add captions. The person chose the local Kokoro voice for the final narration: `voiceover.voice: kokoro:af_heart` (the workspace routine now says `voice: heart`). It runs on their Mac; its first use downloads about 2.6 GB (the voice engine and the model, once). Do not narrate until they approve the recording and one continuous script, and say the download is coming before the first narrated render.";
         const describe = `${b.describe.trim()}\n\n${sound}`;
         const prov = pickProvider();
         const which = prov?.name === "codex" ? "codex" : prov?.name === "claude-code" ? "claude-code" : null;
