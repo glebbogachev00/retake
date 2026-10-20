@@ -529,10 +529,10 @@
               <span class="vicon" aria-hidden="true">∞</span><b>Edge</b><small>Online. Small install, many voices, and fast generation. Your script goes to Microsoft's service.</small><span class="tag">Tap to hear</span>
             </button>
             <button class="voice-card" type="button" data-voice="aiden" data-sample="aiden" role="radio" aria-checked="false">
-              <span class="vicon" aria-hidden="true">A</span><b>Aiden</b><small>Local Qwen voice. The most natural one, and the biggest: about 4 GB, once. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
+              <span class="vicon" aria-hidden="true">A</span><b>Aiden</b><small>Local Qwen voice. The most natural one, and the biggest: about 2.4 GB, once. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
             </button>
             <button class="voice-card" type="button" data-voice="kokoro" data-sample="kokoro" role="radio" aria-checked="false">
-              <span class="vicon" aria-hidden="true">K</span><b>Kokoro</b><small>Local and smaller: about 2.6 GB once, many voices. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
+              <span class="vicon" aria-hidden="true">K</span><b>Kokoro</b><small>Local and light: about 0.9 GB once, many voices. Runs on your Mac, so your script never leaves it.</small><span class="tag">Tap to hear</span>
             </button>
           </div>
           <div class="voice-demo" id="voice-demo"><video id="voice-demo-video" controls playsinline preload="metadata"></video><small id="voice-demo-label"></small></div>
@@ -645,8 +645,8 @@ function renderOnboarding() {
   consent.classList.toggle('show', needsConsent);
   box.checked = onboardingState.consent;
   if (onboardingState.voice === 'edge') $('voice-consent-copy').textContent = 'I understand that Edge sends the narration script to Microsoft’s online speech service.';
-  if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a one-time download of about 4 GB (its voice engine and model), the first time a video is narrated. Nothing downloads on this screen.';
-  if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a one-time download of about 2.6 GB (its voice engine and model), the first time a video is narrated. Nothing downloads on this screen.';
+  if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a one-time download of about 2.4 GB (its voice and the engine that runs it), the first time a video is narrated. Nothing downloads on this screen.';
+  if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a one-time download of about 0.9 GB (its voice and the engine that runs it), the first time a video is narrated. Nothing downloads on this screen.';
   $('onboard-next').disabled =
     (onboardingStep === 1 && !normalUrl($('onboard-url').value)) ||
     (onboardingStep === 2 && brandRead.state === 'reading') ||

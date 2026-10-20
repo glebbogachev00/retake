@@ -10,7 +10,7 @@
         "When your first draft is ready, the window shows the exact sentence to give your agent to add a voiceover, with a copy button.",
         "Kokoro no longer fails to start when your Mac's user name or cache folder makes its files' path long.",
         "Agents can name a voice the way they naturally would — heart, aiden, or Kokoro's own af_heart — and a voice name Retake does not know now says which names work.",
-        "The first use of a local voice downloads its engine as well as the voice: about 2.6 GB for Kokoro and 4 GB for Aiden. The window now says so, and allows up to an hour for it on a slow connection.",
+        "The first use of a local voice downloads the voice and the engine that runs it: about 0.9 GB for Kokoro and 2.4 GB for Aiden, once (the ~600 MB engine is shared by both). The window says so, and allows up to an hour for it on a slow connection.",
         "If an install was interrupted part-way through downloading ffmpeg, Retake now notices the broken copy and fetches it again instead of failing every render."
       ]
     },

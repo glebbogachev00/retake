@@ -38,9 +38,9 @@ export const VOICES: Record<string, { id: string; note: string }> = {
   emma: { id: "en-US-EmmaNeural", note: "Clear and conversational, good over fast UI." },
   aria: { id: "en-US-AriaNeural", note: "A news read: even, flat, no colour." },
   // Local: these run on this Mac (Apple Silicon) and send nothing anywhere.
-  heart: { id: "kokoro:af_heart", note: "Local (Kokoro). Warm, natural, female. First use downloads ~2.6 GB (voice engine and model)." },
+  heart: { id: "kokoro:af_heart", note: "Local (Kokoro). Warm, natural, female. First use: ~0.9 GB (the voice is 300 MB; the engine that runs it, ~600 MB, is shared)." },
   michael: { id: "kokoro:am_michael", note: "Local (Kokoro). Steady, male. Shares Heart's download." },
-  aiden: { id: "qwen:aiden", note: "Local (Qwen3). Natural, male. First use downloads ~4 GB (voice engine and model; ~1.8 GB if Kokoro is already set up)." },
+  aiden: { id: "qwen:aiden", note: "Local (Qwen3). Natural, male. First use: ~2.4 GB (a 1.8 GB voice, plus the shared ~600 MB engine)." },
 };
 
 /** A routine's `voice` is a name above, "silent", a raw edge-tts voice id
@@ -58,9 +58,10 @@ export function voiceId(voice: string): string {
 
 /** Voices that run on this Mac: `kokoro:<voice>` and `qwen:<speaker>`. */
 export const LOCAL_VOICE = /^(kokoro|qwen):[a-z_]+$/;
+const LOCAL_DEPS = ["soundfile==0.14.0", "misaki==0.9.4", "num2words==0.5.14", "spacy==3.8.16", "phonemizer-fork==3.3.2", "espeakng-loader==0.2.4"];
 /** Bump when local pronunciation or levelling changes: it re-renders them. */
 export const LOCAL_VOICE_VERSION = "local-voice-1";
-const LOCAL_MODEL = { kokoro: { repo: "models--mlx-community--Kokoro-82M-8bit", size: "~2.6 GB with the voice engine, once" }, qwen: { repo: "models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit", size: "~4 GB with the voice engine, once" } };
+const LOCAL_MODEL = { kokoro: { repo: "models--mlx-community--Kokoro-82M-8bit", size: "~0.9 GB with its engine, once" }, qwen: { repo: "models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit", size: "~2.4 GB with its engine, once" } };
 
 /** The local voice engine: Retake's script under uv, with the MLX audio stack. */
 export function localEngine(voice: string, platform = process.platform, arch = process.arch): { cmd: string; args: string[] } {
@@ -68,7 +69,10 @@ export function localEngine(voice: string, platform = process.platform, arch = p
   if (spawnSync("uvx", ["--version"], { stdio: "ignore" }).status !== 0) throw new Error(`voiceover: ${voice} runs locally through uv, which is not installed — install it once (\`brew install uv\`), then re-render`);
   const kind = voice.split(":")[0] as keyof typeof LOCAL_MODEL;
   if (!localModelReady(voice)) process.stderr.write(`… first use of ${voice}: downloading its voice model (${LOCAL_MODEL[kind].size}, one time). Nothing you narrate leaves this computer.\n`);
-  return { cmd: "uvx", args: ["--quiet", "--python", "3.12", "--from", "mlx-audio==0.5.5", "--with", "soundfile", "--with", "misaki[en]", "python", path.join(PKG_ROOT, "scripts", "local-voice.py")] };
+  // Exactly the tested versions, and not misaki's `[en]` extra: that adds a
+  // PyTorch-based English model Kokoro never uses (MLX does the speaking),
+  // doubling the download. Measured: 587 MB of engine instead of 1.2 GB.
+  return { cmd: "uvx", args: ["--quiet", "--python", "3.12", "--from", "mlx-audio==0.5.5", ...LOCAL_DEPS.flatMap((d) => ["--with", d]), "python", path.join(PKG_ROOT, "scripts", "local-voice.py")] };
 }
 
 /** Whether a local voice's model is already on this computer. */
@@ -106,8 +110,8 @@ export function edgeFailure(stderr: string, cmd: string): string {
 
 function runEdge(e: { cmd: string; args: string[] }, args: string[], timeout: number): void {
   const local = e.cmd === "uvx";
-  // The first use of a local voice downloads its engine and model (~2.6 GB
-  // for Kokoro): on a slow line that is far past 15 minutes. Allow an hour
+  // The first use of a local voice downloads its engine and model (~0.9 GB
+  // for Kokoro, ~2.4 GB for Aiden): on a slow line that is past 15 minutes. Allow an hour
   // then, keep the downloaders' progress bars out of the captured output
   // (they overflowed it), and say which of the two went wrong.
   const voice = args[args.indexOf("--voice") + 1] ?? "";

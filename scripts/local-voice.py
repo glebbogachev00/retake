@@ -9,8 +9,9 @@ comparison hears the voice, not the volume.
 
   --pronounce "text"   print the text as Kokoro will be given it (no models)
 
-Run by Retake through uv:  uvx --from mlx-audio==0.5.5 --with soundfile
---with "misaki[en]" python local-voice.py ...  Apple Silicon only (MLX).
+Run by Retake through uv, with the pinned set in voice.ts (LOCAL_DEPS):
+uvx --from mlx-audio==0.5.5 --with soundfile==… --with misaki==… … python
+local-voice.py ...  Apple Silicon only (MLX).
 """
 import argparse, os, re, subprocess, sys, tempfile
 

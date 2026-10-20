@@ -48,7 +48,7 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",
     "postinstall": "node scripts/patch-testreel.mjs",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm test",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test",
     "retake": "tsx src/cli.ts",
     "ui": "tsx src/cli.ts ui",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
