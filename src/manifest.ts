@@ -214,6 +214,9 @@ export const Step = z.discriminatedUnion("action", [
         caption that arrives a beat late is a re-render, not a re-take. */
     nudge: z.number().int().min(-60_000).max(60_000).optional(),
     caption: z.string().optional(),
+    /** For the person you send the video to, not for the video: shown under
+        it on a share page (`retake share`). Never drawn on a frame. */
+    notes: z.string().optional(),
     holdMs: z.number().positive().optional(),
     /** Where the camera looks during this scene. Omitted → the manifest's
         `camera` policy (auto = focus on the last selector used, static = none). */
@@ -274,6 +277,9 @@ export type Seed = z.infer<typeof Seed>;
 const ManifestShape = z.object({
   name: z.string().regex(/^[a-z0-9-]+$/, "kebab-case only"),
   title: z.string().optional(),
+  /** What this take shows and why, for whoever it is sent to. A share page
+      (`retake share`) puts it under the video; the video never carries it. */
+  notes: z.string().optional(),
   url: z.string().url(),
   /** Quality preset — the publishing format. Fields below override it. */
   preset: z.enum(Object.keys(PRESETS) as [string, ...string[]]).default(DEFAULT_PRESET),
