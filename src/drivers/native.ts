@@ -63,8 +63,11 @@ export async function openApp(s: CuaSession, m: Manifest, log: (l: string) => vo
   return { pid: win.pid, windowId: win.window_id, scale, points };
 }
 
-export async function snapshot(s: CuaSession, w: AppWindow): Promise<Snapshot> {
-  const r = await s.call<{ elements?: El[]; window_bounds?: Snapshot["window"]; screenshot_width?: number }>("get_window_state", { pid: w.pid, window_id: w.windowId });
+/** The window's controls. Without the screenshot by default: reading the
+    tree alone is ~1 s in TextEdit against ~3 s with the grab, and every step
+    reads it. Only a pixel click needs the screenshot's coordinate space. */
+export async function snapshot(s: CuaSession, w: AppWindow, o: { shot?: boolean } = {}): Promise<Snapshot> {
+  const r = await s.call<{ elements?: El[]; window_bounds?: Snapshot["window"]; screenshot_width?: number }>("get_window_state", { pid: w.pid, window_id: w.windowId, ...(o.shot ? {} : { include_screenshot: false }) });
   return { elements: r.elements ?? [], window: r.window_bounds ?? { x: 40, y: 60, ...w.points }, shot: { width: r.screenshot_width ?? w.points.width * w.scale } };
 }
 
@@ -118,7 +121,7 @@ export function visibleText(els: El[], max = 140): string {
 const KEYS: Record<string, string> = { Enter: "return", Return: "return", Escape: "escape", Tab: "tab", Backspace: "delete", Delete: "forward_delete", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Space: "space", Home: "home", End: "end", PageUp: "page_up", PageDown: "page_down" };
 const MODS: Record<string, string> = { Meta: "cmd", Command: "cmd", Cmd: "cmd", Control: "ctrl", Ctrl: "ctrl", Alt: "option", Option: "option", Shift: "shift" };
 
-export type Ctx = { s: CuaSession; w: AppWindow; dry: boolean; last?: El };
+export type Ctx = { s: CuaSession; w: AppWindow; dry: boolean; last?: El; win?: Snapshot["window"]; /** screenshot px per window point, measured once */ shotScale?: number };
 
 /** Perform one step on the app. Throws with what went wrong and what the
     window showed, the way the web dry run does. */
@@ -131,6 +134,7 @@ export async function perform(ctx: Ctx, step: Step): Promise<void> {
     let snap: Snapshot;
     do {
       snap = await snapshot(s, w);
+      ctx.win = snap.window;
       const e = find(snap.elements, t);
       if (e) return e;
       await sleep(150);
@@ -150,9 +154,11 @@ export async function perform(ctx: Ctx, step: Step): Promise<void> {
         // Not every control can be "pressed" (a text area only offers its
         // menu): a real click at its centre, in the screenshot's pixels.
         if (!e.frame) throw new Error(`${step.selector} cannot be pressed and has no position to click`);
-        const snap = await snapshot(s, w);
-        const k = snap.shot.width / snap.window.width;
-        await s.call("click", { ...base, x: Math.round((e.frame.x + e.frame.w / 2 - snap.window.x) * k), y: Math.round((e.frame.y + e.frame.h / 2 - snap.window.y) * k) });
+        // The screenshot's scale is fixed for the take: measured once, it
+        // spares every later click a slow read with the screen grab.
+        if (!ctx.shotScale || !ctx.win) { const snap = await snapshot(s, w, { shot: true }); ctx.shotScale = snap.shot.width / snap.window.width; ctx.win = snap.window; }
+        const k = ctx.shotScale, at = ctx.win;
+        await s.call("click", { ...base, x: Math.round((e.frame.x + e.frame.w / 2 - at.x) * k), y: Math.round((e.frame.y + e.frame.h / 2 - at.y) * k) });
       }
       ctx.last = e;
       return;
@@ -176,7 +182,23 @@ export async function perform(ctx: Ctx, step: Step): Promise<void> {
       const name = KEYS[key] ?? key.toLowerCase();
       // Keys go to the control last acted on: sent to the app as a whole,
       // they may land in another of its windows, and the driver refuses them.
-      const at = ctx.last ? { element_token: ctx.last.element_token } : {};
+      // Its handle is re-read first: a handle from an earlier read is stale.
+      let el = ctx.last;
+      if (el) {
+        // Matched by role and position, not name: a text area is often named
+        // after what it contains, which the step before just changed.
+        const now = (await snapshot(s, w)).elements;
+        const same = (e: El) => e.role === el!.role && !!e.frame && !!el!.frame && e.frame.x === el!.frame.x && e.frame.y === el!.frame.y && e.frame.w === el!.frame.w;
+        const fresh = now.find(same) ?? now.find((e) => e.role === el!.role && nameOf(e) === nameOf(el!)) ?? el;
+        el = ctx.last = fresh;
+        // Return and Tab in a text control are text: inserted the way typing
+        // is, which reaches a background window when a key event would not.
+        if (!mods.length && /TextArea|TextField/.test(el.role) && (name === "return" || name === "tab")) {
+          await s.call("type_text", { ...base, element_token: el.element_token, text: name === "return" ? "\n" : "\t" });
+          return;
+        }
+      }
+      const at = el ? { element_token: el.element_token } : {};
       if (mods.length) await s.call("hotkey", { ...base, ...at, keys: [...mods, name] });
       else await s.call("press_key", { ...base, ...at, key: name });
       return;

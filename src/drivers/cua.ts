@@ -43,13 +43,22 @@ export class CuaSession {
     const client = new Client({ name: "retake", version: "1" });
     // Its update notice goes to stderr on every start; it is not ours to show.
     await client.connect(new StdioClientTransport({ command: bin, args, stderr: "ignore" }));
-    return new CuaSession(client);
+    const session = new CuaSession(client);
+    // The driver animates its own on-screen cursor to each action, and waits
+    // for it. Retake draws its own pointer onto the take, so that wait is
+    // seconds per click for nothing.
+    await session.call("set_agent_cursor_enabled", { enabled: false }).catch(() => {});
+    return session;
   }
 
   /** One tool call. Returns the structured result; a refusal becomes a
       CuaError carrying the driver's own words, which say what to do. */
   async call<T = Record<string, unknown>>(tool: string, args: Record<string, unknown> = {}): Promise<T> {
+    const started = Date.now();
     const r = await this.client.callTool({ name: tool, arguments: args });
+    // RETAKE_NATIVE_TIMING=1 prints how long each driver call took: where a
+    // slow take's seconds go.
+    if (process.env.RETAKE_NATIVE_TIMING) process.stderr.write(`  cua ${tool} ${Date.now() - started}ms\n`);
     const text = ((r.content ?? []) as { type: string; text?: string }[]).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     if (r.isError) throw new CuaError(tool, text.replace(new RegExp(`^${tool}: `), "").trim() || "failed");
     if (r.structuredContent) return r.structuredContent as T;

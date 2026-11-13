@@ -62,11 +62,19 @@ test("each step goes to the exact control", async () => {
     // A text area cannot be pressed: a real click at its centre, in screenshot pixels.
     ["click", { pid: 7, window_id: 70, x: 960, y: 564 }],
     ["type_text", { pid: 7, window_id: 70, element_token: "t1", text: "Hi" }],
-    // Keys go to the control last typed into, never to "the app".
-    ["press_key", { pid: 7, window_id: 70, element_token: "t1", key: "return" }],
+    // Return in a text control is text: it reaches a background window
+    // where a key event is refused. Other keys go to that control, never "the app".
+    ["type_text", { pid: 7, window_id: 70, element_token: "t1", text: "\n" }],
     ["hotkey", { pid: 7, window_id: 70, element_token: "t1", keys: ["cmd", "s"] }],
     ["set_value", { pid: 7, window_id: 70, element_token: "t1", value: "All new" }],
   ]);
+});
+
+test("Return on a button is a real key press, sent to that button", async () => {
+  const { ctx, calls } = fakeCtx();
+  await perform(ctx, { action: "click", selector: 'role=button[name="Save"]' } as never);
+  await perform(ctx, { action: "keyboard", key: "Enter" } as never);
+  assert.deepEqual(calls().at(-1), ["press_key", { pid: 7, window_id: 70, element_token: "b1", key: "return" }]);
 });
 
 test("a missing control fails with what the window shows", async () => {

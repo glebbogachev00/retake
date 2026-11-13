@@ -6,14 +6,9 @@ import { Manifest } from "../manifest.js";
 import type { DryResult } from "../dryrun.js";
 import { describe, runFileOrCommandSeed } from "../record.js";
 import { CuaSession } from "./cua.js";
-import { describeNative, nativeDoctor } from "./native-doctor.js";
+import { requireReady } from "./native-doctor.js";
 import { menusOf, openApp, perform, snapshot, targetsFor, visibleText, type Ctx } from "./native.js";
 
-/** Refuse to start until every setup item is in place, and say which are not. */
-export function requireReady(): void {
-  const r = nativeDoctor();
-  if (!r.ready) throw new Error(["Recording Mac apps is not set up on this Mac yet:", ...describeNative(r).slice(1)].join("\n"));
-}
 
 export async function dryNative(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean } = {}): Promise<DryResult> {
   requireReady();

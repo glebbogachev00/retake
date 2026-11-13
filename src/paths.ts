@@ -40,4 +40,9 @@ export function entry(name: "cli" | "operator/tools"): { command: string; args: 
 
 /** A demo's manifest: any YAML in demos/ except the files that sit beside
     the demos without being one — the workspace's recording environment. */
+/** The raw recording a take is rendered from: the browser's .webm, or the
+    window recording of a Mac app (src/drivers/native-record.ts). Kept takes,
+    restore and tidy keep these and nothing else. */
+export const NATIVE_TAKE = "native-take.mp4";
+export const isRawTake = (f: string): boolean => f.endsWith(".webm") || f === NATIVE_TAKE;
 export const isDemoFile = (f: string): boolean => /\.ya?ml$/.test(f) && !/^environment\.ya?ml$/.test(path.basename(f));

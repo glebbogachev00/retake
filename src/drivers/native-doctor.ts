@@ -75,3 +75,9 @@ export function describeNative(r: { ready: boolean; lines: NativeLine[] }): stri
     ...r.lines.map((l) => `  ${l.ok === true ? "✓" : l.ok === "warn" ? "·" : "✗"} ${l.text}${l.fix ? `\n      fix: ${l.fix}` : ""}`),
   ];
 }
+
+/** Refuse to start until every setup item is in place, and say which are not. */
+export function requireReady(): void {
+  const r = nativeDoctor();
+  if (!r.ready) throw new Error(["Recording Mac apps is not set up on this Mac yet:", ...describeNative(r).slice(1)].join("\n"));
+}

@@ -7,6 +7,7 @@
  * guessed: for AI-driven apps the next screen arrives whenever the model
  * answers, so no one can script timings up front.
  */
+import { isRawTake } from "./paths.js";
 import { siteOf } from "./logins.js";
 import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";
@@ -592,7 +593,7 @@ async function acquireNamedLock(outRoot: string, name: string, log: (l: string) 
 }
 
 export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
-  if (m.app) throw new Error(`"${m.name}" records the Mac app ${m.app}. Recording Mac apps is not built yet: \`validate\` and \`dry\` work, but it cannot be recorded.`);
+  if (m.app) return (await import("./drivers/native-record.js")).recordNative(m, opts, { describe, captureHash, runFileOrCommandSeed });
   // ${LOGIN_*} reads the login saved for this demo's own site.
   signInAt(m.url.includes("${") ? (() => { try { return expandEnv(m.url); } catch { return m.url; } })() : m.url);
   let releaseNamed: (() => void) | null = null;
@@ -1179,7 +1180,7 @@ export function keptTakes(outDir: string): KeptTake[] {
     const dir = path.join(root, id);
     try {
       const t = JSON.parse(fs.readFileSync(path.join(dir, "take.json"), "utf8")) as Take;
-      const vid = fs.readdirSync(dir).find((f) => f.endsWith(".webm"));
+      const vid = fs.readdirSync(dir).find(isRawTake);
       let bytes = 0;
       for (const f of fs.readdirSync(dir)) bytes += fs.statSync(path.join(dir, f)).size;
       out.push({
@@ -1199,7 +1200,7 @@ export function keepPrevious(outDir: string, log?: (l: string) => void): void {
   if (!fs.existsSync(stash)) return;
   try {
     const takeFile = path.join(stash, "take.json");
-    const raw = fs.readdirSync(stash).find((f) => f.endsWith(".webm"));
+    const raw = fs.readdirSync(stash).find(isRawTake);
     const prev = fs.existsSync(takeFile) ? (JSON.parse(fs.readFileSync(takeFile, "utf8")) as Take) : null;
     // A failed take is not worth a version: nobody wants to go back to it.
     if (prev?.ok && raw) {
@@ -1244,7 +1245,7 @@ export function restoreKept(outDir: string, id: string): boolean {
   for (const f of fs.readdirSync(dir)) fs.copyFileSync(path.join(dir, f), path.join(outDir, f));
   const tp = path.join(outDir, "take.json");
   const t = JSON.parse(fs.readFileSync(tp, "utf8")) as Take;
-  const raw = fs.readdirSync(outDir).find((f) => f.endsWith(".webm"));
+  const raw = fs.readdirSync(outDir).find(isRawTake);
   if (raw) { t.video = path.join(outDir, raw); fs.writeFileSync(tp, JSON.stringify(t)); }
   fs.rmSync(path.join(outDir, STASH), { recursive: true, force: true });
   return true;

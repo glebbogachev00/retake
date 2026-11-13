@@ -83,7 +83,15 @@ test("targets are role and name, not CSS, and say how to write one", () => {
   assert.match(css, /steps\.0\.selector: .*An app has no CSS/);
 });
 
-test("an app demo cannot be recorded yet, and says so", async () => {
-  const m = Manifest.parse(textedit);
-  await assert.rejects(() => record(m, { outDir: process.cwd(), log: () => {} } as never), /Recording Mac apps is not built yet: `validate` and `dry` work/);
+test("an app demo will not record until this Mac is set up for it, and says what is missing", async () => {
+  // Pointed at a cua-driver that does not exist, so this test can never
+  // start a real recording, whatever machine it runs on.
+  const prev = process.env.RETAKE_CUA_DRIVER;
+  process.env.RETAKE_CUA_DRIVER = "/nonexistent/cua-driver";
+  try {
+    const m = Manifest.parse(textedit);
+    await assert.rejects(() => record(m, { outDir: "/nonexistent/out", log: () => {} } as never), /Recording Mac apps is not set up on this Mac yet:[\s\S]*cua-driver isn't installed/);
+  } finally {
+    if (prev === undefined) delete process.env.RETAKE_CUA_DRIVER; else process.env.RETAKE_CUA_DRIVER = prev;
+  }
 });
