@@ -1,6 +1,7 @@
 // Builds Retake's Mac capture helper from source: native/capture → native/bin/retake-capture.
-// Mac only, needs Xcode's command-line tools. Until the helper ships signed and
-// notarized, this is how it is made; `retake doctor` says when it is missing.
+// Mac only, needs Xcode's command-line tools. It is built on the person's own
+// Mac (`retake build-native`), never shipped as an app: the agent does the
+// recording. `retake doctor --native` says when it is missing.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
