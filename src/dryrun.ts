@@ -74,6 +74,7 @@ export function actionFits(action: string, el: ElInfo): string | null {
 }
 
 export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean; outRoot?: string } = {}): Promise<DryResult> {
+  if (m.app) return (await import("./drivers/native-dry.js")).dryNative(m, manifestDir, log, opts);
   // ${LOGIN_*} reads the login saved for this demo's own site.
   signInAt(m.url.includes("${") ? (() => { try { return expandEnv(m.url); } catch { return m.url; } })() : m.url);
   const q = resolve(m);

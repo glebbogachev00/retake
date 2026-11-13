@@ -737,9 +737,39 @@ program
   .action(() => initWorkspace(process.cwd(), say));
 
 program
+  .command("build-native")
+  .description("build Retake's Mac window recorder from its source, wherever Retake is installed (needs Xcode's command-line tools)")
+  .action(() => {
+    if (process.platform !== "darwin") throw new Error("the window recorder is for recording Mac apps, on a Mac");
+    const r = spawnSync(process.execPath, [path.join(PKG_ROOT, "scripts", "build-native.mjs")], { stdio: "inherit" });
+    if (r.status !== 0) throw new Error("the build failed: if it says xcrun or swiftc is missing, install Xcode's command-line tools (xcode-select --install) and run it again");
+    say("Next: `retake doctor --native`. The first recording asks macOS to let the app you run Retake from record the screen.");
+  });
+
+program
+  .command("scout")
+  .description("list what is on a page, or with --app the controls of a Mac app, as targets a demo can use")
+  .argument("[url]", "a web page")
+  .option("--app <app>", "a Mac app's name (e.g. TextEdit) or bundle id, instead of a url")
+  .option("--fresh", "quit the app and start it again first", false)
+  .action(async (url: string | undefined, opts: { app?: string; fresh: boolean }) => {
+    if (opts.app) {
+      const { scoutApp } = await import("./drivers/native-dry.js");
+      for (const l of await scoutApp(opts.app, opts.fresh ? "fresh" : "reuse")) say(l);
+      return;
+    }
+    if (!url) throw new Error("give a url, or --app <Mac app>");
+    const { scout } = await import("./describe.js");
+    const sc = await scout(url);
+    say(`${sc.title}\n${sc.headings.join(" | ")}`);
+    for (const e of sc.elements) say(`- ${e.tag} · ${e.selector} · ${e.text || e.placeholder || e.href || ""}`);
+  });
+
+program
   .command("doctor")
   .description("check that everything Retake needs is in place")
-  .action(() => {
+  .option("--native", "also check what recording Mac apps needs", false)
+  .action(async (opts: { native: boolean }) => {
     let bad = 0;
     const ok = (l: string) => say(`✓ ${l}`);
     const no = (l: string) => { bad++; say(`✗ ${l}`); };
@@ -760,6 +790,19 @@ program
     say(which("codex") ? `✓ codex CLI` : `· codex CLI not found (fine if you don't use Codex)`);
     const root = process.cwd();
     fs.existsSync(path.join(root, "demos")) ? ok(`workspace ${root}`) : say(`· ${root} is not a workspace yet — run: retake init`);
+    // Mac apps are optional: a person who records websites never needs any
+    // of it, so it is one quiet line until they do.
+    const appDemos = (() => { try { return fs.readdirSync(path.join(root, "demos")).filter((f) => /\.ya?ml$/.test(f) && /^app:/m.test(fs.readFileSync(path.join(root, "demos", f), "utf8"))); } catch { return []; } })();
+    const { findCuaDriver } = await import("./drivers/cua.js");
+    if (opts.native || appDemos.length || findCuaDriver()) {
+      const { nativeDoctor, describeNative } = await import("./drivers/native-doctor.js");
+      const r = nativeDoctor();
+      say("");
+      for (const l of describeNative(r)) say(l);
+      if (!r.ready && (opts.native || appDemos.length)) bad++;
+    } else {
+      say("· Mac apps: not set up (optional) — `retake doctor --native` shows what recording one needs");
+    }
     if (bad) process.exitCode = 1;
   });
 

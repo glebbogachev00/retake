@@ -155,6 +155,18 @@ loop above is already in their context. If the agent works from *another*
 folder (your app's repo), add the workspace: `claude --add-dir <your retake workspace>`
 — or skip all this with `retake install`, which gives the agent the tools directly.
 
+## Mac apps
+
+A demo can name a Mac app instead of a page: `app: TextEdit` (a name or bundle
+id) in place of `url:`, optionally `launch: fresh`. Targets are role and name,
+never CSS: `role=button[name="Sign in"]`, `>> nth=1` for the second of several.
+`retake scout --app TextEdit` lists the app's controls in exactly that form.
+`retake doctor --native` (MCP: `native_setup`) says what recording an app
+needs on this Mac, one fix per line; never install or grant anything for the
+person, tell them and ask. Then `validate → dry → run → check` as for the web:
+the take is only the app's window, at Retina size, with a drawn Mac arrow,
+and the app may stay behind the person's own windows while it records.
+
 ## Letting the agent draft with Retake's own scouting
 
 The agent does not have to write the manifest from nothing:

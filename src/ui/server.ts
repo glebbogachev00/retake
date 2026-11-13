@@ -601,6 +601,12 @@ export function serve(port: number) {
         catch (e) { return json(res, 500, { error: `Could not open the folder picker: ${(e as Error).message}` }); }
       }
       if (p === "/api/provider" && req.method === "GET") return json(res, 200, providerStatus());
+      // What recording a Mac app needs on this machine, one line per item:
+      // the setup card in the first-run flow reads exactly what doctor says.
+      if (p === "/api/native/doctor" && req.method === "GET") {
+        const { nativeDoctor } = await import("../drivers/native-doctor.js");
+        return json(res, 200, nativeDoctor());
+      }
       if (p === "/api/releases" && req.method === "GET") {
         // The same site/releases.json the landing page reads — one list, so
         // the window and the page can never disagree about what shipped.
@@ -1009,7 +1015,7 @@ export function serve(port: number) {
         return json(res, 200, signInState(provider));
       }
       if (p === "/api/operator" && req.method === "POST") {
-        const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; project?: string; name?: string; narration?: "silent" | "edge" | "aiden" | "kokoro" };
+        const b = JSON.parse(await readBody(req)) as { describe: string; url?: string; app?: string; project?: string; name?: string; narration?: "silent" | "edge" | "aiden" | "kokoro" };
         if (!b.describe?.trim()) return json(res, 400, { error: "say what the demo should show" });
         const narration = (["silent", "edge", "aiden", "kokoro"] as const).includes(b.narration as never) ? b.narration! : "silent";
         // The choice outlives this session: it goes into the routine, which is
@@ -1029,7 +1035,8 @@ export function serve(port: number) {
         if (!which) return json(res, 400, { error: "The operator needs Claude Code or Codex (Settings). With another model, use “Take it from here” — same result, fixed steps." });
         const ui = `http://localhost:${(req.socket.localPort as number) || 4310}`;
         const project = b.project ? b.project.replace(/^~/, os.homedir()).trim() : undefined;
-        const s = startOperator({ describe, url: b.url?.trim() || undefined, project, name: b.name && safeName(b.name) ? b.name : undefined, ui, root: ROOT, provider: which, onDemo: (demo) => { if (project && safeName(demo)) assignDemoProject(demo, project); } });
+        const app = typeof b.app === "string" && /^[\w .&'()-]{1,80}$/.test(b.app.trim()) ? b.app.trim() : undefined;
+        const s = startOperator({ describe, url: app ? undefined : b.url?.trim() || undefined, app, project, name: b.name && safeName(b.name) ? b.name : undefined, ui, root: ROOT, provider: which, onDemo: (demo) => { if (project && safeName(demo)) assignDemoProject(demo, project); } });
         return json(res, 200, { id: s.id, startedAt: s.startedAt, provider: which });
       }
       const mop = /^\/api\/operator\/([a-z0-9]+)(?:\/(log|pending|done|stream|stop|answer)(?:\/([a-z0-9]+))?)?$/.exec(p);

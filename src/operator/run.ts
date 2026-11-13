@@ -47,12 +47,14 @@ function push(s: Session, type: string, data: unknown) {
 
 /** What the operator is told it is, and how to behave. Short on purpose: the
     tools carry their own instructions, and rules beat prose. */
-export function brief(input: { describe: string; url?: string; project?: string; name?: string }): string {
+export function brief(input: { describe: string; url?: string; app?: string; project?: string; name?: string }): string {
   return [
     "You are Retake's operator. A person wants a demo video of their web app. You have Retake's tools and nothing else — no shell.",
     "",
     `What they want: ${input.describe}`,
-    input.url ? `Their app is at: ${input.url}` : "They did not give a URL.",
+    input.app
+      ? `Their app is the Mac app "${input.app}", not a web page. Record it as an app demo: \`app: ${input.app}\` in place of \`url:\`. Call scout with \`app\` first and use only the role=…[name="…"] targets it returns; write the manifest yourself with write_manifest (draft is for web pages). Then dry, then run, as for the web. If scout says Mac app recording is not set up, stop and tell the person exactly what it listed.`
+      : input.url ? `Their app is at: ${input.url}` : "They did not give a URL.",
     input.project ? `Their app's source is in: ${input.project}` : "No source folder was given.",
     input.name ? `Use the demo name: ${input.name}` : "Pick a short kebab-case demo name from what they asked for.",
     "",
@@ -92,7 +94,7 @@ export function agentEnv(): Record<string, string> {
   return env;
 }
 
-export function startOperator(input: { describe: string; url?: string; project?: string; name?: string; ui: string; root: string; provider: "claude-code" | "codex"; onDemo?: (demo: string) => void }): Session {
+export function startOperator(input: { describe: string; url?: string; app?: string; project?: string; name?: string; ui: string; root: string; provider: "claude-code" | "codex"; onDemo?: (demo: string) => void }): Session {
   const id = "op" + Date.now().toString(36);
   const s: Session = { id, proc: null, lines: [], pending: [], done: false, code: null, onDemo: input.onDemo, startedAt: Date.now(), listeners: new Set() };
   sessions.set(id, s);

@@ -34,6 +34,7 @@
     "assets/icon-192.png",
     "assets/icon-512.png",
     "assets/voice-samples",
+    "assets/cursor-arrow.png",
     ".env.example",
     "README.md",
     "docs/stitch.md",
@@ -42,7 +43,9 @@
     "scripts/local-voice.py",
     "AGENTS.md",
     "llms.txt",
-    "site/releases.json"
+    "site/releases.json",
+    "native/capture",
+    "scripts/build-native.mjs"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",
@@ -55,7 +58,8 @@
     "test": "tsx --test --test-concurrency=3 test/*.test.ts",
     "site:dev": "node scripts/serve-landing.mjs",
     "site:test": "node --test test/*-static.test.mjs",
-    "site:test:browser": "node --test test/landing.test.mjs"
+    "site:test:browser": "node --test test/landing.test.mjs",
+    "build:native": "node scripts/build-native.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

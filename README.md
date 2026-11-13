@@ -120,6 +120,8 @@ To join separate recordings, use [`retake stitch`](docs/stitch.md). Supply exist
 
 **Send several takes as one page.** `retake share admin-overview client-view --name portal` builds a page that plays them in that order, one at a time with a Next button, with each manifest's `notes:` and scenes under the video and a mark where a step failed. Viewers can leave a comment at any moment of a take; `retake share --comments portal` reads them. `retake share --serve` serves it at http://localhost:4790/portal/. The link opens on this Mac; with Tailscale, `tailscale serve` can reach your other devices. Hosted links for clients are not available yet. Ask your agent for "a share link for these takes" and it uses the same thing.
 
+**Mac apps.** A demo can name a Mac app instead of a page: `app: TextEdit` in place of `url:`. Targets are role and name (`role=button[name="Sign in"]`), and `retake scout --app TextEdit` lists them. The take records only the app's window, at Retina size, with a Mac arrow drawn where each click lands, and the app can stay behind your own windows while it records. It needs a one-time setup ([cua-driver](https://github.com/trycua/cua) to drive the app, and Retake's window recorder, built once with `retake build-native` for now); `retake doctor --native` lists each item and its fix, and the Retake window shows the same list when you type an app's name.
+
 ## The recording environment — what has to be true before the camera
 
 Six takes in one session were lost to the environment and not one to the

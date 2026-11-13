@@ -335,6 +335,11 @@
   .ob-shape { min-width:0; }
   .ob-shape b { display:block; margin-top:7px; font-size:12.5px; }
   .ob-shape small { display:block; color:var(--muted); font-size:11px; line-height:1.35; }
+  .ob-native { grid-column:1/-1; list-style:none; margin:0; padding:0; display:grid; gap:10px; text-align:left; }
+  .ob-native li { display:grid; grid-template-columns:20px 1fr; gap:2px 8px; font-size:13.5px; line-height:1.5; }
+  .ob-native li .m { font-weight:700; } .ob-native li.ok .m { color:#3f7a4a; } .ob-native li.bad .m { color:#a3462f; } .ob-native li.warn .m { color:var(--muted); }
+  .ob-native code { grid-column:2; display:block; font:12px/1.5 ui-monospace,Menlo,monospace; background:var(--paper2, #f3f1ea); border:1px solid var(--rule); border-radius:6px; padding:6px 8px; overflow-wrap:anywhere; user-select:all; }
+  .ob-brand > .ob-retry { grid-column:1/-1; justify-self:center; }
   .ob-brand .empty { grid-column:1/-1; min-height:150px; display:grid; place-items:center; color:var(--muted); font-size:13px; border:1px dashed var(--rule2); border-radius:12px; }
   @media (max-width:560px) { .ob-brand { grid-template-columns:1fr; } .ob-shapes { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; } .ob-shape small { display:none; } }
   .ob-review { display:grid; gap:10px; }
@@ -495,15 +500,15 @@
 
         <div class="ob-step on" data-step="1">
           <div class="ob-icon" aria-hidden="true">↗</div>
-          <h2>Paste the URL to record</h2>
-          <p class="ob-lead">Public links and localhost both work.</p>
-          <label class="ob-label" for="onboard-url">URL</label>
-          <input class="ob-input" id="onboard-url" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com" />
+          <h2>What should Retake record?</h2>
+          <p class="ob-lead">A website’s address (public links and localhost both work), or the name of a Mac app.</p>
+          <label class="ob-label" for="onboard-url">Website or Mac app</label>
+          <input class="ob-input" id="onboard-url" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://example.com  or  TextEdit" />
           <div class="ob-error" id="onboard-error" role="alert"></div>
         </div>
 
         <div class="ob-step" data-step="2">
-          <h2>Your videos, in your colours</h2>
+          <h2 id="brand-title">Your videos, in your colours</h2>
           <p class="ob-lead" id="brand-lead">Reading your site…</p>
           <div class="ob-brand" id="ob-brand" aria-live="polite"></div>
         </div>
@@ -542,7 +547,7 @@
         <div class="ob-step" data-step="5">
           <div class="ob-icon" aria-hidden="true">✓</div>
           <h2>Ready for the first draft</h2>
-          <p class="ob-lead">Retake will inspect the page, plan the shortest clear workflow, and record a silent draft.</p>
+          <p class="ob-lead" id="review-lead">Retake will inspect the page, plan the shortest clear workflow, and record a silent draft.</p>
           <div class="ob-review" id="onboard-review">
             <div class="line"><small>Open</small><b id="review-url"></b></div>
             <div class="line"><small>Show</small><b id="review-describe"></b></div>
@@ -594,7 +599,7 @@ const ONBOARD_AUTOSTART_KEY = 'retake:autostart-first-demo';
 const ONBOARD_SIGNED_KEY = 'retake:signed-in-for-draft';
 const VOICE_NAMES = { silent:'No voiceover', edge:'Edge online voice', aiden:'Aiden · local Qwen', kokoro:'Kokoro · local, compact' };
 let onboardingStep = 1;
-let onboardingState = { url:'', describe:'', voice:'silent', consent:false };
+let onboardingState = { url:'', app:'', describe:'', voice:'silent', consent:false };
 let onboardingSubmitted = false;
 let brandRead = { state:'idle', url:'', data:null, style:'showcase' };
 try {
@@ -617,8 +622,63 @@ function normalUrl(raw) {
   if (!/^https?:\/\//i.test(v)) v = /^(localhost|127\.0\.0\.1)(:|\/|$)/i.test(v) ? 'http://' + v : 'https://' + v;
   try { const u = new URL(v); return /^https?:$/.test(u.protocol) && u.hostname ? u.href.replace(/\/$/, '') : ''; } catch { return ''; }
 }
+// What the first box holds: a website (an address) or a Mac app (a name).
+// An address has a scheme, a dot or "localhost"; an app's name has none.
+function targetOf(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v) || /\./.test(v) || /^localhost(:|\/|$)/i.test(v)) { const url = normalUrl(v); return url ? { kind:'web', url } : null; }
+  return /^[A-Za-z][\w .&'()-]{0,79}$/.test(v) ? { kind:'app', app:v } : null;
+}
+// A Mac app needs a one-time setup a website does not. Shown only to someone
+// who typed an app: one line per item, ✓ or the one thing that fixes it,
+// read from the same check as `retake doctor --native`. Retake never runs a
+// fix itself; the person does, then checks again.
+let nativeCheck = { state:'idle', data:null };
+async function checkNative() {
+  nativeCheck = { state:'checking', data:null };
+  // The colours step shares this box: make it read the site again if the person goes back to a website.
+  brandRead = { state:'idle', url:'', data:null, style:'showcase' };
+  $('brand-title').textContent = 'Set up recording Mac apps';
+  $('brand-lead').textContent = 'Checking this Mac…';
+  $('ob-brand').innerHTML = '<div class="empty">Checking what recording an app needs</div>';
+  renderOnboarding();
+  try {
+    const r = await api('/api/native/doctor');
+    nativeCheck = { state: r.ready ? 'ready' : 'missing', data: r };
+  } catch (e) {
+    nativeCheck = { state:'missing', data:{ ready:false, lines:[{ ok:false, text:e.message }] } };
+  }
+  drawNative();
+  renderOnboarding();
+}
+function drawNative() {
+  const r = nativeCheck.data, app = onboardingState.app;
+  $('brand-lead').textContent = r.ready
+    ? `Ready to record ${app}. Only its window is filmed, so you can keep working while it records.`
+    : `Recording ${app} needs a one-time setup on this Mac. Run each fix below yourself (Retake never installs or grants anything for you), then check again.`;
+  const list = document.createElement('ul');
+  list.className = 'ob-native';
+  for (const l of r.lines) {
+    const li = document.createElement('li');
+    li.className = l.ok === true ? 'ok' : l.ok === 'warn' ? 'warn' : 'bad';
+    const m = document.createElement('span'); m.className = 'm'; m.textContent = l.ok === true ? '✓' : l.ok === 'warn' ? '·' : '✗';
+    const t = document.createElement('span'); t.textContent = l.text;
+    li.append(m, t);
+    if (l.fix) { const c = document.createElement('code'); c.textContent = l.fix; li.append(c); }
+    list.append(li);
+  }
+  const box = $('ob-brand');
+  box.replaceChildren(list);
+  if (!r.ready) {
+    const again = document.createElement('button');
+    again.type = 'button'; again.className = 'ob-retry'; again.textContent = 'Check again';
+    again.onclick = checkNative;
+    box.append(again);
+  }
+}
 function syncOnboarding() {
-  if (onboardingStep === 1) onboardingState.url = $('onboard-url').value.trim();
+  if (onboardingStep === 1 && !onboardingState.app) onboardingState.url = $('onboard-url').value.trim();
   if (onboardingStep === 3) onboardingState.describe = $('onboard-describe').value.trim();
   const consent = $('voice-consent').querySelector('input');
   if (onboardingStep === 4) onboardingState.consent = consent.checked;
@@ -632,7 +692,7 @@ function renderOnboarding() {
   $('onboard-back').style.display = onboardingStep > 1 ? '' : 'none';
   $('onboard-next').style.display = onboardingStep < 5 ? '' : 'none';
   $('onboard-submit').style.display = onboardingStep === 5 ? '' : 'none';
-  $('onboard-url').value = onboardingState.url;
+  $('onboard-url').value = onboardingState.app || onboardingState.url;
   $('onboard-describe').value = onboardingState.describe;
   for (const card of document.querySelectorAll('[data-voice]')) {
     const on = card.dataset.voice === onboardingState.voice;
@@ -648,13 +708,17 @@ function renderOnboarding() {
   if (onboardingState.voice === 'aiden') $('voice-consent-copy').textContent = 'I understand that Aiden needs a one-time download of about 2.4 GB (its voice and the engine that runs it), the first time a video is narrated. Nothing downloads on this screen.';
   if (onboardingState.voice === 'kokoro') $('voice-consent-copy').textContent = 'I understand that Kokoro needs a one-time download of about 0.9 GB (its voice and the engine that runs it), the first time a video is narrated. Nothing downloads on this screen.';
   $('onboard-next').disabled =
-    (onboardingStep === 1 && !normalUrl($('onboard-url').value)) ||
-    (onboardingStep === 2 && brandRead.state === 'reading') ||
+    (onboardingStep === 1 && !targetOf($('onboard-url').value)) ||
+    (onboardingStep === 2 && !onboardingState.app && brandRead.state === 'reading') ||
+    (onboardingStep === 2 && !!onboardingState.app && nativeCheck.state !== 'ready') ||
     (onboardingStep === 3 && !$('onboard-describe').value.trim()) ||
     (onboardingStep === 4 && needsConsent && !onboardingState.consent);
-  $('onboard-next').textContent = onboardingStep === 2 && brandRead.state === 'read' ? 'Looks right' : 'Continue';
+  $('onboard-next').textContent = onboardingStep === 2 && !onboardingState.app && brandRead.state === 'read' ? 'Looks right' : 'Continue';
   if (onboardingStep === 5) {
-    $('review-url').textContent = onboardingState.url;
+    $('review-url').textContent = onboardingState.app ? `${onboardingState.app} (Mac app)` : onboardingState.url;
+    $('review-lead').textContent = onboardingState.app
+      ? `Retake will look at ${onboardingState.app}’s window, plan the shortest clear workflow, and record a silent draft of just that window.`
+      : 'Retake will inspect the page, plan the shortest clear workflow, and record a silent draft.';
     $('review-describe').textContent = onboardingState.describe;
     $('review-voice').textContent = VOICE_NAMES[onboardingState.voice];
   }
@@ -690,23 +754,25 @@ for (const card of document.querySelectorAll('[data-voice]')) card.onclick = () 
   demo.classList.add('show');
   video.play().catch(() => {});
 };
-$('onboard-url').oninput = (e) => { onboardingState.url = e.target.value; renderOnboarding(); };
+$('onboard-url').oninput = (e) => { onboardingState.url = e.target.value; onboardingState.app = ''; renderOnboarding(); };
 $('onboard-describe').oninput = (e) => { onboardingState.describe = e.target.value; renderOnboarding(); };
 $('voice-consent').querySelector('input').onchange = (e) => { onboardingState.consent = e.target.checked; renderOnboarding(); };
-$('onboard-back').onclick = () => { syncOnboarding(); onboardingStep = Math.max(1, onboardingStep - 1); if (onboardingStep === 2) readBrand(onboardingState.url); renderOnboarding(); };
+$('onboard-back').onclick = () => { syncOnboarding(); onboardingStep = Math.max(1, onboardingStep - 1); if (onboardingStep === 2) (onboardingState.app ? checkNative() : readBrand(onboardingState.url)); renderOnboarding(); };
 $('onboard-next').onclick = () => {
   syncOnboarding();
   if (onboardingStep === 1) {
-    const url = normalUrl(onboardingState.url);
-    if (!url) { $('onboard-error').textContent = 'Paste a public or localhost address.'; return; }
-    onboardingState.url = url; $('onboard-error').textContent = '';
+    const t = targetOf($('onboard-url').value);
+    if (!t) { $('onboard-error').textContent = 'Paste a website’s address, or type a Mac app’s name.'; return; }
+    if (t.kind === 'app') { onboardingState.app = t.app; onboardingState.url = ''; }
+    else { onboardingState.url = t.url; onboardingState.app = ''; }
+    $('onboard-error').textContent = '';
   }
-  if (onboardingStep === 2 && brandRead.state === 'read') keepBrand();
+  if (onboardingStep === 2 && !onboardingState.app && brandRead.state === 'read') keepBrand();
   if (onboardingStep === 3 && !onboardingState.describe) { $('onboard-describe-error').textContent = 'Say what the viewer should see.'; return; }
   if (onboardingStep === 3) $('onboard-describe-error').textContent = '';
   if (onboardingStep === 4 && onboardingState.voice !== 'silent' && !onboardingState.consent) return;
   onboardingStep = Math.min(5, onboardingStep + 1);
-  if (onboardingStep === 2) readBrand(onboardingState.url);
+  if (onboardingStep === 2) (onboardingState.app ? checkNative() : readBrand(onboardingState.url));
   renderOnboarding();
 };
 
@@ -716,6 +782,7 @@ $('onboard-next').onclick = () => {
 async function readBrand(url) {
   if (brandRead.url === url && brandRead.state !== 'failed') return;
   brandRead = { state:'reading', url, data:null, style:'showcase' };
+  $('brand-title').textContent = 'Your videos, in your colours';
   $('brand-lead').textContent = 'Reading your site…';
   $('ob-brand').innerHTML = '<div class="empty">Looking at your colours and logo</div>';
   renderOnboarding();
@@ -890,7 +957,7 @@ $('onboard-submit').onclick = async () => {
   btn.disabled = true; btn.textContent = 'Starting…'; $('onboard-submit-error').textContent = '';
   try {
     saveOnboarding();
-    const started = await api('/api/operator', { method:'POST', body:JSON.stringify({ url:onboardingState.url, describe:onboardingState.describe, narration:onboardingState.voice }) });
+    const started = await api('/api/operator', { method:'POST', body:JSON.stringify({ url:onboardingState.app ? undefined : onboardingState.url, app:onboardingState.app || undefined, describe:onboardingState.describe, narration:onboardingState.voice }) });
     if (!started?.id) throw new Error('Retake did not return an operator session. Try again.');
     onboardingSubmitted = true;
     document.querySelector('.ob-card').innerHTML = `<div class="ob-success"><div class="ob-icon" aria-hidden="true">●</div><h2>Retake is making the first draft</h2><p class="ob-lead">Keep this window open. Questions and the finished recording will appear here.</p><p class="ob-operator-status">Inspecting the page…</p><div class="ob-operator-slot"></div></div>`;

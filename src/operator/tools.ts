@@ -23,7 +23,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import YAML from "yaml";
-import { loadManifest, resolve, Manifest } from "../manifest.js";
+import { loadManifest, resolve, Manifest, ManifestShape } from "../manifest.js";
 import { record, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, unchangedUpTo, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
 import { render, check, ffmpegBin, stitch } from "../render.js";
 import { execFileSync } from "node:child_process";
@@ -166,7 +166,18 @@ server.registerTool("read_project", { description: "Read an app's source folder:
   return text(d.text);
 });
 
-server.registerTool("scout", { description: "Open a URL headlessly and list what is on it: headings, visible controls with unique selectors, page text. Use the selectors it returns verbatim.", inputSchema: { url: z.string().url() }, annotations: READ_LIVE_APP }, async ({ url }) => {
+server.registerTool("native_setup", { description: "What recording a Mac app needs on this Mac, item by item: each line is ✓, or names the one command or setting that fixes it. Call it when a person asks for a demo of a Mac app (a name like \"TextEdit\" rather than a URL), before scout or write_manifest. If anything is missing, do NOT run the fixes yourself: show the person the list, say plainly what each fix does (an install, a macOS permission prompt, turning cua-driver's telemetry off), ask once whether to go ahead, and let them run or approve each one. Then call this again to confirm.", inputSchema: {}, annotations: READ_ONLY }, async () => {
+  const { nativeDoctor, describeNative } = await import("../drivers/native-doctor.js");
+  const r = nativeDoctor();
+  return text(describeNative(r).join("\n") + (r.ready ? "\nReady: an app demo can be scouted, dry-run and recorded." : "\nNot ready: ask the person before setting up anything above."));
+});
+
+server.registerTool("scout", { description: "Open a URL headlessly and list what is on it: headings, visible controls with unique selectors, page text. Use the selectors it returns verbatim. For a Mac app, pass `app` (its name, e.g. \"TextEdit\", or bundle id) instead of `url`: it opens the app and lists its controls as role=…[name=\"…\"] targets, the only kind an app demo accepts. If Mac app recording is not set up, it says exactly what is missing — tell the person and ask before setting anything up.", inputSchema: { url: z.string().url().optional(), app: z.string().min(1).optional() }, annotations: READ_LIVE_APP }, async ({ url, app }) => {
+  if (app) {
+    try { const lines = await (await import("../drivers/native-dry.js")).scoutApp(app); await tell(`Looked at ${app}: ${lines[0]}`); return text(lines.join("\n")); }
+    catch (e) { return text(`✗ ${(e as Error).message}`); }
+  }
+  if (!url) return text("✗ give a url (a web page) or app (a Mac app)");
   const sc = await scout(url);
   await tell(`Looked at ${url}: ${sc.elements.length} controls${sc.headings[0] ? ` · “${sc.headings[0]}”` : ""}`);
   return text([`title: ${sc.title}`, `headings: ${sc.headings.join(" | ")}`, "controls (tag · selector · text):", ...sc.elements.map((e) => `- ${e.tag} · ${e.selector} · ${e.text || e.placeholder || e.href || ""}`), "", `text: ${sc.text.slice(0, 1200)}`].join("\n"));
@@ -657,8 +668,8 @@ server.registerTool("stitch", {
   inputSchema: {
     inputs: z.array(z.string().min(1)).min(2).describe("ordered video paths or folders containing demo.mp4; relative to workspace, or absolute inside it"),
     out: z.string().min(1).describe("new .mp4 path, relative to workspace or absolute inside its output roots"),
-    transition: Manifest.shape.transition.unwrap().shape.style,
-    transition_ms: Manifest.shape.transition.unwrap().shape.ms,
+    transition: ManifestShape.shape.transition.unwrap().shape.style,
+    transition_ms: ManifestShape.shape.transition.unwrap().shape.ms,
     audio: z.boolean().default(true).describe("preserve source audio; false explicitly mutes"),
   },
   annotations: RETAKE_WRITE,

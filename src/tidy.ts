@@ -10,6 +10,7 @@
  * So tidy never touches those two, reports before it removes anything, and
  * separates "safe, re-renders in seconds" from "the whole take is rubbish".
  */
+import { isRawTake } from "./paths.js";
 import fs from "node:fs";
 import path from "node:path";
 import type { Take } from "./record.js";
@@ -85,7 +86,7 @@ export function planTidy(outRoot: string, o: TidyOptions): Plan {
 
     for (const f of fs.readdirSync(dir)) {
       const full = path.join(dir, f);
-      if (f === "take.json" || (f.endsWith(".webm") && !PROCESSED_RE.test(f)) || f === ".retake-lock" || f === ".poster" || f === ".history" || f === "manifest.used.yaml" || f === "proof-log.md" || f === "facts.json") {
+      if (f === "take.json" || (isRawTake(f) && !PROCESSED_RE.test(f)) || f === ".retake-lock" || f === ".poster" || f === ".history" || f === "manifest.used.yaml" || f === "proof-log.md" || f === "facts.json") {
         keptBytes += bytesOf(full);
         continue;
       }
