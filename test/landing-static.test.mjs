@@ -9,7 +9,7 @@ const js=await fs.readFile(path.join(root,'landing.js'),'utf8');
 
 test('page has one headline, descriptive metadata, and no duplicate IDs',()=>{
   assert.equal((html.match(/<h1\b/g)||[]).length,1);
-  assert.match(html,/<title>Retake \| Video recording for your coding agent<\/title>/);
+  assert.match(html,/<title>Retake \| Video walkthroughs of websites and web apps<\/title>/);
   assert.match(html,/<meta name="description" content="[^"]{80,}"/);
   const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
   assert.equal(new Set(ids).size,ids.length);

@@ -15,7 +15,7 @@ test('landing examples, setup, keyboard, FAQ, media, and responsive layouts', { 
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => { if (response.status() >= 400 && response.url().startsWith(base)) errors.push(`${response.status()} ${response.url()}`); });
     await page.goto(base, { waitUntil: 'domcontentloaded' });
-    assert.match(await page.title(), /Video recording for your coding agent/);
+    assert.match(await page.title(), /Video walkthroughs of websites and web apps/);
     assert.equal(await page.locator('h1').count(), 1);
     await page.locator('#example-video').evaluate(video => video.readyState >= 1 || new Promise(resolve => video.addEventListener('loadedmetadata', resolve, { once: true })));
     assert.equal(await page.locator('#example-video').evaluate(video => video.videoWidth), 1280);

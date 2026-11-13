@@ -50,7 +50,7 @@
     mcp: { label: 'Use the local MCP server', code: '# After installing retake-demos:\nretake install\n\n# Print configuration for your agent:\nretake agent', hint: 'Claude Code can register automatically. For Codex or Cursor, use the configuration printed by retake agent, then restart the client. This is a local tool server, not a hosted API.' }
   };
   const workflow = {
-    record: { title: 'Start with something worth showing.', copy: 'Your agent turns the brief into a reusable flow, checks the steps with a dry run, and records the real browser.', href: '/docs/#record-review-rerun', link: 'Read the recording guide' },
+    record: { title: 'Start with something worth showing.', copy: 'Your agent turns the brief into reusable steps and checks them with a dry run. Retake performs them in a real browser and records the video.', href: '/docs/#record-review-rerun', link: 'Read the recording guide' },
     review: { title: 'The take is yours to judge.', copy: 'Open the local library to watch the video and inspect its scene stills. Tell your agent what to shorten, reframe, or do differently.', href: '#connect', link: 'Set up the local review window' },
     rerun: { title: 'A new take, from the same flow.', copy: 'When the app changes, ask your agent to update the steps and record again. This paired example keeps the browser steps unchanged and revises the captions.', href: '/rerun-proof', link: 'Watch the first run and rerun' }
   };

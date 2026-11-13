@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Rerun the demo. Don't re-record it.</b><br>
-  A product walkthrough as a small YAML file. Your coding agent writes it, Retake records it, you watch and ship it.
+  Retake records video walkthroughs of websites and web apps. Your coding agent prepares the walkthrough; Retake runs it in a browser and saves a video for you to review.
 </p>
 
 <p align="center">
@@ -13,9 +13,9 @@
 
 ---
 
-Retake drives a real browser through a web app, records it, and hands back an MP4 with burned-in captions, a still for every scene, and a proof log of exactly what happened. The demo is a file, so when a button moves you change a selector instead of re-shooting — and when the app changes, you rerun the same file.
+You choose what to show: a URL and one sentence about the result. Your coding agent looks at the page and prepares the steps: what to click, type and wait for. Retake performs them in a browser (Chromium) and records the page. You get an MP4 of your site doing what you asked, a still of every scene, and a proof log of each step. Captions and voiceover are optional. Retake records websites and web apps in one browser tab, not your desktop or native mobile apps.
 
-It is built for the way people work now: **you ask your coding agent for a demo in one sentence**, the agent drafts the file, dry-runs every selector, records a preview, reads the proof log, fixes what failed, and records the real one. Claude Code, Codex, Cursor and anything else that speaks MCP get Retake's tools; `retake ui` is the window you watch it in.
+The steps are saved as a small text file (a YAML manifest), so when a button moves your agent changes one line instead of re-shooting, and when the app changes you rerun the same file. Your agent dry-runs every step, has Retake record a preview, reads the proof log, fixes what failed, and only then makes the final take. `retake ui` is the window you watch it in. `retake install` connects Claude Code; `retake agent` prints the configuration for Codex, Cursor and other MCP clients.
 
 <p align="center"><img src="assets/window.png" width="900" alt="The Retake window: your demos on the left, the video and its scenes in the middle"></p>
 
@@ -34,7 +34,7 @@ Everything below is for the person; it is accurate for you too.
 
 ## Install
 
-Needs Node 20+. ffmpeg ships with the package; Chromium is downloaded once.
+Needs Node 20+, and for the window's first draft, Claude Code or Codex installed and signed in. ffmpeg ships with the package; Chromium is downloaded once.
 
 ```bash
 npm install -g retake-demos
@@ -47,9 +47,10 @@ retake install
 Start `retake ui` and open http://localhost:4310. On an empty workspace, Retake asks only for:
 
 1. the public or localhost URL;
-2. the result the viewer should see;
-3. the final sound: silent, Edge, local Aiden, or local Kokoro;
-4. confirmation of the request.
+2. a look at the colours and logo it read from your site;
+3. the result the viewer should see;
+4. the final sound: silent, Edge, local Aiden, or local Kokoro;
+5. confirmation of the request.
 
 The first draft is always silent. Choosing a local voice plays a packaged sample and asks for consent, but it does not download a model or generate speech. Narration starts only after you approve the recording and its continuous script.
 

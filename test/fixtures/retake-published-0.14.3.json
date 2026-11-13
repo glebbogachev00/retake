@@ -1,73 +1,73 @@
 {
   "package": "retake-demos",
-  "version": "0.14.1",
-  "gitHead": "0a74668c8f2a15a03951621c1a8bbd9232a4aa59",
+  "version": "0.14.3",
+  "gitHead": "2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25",
   "scope": "Only command, flag and manifest facts used by public docs tests, extracted from this published gitHead. Not the complete CLI API.",
   "sources": {
-    "cli": "https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/cli.ts",
-    "manifest": "https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/src/manifest.ts",
-    "readme": "https://github.com/glebbogachev00/retake/blob/0a74668c8f2a15a03951621c1a8bbd9232a4aa59/README.md"
+    "cli": "https://github.com/glebbogachev00/retake/blob/2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25/src/cli.ts",
+    "manifest": "https://github.com/glebbogachev00/retake/blob/2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25/src/manifest.ts",
+    "readme": "https://github.com/glebbogachev00/retake/blob/2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25/README.md"
   },
   "commands": {
     "install": {
       "flags": [],
-      "sourceLines": "765-769"
+      "sourceLines": "766-770"
     },
     "doctor": {
       "flags": [],
-      "sourceLines": "738-741"
+      "sourceLines": "739-742"
     },
     "ui": {
       "flags": [],
-      "sourceLines": "1197-1200"
+      "sourceLines": "1198-1201"
     },
     "agent": {
       "flags": [],
-      "sourceLines": "815-819"
+      "sourceLines": "816-820"
     },
     "validate": {
       "flags": [],
-      "sourceLines": "1152-1155"
+      "sourceLines": "1153-1156"
     },
     "dry": {
       "flags": [],
-      "sourceLines": "973-978"
+      "sourceLines": "974-979"
     },
     "run": {
       "flags": [
         "--no-master"
       ],
-      "sourceLines": "147-165"
+      "sourceLines": "148-166"
     },
     "check": {
       "flags": [],
-      "sourceLines": "985-989"
+      "sourceLines": "986-990"
     },
     "render": {
       "flags": [
         "--preset",
         "--no-master"
       ],
-      "sourceLines": "581-593"
+      "sourceLines": "582-594"
     },
     "secret": {
       "flags": [],
-      "sourceLines": "879-883"
+      "sourceLines": "880-884"
     },
     "signin": {
       "flags": [],
-      "sourceLines": "939-943"
+      "sourceLines": "940-944"
     },
     "login": {
       "flags": [
         "--by-hand",
         "--forget"
       ],
-      "sourceLines": "897-903"
+      "sourceLines": "898-902"
     },
     "logins": {
       "flags": [],
-      "sourceLines": "928-931"
+      "sourceLines": "929-932"
     }
   },
   "shellSetup": [

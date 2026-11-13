@@ -6,7 +6,7 @@ const read = relative => fs.readFile(new URL('../' + relative, import.meta.url),
 const [html, js, css] = await Promise.all(['site/docs/index.html', 'site/docs/docs.js', 'site/docs/docs.css'].map(read));
 // A compact checked-in release snapshot keeps compatibility checks independent
 // of git history, network access and the newer local implementation.
-const published = JSON.parse(await read('test/fixtures/retake-published-0.14.1.json'));
+const published = JSON.parse(await read('test/fixtures/retake-published-0.14.3.json'));
 const release = published.gitHead;
 const decode = text => text.replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 
@@ -15,9 +15,15 @@ test('docs have a single title and beginner-to-review section coverage', () => {
   assert.match(html, /<html lang="en">/);
   assert.match(html, /<title>Retake Docs/);
   assert.match(html, /name="viewport"/);
-  for (const id of ['overview', 'quickstart', 'agents', 'first-demo', 'record-review-rerun', 'voice-captions', 'outputs', 'privacy-costs', 'troubleshooting', 'reference']) {
-    assert.match(html, new RegExp(`<section id="${id}" data-doc-section>`));
-  }
+  // The beginner path, in the order a first reader needs it: what it is, an
+  // example, what you need, install, a first recording, its review. MCP and
+  // the manifest come after the reader has seen a result.
+  const order = ['overview', 'example', 'prerequisites', 'quickstart', 'first-demo', 'review-first', 'agents', 'record-review-rerun', 'voice-captions', 'outputs', 'privacy-costs', 'troubleshooting', 'reference'];
+  const at = order.map(id => html.indexOf(`<section id="${id}" data-doc-section>`));
+  for (const [i, id] of order.entries()) assert.ok(at[i] > 0, `Missing section ${id}`);
+  assert.deepEqual([...at].sort((x, y) => x - y), at, 'Sections out of beginner order');
+  assert.ok(html.indexOf('MCP') > at[order.indexOf('review-first')], 'MCP introduced before the first result');
+  assert.ok(html.indexOf('YAML') > at[order.indexOf('example')], 'YAML introduced before the example');
   for (const client of ['Claude Code', 'Codex', 'Cursor']) assert.ok(html.includes(`<h3 id="${client.toLowerCase().replace(' ', '-')}">${client}</h3>`));
   assert.ok(!html.includes('—'));
 });
@@ -36,10 +42,10 @@ test('stylesheet and script assets exist and page needs no external assets', asy
   assert.ok(!/<(?:script|link|img)[^>]+(?:src|href)="https?:/i.test(html));
 });
 
-test('every copyable CLI command and flag matches the published 0.14.1 fixture', () => {
+test('every copyable CLI command and flag matches the published 0.14.3 fixture', () => {
   assert.equal(published.package, 'retake-demos');
-  assert.equal(published.version, '0.14.1');
-  assert.equal(release, '0a74668c8f2a15a03951621c1a8bbd9232a4aa59');
+  assert.equal(published.version, '0.14.3');
+  assert.equal(release, '2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25');
   for (const url of Object.values(published.sources)) assert.ok(url.includes('/blob/' + release + '/'));
   assert.ok(html.includes(published.sources.cli));
   const blocks = [...html.matchAll(/<pre><code>([\s\S]*?)<\/code><\/pre>/g)].map(match => decode(match[1]));
@@ -104,7 +110,7 @@ test('beginner docs leave out the preview lifecycle flags and their guarantees',
   assert.ok(!/--(?:preview|final|fresh)\b/.test(html), 'Lifecycle flag in the beginner docs');
   for (const flag of published.unsupportedPublicFlags) assert.ok(!html.includes(flag), 'Unpublished flag in public HTML: ' + flag);
   assert.ok(!/one[- ]capture|correction budget|already finalized|capture[- ]hash|capture-relevant.*rejects/i.test(html));
-  assert.match(html, /published <strong>Retake 0\.14\.1<\/strong>/);
+  assert.match(html, /published <strong>Retake 0\.14\.3<\/strong>/);
   assert.ok(html.includes('/blob/' + release + '/src/cli.ts'));
   assert.match(html, /retake run demos\/my-demo\.yaml --no-master/);
   assert.match(html, /retake render outputs\/my-demo demos\/my-demo\.yaml --preset post-landscape --no-master/);
