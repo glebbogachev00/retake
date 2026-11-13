@@ -38,6 +38,8 @@
           <a href="#review-first">Review the video</a>
           <span class="docs-nav-label">KEEP GOING</span>
           <a href="#agents">Use it from your coding agent</a>
+          <a href="#mac-apps">Record a Mac app</a>
+          <a href="#share">Share the takes</a>
           <span class="docs-nav-label">MAKE A KEEPABLE TAKE</span>
           <a href="#record-review-rerun">Record, review &amp; rerun</a>
           <a href="#voice-captions">Voiceover &amp; captions</a>
@@ -61,7 +63,7 @@
           <li><strong>Retake</strong> performs those steps in a browser and records the page as a video.</li>
           <li><strong>You</strong> watch the video and say what to change.</li>
         </ul>
-        <p>The video shows your website or web app, in one browser tab. Retake does not record your desktop, other windows or native mobile apps.</p>
+        <p>The video shows your website or web app, in one browser tab. On a Mac, Retake can also record one Mac app’s window (see <a href="#mac-apps">Record a Mac app</a>). It does not record your whole desktop, other windows or native mobile apps.</p>
         <div class="docs-jump"><a href="#example">See an example ↓</a><a href="#record-review-rerun">Already set up? Record, review &amp; rerun →</a></div>
       </section>
       <section id="example" data-doc-section>
@@ -146,6 +148,18 @@ Do not start my app or record anything yet.</code></pre></div>
         </details>
         <p class="docs-note">From its own chat, your agent will not start your app unless you add <code>RETAKE_ALLOW_START=1</code> to Retake's MCP settings. Leave it off unless you want that.</p>
         <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25/src/cli.ts">CLI: install, agent and mcpServer</a> · <a href="https://github.com/glebbogachev00/retake/blob/2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25/src/operator/tools.ts">Tool permissions</a> · <a href="https://github.com/glebbogachev00/retake/blob/2bbfe4bbbc4ba416ded9cbf05f09ad3fc24b2c25/skill/SKILL.md">Recording skill</a></p>
+      </section>
+      <section id="mac-apps" data-doc-section>
+        <h2>Record a Mac app</h2>
+        <p>On a Mac, Retake can also record one app’s window. Type the app’s name, such as <strong>TextEdit</strong>, in the window’s first box instead of an address, or ask your agent for a demo of the app. The video shows only that app’s window, sharp, with a pointer drawn where each click lands, and you can keep working while it records.</p>
+        <p>It needs a one-time setup, and the window lists each item with its fix before anything starts: cua-driver (the tool that clicks and types in the app) with its Accessibility and Screen Recording permissions and its telemetry turned off, and Retake’s window recorder, built once with <code>retake build-native</code>. Retake never installs or grants any of these for you. <code>retake doctor --native</code> shows the same list in a terminal.</p>
+        <p class="docs-note">Like a web recording, an app recording really clicks and types in the app: use test data. With <code>launch: fresh</code>, Retake restarts the app first, and stops if the app has unsaved work.</p>
+        <p>In the manifest, <code>app: TextEdit</code> replaces <code>url:</code>, and controls are named by role and name, such as <code>role=button[name="Sign in"]</code>. <code>retake scout --app TextEdit</code> lists them.</p>
+      </section>
+      <section id="share" data-doc-section>
+        <h2>Share the takes</h2>
+        <p>To send several finished videos as one page, ask your agent for a share link, or run <code>retake share</code> with the demo names in watching order. The page plays them one at a time with a Next button, shows each demo’s notes and steps, and lets viewers leave a comment at a moment in a video.</p>
+        <p class="docs-note">The link opens on this Mac. With Tailscale it can reach your other devices. Hosted links for clients are not available yet, so check who can open the page before you send it.</p>
       </section>
       <section id="record-review-rerun" data-doc-section>
         <p class="docs-eyebrow">03 / MAKE A KEEPABLE TAKE</p>

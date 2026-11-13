@@ -2,6 +2,19 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.15.0",
+      "date": "2026-11-13",
+      "headline": "Record Mac apps, and send several takes as one page",
+      "notes": [
+        "Retake can now record a Mac app, not only websites. Type the app's name in the window (for example TextEdit), or ask your agent for a demo of it. The video shows only that app's window, sharp, with a pointer drawn where each click lands, and you can keep working while it records.",
+        "Recording a Mac app needs a one-time setup. The window lists each item with the one thing that fixes it, and checks again when you're done. Retake never installs anything or grants a permission for you, and your agent asks before setting anything up.",
+        "Several finished takes can go out as one page: they play in order with a Next button, with each demo's notes and steps under the video. Viewers can leave a comment at a moment in a video, and your agent can read the comments back. The link opens on your own Mac; hosted links are not available yet.",
+        "A demo can carry notes for the people you send it to. They appear on the share page, never in the video, and changing them needs no re-render.",
+        "Local voices download about half as much the first time: about 0.9 GB for Kokoro and 2.4 GB for Aiden, because Retake no longer installs a part neither voice uses.",
+        "The website and the guide now say first what Retake makes, a video walkthrough of your website or app, before explaining who does what."
+      ]
+    },
+    {
       "version": "0.14.3",
       "date": "2026-10-19",
       "headline": "Choosing Kokoro or Aiden now works for someone starting from nothing",
