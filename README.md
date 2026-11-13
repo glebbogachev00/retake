@@ -118,6 +118,8 @@ Exit codes: `0` good · `2` a step failed or the video is a raw fallback · `3` 
 
 To join separate recordings, use [`retake stitch`](docs/stitch.md). Supply existing output folders or video files, a new MP4 path, and one transition style.
 
+**Send several takes as one page.** `retake share admin-overview client-view --name portal` builds a page that plays them in that order, one at a time with a Next button, with each manifest's `notes:` and scenes under the video and a mark where a step failed. Viewers can leave a comment at any moment of a take; `retake share --comments portal` reads them. `retake share --serve` serves it at http://localhost:4790/portal/. The link opens on this Mac; with Tailscale, `tailscale serve` can reach your other devices. Hosted links for clients are not available yet. Ask your agent for "a share link for these takes" and it uses the same thing.
+
 ## The recording environment — what has to be true before the camera
 
 Six takes in one session were lost to the environment and not one to the

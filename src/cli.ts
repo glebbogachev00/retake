@@ -34,6 +34,7 @@
  */
 import { BROWSERS, chromiumPath, installChromium, launchChromium } from "./browser-home.js";
 import { bundledFfmpeg, recorderPatched } from "./self-repair.js";
+import { buildShare, describeComments, serveShares, shareReport, shareRoot, shareServerUp, shareUrl, SHARE_PORT } from "./share.js";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -1761,6 +1762,36 @@ routine
     say(`  ${drafted.length ? `${drafted.length} drafted and waiting: ${drafted.slice(0, 4).map((i) => i.name).join(", ")}${drafted.length > 4 ? "…" : ""}` : "nothing drafted is waiting — add stories to demos/plan.json and draft them, or the runs will have nothing to do"}`);
     if (!r.reference) say(`  ℹ no north star: every take will be delivered unjudged. \`retake routine reference <video>\`.`);
     say(`  A notification says how each run went. \`retake routine schedule off\` stops it.`);
+  });
+
+program
+  .command("share")
+  .description("one page that plays finished takes in order, with what each shows and whether every step worked")
+  .argument("[demos...]", "the demos to put on it, in watching order")
+  .option("--name <name>", "the share's name, and its address (default: the first demo's)")
+  .option("--title <title>", "the page's heading (default: the demo's title, or \"N recordings\")")
+  .option("--by <who>", "adds \"Shared with you by <who>\" to the page")
+  .option("--serve", "serve the shares on this Mac and keep running", false)
+  .option("--comments <share>", "read what viewers wrote on a share")
+  .option("--port <port>", "port for --serve", String(SHARE_PORT))
+  .option("-o, --out <dir>", "output root", "outputs")
+  .action(async (demos: string[], opts: { name?: string; title?: string; by?: string; serve: boolean; port: string; out: string; comments?: string }) => {
+    const outRoot = path.resolve(process.env.RETAKE_OUT?.trim() ? process.env.RETAKE_OUT.replace(/^~/, process.env.HOME ?? "") : opts.out);
+    if (opts.comments) { say(describeComments(shareRoot(outRoot), opts.comments)); return; }
+    const port = Number(opts.port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("--port is a port number");
+    if (!demos.length && !opts.serve) throw new Error("name the demos to share, in watching order: retake share <demo> [<demo>...]");
+    if (demos.length) {
+      const s = buildShare({ outRoot, demosDir: DEMOS_DIR(), demos, name: opts.name, title: opts.title, by: opts.by });
+      for (const l of shareReport(s, shareUrl(s.name, port), port)) say(l);
+      if (!opts.serve && !(await shareServerUp(port))) say(`  Nothing is serving it yet: retake share --serve${port === SHARE_PORT ? "" : ` --port ${port}`}`);
+    }
+    if (opts.serve) {
+      if (await shareServerUp(port)) { say(`· shares are already being served on port ${port}`); return; }
+      fs.mkdirSync(shareRoot(outRoot), { recursive: true });
+      await serveShares(shareRoot(outRoot), port);
+      say(`▶ serving ${path.relative(process.cwd(), shareRoot(outRoot))} on http://localhost:${port}/<share>/ — Ctrl-C to stop`);
+    }
   });
 
 program.parseAsync(process.argv).catch((e) => {
