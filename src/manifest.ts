@@ -7,6 +7,7 @@
  *   - `scene`    step markers that become burned-in captions + the proof log
  *   - `outputs`  which artifacts to produce and how
  */
+import { appAddress, nativeTargetProblem } from "./native-target.js";
 import { LOGIN_FIELDS, readLogin, siteOf } from "./logins.js";
 import fs from "node:fs";
 import { createHmac } from "node:crypto";
@@ -271,10 +272,19 @@ export const Seed = z.discriminatedUnion("kind", [
 ]);
 export type Seed = z.infer<typeof Seed>;
 
-const ManifestShape = z.object({
+export const ManifestShape = z.object({
   name: z.string().regex(/^[a-z0-9-]+$/, "kebab-case only"),
   title: z.string().optional(),
-  url: z.string().url(),
+  /** Where the demo happens: a web page. Or, instead, `app:`. */
+  url: z.string().url().optional(),
+  /** A Mac app to record instead of a web page: its name as in /Applications
+      ("TextEdit") or its bundle id ("com.apple.TextEdit"). Exactly one of
+      `url` and `app`. Targets are then role=button[name="…"], not CSS. */
+  app: z.string().min(1).optional(),
+  /** App demos only. `fresh` quits the app and starts it again before the
+      take, so it opens in a known state; `reuse` (the default) keeps it
+      running as it is. */
+  launch: z.enum(["fresh", "reuse"]).optional(),
   /** Quality preset — the publishing format. Fields below override it. */
   preset: z.enum(Object.keys(PRESETS) as [string, ...string[]]).default(DEFAULT_PRESET),
   /** Recording viewport (video pixels). Default = the preset's canvas. Give a
@@ -558,8 +568,59 @@ export const Manifest = ManifestShape.superRefine((m, ctx) => {
     if (seen.has(st.label)) ctx.addIssue({ code: "custom", path: ["steps", i, "label"], message: `duplicate scene label "${st.label}" (also step ${seen.get(st.label)}) — labels must be unique` });
     else seen.set(st.label, i);
   });
-});
+  appRules(m, ctx);
+}).transform((m) => ({ ...m, url: m.url ?? appAddress(m.app ?? "") }));
 export type Manifest = z.infer<typeof Manifest>;
+
+/** What an app demo cannot use, said in words that name the alternative.
+    Everything here is a browser thing: an app has no URLs, no page to run
+    script in, no network to stub, no CSS. */
+const NOT_IN_AN_APP: Partial<Record<Step["action"], string>> = {
+  navigate: "there are no URLs in an app; click the control that opens the screen you want",
+  evaluate: "there is no page to run script in; put the app in its state with a `command` seed and `launch: fresh`",
+  hover: "hovering is not supported in apps yet; click, or use a scene to hold on the control",
+  select: "pick from a menu or pop-up by clicking it, then clicking the item",
+  upload: "file dialogs are not supported in apps yet",
+  download: "downloads are not supported in apps yet",
+  stub: "an app's network cannot be stubbed; reset its state with a `command` seed instead",
+  zoom: "use the scene's `camera` to zoom in an app",
+};
+
+function appRules(m: z.infer<typeof ManifestShape>, ctx: z.RefinementCtx): void {
+  if (!m.url === !m.app) {
+    ctx.addIssue({ code: "custom", path: [m.url ? "app" : "url"], message: m.url ? "give either `url:` (a web page) or `app:` (a Mac app), not both" : "give `url:` (a web page) or `app:` (a Mac app to record)" });
+    return;
+  }
+  if (!m.app) {
+    if (m.launch) ctx.addIssue({ code: "custom", path: ["launch"], message: "`launch:` is for app demos; a web demo opens its `url`" });
+    return;
+  }
+  const field = (key: string, why: string) => ctx.addIssue({ code: "custom", path: [key], message: `\`${key}\` is a browser setting; ${why}` });
+  if (m.viewport) field("viewport", "an app's window is sized from the preset");
+  if (m.scale !== undefined) field("scale", "an app is recorded at the display's own scale");
+  if (m.auth) field("auth", "sign in with steps, and keep the password in a secret: ${VAR} with `secret: true`");
+  if (m.determinism) field("determinism", "an app's clock and randomness cannot be frozen from outside");
+  if (m.persistentCss) field("persistentCss", "an app has no CSS");
+  if (m.waitForSelector) field("waitForSelector", "use a `waitFor` step with an app target");
+  if (m.reducedMotion) field("reducedMotion", "turn motion down in the app itself, or in System Settings");
+  if (m.stub.length) field("stub", "an app's network cannot be stubbed; reset its state with a `command` seed");
+  m.seed.forEach((sd, i) => {
+    if (sd.kind === "evaluate") ctx.addIssue({ code: "custom", path: ["seed", i], message: "an `evaluate` seed runs script in a web page; use a `command` seed for an app" });
+  });
+  for (const [list, steps] of [["setup", m.setup], ["steps", m.steps]] as const) {
+    steps.forEach((st, i) => {
+      const why = NOT_IN_AN_APP[st.action];
+      if (why) { ctx.addIssue({ code: "custom", path: [list, i, "action"], message: `\`${st.action}\` is not available in an app: ${why}` }); return; }
+      const targets: [string, string][] = [];
+      if ("selector" in st && typeof st.selector === "string") targets.push(["selector", st.selector]);
+      if ("at" in st && st.at && typeof st.at === "object" && "selector" in st.at) targets.push(["at", st.at.selector]);
+      for (const [key, t] of targets) {
+        const problem = nativeTargetProblem(t);
+        if (problem) ctx.addIssue({ code: "custom", path: [list, i, key], message: problem });
+      }
+    });
+  }
+}
 
 export type LoadedManifest = { manifest: Manifest; file: string; dir: string };
 

@@ -74,6 +74,7 @@ export function actionFits(action: string, el: ElInfo): string | null {
 }
 
 export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) => void, opts: { seed?: boolean; outRoot?: string } = {}): Promise<DryResult> {
+  if (m.app) throw new Error(`"${m.name}" records the Mac app ${m.app}. Recording Mac apps is not built yet: \`validate\` checks the demo, but it cannot be dry-run or recorded.`);
   // ${LOGIN_*} reads the login saved for this demo's own site.
   signInAt(m.url.includes("${") ? (() => { try { return expandEnv(m.url); } catch { return m.url; } })() : m.url);
   const q = resolve(m);

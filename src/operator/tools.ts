@@ -23,7 +23,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import YAML from "yaml";
-import { loadManifest, resolve, Manifest } from "../manifest.js";
+import { loadManifest, resolve, Manifest, ManifestShape } from "../manifest.js";
 import { record, acquireLock, releaseLock, keepPrevious, restorePrevious, stashPrevious, unchangedUpTo, EXPENSIVE_TAKE_SECONDS, type Take } from "../record.js";
 import { render, check, ffmpegBin, stitch } from "../render.js";
 import { execFileSync } from "node:child_process";
@@ -656,8 +656,8 @@ server.registerTool("stitch", {
   inputSchema: {
     inputs: z.array(z.string().min(1)).min(2).describe("ordered video paths or folders containing demo.mp4; relative to workspace, or absolute inside it"),
     out: z.string().min(1).describe("new .mp4 path, relative to workspace or absolute inside its output roots"),
-    transition: Manifest.shape.transition.unwrap().shape.style,
-    transition_ms: Manifest.shape.transition.unwrap().shape.ms,
+    transition: ManifestShape.shape.transition.unwrap().shape.style,
+    transition_ms: ManifestShape.shape.transition.unwrap().shape.ms,
     audio: z.boolean().default(true).describe("preserve source audio; false explicitly mutes"),
   },
   annotations: RETAKE_WRITE,

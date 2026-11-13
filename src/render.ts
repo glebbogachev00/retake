@@ -25,7 +25,7 @@ import { renderCard, renderCalloutOverlay, renderPoster, renderTitledCover } fro
 import { describeIdle, planIdle, warpFilterArgs, warpTake } from "./pace.js";
 import { holdFilterArgs, holdTake, planHolds } from "./hold.js";
 import { DEFAULT_VOICE, LOCAL_VOICE, LOCAL_VOICE_VERSION, voiceId, audioSeconds, cueGroups, cuesPerParagraph, cutPoints, silences, synthesize, synthesizeWithCues } from "./voice.js";
-import { expandEnv, resolve, Manifest, type Resolved, type Step } from "./manifest.js";
+import { expandEnv, resolve, Manifest, ManifestShape, type Resolved, type Step } from "./manifest.js";
 import type { Take, TimelineEntry } from "./record.js";
 import { ffmpegBin } from "./media-bin.js";
 export { ffmpegBin } from "./media-bin.js";
@@ -433,7 +433,7 @@ export function stitch(inputs: string[], output: string, options: {
   audio?: boolean;
   log?: (line: string) => void;
 } = {}): string {
-  const transition = Manifest.shape.transition.parse(options.transition);
+  const transition = ManifestShape.shape.transition.parse(options.transition);
   if (inputs.length < 2) throw new Error("stitch needs at least two inputs");
   const target = path.resolve(output);
   if (path.extname(target).toLowerCase() !== ".mp4") throw new Error("stitch output must be an .mp4 file");
