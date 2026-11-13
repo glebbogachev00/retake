@@ -480,3 +480,45 @@ test("the API still refuses what it should, on the real routes", async () => {
   assert.equal((await fetch(`http://127.0.0.1:${PORT}/api/demos`)).status, 401, "guarded GET");
   assert.equal((await fetch(`http://127.0.0.1:${PORT}/api/demos`, { headers: { "x-retake-token": token } })).status, 200);
 });
+
+test("someone who types a Mac app gets its setup card, and the draft starts with the app", async () => {
+  const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs: string[] = [];
+  p.on("pageerror", (e) => errs.push(String(e)));
+  p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  let ready = false, brandAsked = false, sent: Record<string, unknown> | null = null;
+  await p.route("**/api/demos", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await p.route("**/api/brand", (r) => { brandAsked = true; return r.fulfill({ status: 500, body: "{}" }); });
+  await p.route("**/api/native/doctor", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(ready
+    ? { ready: true, lines: [{ ok: true, text: "cua-driver telemetry is off" }] }
+    : { ready: false, lines: [{ ok: true, text: "macOS 26.5.1" }, { ok: false, text: "cua-driver telemetry is on", fix: "cua-driver telemetry disable" }, { ok: false, text: "<img src=x onerror=alert(1)>" }] }) }));
+  await p.route("**/api/operator", async (r) => { sent = r.request().postDataJSON(); await r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "app-test", provider: "codex" }) }); });
+  await p.route("**/api/operator/app-test/stream*", (r) => r.fulfill({ status: 200, contentType: "text/event-stream", body: "retry: 1000\n\n" }));
+  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
+
+  await p.locator("#onboard-url").fill("TextEdit");
+  await p.locator("#onboard-next").click();
+  await p.locator(".ob-native").waitFor();
+  assert.match(await p.locator("#brand-title").innerText(), /Set up recording Mac apps/);
+  assert.match(await p.locator("#ob-brand").innerText(), /cua-driver telemetry disable/);
+  assert.equal(await p.locator("#ob-brand img").count(), 0, "the check's words are text, never markup");
+  assert.ok(await p.locator("#onboard-next").isDisabled(), "Continue waits until the Mac is ready");
+  ready = true;
+  await p.locator("#ob-brand .ob-retry").click();
+  await p.locator(".ob-native li.ok").first().waitFor();
+  await p.waitForFunction(() => !(document.getElementById("onboard-next") as HTMLButtonElement).disabled);
+  assert.match(await p.locator("#brand-lead").innerText(), /Only its window is filmed/);
+  await p.locator("#onboard-next").click();
+  await p.locator("#onboard-describe").fill("Write a note and save it");
+  await p.locator("#onboard-next").click();
+  await p.locator("#onboard-next").click();
+  assert.match(await p.locator("#review-url").innerText(), /TextEdit \(Mac app\)/);
+  await p.locator("#onboard-submit").click();
+  await p.waitForFunction(() => document.querySelector(".ob-success") !== null);
+  const body = sent as Record<string, unknown> | null;
+  assert.equal(body?.app, "TextEdit");
+  assert.equal(body?.url, undefined);
+  assert.equal(brandAsked, false, "an app has no website colours to read");
+  assert.deepEqual(errs, []);
+  await p.close();
+});

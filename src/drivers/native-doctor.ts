@@ -62,7 +62,7 @@ export function nativeDoctor(p: Probes = realProbes()): { ready: boolean; lines:
   }
 
   const cap = p.capture();
-  if (!cap.built) lines.push({ ok: false, text: "Retake's window recorder isn't built yet", fix: "node scripts/build-native.mjs   (in the Retake folder; needs Xcode's command-line tools)" });
+  if (!cap.built) lines.push({ ok: false, text: "Retake's window recorder isn't built yet", fix: "retake build-native   (needs Xcode's command-line tools: xcode-select --install)" });
   else if (cap.error) lines.push({ ok: false, text: `Retake's window recorder doesn't start: ${cap.error}` });
   else if (!cap.screenRecording) lines.push({ ok: false, text: "Retake's window recorder needs Screen Recording", fix: "System Settings → Privacy & Security → Screen & System Audio Recording → turn on the app that runs Retake, then restart it" });
   else lines.push({ ok: true, text: "Retake's window recorder can record a window" });

@@ -47,7 +47,7 @@ test("each missing piece names the one thing that fixes it", () => {
   assert.deepEqual(fixes({ ...ready, cua: (b, a) => a[0] === "status" ? { status: 1, out: "Cua Driver daemon is not running" } : ready.cua(b, a) }), ["open -n -g -a CuaDriver --args serve"]);
   assert.deepEqual(fixes({ ...ready, cua: (b, a) => a[0] === "permissions" ? { status: 0, out: JSON.stringify({ accessibility: true, screen_recording: false }) } : ready.cua(b, a) }), ["cua-driver permissions grant"]);
   assert.deepEqual(fixes({ ...ready, cua: (b, a) => a[0] === "telemetry" ? { status: 0, out: JSON.stringify({ enabled: true }) } : ready.cua(b, a) }), ["cua-driver telemetry disable"]);
-  assert.match(fixes({ ...ready, capture: () => ({ built: false }) })[0], /build-native\.mjs/);
+  assert.match(fixes({ ...ready, capture: () => ({ built: false }) })[0], /^retake build-native/);
   assert.match(fixes({ ...ready, capture: () => ({ built: true, screenRecording: false }) })[0], /Screen & System Audio Recording/);
   assert.match(fixes({ ...ready, macos: () => "14.6" })[0], /Software Update/);
   const other = nativeDoctor({ ...ready, cua: (b, a) => a[0] === "--version" ? { status: 0, out: "cua-driver 0.49.1" } : ready.cua(b, a) });

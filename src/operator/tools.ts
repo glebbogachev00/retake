@@ -165,6 +165,12 @@ server.registerTool("read_project", { description: "Read an app's source folder:
   return text(d.text);
 });
 
+server.registerTool("native_setup", { description: "What recording a Mac app needs on this Mac, item by item: each line is ✓, or names the one command or setting that fixes it. Call it when a person asks for a demo of a Mac app (a name like \"TextEdit\" rather than a URL), before scout or write_manifest. If anything is missing, do NOT run the fixes yourself: show the person the list, say plainly what each fix does (an install, a macOS permission prompt, turning cua-driver's telemetry off), ask once whether to go ahead, and let them run or approve each one. Then call this again to confirm.", inputSchema: {}, annotations: READ_ONLY }, async () => {
+  const { nativeDoctor, describeNative } = await import("../drivers/native-doctor.js");
+  const r = nativeDoctor();
+  return text(describeNative(r).join("\n") + (r.ready ? "\nReady: an app demo can be scouted, dry-run and recorded." : "\nNot ready: ask the person before setting up anything above."));
+});
+
 server.registerTool("scout", { description: "Open a URL headlessly and list what is on it: headings, visible controls with unique selectors, page text. Use the selectors it returns verbatim. For a Mac app, pass `app` (its name, e.g. \"TextEdit\", or bundle id) instead of `url`: it opens the app and lists its controls as role=…[name=\"…\"] targets, the only kind an app demo accepts. If Mac app recording is not set up, it says exactly what is missing — tell the person and ask before setting anything up.", inputSchema: { url: z.string().url().optional(), app: z.string().min(1).optional() }, annotations: READ_LIVE_APP }, async ({ url, app }) => {
   if (app) {
     try { const lines = await (await import("../drivers/native-dry.js")).scoutApp(app); await tell(`Looked at ${app}: ${lines[0]}`); return text(lines.join("\n")); }

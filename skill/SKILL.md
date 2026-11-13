@@ -808,6 +808,30 @@ things checks cannot see — a caption that is true when its scene starts and
 false by the end, a payoff nobody can find, four seconds where nothing
 changes. `look` at the payoff scene is the other half.
 
+## Mac apps
+
+A person may name a Mac app ("record TextEdit", "a demo of our desktop app")
+instead of a URL. Then:
+
+1. **`native_setup` first.** If any line is ✗, stop. Show the person the
+   list, say what each fix does (an installer, a macOS permission prompt,
+   turning cua-driver's telemetry off), and ask once. Never run a fix
+   yourself. Call `native_setup` again after they have.
+2. **`scout` with `app`.** Use only the `role=…[name="…"]` targets it
+   returns. An app has no CSS, no URLs and no page to run script in, and
+   `validate` refuses all three with the alternative.
+3. **Write the manifest yourself** (`write_manifest`; `draft` is for web
+   pages) with `app: <name>` in place of `url:`. `launch: fresh` restarts the
+   app first; it quits gracefully and stops if the app has unsaved work.
+4. **`dry`, then `run`, then judge it**, as for the web. Tell the person they
+   can keep working while it records, as long as they leave the app's own
+   window alone.
+
+What the take looks like: only the app's window, at Retina size, with a Mac
+arrow drawn where each click lands. Typed text appears a phrase at a time,
+not letter by letter, and the driver takes 1–3 s per action, so there are
+short pauses between steps.
+
 ## When a take fails
 
 The camera stops at the first failed step, so a failed take is short and

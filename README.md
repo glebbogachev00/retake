@@ -117,6 +117,8 @@ Exit codes: `0` good · `2` a step failed or the video is a raw fallback · `3` 
 
 To join separate recordings, use [`retake stitch`](docs/stitch.md). Supply existing output folders or video files, a new MP4 path, and one transition style.
 
+**Mac apps.** A demo can name a Mac app instead of a page: `app: TextEdit` in place of `url:`. Targets are role and name (`role=button[name="Sign in"]`), and `retake scout --app TextEdit` lists them. The take records only the app's window, at Retina size, with a Mac arrow drawn where each click lands, and the app can stay behind your own windows while it records. It needs a one-time setup ([cua-driver](https://github.com/trycua/cua) to drive the app, and Retake's window recorder, built once with `retake build-native` for now); `retake doctor --native` lists each item and its fix, and the Retake window shows the same list when you type an app's name.
+
 ## The recording environment — what has to be true before the camera
 
 Six takes in one session were lost to the environment and not one to the

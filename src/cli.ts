@@ -736,6 +736,16 @@ program
   .action(() => initWorkspace(process.cwd(), say));
 
 program
+  .command("build-native")
+  .description("build Retake's Mac window recorder from its source, wherever Retake is installed (needs Xcode's command-line tools)")
+  .action(() => {
+    if (process.platform !== "darwin") throw new Error("the window recorder is for recording Mac apps, on a Mac");
+    const r = spawnSync(process.execPath, [path.join(PKG_ROOT, "scripts", "build-native.mjs")], { stdio: "inherit" });
+    if (r.status !== 0) throw new Error("the build failed: if it says xcrun or swiftc is missing, install Xcode's command-line tools (xcode-select --install) and run it again");
+    say("Next: `retake doctor --native`. The first recording asks macOS to let the app you run Retake from record the screen.");
+  });
+
+program
   .command("scout")
   .description("list what is on a page, or with --app the controls of a Mac app, as targets a demo can use")
   .argument("[url]", "a web page")
