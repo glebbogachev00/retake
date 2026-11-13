@@ -165,7 +165,12 @@ server.registerTool("read_project", { description: "Read an app's source folder:
   return text(d.text);
 });
 
-server.registerTool("scout", { description: "Open a URL headlessly and list what is on it: headings, visible controls with unique selectors, page text. Use the selectors it returns verbatim.", inputSchema: { url: z.string().url() }, annotations: READ_LIVE_APP }, async ({ url }) => {
+server.registerTool("scout", { description: "Open a URL headlessly and list what is on it: headings, visible controls with unique selectors, page text. Use the selectors it returns verbatim. For a Mac app, pass `app` (its name, e.g. \"TextEdit\", or bundle id) instead of `url`: it opens the app and lists its controls as role=…[name=\"…\"] targets, the only kind an app demo accepts. If Mac app recording is not set up, it says exactly what is missing — tell the person and ask before setting anything up.", inputSchema: { url: z.string().url().optional(), app: z.string().min(1).optional() }, annotations: READ_LIVE_APP }, async ({ url, app }) => {
+  if (app) {
+    try { const lines = await (await import("../drivers/native-dry.js")).scoutApp(app); await tell(`Looked at ${app}: ${lines[0]}`); return text(lines.join("\n")); }
+    catch (e) { return text(`✗ ${(e as Error).message}`); }
+  }
+  if (!url) return text("✗ give a url (a web page) or app (a Mac app)");
   const sc = await scout(url);
   await tell(`Looked at ${url}: ${sc.elements.length} controls${sc.headings[0] ? ` · “${sc.headings[0]}”` : ""}`);
   return text([`title: ${sc.title}`, `headings: ${sc.headings.join(" | ")}`, "controls (tag · selector · text):", ...sc.elements.map((e) => `- ${e.tag} · ${e.selector} · ${e.text || e.placeholder || e.href || ""}`), "", `text: ${sc.text.slice(0, 1200)}`].join("\n"));

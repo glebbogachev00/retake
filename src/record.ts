@@ -592,7 +592,7 @@ async function acquireNamedLock(outRoot: string, name: string, log: (l: string) 
 }
 
 export async function record(m: Manifest, opts: RecordOptions): Promise<Take> {
-  if (m.app) throw new Error(`"${m.name}" records the Mac app ${m.app}. Recording Mac apps is not built yet: \`validate\` checks the demo, but it cannot be dry-run or recorded.`);
+  if (m.app) throw new Error(`"${m.name}" records the Mac app ${m.app}. Recording Mac apps is not built yet: \`validate\` and \`dry\` work, but it cannot be recorded.`);
   // ${LOGIN_*} reads the login saved for this demo's own site.
   signInAt(m.url.includes("${") ? (() => { try { return expandEnv(m.url); } catch { return m.url; } })() : m.url);
   let releaseNamed: (() => void) | null = null;

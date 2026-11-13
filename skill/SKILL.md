@@ -37,6 +37,8 @@ say so in one line and stop.
 1. **`read_project`** (if you have the source folder) — routes, start
    command, sign-in fields, stable selectors, things that animate forever.
 2. **`scout <url>`** — what is really on the page: unique selectors, text.
+   For a Mac app (`app:` in place of `url:`), `scout` with `app` lists its
+   controls as `role=…[name="…"]` targets; an app demo accepts nothing else.
    If the URL refuses, check `ports`; dev servers often sit one port over.
    Do not start the app yourself unless the person says to.
 3. **What to record?** If the person asked for suggestions, call `ideas` —

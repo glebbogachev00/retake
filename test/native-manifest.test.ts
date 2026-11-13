@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Manifest } from "../src/manifest.js";
 import { appAddress, isAppAddress, nativeTargetProblem, parseNativeTarget } from "../src/native-target.js";
-import { dryRun } from "../src/dryrun.js";
+import { record } from "../src/record.js";
 
 const textedit = {
   name: "textedit-note",
@@ -83,7 +83,7 @@ test("targets are role and name, not CSS, and say how to write one", () => {
   assert.match(css, /steps\.0\.selector: .*An app has no CSS/);
 });
 
-test("an app demo cannot be dry-run or recorded yet, and says so", async () => {
+test("an app demo cannot be recorded yet, and says so", async () => {
   const m = Manifest.parse(textedit);
-  await assert.rejects(() => dryRun(m, process.cwd(), () => {}), /Recording Mac apps is not built yet/);
+  await assert.rejects(() => record(m, { outDir: process.cwd(), log: () => {} } as never), /Recording Mac apps is not built yet: `validate` and `dry` work/);
 });

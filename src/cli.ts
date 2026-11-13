@@ -736,6 +736,25 @@ program
   .action(() => initWorkspace(process.cwd(), say));
 
 program
+  .command("scout")
+  .description("list what is on a page, or with --app the controls of a Mac app, as targets a demo can use")
+  .argument("[url]", "a web page")
+  .option("--app <app>", "a Mac app's name (e.g. TextEdit) or bundle id, instead of a url")
+  .option("--fresh", "quit the app and start it again first", false)
+  .action(async (url: string | undefined, opts: { app?: string; fresh: boolean }) => {
+    if (opts.app) {
+      const { scoutApp } = await import("./drivers/native-dry.js");
+      for (const l of await scoutApp(opts.app, opts.fresh ? "fresh" : "reuse")) say(l);
+      return;
+    }
+    if (!url) throw new Error("give a url, or --app <Mac app>");
+    const { scout } = await import("./describe.js");
+    const sc = await scout(url);
+    say(`${sc.title}\n${sc.headings.join(" | ")}`);
+    for (const e of sc.elements) say(`- ${e.tag} · ${e.selector} · ${e.text || e.placeholder || e.href || ""}`);
+  });
+
+program
   .command("doctor")
   .description("check that everything Retake needs is in place")
   .option("--native", "also check what recording Mac apps needs", false)

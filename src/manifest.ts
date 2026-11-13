@@ -614,6 +614,7 @@ function appRules(m: z.infer<typeof ManifestShape>, ctx: z.RefinementCtx): void 
       const targets: [string, string][] = [];
       if ("selector" in st && typeof st.selector === "string") targets.push(["selector", st.selector]);
       if ("at" in st && st.at && typeof st.at === "object" && "selector" in st.at) targets.push(["at", st.at.selector]);
+      if (st.action === "scroll" && typeof st.to === "string" && st.to !== "top" && st.to !== "bottom") targets.push(["to", st.to]);
       for (const [key, t] of targets) {
         const problem = nativeTargetProblem(t);
         if (problem) ctx.addIssue({ code: "custom", path: [list, i, key], message: problem });
