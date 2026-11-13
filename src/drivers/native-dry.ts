@@ -50,7 +50,7 @@ export async function scoutApp(app: string, launch: "fresh" | "reuse" = "reuse")
     const t = targetsFor(snap.elements);
     return [
       `${app} · ${t.length} control${t.length === 1 ? "" : "s"} in its window (${w.points.width}×${w.points.height} pt). Use these targets verbatim:`,
-      ...t.slice(0, 120).map((x) => `- ${x.target}${x.actions.includes("AXPress") ? "" : x.role === "textbox" ? "  (type into it)" : ""}`),
+      ...t.slice(0, 120).map((x) => `- ${x.target}${x.role === "textbox" ? `  (type into it${x.hint ? `; it is called “${x.hint}”` : ""})` : ""}`),
       ...(t.length > 120 ? [`… and ${t.length - 120} more`] : []),
       ...(menusOf(snap.elements).length ? ["", `menus: ${menusOf(snap.elements).join(" · ")} — click one with role=menuitem[name="File"], then its item, e.g. role=menuitem[name="Save…"]`] : []),
       "",

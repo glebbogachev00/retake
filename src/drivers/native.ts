@@ -92,13 +92,25 @@ export function menusOf(els: El[]): string[] {
 /** Every control in the window as a manifest-ready target, unique ones
     first. Menus are listed apart (menusOf): hundreds of menu items would
     bury the window's own controls. */
-export function targetsFor(all: El[]): { target: string; role: string; name: string; actions: string[] }[] {
+export function targetsFor(all: El[]): { target: string; role: string; name: string; actions: string[]; hint?: string }[] {
   const els = all.filter((e) => !MENU.test(e.role));
   const seen = new Map<string, number>();
-  const out: { target: string; role: string; name: string; actions: string[]; dup: boolean }[] = [];
+  const out: { target: string; role: string; name: string; actions: string[]; dup: boolean; hint?: string }[] = [];
+  let textboxes = 0;
   for (const e of els) {
     const role = webRole(e.role) ?? (/^AX/.test(e.role) ? e.role : null);
     if (!role || role === "window") continue;
+    // A text field is targeted by its order, never its name: many apps name
+    // a text area after what is typed in it (TextEdit does), so that name
+    // changes as the demo types, and it would copy a document's contents
+    // into the demo file.
+    if (role === "textbox") {
+      const n = textboxes++;
+      const real = e.label?.trim() && e.label !== e.value ? e.label.trim() : "";
+      out.push({ target: n ? `role=textbox >> nth=${n}` : "role=textbox", role, name: `\0textbox${n}`, actions: e.actions ?? [], dup: false, ...(real ? { hint: real } : {}) });
+      seen.set(`${role}\0\0textbox${n}`, 1);
+      continue;
+    }
     const name = nameOf(e);
     const key = `${role}\0${name}`;
     const n = seen.get(key) ?? 0;
@@ -108,7 +120,7 @@ export function targetsFor(all: El[]): { target: string; role: string; name: str
   }
   // A target is unique only if nothing after it shares its role and name.
   const unique = (t: (typeof out)[number]) => (seen.get(`${t.role}\0${t.name}`) ?? 0) === 1;
-  return [...out.filter(unique), ...out.filter((t) => !unique(t))].map(({ dup: _d, ...t }) => t);
+  return [...out.filter(unique), ...out.filter((t) => !unique(t))].map(({ dup: _d, ...t }) => ({ ...t, name: t.name.startsWith("\0") ? "" : t.name }));
 }
 
 /** What the window shows, in a line: for "no such control", the answer to

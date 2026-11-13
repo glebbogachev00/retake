@@ -29,7 +29,12 @@ test("a target finds its control by role, name and position", () => {
 
 test("scout lists the window's controls, unique first, menus apart, and never the Apple menu", () => {
   const t = targetsFor(els).map((x) => x.target);
-  assert.deepEqual(t, ['role=textbox[name="First Text View"]', "role=button", 'role=text[name="Saved"]', 'role=button[name="Save"]', 'role=button[name="Save"] >> nth=1']);
+  assert.deepEqual(t, ["role=textbox", "role=button", 'role=text[name="Saved"]', 'role=button[name="Save"]', 'role=button[name="Save"] >> nth=1']);
+  // A text area named after its contents is listed by order: the name would
+  // change as the demo types, and copy the document into the demo file.
+  const typed = targetsFor([{ role: "AXTextArea", label: "Dear Sam, the contract…", value: "Dear Sam, the contract…", element_token: "t" }, { role: "AXTextField", label: "E-mail", value: "", element_token: "f" }]);
+  assert.deepEqual(typed.map((x) => [x.target, x.hint]), [["role=textbox", undefined], ["role=textbox >> nth=1", "E-mail"]]);
+  assert.ok(!JSON.stringify(typed).includes("Dear Sam"));
   assert.ok(!t.some((x) => /menu/i.test(x)));
   assert.deepEqual(menusOf(els), ["File"]);
   assert.ok(!visibleText(els).includes("Recent Items"));
