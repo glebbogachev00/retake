@@ -738,7 +738,8 @@ program
 program
   .command("doctor")
   .description("check that everything Retake needs is in place")
-  .action(() => {
+  .option("--native", "also check what recording Mac apps needs", false)
+  .action(async (opts: { native: boolean }) => {
     let bad = 0;
     const ok = (l: string) => say(`✓ ${l}`);
     const no = (l: string) => { bad++; say(`✗ ${l}`); };
@@ -759,6 +760,19 @@ program
     say(which("codex") ? `✓ codex CLI` : `· codex CLI not found (fine if you don't use Codex)`);
     const root = process.cwd();
     fs.existsSync(path.join(root, "demos")) ? ok(`workspace ${root}`) : say(`· ${root} is not a workspace yet — run: retake init`);
+    // Mac apps are optional: a person who records websites never needs any
+    // of it, so it is one quiet line until they do.
+    const appDemos = (() => { try { return fs.readdirSync(path.join(root, "demos")).filter((f) => /\.ya?ml$/.test(f) && /^app:/m.test(fs.readFileSync(path.join(root, "demos", f), "utf8"))); } catch { return []; } })();
+    const { findCuaDriver } = await import("./drivers/cua.js");
+    if (opts.native || appDemos.length || findCuaDriver()) {
+      const { nativeDoctor, describeNative } = await import("./drivers/native-doctor.js");
+      const r = nativeDoctor();
+      say("");
+      for (const l of describeNative(r)) say(l);
+      if (!r.ready && (opts.native || appDemos.length)) bad++;
+    } else {
+      say("· Mac apps: not set up (optional) — `retake doctor --native` shows what recording one needs");
+    }
     if (bad) process.exitCode = 1;
   });
 

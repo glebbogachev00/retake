@@ -40,3 +40,6 @@ __pycache__/
 # Internal working briefs: kept locally for agents, not published
 AGENT-HANDOFF.md
 VIDEO-CRITIQUE-FIX-BRIEF.md
+
+# The Mac capture helper, built from native/capture by scripts/build-native.mjs
+native/bin/
