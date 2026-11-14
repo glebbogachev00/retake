@@ -90,7 +90,10 @@ test("an app demo will not record until this Mac is set up for it, and says what
   process.env.RETAKE_CUA_DRIVER = "/nonexistent/cua-driver";
   try {
     const m = Manifest.parse(textedit);
-    await assert.rejects(() => record(m, { outDir: "/nonexistent/out", log: () => {} } as never), /Recording Mac apps is not set up on this Mac yet:[\s\S]*cua-driver isn't installed/);
+    // Off a Mac (CI runs on Linux) the first thing missing is the Mac itself.
+    const missing = process.platform === "darwin" ? /cua-driver isn't installed/ : /needs a Mac/;
+    await assert.rejects(() => record(m, { outDir: "/nonexistent/out", log: () => {} } as never), (e: Error) =>
+      /Recording Mac apps is not set up on this Mac yet:/.test(e.message) && missing.test(e.message));
   } finally {
     if (prev === undefined) delete process.env.RETAKE_CUA_DRIVER; else process.env.RETAKE_CUA_DRIVER = prev;
   }
