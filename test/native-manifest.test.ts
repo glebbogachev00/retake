@@ -33,7 +33,7 @@ test("an app demo parses, and gets an app:// address everything else can read", 
   assert.equal(r.data.launch, "fresh");
   assert.equal(r.data.url, "app://TextEdit");
   assert.ok(isAppAddress(r.data.url));
-  assert.equal(appAddress("com.indepth.hub"), "app://com.indepth.hub");
+  assert.equal(appAddress("com.example.notes"), "app://com.example.notes");
 });
 
 test("a demo names a web page or an app, exactly one", () => {
