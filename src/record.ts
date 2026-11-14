@@ -1412,15 +1412,12 @@ export async function runStep(rec: PageRecorder, page: Page, step: Step, m: Mani
     case "select": {
       /* Hover first so the cursor actually travels to the control — a value
          that changes with nothing moving reads as a glitch rather than a
-         choice. Playwright takes the option by value or by visible label, and
-         a page may use either, so try one and fall back to the other. */
+         choice. A plain string matches an option's value OR its visible label
+         in one pass, so a manifest author never has to know which the page
+         uses. Asking for the value first and falling back to the label used to
+         wait out the whole timeout on every label — ~8s frozen on camera. */
       await rec.hover(step.selector, { timeout });
-      const target = page.locator(step.selector).first();
-      try {
-        await target.selectOption({ value: step.value }, { timeout });
-      } catch {
-        await target.selectOption({ label: step.value }, { timeout });
-      }
+      await page.locator(step.selector).first().selectOption(step.value, { timeout });
       break;
     }
     case "scroll": {
@@ -1488,17 +1485,6 @@ export async function runStep(rec: PageRecorder, page: Page, step: Step, m: Mani
       const dest = path.join(dir, name);
       await dl.saveAs(dest);
       ctx.downloads.push(dest);
-      break;
-    }
-    case "select": {
-      // The cursor travels to it on camera (testreel has no select of its
-      // own), then the option is chosen by value, falling back to its
-      // visible label — a manifest author should not have to know which
-      // one the page uses.
-      await rec.hover(step.selector, { timeout });
-      const sel = page.locator(step.selector).first();
-      try { await sel.selectOption(step.value, { timeout }); }
-      catch { await sel.selectOption({ label: step.value }, { timeout }); }
       break;
     }
     case "waitFor":

@@ -240,8 +240,8 @@ export async function dryRun(m: Manifest, manifestDir: string, log: (l: string) 
           // whole failure mode, so dry proves the value is selectable.
           const sel = page.locator(step.selector).first();
           await sel.waitFor({ timeout: short });
-          try { await sel.selectOption(step.value, { timeout: short }); }
-          catch { await sel.selectOption({ label: step.value }, { timeout: short }); }
+          // A plain string matches the value or the visible label, as the recorder's does.
+          await sel.selectOption(step.value, { timeout: short });
           break;
         }
         // `to: top` and `to: bottom` are the PAGE's ends, not selectors — the
