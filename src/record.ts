@@ -167,7 +167,17 @@ export function determinismScript(determinism: NonNullable<Manifest["determinism
 }
 
 export function persistentCssScript(css: string): string {
+  /* Two routes, because one is not enough. A page whose Content-Security-Policy
+     forbids inline styles (Zitadel's sign-in does) drops the <style> element
+     without a word, so a blur meant to hide a secret silently showed it. A
+     constructed stylesheet is not subject to style-src and needs no <head>, so
+     it goes first; the element stays as the route for older engines. */
   return `(() => {
+    try {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(${JSON.stringify(css)});
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    } catch {}
     const install = () => {
       if (document.getElementById("retake-persistent-css")) return true;
       const root = document.head || document.documentElement;
