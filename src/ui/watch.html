@@ -48,8 +48,10 @@
   .fixline { margin-top:10px; min-height:1.45em; font-size:var(--small); color:var(--muted); }
   .fixline button { background:none; padding:0 4px; color:var(--accent); font-size:var(--small); }
   ol.steps { list-style:none; margin:26px 0 0; padding:0; columns:2 380px; column-gap:40px; }
-  ol.steps li { break-inside:avoid; display:flex; gap:10px; padding:3px 0; font-size:var(--small); }
-  ol.steps li.h { color:var(--muted); padding-top:12px; }
+  ol.steps li { break-inside:avoid; padding:3px 0; font-size:var(--small); }
+  ol.steps li .row { display:flex; gap:10px; }
+  /* A scenario's heading lives in its first step's item, so a column can never end between them. */
+  ol.steps li .h { display:block; color:var(--muted); padding:9px 0 3px; font-weight:400; }
   ol.steps li .m { width:16px; flex:none; text-align:center; color:var(--muted); }
   ol.steps li.pass .m { color:var(--pass); } ol.steps li.fail .m { color:var(--fail); } ol.steps li.flagged .m { color:var(--accent); }
   ol.steps li.here { font-weight:600; }
@@ -272,12 +274,13 @@ function session(id) {
     const here = mode === 'replay' ? stepAtSec(nowSec()) : null;
     let scen, out = '';
     for (const s of S.steps) {
-      if (s.scenario !== scen) { scen = s.scenario; if (scen) out += `<li class="h">${esc(scen)}</li>`; }
+      let head = '';
+      if (s.scenario !== scen) { scen = s.scenario; if (scen) head = `<span class="h">${esc(scen)}</span>`; }
       const fl = flagged.get(s.n) || [];
       const cls = fl.length ? 'flagged' : s.result || 'running';
       const m = fl.length ? '⚑' : s.result === 'pass' ? '✓' : s.result === 'fail' ? '✗' : '…';
       const notes = fl.filter(f => f.note || f.fixStatus).map(f => `<span class="n">${f.note ? '“' + esc(f.note) + '”' : 'Unclear'}${f.fixStatus ? ' · ' + esc(f.fixStatus) : ''}</span>`).join('');
-      out += `<li class="${cls}${here && here.n === s.n ? ' here' : ''}" ${mode === 'replay' ? `data-t="${s.t / 1000}"` : ''}><span class="m">${m}</span><span>${esc(s.intent)}${notes}</span></li>`;
+      out += `<li class="${cls}${here && here.n === s.n ? ' here' : ''}" ${mode === 'replay' ? `data-t="${s.t / 1000}"` : ''}>${head}<span class="row"><span class="m">${m}</span><span>${esc(s.intent)}${notes}</span></span></li>`;
     }
     const el = $('steps');
     if (el.innerHTML !== out) el.innerHTML = out;

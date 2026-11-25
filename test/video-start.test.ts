@@ -31,17 +31,39 @@ function contrastAt(video: string, at: number): number {
   return max - min;
 }
 
+/** How long the video really is, from its decoded frames (a webm's own
+    header is not to be trusted for this). */
+function videoLength(video: string): number {
+  const err = spawnSync(ffmpegBin(), ["-hide_banner", "-i", video, "-f", "null", "-"], { encoding: "utf8" }).stderr ?? "";
+  const t = [...err.matchAll(/time=(\d+):(\d+):([\d.]+)/g)].at(-1);
+  return t ? Number(t[1]) * 3600 + Number(t[2]) * 60 + Number(t[3]) : 0;
+}
+
 test("a slow server does not leave blank frames at the front of the take", async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "video-start-"));
-  const f = path.join(dir, "t.yaml");
-  fs.writeFileSync(f, [
-    "name: t", `url: http://127.0.0.1:${PORT}/`, "preset: draft", "cursor: false", "waitForSelector: \"#here\"",
-    "steps:", "  - { action: scene, label: a }", "  - { action: wait, ms: 1200 }",
-  ].join("\n"));
-  const out = path.join(dir, "out");
-  fs.mkdirSync(out);
-  const take = await record(loadManifest(f).manifest, { outDir: out, manifestDir: dir, headed: false, log: () => {} });
-  assert.ok(take.video && fs.existsSync(take.video), "a video was recorded");
+  // On CI's two-core runner, with other browser tests running beside this
+  // one, the recorder sometimes loses the end of the video: the webm stops at
+  // ~1.3s although the take ran for ~3s, so there is no frame at all where
+  // the take opens (CI on main at 5e976af: video 1.32s, cut 1.63s; on PR #3
+  // twice: 1.28s, 1.60s). That is a starved machine, not a cut in the wrong
+  // place, and it is the only failure retried here: twice at most, and said
+  // out loud. A video long enough to hold its opening that opens on blank
+  // still fails at once.
+  let take!: Awaited<ReturnType<typeof record>>;
+  for (let attempt = 1; ; attempt++) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "video-start-"));
+    const f = path.join(dir, "t.yaml");
+    fs.writeFileSync(f, [
+      "name: t", `url: http://127.0.0.1:${PORT}/`, "preset: draft", "cursor: false", "waitForSelector: \"#here\"",
+      "steps:", "  - { action: scene, label: a }", "  - { action: wait, ms: 1200 }",
+    ].join("\n"));
+    const out = path.join(dir, "out");
+    fs.mkdirSync(out);
+    take = await record(loadManifest(f).manifest, { outDir: out, manifestDir: dir, headed: false, log: () => {} });
+    assert.ok(take.video && fs.existsSync(take.video), "a video was recorded");
+    const length = videoLength(take.video!);
+    if (length > take.trimBefore + 0.4 || attempt === 3) break;
+    process.stderr.write(`# video-start: attempt ${attempt} recorded only ${length.toFixed(2)}s, ending before the take's cut at ${take.trimBefore.toFixed(2)}s: the recorder was starved; recording again\n`);
+  }
   // 0.4s in: the old cut left ~1.5s of blank here, so this still catches it,
   // while a busy machine's slow first paint is not mistaken for the bug.
   const opening = contrastAt(take.video!, take.trimBefore + 0.4);
