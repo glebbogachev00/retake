@@ -160,7 +160,7 @@
           <label class="field"><span>Notes for the room</span><textarea class="input" id="notes" placeholder="Anything facilities should know"></textarea></label>
           <div class="actions"><a class="btn" href="/rooms/${r.id}">Cancel</a><button class="btn primary" id="save" type="submit">Save booking</button></div>
         </form>
-        <aside class="card summary"><h2>Before you book</h2><dl><dt>Room</dt><dd>${r.name}</dd><dt>Seats</dt><dd>${r.seats}</dd><dt>Has</dt><dd>${r.kit.join(', ')}</dd><dt>Free</dt><dd>14:00 – 16:00</dd></dl>
+        <aside class="card summary"><h2>Before you book</h2><dl><dt>Room</dt><dd>${r.name}</dd><dt>Seats</dt><dd>${r.seats}</dd><dt>Has</dt><dd>${r.kit.join(', ')}</dd><dt>Free</dt><dd>14:00 – 16:00</dd><dt>Price</dt><dd>${esc(window.LARKSPUR_PRICE || 'Included in your plan')}</dd></dl>
           <p class="hint">Bookings longer than two hours need an office lead to approve them.</p></aside>
       </div>`);
     document.getElementById('form').onsubmit = (e) => {

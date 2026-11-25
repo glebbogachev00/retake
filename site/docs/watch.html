@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Watch mode | Retake Docs</title>
-  <meta name="description" content="Watch an AI or a test script test your web app, live or as a replay, and mark any moment that works but does not look clear. Your notes become a fix request your coding agent can pick up.">
+  <title>Watch | Retake Docs</title>
+  <meta name="description" content="Watch an AI test your web app, live or as a replay, and mark what looks unclear: your notes become fixes. Keep your app’s key flows as journeys, checked every night, and hear about it only when something changed.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/landing.css">
   <link rel="stylesheet" href="/docs/docs.css">
@@ -20,7 +20,7 @@
     <aside class="docs-sidebar" aria-label="Documentation navigation">
       <div class="docs-search" hidden>
         <label for="docs-query">Search this page <kbd>⌘ / Ctrl K</kbd></label>
-        <input id="docs-query" type="search" placeholder="Try “pace” or “mask”" autocomplete="off" aria-describedby="search-help search-status" aria-controls="search-results">
+        <input id="docs-query" type="search" placeholder="Try “mask” or “nightly”" autocomplete="off" aria-describedby="search-help search-status" aria-controls="search-results">
         <p id="search-help">Search stays in this page. Use ↓ for results; Esc to clear.</p>
         <p id="search-status" role="status" aria-live="polite"></p>
         <ul id="search-results" aria-label="Search results" hidden></ul>
@@ -29,58 +29,65 @@
       <details class="docs-navigation" open>
         <summary>On this page</summary>
         <nav aria-label="On this page">
-          <span class="docs-nav-label">WATCH MODE</span>
+          <span class="docs-nav-label">WATCH</span>
           <a href="#overview">What it is</a>
           <a href="#watch-or-demo">Watch or a demo?</a>
-          <span class="docs-nav-label">WATCH A SESSION</span>
+          <span class="docs-nav-label">SESSIONS</span>
           <a href="#live">Watch it live</a>
           <a href="#replay">Watch a replay</a>
           <a href="#notes">Unclear &amp; notes</a>
           <a href="#fix-request">What happens to your notes</a>
           <a href="#masks">Hiding secrets</a>
+          <span class="docs-nav-label">JOURNEYS &amp; NIGHTLY</span>
+          <a href="#journeys">Journeys</a>
+          <a href="#nightly">Every night</a>
+          <a href="#changed">When something changed</a>
           <span class="docs-nav-label">FOR DEVELOPERS</span>
           <a href="#install">Install &amp; import</a>
           <a href="#script">A minimal script</a>
           <a href="#api">API reference</a>
           <a href="#folder">The session folder</a>
           <a href="#agents">Fix requests, for agents</a>
+          <a href="#write-journey">Write a journey</a>
+          <a href="#watch-commands">Run, accept, schedule</a>
           <a href="#limits">Limits</a>
         </nav>
       </details>
-      <p class="docs-sidebar-note">You watch. You point.<br>Your agent fixes.</p>
+      <p class="docs-sidebar-note">You watch. You point.<br>Your agent fixes. Every night,<br>you hear only what changed.</p>
     </aside>
     <main id="main" class="docs-content" tabindex="-1">
       <section id="overview" data-doc-section>
-        <p class="docs-eyebrow">RETAKE / DOCS / WATCH MODE</p>
+        <p class="docs-eyebrow">RETAKE / DOCS / WATCH</p>
         <h1>Watch an AI<br> test your app.</h1>
-        <p class="docs-lead">Watch mode lets you watch an AI or a test script test your web app, live or as a replay, and mark any moment that works but does not look clear.</p>
+        <p class="docs-lead">Watch tests your web app the way a person would use it, shows you what it saw, and tells you when something changed.</p>
         <ul>
-          <li><strong>A test script or an AI agent</strong> drives your app in its own browser. Before each step it says what it is about to do and what it expects; after the step, whether it worked.</li>
-          <li><strong>Retake</strong> shows the page in the Retake window as it happens, at the pace you pick, with secrets blacked out. It keeps the whole session: a video, every step with a screenshot, and your notes.</li>
-          <li><strong>You</strong> press <strong>Unclear</strong> or type a note on any moment that looks wrong, even if the test passed.</li>
-          <li><strong>Your coding agent</strong> gets your notes as one fix request, with a screenshot of each moment.</li>
+          <li><strong>Sessions.</strong> A test script or an AI agent tests your app while you watch, live or as a replay. Press <strong>Unclear</strong> on anything that works but does not look right, and your notes go to your coding agent as one fix request.</li>
+          <li><strong>Journeys.</strong> Your app’s key flows, such as signing in or booking, kept as small scripts in your workspace, so the same test can run again whenever you like.</li>
+          <li><strong>Nightly.</strong> Every journey runs each night and is compared with the run you accepted as normal. You hear nothing unless something changed or failed. Then one notification, and one screen that shows exactly what changed.</li>
         </ul>
-        <div class="docs-jump"><a href="#live">How to watch ↓</a><a href="#install">Connect a test script →</a></div>
+        <p>Secrets the test names, such as passwords, are blacked out in everything Watch keeps.</p>
+        <div class="docs-jump"><a href="#live">Watch a session ↓</a><a href="#journeys">Journeys and nightly checks ↓</a><a href="#install">Connect a test script →</a></div>
       </section>
       <section id="watch-or-demo" data-doc-section>
         <h2>Watch or a demo?</h2>
         <p>Both show your app in a browser. They are made for different people.</p>
         <table class="docs-table">
-          <thead><tr><th scope="col">A demo</th><th scope="col">Watch mode</th></tr></thead>
+          <thead><tr><th scope="col">A demo</th><th scope="col">Watch</th></tr></thead>
           <tbody>
             <tr><td>A polished video of your app, to show other people.</td><td>A test run you take part in, to find what needs fixing.</td></tr>
             <tr><td>Made from saved steps, in a demo file your agent writes.</td><td>Driven by your own test script or AI agent, in its own browser.</td></tr>
             <tr><td>Retake sets the pace, captions and camera.</td><td>You set the pace, and stop it whenever you like.</td></tr>
             <tr><td>You review the finished video, then share it.</td><td>You comment on moments, live or afterwards.</td></tr>
             <tr><td>You get a video, stills and a list of every step.</td><td>You get a session folder and a fix request.</td></tr>
+            <tr><td>You rerun it when the app changes.</td><td>It reruns every night and tells you when the app changed.</td></tr>
           </tbody>
         </table>
-        <p>If you want to show your product, make a demo: start with the <a href="/docs/">main guide</a>. If you want to see how your app holds up while something tests it, and say what to fix, use Watch mode.</p>
+        <p>If you want to show your product, make a demo: start with the <a href="/docs/">main guide</a>. If you want to see how your app holds up while something tests it, say what to fix, and know when it changes, use Watch.</p>
       </section>
       <section id="live" data-doc-section>
-        <p class="docs-eyebrow">01 / WATCH A SESSION</p>
+        <p class="docs-eyebrow">01 / SESSIONS</p>
         <h2>Watch it live</h2>
-        <p>Keep the Retake window running (<code>retake ui</code>) and open <a href="http://localhost:4310/watch">http://localhost:4310/watch</a>. If a test is running, it opens straight onto it. If not, it lists past sessions, newest first. A test script also prints its own link when it starts.</p>
+        <p>Keep the Retake window running (<code>retake ui</code>) and open <a href="http://localhost:4310/watch">http://localhost:4310/watch</a>. If a test is running, it opens straight onto it. If not, it shows the Watch area: your journeys, with past sessions under <strong>Sessions</strong>. A test script also prints its own link when it starts.</p>
         <figure class="docs-figure">
           <a href="/media/watch-live-v2.jpg"><img src="/media/watch-live-v2.jpg" alt="The Watch screen during a test of Larkspur, a made-up room-booking app. The app’s room page for Juniper fills most of the screen. Under it: “Open Juniper, expecting the page for Juniper, with today’s schedule”, the verdict “Passed, free from 14:00 to 16:00”, the buttons Next and Unclear, and the note field. The pace switch at the top right is set to Watch, and the four steps so far are listed at the bottom." width="1122" height="1080" loading="lazy"></a>
           <figcaption>Live, at Watch pace, four steps into a test of Larkspur, a made-up app built for these pictures.</figcaption>
@@ -97,7 +104,7 @@
       </section>
       <section id="replay" data-doc-section>
         <h2>Watch a replay</h2>
-        <p>Every session is saved, so you can watch it later on the same screen. Open it from the list at <code>/watch</code>.</p>
+        <p>Every session is saved, so you can watch it later on the same screen. Open it from <strong>Sessions</strong>, at the foot of the Watch area.</p>
         <figure class="docs-figure">
           <a href="/media/watch-replay-v2.jpg"><img src="/media/watch-replay-v2.jpg" alt="The Watch screen replaying the finished session. The app shows the Bookings page with the new Design review booking. Under it, a timeline with a tick for each step and two blue dots for notes, the line “Find the new booking, Passed”, and the step list, where two steps carry the notes written about them." width="1122" height="1180" loading="lazy"></a>
           <figcaption>A replay, paused on the last step. Each tick on the timeline is a step; each blue dot is a note.</figcaption>
@@ -153,10 +160,48 @@
           <li><strong>Masks hide pixels, not words.</strong> The page address of each step and each note is saved in the session’s files and the fix request. Do not write secrets into step descriptions or notes.</li>
         </ul>
       </section>
+      <section id="journeys" data-doc-section>
+        <p class="docs-eyebrow">02 / JOURNEYS &amp; NIGHTLY</p>
+        <h2>Journeys</h2>
+        <p>A journey is one of your app’s key flows, such as signing in, booking, or paying, written once as a small test script and kept in your workspace. Ask your coding agent to write one: it uses the same steps as a session. Then it can run again whenever you like, with nobody watching.</p>
+        <figure class="docs-figure">
+          <a href="/media/watch-journeys-v2.png"><img src="/media/watch-journeys-v2.png" alt="The Watch area in the Retake window. The heading reads “1 journey changed since last night”. Below it, four journeys, each with one line: Book a room, Changed last night; Find a room for six, Sign in and Your bookings, each Unchanged since 18 Nov. A Sessions link sits underneath." width="1122" height="499" loading="lazy"></a>
+          <figcaption>The Watch area: each journey and one line about it. Here, one of Larkspur’s four journeys changed overnight.</figcaption>
+        </figure>
+        <p>Open <strong>Watch</strong> in the Retake window, next to Demos. Each journey has one line: <strong>Unchanged since</strong> a date, <strong>Changed last night</strong> or <strong>Failed last night</strong>. When something changed, the heading says so. Past sessions are under <strong>Sessions</strong>.</p>
+        <p>The first run of a journey that passes becomes its <strong>normal</strong>. Every later run is compared with it, step by step. After that, only you move the normal.</p>
+        <p>A journey signs in with a login you saved once with <code>retake login</code>, kept in your Mac’s Keychain. No password is ever written into a journey. If no login is saved, the journey stops and names the exact line to type.</p>
+      </section>
+      <section id="nightly" data-doc-section>
+        <h2>Every night</h2>
+        <p>Turn on the nightly run once, in a terminal in your workspace:</p>
+        <div class="docs-code"><div class="docs-code-head"><span>Terminal · in your workspace</span></div><pre><code>retake watch schedule daily</code></pre></div>
+        <p>Every journey then runs at 03:00 (<code>weekdays</code> and <code>--at 06:30</code> change when). When nothing changed, you hear nothing. When something changed or failed, you get one notification for the whole night:</p>
+        <figure class="docs-figure docs-figure-small">
+          <a href="/media/watch-notice-v2.png"><img src="/media/watch-notice-v2.png" alt="A notification card from Retake Watch, at 3:04: “1 journey changed since last night: Book a room”." width="632" height="197" loading="lazy"></a>
+          <figcaption>The one notification, with the words the nightly run sends. It is drawn here; your computer shows it in its own style.</figcaption>
+        </figure>
+        <p>The run happens on this computer, so it has to be on. A Mac that is asleep at 03:00 runs it when it wakes. <code>retake watch schedule off</code> stops it. It never replaces a routine’s schedule.</p>
+      </section>
+      <section id="changed" data-doc-section>
+        <h2>When something changed</h2>
+        <p>Open the journey from the Watch area. It opens at the moment it changed.</p>
+        <figure class="docs-figure">
+          <a href="/media/watch-changed-v2.jpg"><img src="/media/watch-changed-v2.jpg" alt="The changed journey’s screen for Book a room: “Changed last night, step 4: Press Book Juniper. The text changed, the picture changed.” Below, the line “Included in your plan” struck through and the new line “£40 an hour”. Then two pictures of the booking form side by side, “Normal since 18 Nov” and “Last night”, with the new price outlined in the second. Then a few seconds of the run’s video, and the buttons Accept as normal and Open the session." width="1122" height="1052" loading="lazy"></a>
+          <figcaption>Larkspur’s booking form started showing a price overnight. The change is outlined, and the text says exactly what moved.</figcaption>
+        </figure>
+        <ul>
+          <li><strong>What changed, in words.</strong> The step, and whether its text, its picture or its result moved. Lines that disappeared are struck through; new lines are listed under them.</li>
+          <li><strong>Normal and last night, side by side,</strong> with the changed patch outlined, and the few seconds of video around it.</li>
+          <li><strong>Accept as normal</strong> is the one button. Press it when the change is meant to be there, and the next journey that changed opens, or the list. <strong>Open the session</strong> plays the whole run from that moment.</li>
+        </ul>
+        <p>If the change is a mistake, do not accept it: ask your coding agent to fix the app. The next night tells you whether it is back to normal.</p>
+        <p class="docs-note"><strong>What counts as a change.</strong> A step that passed and now fails, or the other way round; a line of text on the page that appeared or disappeared; or a part of the picture bigger than about 20 × 20 pixels that looks different. Anything masked never counts, so mask what changes by itself, such as a clock or today’s date, the way you mask a password. A journey that fails is reported as failed, even if something also changed.</p>
+      </section>
       <section id="install" data-doc-section>
-        <p class="docs-eyebrow">02 / FOR DEVELOPERS</p>
+        <p class="docs-eyebrow">03 / FOR DEVELOPERS</p>
         <h2>Install &amp; import</h2>
-        <p>Watch mode arrived in Retake 0.16.0. Your test keeps its own Playwright browser; Retake does not launch one. Add Retake to the project that holds the test:</p>
+        <p>Watch arrived in Retake 0.16.0. Your test keeps its own Playwright browser; Retake does not launch one. Add Retake to the project that holds the test:</p>
         <div class="docs-code"><div class="docs-code-head"><span>Terminal · in your test project</span></div><pre><code>npm install --save-dev retake-demos</code></pre></div>
         <div class="docs-code"><div class="docs-code-head"><span>The import</span></div><pre><code>import { startWatch } from 'retake-demos/dist/watch.js';</code></pre></div>
         <p>From a clone of the Retake repository, import <code>&lt;clone&gt;/dist/watch.js</code> after <code>npm run build</code>, or <code>&lt;clone&gt;/src/watch.ts</code> under tsx. To use Retake’s own copy of Chromium, import <code>retake-demos/dist/browser-home.js</code> before you import <code>playwright</code>.</p>
@@ -236,6 +281,17 @@ await browser.close();</code></pre></div>
           <a href="/media/watch-report-v2.png"><img src="/media/watch-report-v2.png" alt="The session’s report.md, rendered: the title “Larkspur · Book a room”, 8 steps, 8 passed, 0 failed, 2 flagged by you; then the two notes with their step, time and page address; then every step with what it expected and how it went." width="942" height="921" loading="lazy"></a>
           <figcaption>The report: your notes first, then every step. Each “screenshot” is a link to the picture in <code>shots/</code>.</figcaption>
         </figure>
+        <p>Journeys keep their state next to the journeys, because the normal is a decision rather than an output:</p>
+        <div class="docs-code"><div class="docs-code-head"><span>Workspace · journeys, not a command</span></div><pre><code>watch/
+  book-a-room.mjs             # a journey
+  _shared.mjs                 # code journeys import
+  .journeys/book-a-room/
+    baseline/                 # the run accepted as normal, and its pictures
+    last.json                 # what the newest run found
+    runs.jsonl                # every run, one line each
+outputs/watch/&lt;session&gt;/
+  snapshots.json, snapshots/  # that run's text and picture of each step
+  journey.json                # that run's verdict and every change</code></pre></div>
       </section>
       <section id="agents" data-doc-section>
         <h2>Fix requests, for agents</h2>
@@ -251,6 +307,39 @@ await browser.close();</code></pre></div>
 });</code></pre></div>
         <p>Retake runs that command in that folder with the brief on its standard input, and writes its output to <code>fix-request.log</code> beside the brief. It runs with your permissions, in your repository: give it a command you would run yourself. Without <code>fix</code>, nothing runs.</p>
       </section>
+      <section id="write-journey" data-doc-section>
+        <h2>Write a journey</h2>
+        <p>A journey is a file in the workspace’s <code>watch/</code> folder. Its name is the journey’s name. Files that start with <code>_</code> are shared code that journeys import, and never run on their own.</p>
+        <div class="docs-code"><div class="docs-code-head"><span>watch/book-a-room.mjs · an illustrative journey, change the URL and selectors</span></div><pre><code>export const title = 'Book a room';                   // optional; the file name otherwise
+export const viewport = { width: 1280, height: 800 };  // optional; 480 wide or less runs as a phone
+
+export default async function (page, w, { signIn }) {
+  await w.step('Sign in', 'The Today page opens');
+  await page.goto('https://app.example.com');
+  await signIn('https://app.example.com');             // the login saved with retake login
+  await w.result(true);
+
+  await w.step('Open Rooms', 'All rooms, with what is free now');
+  await page.click('nav &gt;&gt; text=Rooms');
+  await w.result(await page.isVisible('.room'), 'Listed');
+}</code></pre></div>
+        <p><code>page</code> is a fresh browser page and <code>w</code> is a Watch session, with the calls in the <a href="#api">API reference</a>. Use <code>w.mask</code> for secrets and for anything that changes by itself. The third argument is the journey’s kit:</p>
+        <ul>
+          <li><code>signIn(url?, { user?, password?, code?, until? })</code> signs in with the login saved for that site (<code>retake login &lt;url&gt;</code>): the username, the password, and the authenticator code when a key is saved, across however many screens the sign-in takes. It masks each field before typing into it and never retries a refused password. With no login saved, it stops and names the exact <code>retake login</code> line to run. <code>until: 'password'</code> (or <code>'code'</code>) stops when that screen shows, with nothing typed, for a journey about the sign-in screens themselves.</li>
+          <li><code>phone</code> is <code>true</code> when the journey runs at phone width.</li>
+        </ul>
+        <p>Comparison happens at every <code>w.result</code>: the page’s visible text and a picture of it are kept, and each step is matched with the same step of the normal run by what it says it does. A step added in the middle marks only itself as new.</p>
+      </section>
+      <section id="watch-commands" data-doc-section>
+        <h2>Run, accept, schedule</h2>
+        <div class="docs-code"><div class="docs-code-head"><span>Terminal · in your workspace</span></div><pre><code>retake watch                         # each journey, and its one line
+retake watch run &lt;journey|all&gt;       # run them now (--headed shows the browser)
+retake watch accept &lt;journey&gt;        # the last run becomes the normal
+retake watch schedule daily          # every night at 03:00; weekdays, off, --at HH:MM</code></pre></div>
+        <p><code>retake watch run</code> exits <code>0</code> when nothing changed, <code>3</code> when something changed and <code>2</code> when a journey failed, so it also fits a CI step. A journey that runs longer than 10 minutes has failed.</p>
+        <p>The schedule uses launchd on a Mac and cron on Linux, under its own name, so it never replaces <code>retake routine schedule</code>. What the nightly runs printed is in <code>.retake/watch-schedule.log</code>. Quiet unchanged nights are tidied as the next one runs; nights that changed or failed, and any session with a note on it, are kept.</p>
+        <p>Coding agents get a <code>watch</code> tool that lists the journeys and runs them. Accepting a change as normal and turning on the nightly run stay with the person: in the window, or at their own terminal.</p>
+      </section>
       <section id="limits" data-doc-section>
         <h2>Limits</h2>
         <ul>
@@ -261,9 +350,11 @@ await browser.close();</code></pre></div>
           <li>The cursor is drawn from real mouse events. It glides to where Playwright clicked, a moment after the click.</li>
           <li>Masks do not reach into closed shadow roots, and a Playwright locator mask can show for a moment; see <a href="#masks">Hiding secrets</a>.</li>
           <li>A script that exits without <code>w.end()</code> keeps its steps, flags and raw frames, but has no video and no report.</li>
+          <li>Journeys compare only at <code>w.result</code>; whatever happens between two results is not compared.</li>
+          <li>The nightly run needs the computer on. On Linux, cron does not catch up a night the computer was off.</li>
           <li>The fix command is remembered by the window the test talked to. After that window restarts, notes from a replay still reach the queue, but do not start the command.</li>
         </ul>
-        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/main/docs/watch.md">Watch mode developer notes</a> · <a href="https://github.com/glebbogachev00/retake/blob/main/src/watch.ts">The script side</a> · <a href="https://github.com/glebbogachev00/retake/blob/main/src/ui/watch.html">The Watch screen</a></p>
+        <p class="docs-source">Source: <a href="https://github.com/glebbogachev00/retake/blob/main/docs/watch.md">Watch developer notes</a> · <a href="https://github.com/glebbogachev00/retake/blob/main/src/watch.ts">The script side</a> · <a href="https://github.com/glebbogachev00/retake/blob/main/src/ui/watch.html">The Watch screen</a></p>
       </section>
       <footer class="docs-footer"><a href="/docs/">← All docs</a><a href="#overview">Back to top ↑</a></footer>
     </main>

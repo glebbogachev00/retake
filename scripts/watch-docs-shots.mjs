@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 /**
- * The pictures on the Watch mode docs page (site/docs/watch.html), made the
- * way a person would see them: a real Watch session against Larkspur, a
- * made-up room-booking app (test/fixtures/larkspur/), watched in the real
- * /watch window, then framed for the site.
+ * The pictures on the Watch docs page (site/docs/watch.html), made the way
+ * a person would see them, against Larkspur, a made-up room-booking app
+ * (test/fixtures/larkspur/):
+ *
+ *   - Sessions: a real Watch session, watched in the real /watch window.
+ *   - Journeys and Nightly: Larkspur's journeys (test/fixtures/larkspur/watch/)
+ *     run twice with `retake watch run all`, the booking form's price changed
+ *     in between, then the Watch list and the changed journey's screen.
  *
  *   npm run build && node scripts/watch-docs-shots.mjs
  *
  * It starts its own Retake window in a temporary workspace, so nothing lands
- * in this repo's outputs/ and the person's pace is left alone. Writes
- * site/media/watch-*-v2.png.
+ * in this repo's outputs/ or watch/, and the person's pace is left alone.
+ * Writes site/media/watch-*-v2.{png,jpg}.
  */
 import "../dist/browser-home.js";            // Retake's own browser
 import fs from "node:fs";
@@ -23,7 +27,7 @@ import { chromium } from "playwright";
 import { startWatch } from "../dist/watch.js";
 import { serveLarkspur } from "../test/fixtures/larkspur/serve.mjs";
 
-const deadline = setTimeout(() => { process.stderr.write("shots: gave up after 4 minutes\n"); process.exit(1); }, 240_000);
+const deadline = setTimeout(() => { process.stderr.write("shots: gave up after 8 minutes\n"); process.exit(1); }, 480_000);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MEDIA = path.join(ROOT, "site", "media");
 const say = (l) => process.stdout.write(`shots: ${l}\n`);
@@ -39,7 +43,8 @@ const ui = spawn(process.execPath, [path.join(ROOT, "dist", "cli.js"), "ui", "-p
 const UI = `http://localhost:${port}`;
 for (let i = 0; i < 60; i++) { try { if ((await fetch(UI + "/watch")).ok) break; } catch { /* not yet */ } await sleep(250); }
 
-const { server: app, url: APP } = await serveLarkspur(await new Promise((ok) => { const s = net.createServer().once("error", () => ok(0)).listen(4471, "127.0.0.1", () => s.close(() => ok(4471))); }));
+const lark = await serveLarkspur(await new Promise((ok) => { const s = net.createServer().once("error", () => ok(0)).listen(4471, "127.0.0.1", () => s.close(() => ok(4471))); }));
+const APP = lark.url;
 say(`window ${UI}, app ${APP}, workspace ${work}`);
 
 const browser = await chromium.launch();
@@ -48,7 +53,7 @@ const page = await (await browser.newContext({ viewport: { width: 1000, height: 
 const viewer = await (await browser.newContext({ viewport: { width: 1040, height: 1100 }, deviceScaleFactor: 2 })).newPage();
 const raw = {};
 const box = async (sel) => viewer.locator(sel).first().boundingBox();
-const grab = async (name, clip) => { raw[name] = { png: await viewer.screenshot({ clip }), clip }; say(`captured ${name}`); };
+const grab = async (name, clip) => { raw[name] = { png: await viewer.screenshot({ clip, fullPage: true }), clip }; say(`captured ${name}`); };
 const whole = async () => { const a = await box("#app"); const s = await box("#steps"); return { x: a.x, y: 0, width: a.width, height: s.y + s.height + 28 }; };
 const speed = async (s) => { await viewer.click(`button[data-speed="${s}"]`); await sleep(250); };
 const settle = () => sleep(900);                    // the live picture is a frame or two behind the page
@@ -162,12 +167,71 @@ await sleep(1200);
   await grab("sending", { x: m.x, y: t.y - 18, width: m.width, height: s.y + s.height + 24 - (t.y - 18) });
 }
 await viewer.waitForFunction(() => /Sent 2 notes to fix/.test(document.getElementById("fixline").textContent), null, { timeout: 20000 });
+say("both notes sent");
 const flags = JSON.parse(fs.readFileSync(path.join(dir, "flags.json"), "utf8"));
 assert.equal(flags.length, 2);
 assert.deepEqual(flags.map((f) => f.source), ["live", "replay"]);
 // An example has nothing to fix: close its request so no agent watching the queue picks it up.
 fs.appendFileSync(path.join(path.dirname(dir), "fix-queue.jsonl"), JSON.stringify({ dir, request: "fix-request", notes: 2, at: new Date().toISOString(), status: "done (docs example, nothing to fix)" }) + "\n");
 const report = fs.readFileSync(path.join(dir, "report.md"), "utf8");
+
+// ---- journeys: two real runs, with the price changed in between ----
+fs.cpSync(path.join(ROOT, "test", "fixtures", "larkspur", "watch"), path.join(work, "watch"), { recursive: true });
+await viewer.evaluate(() => fetch("/api/watch/speed", { method: "POST", headers: { "content-type": "application/json", "x-retake-token": window.__retakeToken }, body: JSON.stringify({ speed: "fast" }) }));
+// Not spawnSync: this process is also serving Larkspur, and the journeys need it to answer.
+const watchRun = () => new Promise((ok) => {
+  const p = spawn(process.execPath, [path.join(ROOT, "dist", "cli.js"), "watch", "run", "all"], { cwd: work, env: { ...env, RETAKE_UI: UI, LARKSPUR_URL: APP } });
+  let stdout = "", stderr = "";
+  p.stdout.on("data", (c) => { stdout += c; for (const l of String(c).split("\n")) if (/^[▶✓✗△]/.test(l)) say(`  ${l}`); });
+  p.stderr.on("data", (c) => { stderr += c; });
+  p.on("close", (status) => ok({ status, stdout, stderr }));
+});
+let run = await watchRun();
+assert.equal(run.status, 0, `the first run keeps each journey as normal:\n${run.stdout}${run.stderr}`);
+lark.price = "£40 an hour";
+run = await watchRun();
+assert.equal(run.status, 3, `the second run finds the new price:\n${run.stdout}${run.stderr}`);
+assert.match(run.stdout, /book-a-room changed at step 4/);
+say("journeys run twice; book-a-room changed at step 4");
+// The nightly run happens at 03:00, and this script cannot wait for it: put
+// each run on the night it would have run, the first a week ago, so the
+// window says "last night" and "Unchanged since …" as it would in the morning.
+const night = (daysAgo, min) => { const d = new Date(); d.setDate(d.getDate() - daysAgo); d.setHours(3, min, 0, 0); return d.toISOString(); };
+const jroot = path.join(work, "watch", ".journeys");
+const lasts = [];
+for (const [i, name] of fs.readdirSync(jroot).sort().entries()) {
+  const j = (f) => path.join(jroot, name, f);
+  const edit = (f, fn) => { const v = JSON.parse(fs.readFileSync(j(f), "utf8")); fn(v); fs.writeFileSync(j(f), JSON.stringify(v, null, 2)); return v; };
+  edit("baseline/snapshots.json", (b) => { b.acceptedAt = night(7, i); });
+  lasts.push(edit("last.json", (l) => { l.at = night(0, i); l.scheduled = true; }));
+  const runs = fs.readFileSync(j("runs.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  runs.forEach((r, k) => { r.at = night(k === runs.length - 1 ? 0 : 7, i); r.scheduled = true; });
+  fs.writeFileSync(j("runs.jsonl"), runs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+}
+const { nightlyNotice } = await import("../dist/watch/journey-store.js");
+const notice = nightlyNotice(lasts);
+assert.ok(notice, "a changed night is not silent");
+
+await viewer.setViewportSize({ width: 1040, height: 900 });
+await viewer.goto(UI + "/watch");
+await viewer.waitForSelector("ul.journeys");
+await viewer.waitForFunction(() => /Changed last night/.test(document.querySelector("ul.journeys").textContent));
+{
+  const a = await box("#app"), m = await box(".more");
+  await grab("journeys", { x: a.x, y: 0, width: a.width, height: m.y + m.height + 30 });
+}
+await viewer.goto(UI + "/watch/j/book-a-room");
+await viewer.waitForSelector("#accept");
+await viewer.waitForFunction(() => { const v = document.getElementById("clip"); return v && v.readyState >= 2; });
+// The clip runs from the step's action to the screen it leads to: hold it on that screen.
+// The player's controls show only on hover while it plays, so they are off for the picture.
+await viewer.evaluate(() => { const v = document.getElementById("clip"); v.pause(); v.controls = false; const m = /#t=([\d.]+),([\d.]+)/.exec(v.src); v.currentTime = Number(m[2]) - 1.2; });
+await sleep(800);
+await viewer.mouse.move(5, 5);
+{
+  const a = await box("#app"), act = await box(".act");
+  await grab("changed", { x: a.x, y: 0, width: a.width, height: act.y + act.height + 28 });
+}
 
 // ---- framing: a plain window on the site's paper, at 2× ----
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -200,10 +264,20 @@ const FRAME_CSS = `
   .doc h3 { font-size: 14px; margin: 18px 0 6px; color: #72736b; font-weight: 600; }
   .doc p { margin: 6px 0; color: #4b4d44; } .doc ul, .doc ol { margin: 6px 0; padding-left: 22px; } .doc li { margin: 6px 0; }
   .doc a { color: #8a601e; text-decoration: underline; text-underline-offset: 2px; }
+  .canvas.loose { padding: 64px 96px; }
+  .notice { width: 440px; display: flex; gap: 12px; align-items: flex-start; padding: 13px 16px 14px 13px; border-radius: 18px; background: rgba(255,254,250,.94); border: 1px solid #e3e2d9;
+    box-shadow: 0 1px 2px rgba(37,39,32,.06), 0 18px 36px -18px rgba(37,39,32,.3); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: #252720; }
+  .notice .icon svg { width: 38px; height: 38px; display: block; }
+  .notice .txt { flex: 1; min-width: 0; }
+  .notice .top { display: flex; justify-content: space-between; gap: 12px; margin: 1px 0 2px; }
+  .notice .top b { font-weight: 600; } .notice .top span { color: #8a8b82; font-size: 12px; }
+  .notice .body { display: block; color: #3d3f37; }
   .doc code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: #f3f3ed; padding: 1px 5px; border-radius: 3px; }`;
 const framer = await (await browser.newContext({ viewport: { width: 1400, height: 1000 }, deviceScaleFactor: 2 })).newPage();
 async function frame(name, address, inner, type = "png") {
-  await framer.setContent(`<!doctype html><meta charset="utf-8"><style>${FRAME_CSS}</style><div class="canvas"><div class="win"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr"><span>${esc(address)}</span></span><span class="pad"></span></div>${inner}</div></div>`);
+  const body = address === null ? `<div class="canvas loose">${inner}</div>`
+    : `<div class="canvas"><div class="win"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr"><span>${esc(address)}</span></span><span class="pad"></span></div>${inner}</div></div>`;
+  await framer.setContent(`<!doctype html><meta charset="utf-8"><style>${FRAME_CSS}</style>${body}`);
   await framer.evaluate(() => Promise.all([...document.images].map((i) => i.decode())));
   // Pictures with the live page in them are photographs, as far as a file format is concerned: JPEG, a third the size.
   const file = path.join(MEDIA, `watch-${name}-v2.${type === "jpeg" ? "jpg" : "png"}`);
@@ -218,11 +292,16 @@ await frame("replay", where, shot("replay"), "jpeg");
 await frame("sending", where, shot("sending"));
 await frame("mask", where, shot("mask"), "jpeg");
 await frame("report", "report.md", `<article class="doc">${markdown(report)}</article>`);
+await frame("journeys", where, shot("journeys"));
+await frame("changed", "localhost:4310/watch/j/book-a-room", shot("changed"), "jpeg");
+// The notification is drawn, not an operating system's: the words are the ones the nightly run sends.
+const mark = fs.readFileSync(path.join(ROOT, "site", "favicon.svg"), "utf8");
+await frame("notice", null, `<div class="notice"><span class="icon">${mark}</span><span class="txt"><span class="top"><b>${esc(notice.title)}</b><span>3:04</span></span><span class="body">${esc(notice.body)}</span></span></div>`);
 
 // The window, its workspace and the app were ours: close them.
 await browser.close();
 ui.kill();
-app.close();
+lark.server.close();
 fs.rmSync(work, { recursive: true, force: true });
 clearTimeout(deadline);
 say("done");

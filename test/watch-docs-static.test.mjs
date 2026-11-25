@@ -8,7 +8,7 @@ const { name } = JSON.parse(pkg);
 test('the Watch page has one title, the docs frame, and is reachable from the docs', () => {
   assert.equal((html.match(/<h1\b/g) || []).length, 1);
   assert.match(html, /<html lang="en">/);
-  assert.match(html, /<title>Watch mode \| Retake Docs<\/title>/);
+  assert.match(html, /<title>Watch \| Retake Docs<\/title>/);
   assert.match(html, /name="viewport"/);
   assert.match(html, /<details class="docs-navigation" open>/);
   assert.match(html, /<noscript>[\s\S]*browser’s Find/);
@@ -45,4 +45,12 @@ test('every call and option of the script side is documented on the page and in 
   for (const option of options) assert.ok(html.includes(`<code>${option}</code>`), `Option not on the page: ${option}`);
   const importLine = `import { startWatch } from '${name}/dist/watch.js';`;
   assert.ok(html.includes(importLine) && notes.includes(importLine), 'The page and docs/watch.md give different imports');
+});
+
+test('every retake watch command the CLI has is on the page, with the nightly wording', async () => {
+  const cli = await read('src/cli.ts');
+  const subs = [...cli.matchAll(/watchCmd\s*\.command\("([a-z]+)"\)/g)].map(match => match[1]);
+  assert.deepEqual([...subs].sort(), ['accept', 'run', 'schedule']);
+  for (const sub of subs) assert.ok(html.includes(`retake watch ${sub}`), `Not on the page: retake watch ${sub}`);
+  for (const text of ['Accept as normal', 'Unchanged since', 'Changed last night', 'watch/']) assert.ok(html.includes(text), text);
 });
