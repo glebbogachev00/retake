@@ -55,6 +55,7 @@ import { STYLES, VOICES, RoutineSchema, environmentFor, readRoutines, rememberNa
 import { loadEnvSpec } from "../recording-env.js";
 import { describeSchedule, readSchedule, scheduleLoaded } from "../schedule.js";
 import { synthesize, voiceCachePath, LOCAL_VOICE, localModelReady } from "../voice.js";
+import { watchRoutes } from "./watch-routes.js";
 
 const ROOT = PROJECT_ROOT;
 const DEMOS = path.join(ROOT, "demos");
@@ -506,6 +507,8 @@ export function serve(port: number) {
   const TOKEN = newToken();
   writeToken(ROOT, TOKEN);
   for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) process.on(sig, () => { clearToken(ROOT); if (sig !== "exit") process.exit(0); });
+  // Watch mode: a person watching an AI test their app (src/ui/watch-routes.ts).
+  const watch = watchRoutes({ root: ROOT, outRoot, token: TOKEN, activity: (type, data) => { for (const w of activityWatchers) w({ type, data }); } });
   const chatPage = fs.readFileSync(path.join(HERE, "chat.html"), "utf8")
     .replace("</head>", `<script>window.__retakeToken=${JSON.stringify(TOKEN)}</script></head>`);
   const server = http.createServer(async (req, res) => {
@@ -517,7 +520,8 @@ export function serve(port: number) {
       if (p.startsWith("/api/")) {
         const no = checkRequest(req, { token: TOKEN, port, write: req.method !== "GET", maxBody: MAX_BODY });
         if (no) return json(res, no.status, { error: no.error });
-      }
+        if (await watch.handleApi(req, res, url, p, () => readBody(req))) return;
+      } else if (watch.handlePage(req, res, p)) return;
       if (p === "/" && req.method === "GET") {
         // Never cached. The page carries this window's token and whatever the
         // build says today; a browser holding yesterday's copy is how somebody

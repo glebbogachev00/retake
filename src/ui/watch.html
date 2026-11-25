@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watch · Retake</title>
+<link rel="icon" href="/favicon.svg">
+<style>
+  :root { --paper:#f6f6f3; --ink:#1b1b19; --muted:#6c6c66; --fill:#ebebe6; --fill2:#e2e2dc; --pass:#2f7d4f; --fail:#b3402f; --accent:#0a84ff; --body:15px; --small:13px; --title:20px; color-scheme: light dark; }
+  @supports (color: AccentColor) { :root { --accent: AccentColor; } }
+  @media (prefers-color-scheme: dark) { :root { --paper:#161615; --ink:#ececE8; --muted:#94948d; --fill:#222220; --fill2:#2c2c29; --pass:#6cc08e; --fail:#e5806f; } }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--paper); color:var(--ink); font: var(--body)/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:1180px; margin:0 auto; padding:20px 28px 48px; }
+  a { color:inherit; text-decoration:none; }
+  button { font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:8px 16px; cursor:pointer; }
+  button:hover { background:var(--fill2); }
+  button.go { background:var(--accent); color:#fff; }
+  kbd { font:inherit; font-size:var(--small); color:var(--muted); margin-left:6px; }
+  button.go kbd { color:rgba(255,255,255,.75); }
+  .small { font-size:var(--small); color:var(--muted); }
+  header { display:flex; align-items:center; gap:16px; min-height:40px; margin-bottom:14px; }
+  header h1 { font-size:var(--title); font-weight:600; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  header .back { color:var(--muted); }
+  .seg { display:inline-flex; background:var(--fill); border-radius:10px; padding:3px; }
+  .seg button { background:transparent; padding:5px 14px; border-radius:8px; }
+  .seg button[aria-pressed="true"] { background:var(--paper); }
+  .stage { background:var(--fill); border-radius:14px; overflow:hidden; aspect-ratio:16/10; display:flex; align-items:center; justify-content:center; }
+  .stage img, .stage video { width:100%; height:100%; object-fit:contain; display:block; }
+  .stage .empty { color:var(--muted); }
+  .track { position:relative; height:28px; margin-top:10px; cursor:pointer; touch-action:none; }
+  .track .bar { position:absolute; left:0; right:0; top:12px; height:4px; border-radius:2px; background:var(--fill2); }
+  .track .done { position:absolute; left:0; top:12px; height:4px; border-radius:2px; background:var(--ink); opacity:.55; }
+  .track .mark { position:absolute; top:6px; width:3px; height:16px; margin-left:-1px; border-radius:2px; background:var(--muted); }
+  .track .mark.fail { background:var(--fail); }
+  .track .mark:hover { background:var(--ink); }
+  .track .flag { position:absolute; top:0; width:8px; height:8px; margin-left:-4px; border-radius:50%; background:var(--accent); }
+  .track .head { position:absolute; top:5px; width:2px; height:18px; margin-left:-1px; background:var(--ink); }
+  .now { margin:16px 0 0; min-height:1.45em; }
+  .now .exp { color:var(--muted); }
+  .verdict { margin:2px 0 0; min-height:1.45em; color:var(--muted); }
+  .verdict.pass b { color:var(--pass); font-weight:600; } .verdict.fail b { color:var(--fail); font-weight:600; }
+  .act { display:flex; gap:10px; align-items:center; margin-top:14px; }
+  .act input { flex:1; font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:8px 14px; outline:none; }
+  .act input:focus { background:var(--fill2); }
+  .fixline { margin-top:10px; min-height:1.45em; font-size:var(--small); color:var(--muted); }
+  .fixline button { background:none; padding:0 4px; color:var(--accent); font-size:var(--small); }
+  ol.steps { list-style:none; margin:26px 0 0; padding:0; columns:2 380px; column-gap:40px; }
+  ol.steps li { break-inside:avoid; display:flex; gap:10px; padding:3px 0; font-size:var(--small); }
+  ol.steps li.h { color:var(--muted); padding-top:12px; }
+  ol.steps li .m { width:16px; flex:none; text-align:center; color:var(--muted); }
+  ol.steps li.pass .m { color:var(--pass); } ol.steps li.fail .m { color:var(--fail); } ol.steps li.flagged .m { color:var(--accent); }
+  ol.steps li.here { font-weight:600; }
+  ol.steps li .n { color:var(--muted); display:block; font-weight:400; }
+  ol.steps li[data-t] { cursor:pointer; }
+  .list { list-style:none; margin:24px 0 0; padding:0; }
+  .list li a { display:flex; gap:16px; align-items:baseline; padding:12px 14px; border-radius:10px; }
+  .list li a:hover { background:var(--fill); }
+  .list .t { flex:1; } .list .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); display:inline-block; margin-right:8px; }
+  .quiet { color:var(--muted); margin-top:30vh; text-align:center; }
+  @media (prefers-reduced-motion: no-preference) { main { animation: in .2s ease-out; } @keyframes in { from { opacity:0 } } }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const T = window.__retakeToken;
+const H = { 'content-type': 'application/json', 'x-retake-token': T };
+const api = (p, body) => fetch(p, body === undefined ? { headers: H } : { method: 'POST', headers: H, body: JSON.stringify(body) }).then(r => r.json());
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const clock = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const app = document.getElementById('app');
+const id = (location.pathname.match(/^\/watch\/([a-z0-9-]+)$/) || [])[1];
+
+if (!id) home(); else session(id);
+
+// ---------- the list: sessions, newest first ----------
+async function home() {
+  const all = await api('/api/watch/sessions');
+  const live = all.find(s => s.live);
+  if (live) { location.replace('/watch/' + live.id); return; }
+  if (!all.length) { app.innerHTML = '<p class="quiet">Nothing has been watched yet.</p>'; return; }
+  app.innerHTML = '<header><h1>Watched</h1></header><ul class="list">' + all.map(s => {
+    const d = new Date(s.startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    const bits = [s.steps + ' steps', s.failed ? s.failed + ' failed' : '', s.flags ? s.flags + ' flagged' : ''].filter(Boolean).join(' · ');
+    return `<li><a href="/watch/${s.id}"><span class="t">${s.live ? '<span class="dot"></span>' : ''}${esc(s.title)}</span><span class="small">${bits}</span><span class="small">${d}</span></a></li>`;
+  }).join('') + '</ul>';
+  setTimeout(home, 5000);
+}
+
+// ---------- one session ----------
+function session(id) {
+  let S = null, mode = null, rate = 1, pendingFlag = null, noteTime = null, resumeAfterNote = false, fixAsked = false;
+  app.innerHTML = `
+    <header><a class="back" href="/watch">‹</a><h1 id="title"></h1><div class="seg" id="seg"></div></header>
+    <div class="stage" id="stage"><span class="empty">Starting…</span></div>
+    <div class="track" id="track" hidden><div class="bar"></div><div class="done" id="done"></div><div id="marks"></div><div class="head" id="head"></div></div>
+    <p class="now" id="now"></p>
+    <p class="verdict" id="verdict"></p>
+    <div class="act">
+      <button id="next" hidden>Next</button>
+      <button id="unclear">Unclear<kbd>U</kbd></button>
+      <input id="note" placeholder="Note on this moment…" autocomplete="off" maxlength="500">
+    </div>
+    <div class="fixline" id="fixline"></div>
+    <ol class="steps" id="steps"></ol>`;
+  const $ = s => document.getElementById(s);
+  const note = $('note'), stage = $('stage');
+  let video = null;
+
+  const es = new EventSource(`/api/watch/${id}/stream?t=${encodeURIComponent(T)}`);
+  es.addEventListener('state', e => { S = JSON.parse(e.data); render(); });
+
+  const nowSec = () => mode === 'replay' ? (video ? video.currentTime : 0) : S && S.startedAt ? (Date.now() - Date.parse(S.startedAt)) / 1000 : 0;
+  const stepAtSec = sec => { let b = null; for (const s of S.steps) if (s.t <= sec * 1000 && (!b || s.t >= b.t)) b = s; return b; };
+
+  function render() {
+    if (!S) return;
+    document.title = S.title + ' · Watch';
+    $('title').textContent = S.title;
+    const want = S.live ? 'live' : S.video ? 'replay' : 'still';
+    if (want !== mode) setMode(want);
+    renderLine();
+    renderSteps();
+    renderFix();
+    if (mode === 'live') {
+      $('seg').innerHTML = ['watch', 'step', 'fast'].map(s => `<button data-speed="${s}" aria-pressed="${S.speed === s}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('');
+      const next = $('next');
+      next.hidden = false;
+      next.className = S.waiting && S.speed === 'step' && !S.hold ? 'go' : '';
+    }
+    if (mode === 'replay') renderMarks();
+  }
+
+  function setMode(m) {
+    mode = m;
+    if (m === 'live') {
+      stage.innerHTML = `<img id="live" alt="" src="/api/watch/${id}/live.mjpg?t=${encodeURIComponent(T)}">`;
+    } else if (m === 'replay') {
+      stage.innerHTML = `<video id="vid" preload="auto" src="/watch-files/${id}/${esc(S.video)}"></video>`;
+      video = $('vid');
+      video.playbackRate = rate;
+      video.addEventListener('timeupdate', () => { renderLine(); renderHead(); renderSteps(); });
+      video.addEventListener('loadedmetadata', () => { renderMarks(); video.play().catch(() => {}); });
+      video.addEventListener('click', () => video.paused ? video.play() : video.pause());
+      video.addEventListener('ended', () => askFix());
+      $('track').hidden = false;
+      $('next').hidden = true;
+      $('seg').innerHTML = [1, 2].map(r => `<button data-rate="${r}" aria-pressed="${rate === r}">${r}×</button>`).join('');
+    } else {
+      stage.innerHTML = '<span class="empty">This session has no video.</span>';
+      $('seg').innerHTML = '';
+      $('next').hidden = true;
+    }
+  }
+
+  function renderLine() {
+    let s, running;
+    if (mode === 'replay') { s = stepAtSec(nowSec()); running = s && s.tEnd !== null && nowSec() * 1000 < s.tEnd; }
+    else { s = S.steps[S.steps.length - 1]; running = s && !s.result; }
+    if (!s) { $('now').textContent = mode === 'live' ? (S.scenario || 'Starting…') : ''; $('verdict').textContent = ''; return; }
+    $('now').innerHTML = `${esc(s.intent)}${s.expect ? ` <span class="exp">— expecting ${esc(s.expect.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase()))}</span>` : ''}`;
+    const v = $('verdict');
+    if (running || !s.result) { v.className = 'verdict'; v.textContent = ''; return; }
+    v.className = 'verdict ' + s.result;
+    v.innerHTML = `<b>${s.result === 'pass' ? 'Passed' : 'Failed'}</b>${s.note ? ' — ' + esc(s.note) : ''}`;
+  }
+
+  function renderSteps() {
+    const flagged = new Map();
+    for (const f of S.flags) if (f.step != null) { if (!flagged.has(f.step)) flagged.set(f.step, []); flagged.get(f.step).push(f); }
+    const here = mode === 'replay' ? stepAtSec(nowSec()) : null;
+    let scen, out = '';
+    for (const s of S.steps) {
+      if (s.scenario !== scen) { scen = s.scenario; if (scen) out += `<li class="h">${esc(scen)}</li>`; }
+      const fl = flagged.get(s.n) || [];
+      const cls = fl.length ? 'flagged' : s.result || 'running';
+      const m = fl.length ? '⚑' : s.result === 'pass' ? '✓' : s.result === 'fail' ? '✗' : '…';
+      const notes = fl.filter(f => f.note || f.fixStatus).map(f => `<span class="n">${f.note ? '“' + esc(f.note) + '”' : 'Unclear'}${f.fixStatus ? ' · ' + esc(f.fixStatus) : ''}</span>`).join('');
+      out += `<li class="${cls}${here && here.n === s.n ? ' here' : ''}" ${mode === 'replay' ? `data-t="${s.t / 1000}"` : ''}><span class="m">${m}</span><span>${esc(s.intent)}${notes}</span></li>`;
+    }
+    const el = $('steps');
+    if (el.innerHTML !== out) el.innerHTML = out;
+  }
+
+  function renderMarks() {
+    if (!video || !video.duration) return;
+    const d = video.duration, pct = ms => Math.min(100, (ms / 1000) / d * 100) + '%';
+    $('marks').innerHTML = S.steps.map(s => `<div class="mark ${s.result === 'fail' ? 'fail' : ''}" data-t="${s.t / 1000}" title="${esc(s.intent)}" style="left:${pct(s.t)}"></div>`).join('')
+      + S.flags.map(f => `<div class="flag" title="${esc(f.note || 'Unclear')}" style="left:${pct(f.time * 1000)}"></div>`).join('');
+    renderHead();
+  }
+  function renderHead() {
+    if (!video || !video.duration) return;
+    const p = Math.min(100, video.currentTime / video.duration * 100) + '%';
+    $('head').style.left = p; $('done').style.width = p;
+  }
+
+  let ticking = null;
+  function renderFix() {
+    const fl = $('fixline'), pf = S.fix.pending;
+    clearInterval(ticking);
+    if (pf) {
+      const draw = () => { const left = Math.max(0, Math.ceil((pf.sendAt - Date.now()) / 1000)); fl.innerHTML = `Sending ${pf.notes} note${pf.notes === 1 ? '' : 's'} to fix in ${left}s — <button id="undo">Undo</button>`; $('undo').onclick = () => api(`/api/watch/${id}/fix/undo`, {}); };
+      draw(); ticking = setInterval(draw, 500);
+    } else if (S.fix.last) fl.textContent = `Sent ${S.fix.last.notes} note${S.fix.last.notes === 1 ? '' : 's'} to fix.`;
+    else fl.textContent = '';
+  }
+
+  // ---------- the one decision ----------
+  // Unclear is saved the moment it is pressed; the field is ready for words
+  // before the save has even answered, so nothing typed is lost.
+  function unclear() {
+    const time = nowSec();
+    note.focus();
+    pendingFlag = api(`/api/watch/${id}/flag`, { kind: 'unclear', time }).then(r => r.flag ? r.flag.n : null).catch(() => null);
+  }
+  async function saveNote() {
+    const text = note.value.trim(), time = noteTime ?? nowSec(), flag = pendingFlag;
+    doneNote();
+    if (flag) { const n = await flag; if (text && n != null) await api(`/api/watch/${id}/note`, { n, note: text }); }
+    else if (text) await api(`/api/watch/${id}/flag`, { kind: 'note', note: text, time });
+  }
+  function doneNote() { pendingFlag = null; noteTime = null; note.value = ''; note.blur(); }
+  note.addEventListener('input', () => { if (noteTime === null) noteTime = nowSec(); });
+  note.addEventListener('focus', () => {
+    if (mode === 'live') api(`/api/watch/${id}/hold`, { on: true });
+    if (mode === 'replay' && video && !video.paused) { resumeAfterNote = true; video.pause(); }
+  });
+  note.addEventListener('blur', () => {
+    if (mode === 'live') api(`/api/watch/${id}/hold`, { on: false });
+    if (mode === 'replay' && video && resumeAfterNote) { resumeAfterNote = false; video.play().catch(() => {}); }
+  });
+  note.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); saveNote(); }
+    if (e.key === 'Escape') { e.preventDefault(); doneNote(); }   // the Unclear flag itself is already saved
+  });
+  $('unclear').onclick = unclear;
+  $('next').onclick = () => api(`/api/watch/${id}/next`, {});
+  document.addEventListener('keydown', e => {
+    if (e.target === note || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'u' || e.key === 'U') { e.preventDefault(); unclear(); }
+    if (e.key === ' ') { e.preventDefault(); if (mode === 'live') api(`/api/watch/${id}/next`, {}); else if (video) video.paused ? video.play() : video.pause(); }
+    if (mode === 'replay' && video && e.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 5);
+    if (mode === 'replay' && video && e.key === 'ArrowRight') video.currentTime = Math.min(video.duration, video.currentTime + 5);
+  });
+  $('seg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.speed) { S.speed = b.dataset.speed; render(); api('/api/watch/speed', { speed: b.dataset.speed }); }
+    if (b.dataset.rate) { rate = Number(b.dataset.rate); if (video) video.playbackRate = rate; $('seg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(Number(x.dataset.rate) === rate))); }
+  });
+  // The timeline: click or drag anywhere, or on a step's mark.
+  const track = $('track');
+  const seek = e => { if (!video || !video.duration) return; const r = track.getBoundingClientRect(); const m = e.target.closest && e.target.closest('.mark'); video.currentTime = m ? Number(m.dataset.t) : Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * video.duration; renderHead(); };
+  track.addEventListener('pointerdown', e => { seek(e); track.setPointerCapture(e.pointerId); const mv = ev => seek(ev); track.addEventListener('pointermove', mv); track.addEventListener('pointerup', () => track.removeEventListener('pointermove', mv), { once: true }); });
+  $('steps').addEventListener('click', e => { const li = e.target.closest('li[data-t]'); if (li && video) { video.currentTime = Number(li.dataset.t); video.play().catch(() => {}); } });
+
+  // Notes go to be fixed when the video ends, or when the window closes.
+  function askFix() {
+    if (!S || S.live || fixAsked) return;
+    if (!S.flags.some(f => !f.fix)) return;
+    fixAsked = true;
+    fetch(`/api/watch/${id}/fix`, { method: 'POST', headers: H, body: '{}', keepalive: true });
+    setTimeout(() => { fixAsked = false; }, 12000);
+  }
+  addEventListener('pagehide', () => askFix());
+}
+</script>
+</body>
+</html>

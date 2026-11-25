@@ -38,6 +38,7 @@
     ".env.example",
     "README.md",
     "docs/stitch.md",
+    "docs/watch.md",
     "LICENSE",
     "scripts/patch-testreel.mjs",
     "scripts/local-voice.py",
