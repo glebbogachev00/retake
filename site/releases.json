@@ -2,6 +2,18 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.17.0",
+      "date": "2026-11-25",
+      "headline": "Point Retake at your app's address and it suggests what to check",
+      "notes": [
+        "Give Retake your app's address and it looks around for you, then suggests four to eight journeys worth checking, in plain words.",
+        "Each suggestion says whether it only reads or also changes data. The ones that change data start unticked, and they only ever run on an app you have said is a test space.",
+        "If your app has a sign-in, Retake asks for a test account first and keeps it in your Mac's Keychain. Every journey runs once before it is added.",
+        "Retake notices when you deploy a new version and checks your app again within minutes. When nothing changed, you hear nothing.",
+        "One switch turns on both: the check every night, and the check after each new version."
+      ]
+    },
+    {
       "version": "0.16.0",
       "date": "2026-11-25",
       "headline": "Watch an AI test your app, and hear about it only when something changes",

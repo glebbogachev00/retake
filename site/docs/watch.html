@@ -40,6 +40,7 @@
           <a href="#masks">Hiding secrets</a>
           <span class="docs-nav-label">JOURNEYS &amp; NIGHTLY</span>
           <a href="#journeys">Journeys</a>
+          <a href="#add-an-app">Add an app</a>
           <a href="#nightly">Every night</a>
           <a href="#changed">When something changed</a>
           <span class="docs-nav-label">FOR DEVELOPERS</span>
@@ -171,6 +172,19 @@
         <p>Open <strong>Watch</strong> in the Retake window, next to Demos. Each journey has one line: <strong>Unchanged since</strong> a date, <strong>Changed last night</strong> or <strong>Failed last night</strong>. When something changed, the heading says so. Past sessions are under <strong>Sessions</strong>.</p>
         <p>The first run of a journey that passes becomes its <strong>normal</strong>. Every later run is compared with it, step by step. After that, only you move the normal.</p>
         <p>A journey signs in with a login you saved once with <code>retake login</code>, kept in your Mac’s Keychain. No password is ever written into a journey. If no login is saved, the journey stops and names the exact line to type.</p>
+      </section>
+      <section id="add-an-app" data-doc-section>
+        <h2>Add an app</h2>
+        <p>You don’t have to write journeys yourself. Give Retake your app’s address and it suggests what to check.</p>
+        <ol>
+          <li><strong>Type the address.</strong> In the Watch area, choose <strong>Add an app</strong> and enter where your app runs.</li>
+          <li><strong>Retake looks around.</strong> It follows links in a real browser and never sends a form. If the app has a sign-in, it asks for a test account first and keeps it in your Mac’s Keychain.</li>
+          <li><strong>Pick what to check.</strong> You get 4 to 8 journeys in plain words, each marked <strong>Reads only</strong> or <strong>Changes data</strong>. The ones that change data start unticked. Each journey you pick runs once before it is added, and that run becomes its normal.</li>
+          <li><strong>One question, once.</strong> If you pick a journey that changes data, Retake asks whether the app is a test space. Journeys that change data run only there.</li>
+        </ol>
+        <p>Retake also notices when you deploy. A few minutes after a new version of your app appears, it runs that app’s journeys again. When nothing changed, you hear nothing. An app that shows no version is checked each night only, and the Watch area says so.</p>
+        <div class="docs-code"><div class="docs-code-head"><span>Terminal · in your workspace</span></div><pre><code>retake watch suggest https://your.app        # what Retake would check
+retake watch add https://your.app --pick 1,3 # add the ones you want</code></pre></div>
       </section>
       <section id="nightly" data-doc-section>
         <h2>Every night</h2>
@@ -335,7 +349,11 @@ export default async function (page, w, { signIn }) {
         <div class="docs-code"><div class="docs-code-head"><span>Terminal · in your workspace</span></div><pre><code>retake watch                         # each journey, and its one line
 retake watch run &lt;journey|all&gt;       # run them now (--headed shows the browser)
 retake watch accept &lt;journey&gt;        # the last run becomes the normal
-retake watch schedule daily          # every night at 03:00; weekdays, off, --at HH:MM</code></pre></div>
+retake watch schedule daily          # every night at 03:00; weekdays, off, --at HH:MM
+retake watch schedule on             # every night, and soon after each new version
+retake watch check                   # look for a new version now
+retake watch suggest &lt;url&gt;           # journeys Retake would add for an app
+retake watch add &lt;url&gt; --pick 1,3    # add the ones you pick</code></pre></div>
         <p><code>retake watch run</code> exits <code>0</code> when nothing changed, <code>3</code> when something changed and <code>2</code> when a journey failed, so it also fits a CI step. A journey that runs longer than 10 minutes has failed.</p>
         <p>The schedule uses launchd on a Mac and cron on Linux, under its own name, so it never replaces <code>retake routine schedule</code>. What the nightly runs printed is in <code>.retake/watch-schedule.log</code>. Quiet unchanged nights are tidied as the next one runs; nights that changed or failed, and any session with a note on it, are kept.</p>
         <p>Coding agents get a <code>watch</code> tool that lists the journeys and runs them. Accepting a change as normal and turning on the nightly run stay with the person: in the window, or at their own terminal.</p>
