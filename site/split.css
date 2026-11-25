@@ -104,7 +104,7 @@
 .fl-tr { top: 22px; right: 22px; }
 .fl-bl { bottom: 70px; left: 22px; }
 .fl-br { bottom: 70px; right: 22px; }
-.fl-tl::first-letter { color: var(--rec); }
+.fl-tl .rec-word { color: var(--rec); }
 
 /* ---------- the session card: an agent recording a take ---------- */
 .session {
