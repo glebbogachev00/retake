@@ -2,6 +2,20 @@
   "_readme": "What's new, written for the person using Retake — not for whoever wrote it. Both the landing page and the Retake window read THIS file; there is no second copy. Rules for adding one: say what changed for them, name no files, no flags they will not type, no words like refactor or regression. If a line only makes sense to someone who has read the source, it does not belong here. Newest first. Add an entry on every release that changes what people see.",
   "releases": [
     {
+      "version": "0.16.0",
+      "date": "2026-11-25",
+      "headline": "Watch an AI test your app, and point at what looks unclear",
+      "notes": [
+        "Watch mode: when an AI or a test script tests your web app, you can watch it in the Retake window as it happens, or later as a replay. Before each step you see what it is about to do and what it expects, then whether it worked.",
+        "You set the pace. Watch pauses briefly after each step, Step waits until you press Next, and Fast does not stop. The test cannot change your choice.",
+        "Press Unclear, or the U key, on anything that works but does not look right, and add a few words if you like. Replays work the same way, on a timeline with a mark for every step.",
+        "When a session ends, your notes go out together as one fix request your coding agent can pick up, with a picture of each moment. You have ten seconds to undo, and if your agent reports back, you see its progress next to each note.",
+        "Passwords and other secrets the test names are blacked out in the live picture, the video and every screenshot.",
+        "Every session is kept: its video, each step with a picture, your notes and a short report.",
+        "The guide has a new page on Watch mode, for the person watching and for developers connecting their tests."
+      ]
+    },
+    {
       "version": "0.15.0",
       "date": "2026-11-13",
       "headline": "Record Mac apps, and send several takes as one page",
