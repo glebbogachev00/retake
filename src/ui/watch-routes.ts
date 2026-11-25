@@ -26,6 +26,15 @@
  *   POST /api/watch/<id>/note        the words for a flag
  *   POST /api/watch/<id>/fix         send the notes to be fixed (after 10 s)
  *   POST /api/watch/<id>/fix/undo    …unless taken back
+ *
+ * Journeys (src/watch/journey-store.ts):
+ *
+ *   GET  /watch/j/<name>                      a changed or failed journey, at its moment
+ *   GET  /watch/sessions                      every session, newest first
+ *   GET  /watch-journey/<name>/<file>         the accepted run's pictures
+ *   GET  /api/watch/journeys                  each journey with its one line
+ *   GET  /api/watch/journeys/<name>           one journey: its last run and the moment
+ *   POST /api/watch/journeys/<name>/accept    the last run is the new normal
  */
 import fs from "node:fs";
 import http from "node:http";
@@ -37,6 +46,7 @@ import {
   appendFlag, isSpeed, queueStatus, readFlagsIn, readMeta, readSteps, runFix, safeId, stepAt, unsent, updateFlag,
   writeFixRequest, writeReport, type FlagRecord, type Speed,
 } from "../watch/session.js";
+import { acceptLast, baselineDir, journeyNameOk, journeyStates, listJourneys, momentOf, readBaseline, readLast, readSnapshots, shortDate, summaryLine } from "../watch/journey-store.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const FIX_UNDO_MS = 10_000;
@@ -227,12 +237,19 @@ export function watchRoutes(deps: WatchDeps) {
   /** Pages and files: no token, like the window's own page. */
   function handlePage(req: http.IncomingMessage, res: http.ServerResponse, p: string): boolean {
     if (req.method !== "GET" && req.method !== "HEAD") return false;
-    if (p === "/watch" || p === "/watch/" || /^\/watch\/[a-z0-9-]+$/.test(p)) {
+    if (p === "/watch" || p === "/watch/" || /^\/watch\/[a-z0-9-]+$/.test(p) || /^\/watch\/j\/[a-z0-9-]+$/.test(p)) {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
       res.end(page());
       return true;
     }
-    const mf = /^\/watch-files\/([a-z0-9-]+)\/((?:shots\/)?[A-Za-z0-9._-]+)$/.exec(p);
+    const mj = /^\/watch-journey\/([a-z0-9-]+)\/(snapshots\/[A-Za-z0-9._-]+)$/.exec(p);
+    if (mj) {
+      const f = journeyNameOk(mj[1]) ? path.join(baselineDir(deps.root, mj[1]), mj[2]) : "";
+      if (!f || !fs.existsSync(f)) return json(res, 404, { error: "not found" });
+      sendFile(f, req, res);
+      return true;
+    }
+    const mf = /^\/watch-files\/([a-z0-9-]+)\/((?:shots\/|snapshots\/)?[A-Za-z0-9._-]+)$/.exec(p);
     if (mf) {
       const dir = dirFor(mf[1]);
       const f = dir ? path.join(dir, mf[2]) : "";
@@ -250,6 +267,41 @@ export function watchRoutes(deps: WatchDeps) {
 
     if (p === "/api/watch/where" && req.method === "GET") return json(res, 200, { out: deps.outRoot(), speed });
     if (p === "/api/watch/sessions" && req.method === "GET") return json(res, 200, list());
+
+    // ---- journeys ----
+    if (p === "/api/watch/journeys" && req.method === "GET") {
+      const all = journeyStates(deps.root);
+      const live = list().find((x) => x.live);
+      return json(res, 200, {
+        summary: summaryLine(all.map((j) => j.last)),
+        journeys: all.map((j) => ({ name: j.name, title: j.title, line: j.line, status: j.status, session: j.session })),
+        sessions: list().length, live: live?.id ?? null,
+      });
+    }
+    const mjr = /^\/api\/watch\/journeys\/([a-z0-9-]+)(\/accept)?$/.exec(p);
+    if (mjr) {
+      const name = mjr[1];
+      if (!listJourneys(deps.root).some((j) => j.name === name)) return json(res, 404, { error: "no such journey" });
+      if (mjr[2] && req.method === "POST") {
+        try { acceptLast(deps.root, name); } catch (e) { return json(res, 409, { error: (e as Error).message }); }
+        deps.activity("journey-accepted", { name });
+        const next = journeyStates(deps.root).find((j) => j.status === "changed")?.name ?? null;
+        return json(res, 200, { ok: true, next });
+      }
+      if (mjr[2] || req.method !== "GET") return json(res, 405, { error: "method not allowed" });
+      const last = readLast(deps.root, name);
+      const baseline = readBaseline(deps.root, name);
+      const st = journeyStates(deps.root).find((j) => j.name === name)!;
+      const session = last?.dir && fs.existsSync(last.dir) ? last.session : null;
+      const moment = last && session ? momentOf(last, baseline, readSnapshots(last.dir), readSteps(last.dir)) : null;
+      const meta = session && last ? readMeta(last.dir) : null;
+      return json(res, 200, {
+        name, title: st.title, line: st.line, status: last?.status ?? null, at: last?.at ?? null, error: last?.error ?? null,
+        session, video: meta?.video ?? null, changes: last?.changes.length ?? 0,
+        others: last ? last.changes.slice(1).map((c) => ({ n: c.n, intent: c.intent })) : [],
+        acceptedAt: baseline?.acceptedAt ?? null, accepted: baseline ? shortDate(baseline.acceptedAt) : null, moment,
+      });
+    }
     if (p === "/api/watch/speed" && req.method === "POST") {
       const b = await body<{ speed?: string }>();
       if (!isSpeed(b.speed)) return json(res, 400, { error: "speed is watch, step or fast" });
