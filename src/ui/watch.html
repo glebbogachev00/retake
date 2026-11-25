@@ -45,6 +45,8 @@
   .act { display:flex; gap:10px; align-items:center; margin-top:14px; }
   .act input { flex:1; font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:8px 14px; outline:none; }
   .act input:focus { background:var(--fill2); }
+  /* On a phone, as on the landing's drawing: the buttons on one line, the note on its own, full width. */
+  @media (max-width: 640px) { .act { flex-wrap:wrap; } .act input { flex:1 1 100%; min-width:0; } }
   .fixline { margin-top:10px; min-height:1.45em; font-size:var(--small); color:var(--muted); }
   .fixline button { background:none; padding:0 4px; color:var(--accent); font-size:var(--small); }
   ol.steps { list-style:none; margin:26px 0 0; padding:0; columns:2 380px; column-gap:40px; }

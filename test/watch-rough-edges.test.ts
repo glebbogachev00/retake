@@ -337,3 +337,55 @@ test("reads run before writes, and what a data journey makes never reads as a ch
     if (was.login === undefined) delete process.env.RETAKE_LOGIN_FILE; else process.env.RETAKE_LOGIN_FILE = was.login;
   }
 });
+
+// ---------- the live session on a phone ----------
+
+type Box = { top: number; bottom: number; left: number; right: number };
+import { chromium } from "playwright";
+
+test("on a phone the live controls wrap: Next and Unclear on one line, the note on its own, nothing off the edge; a laptop keeps one row", { timeout: 120_000 }, async () => {
+  const root = workspace();
+  const out = path.join(root, "outputs");
+  const id = "portal-licences-20261126-0900";
+  const dir = path.join(out, "watch", id);
+  fs.mkdirSync(dir, { recursive: true });
+  const startedAt = new Date().toISOString();
+  fs.writeFileSync(path.join(dir, "session.json"), JSON.stringify({ id, title: "Client portal – licences", startedAt, endedAt: null, video: null }));
+  fs.writeFileSync(path.join(dir, "steps.json"), JSON.stringify([{ n: 1, scenario: null, intent: "Open Licences", expect: "The licence is listed", result: null, note: "", startedAt, endedAt: null, t: 0, tEnd: null, url: "", screenshot: null }]));
+  fs.writeFileSync(path.join(dir, "flags.json"), "[]");
+  const routes = watchRoutes({ root, outRoot: () => out, token: "t", activity: () => {} });
+  const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url ?? "/", "http://x");
+    const body = () => new Promise<string>((ok) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => ok(b)); });
+    if (url.pathname.startsWith("/api/")) { if (await routes.handleApi(req, res, url, url.pathname, body)) return; }
+    else if (routes.handlePage(req, res, url.pathname)) return;
+    res.writeHead(404); res.end();
+  });
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  // A script starts it: the session is live, so Next shows.
+  await fetch(`${base}/api/watch/sessions`, { method: "POST", body: JSON.stringify({ id, dir, title: "Client portal – licences", startedAt }) });
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const measure = async (width: number) => {
+      const page = await browser.newPage({ viewport: { width, height: 844 } });
+      await page.goto(`${base}/watch/${id}`);
+      await page.waitForSelector("#next:not([hidden])");
+      // A string, not a function: tsx would add a helper the page does not have.
+      const r = (await page.evaluate(`(() => {
+        const box = (sel) => { const b = document.querySelector(sel).getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; };
+        return { next: box("#next"), unclear: box("#unclear"), note: box("#note"), scroll: document.documentElement.scrollWidth, width: innerWidth };
+      })()`)) as { next: Box; unclear: Box; note: Box; scroll: number; width: number };
+      await page.close();
+      return r;
+    };
+    const phone = await measure(390);
+    assert.ok(phone.scroll <= phone.width, `the page scrolls sideways: ${phone.scroll} > ${phone.width}`);
+    assert.ok(phone.note.right <= phone.width, `the note runs off the edge: ${phone.note.right}`);
+    assert.ok(phone.note.top >= phone.unclear.bottom, "the note is on its own line, under the buttons");
+    assert.equal(Math.round(phone.next.top), Math.round(phone.unclear.top), "Next and Unclear share a line");
+    assert.ok(phone.note.right - phone.note.left > phone.width * 0.8, "the note is full width");
+    const laptop = await measure(1440);
+    assert.equal(Math.round(laptop.note.top), Math.round(laptop.unclear.top), "on a laptop it is still one row");
+  } finally { await browser.close(); server.close(); }
+});
