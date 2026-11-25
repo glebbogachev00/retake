@@ -9,11 +9,22 @@ expects; after the step it says how it went. Retake streams the page into the
 window, paces the run at the speed the person picked, hides secrets, and
 writes the whole session to a folder.
 
+The public guide, with screenshots, is at
+https://www.useretake.app/docs/watch (`site/docs/watch.html`). This file is
+the developer's source; keep the two in step.
+Its pictures come from `scripts/watch-docs-shots.mjs`: a real session, and
+real journey runs (`test/fixtures/larkspur/watch/`), against Larkspur, a
+made-up app in `test/fixtures/larkspur/`. Rerun it when the window changes.
+
 ## The script side
 
+Watch mode arrived in 0.16.0. Add Retake to the project that holds the test
+(`npm install --save-dev retake-demos`); the test keeps its own Playwright.
+
 ```js
-import { startWatch } from '/Users/glebbogachev/Documents/Retake-watch/dist/watch.js';
-// from source, under tsx: '/Users/glebbogachev/Documents/Retake-watch/src/watch.ts'
+import { startWatch } from 'retake-demos/dist/watch.js';
+// from a clone: '<clone>/dist/watch.js' after `npm run build`,
+// or '<clone>/src/watch.ts' under tsx
 
 const w = await startWatch(page, { title: 'Client portal – licences', ui: 'http://localhost:4311' });
 await w.mask('#password');                            // before anything secret is on screen
@@ -27,7 +38,7 @@ const { dir, flags } = await w.end();                 // writes the folder, retu
 
 | Call | What it does |
 |---|---|
-| `startWatch(page, { title, ui?, out?, mask?, fix? })` | Starts the live picture and the session folder. `ui` is the Retake window (default `$RETAKE_UI`, else `http://localhost:4310`; `false` for none). `out` is the outputs folder (default: the window's). `mask` hides things from the very first frame. |
+| `startWatch(page, { title, ui?, out?, mask?, fix? })` | Starts the live picture and the session folder. `ui` is the Retake window (default `$RETAKE_UI`, else `http://localhost:4310`; `false` for none). `out` is the outputs folder (default `$RETAKE_OUT`, else the window's; with neither, Retake's own install folder, so set it when there is no window). `mask` hides things from the very first frame. |
 | `w.scenario(name)` | Groups the steps that follow under a heading. |
 | `w.step(intent, expect)` | Starts a step. Its screenshot is taken once the next action has settled (the first change on screen, then half a second of stillness), or at `result` if nothing changed. |
 | `w.result(ok, note?)` | Ends the step: pass or fail, and a short note. |
@@ -37,7 +48,7 @@ const { dir, flags } = await w.end();                 // writes the folder, retu
 | `w.dir`, `w.link` | The session folder, and its address in the window (or `null`). |
 
 To use Retake's own browser in a script, import
-`/Users/glebbogachev/Documents/Retake-watch/dist/browser-home.js` before `playwright`.
+`retake-demos/dist/browser-home.js` before `playwright`.
 
 ### Masks
 
@@ -78,6 +89,7 @@ names). It opens the live session, or lists past sessions, newest first.
 - After the session, the same screen plays the video, at 1× or 2×. Each step is
   a mark on the timeline; click a mark, a step, or anywhere on the line to
   jump. Unclear and notes work the same and attach to the step at that time.
+  Space plays and pauses; ← and → jump 5 seconds.
 
 When a session's video ends (on `w.end()` for a live session; at the end of
 playback, or when the window closes, for a replay) and it has unsent notes,
@@ -346,6 +358,11 @@ followed by "6 journeys, nothing unexpected" when nothing did.
 
 - The live picture and the video show the page's viewport only: no browser
   chrome, no other tabs or popup windows.
+- They come from the Chrome DevTools screencast, so they need Chromium. In
+  Firefox or WebKit there is no live picture and no video; steps and
+  screenshots are still kept.
+- The window listens on 127.0.0.1 only, so the person watches on the same
+  computer as the window. Watching from another device is not built.
 - The cursor is drawn by the page from real mouse events. It glides to
   where Playwright clicked, a moment after the click.
 - Watch pace pauses only at Retake's own calls (`step`, `beat`). It cannot slow
@@ -355,5 +372,10 @@ followed by "6 journeys, nothing unexpected" when nothing did.
   black box may sit underneath.
 - A script that exits without `w.end()` leaves `steps.json`, `flags.json` and
   the raw frames in `.frames/`, but no video and no report.
+- The `fix` command is held by the window the script registered with. After
+  that window restarts, notes from a replay still reach the queue but do not
+  start the command.
+- Masks hide pixels, not text: each step's and each flag's URL is saved in
+  the folder and the fix brief.
 - The screencast sends a frame only when the screen changes, so a still screen
   is one frame held: the video is exact in time, not in frame count.

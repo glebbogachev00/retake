@@ -171,3 +171,37 @@ test("with no window open, a session still records, masks, and writes its whole 
     assert.ok(dir.startsWith(path.join(out, "watch")));
   } finally { await browser.close(); }
 });
+
+test("in the window's two-column step list, a scenario's heading stays in the column of its first step", { timeout: 30_000 }, async () => {
+  const html = fs.readFileSync(path.join(import.meta.dirname, "..", "src", "ui", "watch.html"), "utf8");
+  // The shape that split in the self-test: one step, then a new heading that
+  // column balancing left at the foot of the first column.
+  const scenarios = ["Sign in", "Licence running out", "Licence running out"];
+  const steps = scenarios.map((scenario, i) => step(i + 1, i * 1000, i * 1000 + 800, { scenario, intent: `Step ${i + 1} of the session` }));
+  const state = { id: "s", title: "Layout", live: false, video: null, speed: "watch", waiting: false, hold: false, next: 0, scenario: null, startedAt: steps[0].startedAt, steps, flags: [2, 3].map((n) => ({ n, kind: "unclear", step: n, time: n, note: `A note on step ${n}`, fixStatus: "sent" })), fix: { pending: null, last: null } };
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+    await page.route("http://watch.test/**", (route) => {
+      const u = new URL(route.request().url());
+      if (u.pathname === "/watch/s") return route.fulfill({ contentType: "text/html", body: html.replace("</head>", `<script>window.__retakeToken="t"</script></head>`) });
+      if (u.pathname === "/api/watch/s/stream") return route.fulfill({ contentType: "text/event-stream", body: `event: state\ndata: ${JSON.stringify(state)}\n\n` });
+      return route.fulfill({ contentType: "application/json", body: "{}" });
+    });
+    await page.goto("http://watch.test/watch/s");
+    await page.waitForFunction((n) => document.querySelectorAll("#steps .m").length === n, steps.length);
+    const pairs = await page.evaluate(() => {
+      const all = [...document.querySelectorAll("#steps .h, #steps .m")];
+      return all.flatMap((el, i) => {
+        if (!el.classList.contains("h")) return [];
+        const h = el.getBoundingClientRect(), first = all[i + 1].getBoundingClientRect();
+        return [{ heading: el.textContent, headingLeft: Math.round(h.left), headingBottom: Math.round(h.bottom), stepLeft: Math.round(first.left), stepTop: Math.round(first.top) }];
+      });
+    });
+    assert.equal(pairs.length, 2);
+    for (const p of pairs) {
+      assert.ok(Math.abs(p.headingLeft - p.stepLeft) < 40, `“${p.heading}” sits in a different column from its first step`);
+      assert.ok(p.stepTop >= p.headingBottom - 2 && p.stepTop - p.headingBottom < 30, `“${p.heading}” is not directly above its first step`);
+    }
+  } finally { await browser.close(); }
+});
