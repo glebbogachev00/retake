@@ -853,6 +853,16 @@ Two things are the person's, not yours: accepting a change as the new normal
 and turning the nightly run on (`retake watch schedule daily`). Ask; never
 do either on your own.
 
+Starting from nothing, begin from the app's address: `watch_suggest` looks
+around it and proposes 4–8 journeys, each marked reads only or changes data.
+Show them in plain words and let the person pick, then `watch_write` with
+their picks (Retake writes them, or pass your own file per proposal as
+`code`). Each runs once first and is added only if it passes. A journey that
+changes data says `export const changesData = true` and runs only where the
+person said the app is a test space; never answer that for them. `retake watch
+schedule on` (theirs to switch) runs every journey each night and within
+minutes of a new version of the app.
+
 ## Mac apps
 
 A person may name a Mac app ("record TextEdit", "a demo of our desktop app")

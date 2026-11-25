@@ -97,6 +97,57 @@
   .act a.quiet2 { color:var(--muted); padding:8px 6px; }
   .act a.quiet2:hover { color:var(--ink); }
   .others { margin-top:12px; font-size:var(--small); color:var(--muted); }
+  .ran { margin:6px 0 0; color:var(--muted); }
+  .sum + .ran { margin-top:4px; }
+  .blind { margin:2px 0 0; color:var(--muted); font-size:var(--small); }
+  ul.journeys .l.skipped { color:var(--muted); }
+  .ask { margin:18px 0 0; padding:14px; background:var(--fill); border-radius:12px; display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  .ask p { margin:0; flex:1 1 260px; }
+  .ask .btns { display:flex; gap:8px; }
+  .ask button { background:var(--paper); }
+  .ask button:hover { background:var(--fill2); }
+  /* Adding an app: one thing per screen, at the middle of it. */
+  .add { max-width:560px; margin:22vh auto 0; }
+  .add h1 { font-size:var(--title); font-weight:600; margin:0 0 6px; }
+  .add p.sub { margin:0 0 18px; color:var(--muted); }
+  .add form { display:flex; gap:10px; }
+  .add input[type=text], .add input[type=password], .add input[type=email], .add input[type=url] { flex:1; min-width:0; font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:10px 14px; outline:none; }
+  .add input:focus { background:var(--fill2); }
+  .add .fields { display:grid; gap:10px; }
+  .add .row { display:flex; gap:10px; align-items:center; margin-top:16px; }
+  .add .row .sp { flex:1; }
+  .add .quietlink { background:none; padding:8px 4px; color:var(--muted); }
+  .add .quietlink:hover { background:none; color:var(--ink); }
+  .add .err { color:var(--fail); margin:12px 0 0; min-height:1.45em; }
+  .add.wide { max-width:720px; margin-top:10vh; }
+  .wait { color:var(--muted); min-height:1.45em; }
+  .wait .cur { display:inline-block; width:1px; height:1em; background:var(--muted); margin-left:2px; vertical-align:-2px; }
+  @media (prefers-reduced-motion: no-preference) { .wait .cur { animation: blink 1s steps(1) infinite; } @keyframes blink { 50% { opacity:0 } } }
+  ul.picks { list-style:none; margin:18px 0 0; padding:0; }
+  ul.picks li label { display:grid; grid-template-columns:22px 1fr auto; gap:4px 12px; align-items:baseline; padding:10px 12px; border-radius:10px; cursor:pointer; }
+  ul.picks li label:hover { background:var(--fill); }
+  ul.picks input { margin:0; accent-color:var(--accent); width:16px; height:16px; transform:translateY(2px); }
+  ul.picks .pt { font-weight:600; }
+  ul.picks .pc { grid-column:2 / 4; color:var(--muted); font-size:var(--small); }
+  ul.picks .pk { color:var(--muted); font-size:var(--small); white-space:nowrap; }
+  ul.picks .pk.data { color:var(--ink); }
+  ul.done { list-style:none; margin:18px 0 0; padding:0; }
+  ul.done li { padding:8px 0; display:flex; gap:10px; }
+  ul.done li .m { width:16px; flex:none; text-align:center; }
+  ul.done li.ok .m { color:var(--pass); } ul.done li.no .m { color:var(--fail); }
+  ul.done li .why { display:block; color:var(--muted); font-size:var(--small); }
+  @media (max-width: 520px) {
+    main { padding:16px 18px 40px; }
+    .add { margin-top:12vh; }
+    .add form { flex-direction:column; }
+    /* The next move first and full width; the quiet ones under it. */
+    .add .row { flex-wrap:wrap; }
+    .add .row .go { order:-1; flex:1 1 100%; text-align:center; }
+    .add .row .sp { display:none; }
+    ul.picks li label { grid-template-columns:22px 1fr; }
+    ul.picks .pk { grid-column:2; }
+    ul.picks .pc { grid-column:2; }
+  }
   @media (prefers-reduced-motion: no-preference) { main { animation: in .2s ease-out; } @keyframes in { from { opacity:0 } } }
 </style>
 </head>
@@ -113,23 +164,189 @@ const AREAS = '<nav class="areas"><a href="/">Demos</a><a href="/watch" aria-cur
 const journeyName = (location.pathname.match(/^\/watch\/j\/([a-z0-9-]+)$/) || [])[1];
 const id = journeyName ? null : (location.pathname.match(/^\/watch\/([a-z0-9-]+)$/) || [])[1];
 
+// Declared before the router runs: the screens below use them at once.
+let homeTimer = null, waitTimer = null, followTimer = null, shown = null;
+const WAITING = { exploring: ['Looking around', 'Reading its pages', 'Following its navigation', 'Finding its forms', 'Choosing what is worth watching'], adding: ['Running each one once', 'Keeping the ones that pass'] };
 if (journeyName) journey(journeyName);
 else if (id === 'sessions') sessions();
+else if (id === 'add') addApp();
 else if (!id) home();
 else session(id);
 
 // ---------- the Watch area: each journey, one line ----------
 async function home() {
-  const J = await api('/api/watch/journeys');
+  clearTimeout(homeTimer);
+  const J = await api('/api/watch/journeys').catch(() => null);
+  if (!J) { homeTimer = setTimeout(home, 3000); return; }
   if (J.live) { location.replace('/watch/' + J.live); return; }
-  const more = J.sessions ? `<p class="more"><a href="/watch/sessions">Sessions</a></p>` : '';
-  if (!J.journeys.length) { app.innerHTML = AREAS + '<p class="quiet">A journey is a script in this workspace’s watch/ folder.</p>' + more; setTimeout(home, 15000); return; }
-  app.innerHTML = AREAS + (J.summary ? `<h1 class="sum">${esc(J.summary)}</h1>` : '') + '<ul class="journeys">' + J.journeys.map(j => {
+  // Nothing to watch yet: the one thing to ask is the app's address.
+  if (!J.journeys.length) { addApp(); return; }
+  const more = `<p class="more"><a href="/watch/add">Add an app</a>${J.sessions ? ' · <a href="/watch/sessions">Sessions</a>' : ''}</p>`;
+  let h = AREAS + (J.summary ? `<h1 class="sum">${esc(J.summary)}</h1>` : '');
+  if (J.ran) h += `<p class="ran">${esc(J.ran)}</p>`;
+  if (J.blind) h += `<p class="blind">${esc(J.blind)}</p>`;
+  if (J.ask) h += `<div class="ask"><p>${esc(J.ask.question)}</p><div class="btns"><button data-test="yes">Yes, a test space</button><button data-test="no">No</button></div></div>`;
+  h += '<ul class="journeys">' + J.journeys.map(j => {
     const href = j.status === 'changed' || j.status === 'failed' ? '/watch/j/' + j.name : j.session ? '/watch/' + j.session : null;
-    const inner = `<span class="t">${esc(j.title)}</span><span class="l ${esc(j.status || '')}">${esc(j.line)}</span>`;
+    const inner = `<span class="t">${esc(j.title)}</span><span class="l ${esc(j.status || '')}"${j.why ? ` title="${esc(j.why)}"` : ''}>${esc(j.line)}</span>`;
     return `<li>${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
   }).join('') + '</ul>' + more;
-  setTimeout(home, 15000);
+  app.innerHTML = h;
+  app.querySelectorAll('[data-test]').forEach(b => b.onclick = async () => { await api('/api/watch/spaces', { url: J.ask.url, test: b.dataset.test === 'yes' }); home(); });
+  homeTimer = setTimeout(home, 15000);
+}
+
+// ---------- adding an app: its address, then what is worth watching ----------
+/** Waiting writes itself: one faded line types a phrase, holds it, erases it. */
+function typeWait(el, phrases) {
+  clearTimeout(waitTimer);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.innerHTML = esc(phrases[0]) + '…'; return; }
+  let i = 0, n = 0, dir = 1;
+  const tick = () => {
+    if (!el.isConnected) return;
+    const p = phrases[i % phrases.length] + '…';
+    n += dir;
+    el.innerHTML = esc(p.slice(0, n)) + '<span class="cur"></span>';
+    if (dir > 0 && n >= p.length) { dir = -1; waitTimer = setTimeout(tick, 1600); return; }
+    if (dir < 0 && n <= 0) { dir = 1; i++; waitTimer = setTimeout(tick, 300); return; }
+    waitTimer = setTimeout(tick, dir > 0 ? 45 : 18);
+  };
+  tick();
+}
+
+async function addApp() {
+  const job = new URLSearchParams(location.search).get('job');
+  if (job) return follow(job);
+  history.replaceState(null, '', '/watch/add');
+  const J = await api('/api/watch/journeys').catch(() => ({ journeys: [] }));
+  app.innerHTML = AREAS + `<section class="add">
+      <h1>${J.journeys.length ? 'Add an app' : 'What should Watch keep an eye on?'}</h1>
+      <p class="sub">The app’s address. Retake looks around it and suggests what to watch.</p>
+      <form id="f"><input id="u" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="app.example.com" aria-label="The app’s address"><button class="go" type="submit">Look around</button></form>
+      <p class="err" id="err"></p>
+    </section>` + (J.journeys.length ? '<p class="more" style="text-align:center"><a href="/watch">Back to Watch</a></p>' : J.sessions ? '<p class="more" style="text-align:center"><a href="/watch/sessions">Sessions</a></p>' : '');
+  const u = document.getElementById('u');
+  u.focus();
+  document.getElementById('f').onsubmit = async e => {
+    e.preventDefault();
+    if (!u.value.trim()) { u.focus(); return; }
+    const r = await api('/api/watch/suggest', { url: u.value.trim() });
+    if (r.error && !r.id) { document.getElementById('err').textContent = r.error; return; }
+    history.replaceState(null, '', '/watch/add?job=' + r.id);
+    follow(r.id);
+  };
+}
+
+async function follow(jobId) {
+  clearTimeout(followTimer);
+  // A request lost on the way (the computer slept, the window restarted) is asked again.
+  const J = await api('/api/watch/suggest/' + jobId).catch(() => null);
+  if (!J) { followTimer = setTimeout(() => follow(jobId), 2000); return; }
+  if (J.error && !J.id) { history.replaceState(null, '', '/watch/add'); addApp(); return; }
+  const key = J.phase + (J.phase === 'adding' || J.phase === 'exploring' ? '' : ':' + J.id);
+  if (J.phase === 'exploring' || J.phase === 'adding') {
+    if (shown !== key) {
+      app.innerHTML = AREAS + `<section class="add"><h1>${esc(J.host)}</h1><p class="wait" id="wait"></p></section>`;
+      typeWait(document.getElementById('wait'), J.phase === 'exploring' ? WAITING.exploring : WAITING.adding);
+      shown = key;
+    }
+    followTimer = setTimeout(() => follow(jobId), 1000);
+    return;
+  }
+  shown = key;
+  clearTimeout(waitTimer);
+  if (J.phase === 'error') {
+    app.innerHTML = AREAS + `<section class="add"><h1>${esc(J.host)}</h1><p class="sub">${esc(J.error)}</p><div class="row"><a class="btn go" href="/watch/add">Try another address</a></div></section>`;
+    return;
+  }
+  if (J.phase === 'signin') return signInStep(J);
+  if (J.phase === 'ready') return proposals(J);
+  if (J.phase === 'done') return finished(J);
+}
+
+// This app needs a sign-in: the existing login form, here, for a test account.
+async function signInStep(J) {
+  const req = await api('/api/logins/request', { url: J.signIn.url, why: 'This app needs a sign-in. Use a test account.' });
+  const pending = await api('/api/logins/pending').catch(() => []);
+  const store = (pending.find(x => x.id === req.id) || {}).store || 'this computer';
+  app.innerHTML = AREAS + `<section class="add">
+      <h1>This app needs a sign-in.</h1>
+      <p class="sub">Use a test account. It stays in ${esc(store)}, and journeys sign in with it.</p>
+      <form id="lf" class="fields" autocomplete="on">
+        <input id="lu" type="email" autocomplete="username" placeholder="Username or email" aria-label="Username or email">
+        <input id="lp" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password">
+        <input id="lt" type="password" autocomplete="off" placeholder="Authenticator key (the setup key, not a code)" aria-label="Authenticator key" hidden>
+        <div class="row"><button type="button" class="quietlink" id="code">It asks for a code</button><span class="sp"></span><button type="button" class="quietlink" id="skip">Not now</button><button class="go" type="submit">Save and look again</button></div>
+      </form>
+      <p class="err" id="err"></p>
+    </section>`;
+  const $ = s => document.getElementById(s);
+  $('lu').focus();
+  $('code').onclick = () => { $('lt').hidden = false; $('code').remove(); $('lt').focus(); };
+  $('skip').onclick = async () => { await api(`/api/logins/${req.id}/cancel`, {}).catch(() => {}); await api(`/api/watch/suggest/${J.id}/continue`, { skip: true }); shown = null; follow(J.id); };
+  $('lf').onsubmit = async e => {
+    e.preventDefault();
+    const user = $('lu').value, password = $('lp').value, totp = $('lt').value;
+    if (!user.trim() || !password) { (user.trim() ? $('lp') : $('lu')).focus(); return; }
+    const r = await api(`/api/logins/${req.id}/save`, { user, password, totp });
+    if (r.error) { $('err').textContent = 'Could not save: ' + r.error; return; }
+    await api(`/api/watch/suggest/${J.id}/continue`, {});
+    shown = null; follow(J.id);
+  };
+}
+
+function proposals(J) {
+  if (!J.proposals.length) {
+    app.innerHTML = AREAS + `<section class="add"><h1>${esc(J.host)}</h1><p class="sub">Nothing worth watching was found there${J.signIn && !J.signedIn ? ' before the sign-in' : ''}.</p><div class="row"><a class="btn go" href="/watch/add">Try another address</a></div></section>`;
+    return;
+  }
+  const note = J.signInError ? `<p class="sub">The sign-in did not work (${esc(J.signInError)}), so only the pages before it were seen.</p>`
+    : J.signIn && !J.signedIn ? '<p class="sub">Only the pages before the sign-in were seen.</p>' : '';
+  app.innerHTML = AREAS + `<section class="add wide">
+      <h1>Worth watching on ${esc(J.host)}</h1>${note}
+      <ul class="picks">${J.proposals.map((p, i) => `<li><label><input type="checkbox" value="${i + 1}"${p.changes === 'data' ? '' : ' checked'}><span class="pt">${esc(p.title)}</span><span class="pk ${p.changes === 'data' ? 'data' : ''}">${p.changes === 'data' ? 'Changes data' : 'Reads only'}</span><span class="pc">${esc(p.checks)}</span></label></li>`).join('')}</ul>
+      <div class="row"><span class="sp"></span><button class="go" id="addb">Add journeys</button></div>
+      <p class="err" id="err"></p>
+    </section>`;
+  const boxes = [...app.querySelectorAll('ul.picks input')];
+  const btn = document.getElementById('addb');
+  const sync = () => { btn.disabled = !boxes.some(b => b.checked); btn.style.opacity = btn.disabled ? .45 : 1; };
+  boxes.forEach(b => b.onchange = sync); sync();
+  btn.onclick = async () => {
+    const pick = boxes.filter(b => b.checked).map(b => Number(b.value));
+    const writes = pick.some(n => J.proposals[n - 1].changes === 'data');
+    // Asked once per app, only when it matters.
+    if (writes && J.testSpace === null) return askSpace(J, pick);
+    await add(J, pick);
+  };
+}
+
+function askSpace(J, pick) {
+  app.innerHTML = AREAS + `<section class="add">
+      <h1>Is ${esc(J.host)} a test space?</h1>
+      <p class="sub">Journeys that change data run only there.</p>
+      <div class="row"><button id="yes">Yes, a test space</button><button id="no">No</button></div>
+    </section>`;
+  document.getElementById('yes').onclick = async () => { await api('/api/watch/spaces', { url: J.origin, test: true }); add(J, pick); };
+  document.getElementById('no').onclick = async () => { await api('/api/watch/spaces', { url: J.origin, test: false }); add(J, pick); };
+}
+
+async function add(J, pick) {
+  const r = await api(`/api/watch/suggest/${J.id}/add`, { pick });
+  if (r.error && !r.id) { const e = document.getElementById('err'); if (e) e.textContent = r.error; return; }
+  shown = null; follow(J.id);
+}
+
+function finished(J) {
+  const res = J.results || [];
+  // Everything went in: the list it went into is the ending.
+  if (res.length && res.every(r => r.added)) { history.replaceState(null, '', '/watch'); home(); return; }
+  const n = res.filter(r => r.added).length;
+  app.innerHTML = AREAS + `<section class="add">
+      <h1>${n ? `${n} added` : 'Nothing added'}</h1>
+      <ul class="done">${res.map(r => `<li class="${r.added ? 'ok' : 'no'}"><span class="m">${r.added ? '✓' : '✗'}</span><span>${esc(r.title)}${r.added ? '' : `<span class="why">${esc(r.why)}</span>`}</span></li>`).join('')}</ul>
+      <div class="row"><a class="btn go" href="/watch">Done</a></div>
+    </section>`;
 }
 
 // ---------- a journey that changed or failed, at its moment ----------

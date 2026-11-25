@@ -84,7 +84,8 @@ export function providerStatus(): { active: string | null; available: string[] }
   return { active: p ? `${p.name} · ${p.model}` : null, available };
 }
 
-async function chat(p: Provider, system: string, user: string, projectDir?: string): Promise<string> {
+/** One prompt to the configured model, text back. Shared with Watch's journey suggestions. */
+export async function chat(p: Provider, system: string, user: string, projectDir?: string): Promise<string> {
   if (p.name === "claude-code" || p.name === "codex") return chatCli(p, system, user, projectDir);
   const r = await fetch(`${p.baseUrl}/chat/completions`, {
     method: "POST",

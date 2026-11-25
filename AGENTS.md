@@ -416,6 +416,34 @@ changed or failed. Accepting a change as normal is the person's call
 (`retake watch accept <journey>` only when they say so). Never install a
 schedule without asking.
 
+## Watch for any app, with nothing set up — `watch_suggest`, `watch_write`
+
+When the person wants their app watched, start from its address, not from a
+blank journey. `watch_suggest` (CLI: `retake watch suggest <url>`) looks around
+the app in a real browser and returns 4–8 journeys, each with one line on
+what it checks, marked reads only or changes data, with the steps Retake
+would write. Show them in plain words and let the person pick; data journeys
+are unticked unless they ask. Then `watch_write` with their picks (CLI:
+`retake watch add <url> --pick 1,3`): Retake writes them from its steps, or
+you pass your own file per proposal as `code`. Each runs once first; only a
+passing run is added, and it becomes the normal.
+
+- **A sign-in found** means the login form is open in the window ("This app
+  needs a sign-in. Use a test account."), or relay the `retake login` line.
+  Call `watch_suggest` again once they say done. Journeys sign in with
+  `await signIn(url)`; never a value in a file.
+- **Data journeys run only on a test space.** Pass `test_space` only with the
+  person's own answer to "Is <app> a test space? Journeys that change data
+  run only there." A journey you write that changes anything says
+  `export const changesData = true`, and every journey says which app it is
+  about: `export const url = "https://…"`. Without a yes, it is skipped.
+- **New versions are noticed by themselves.** `retake watch schedule on` is
+  one switch: every night, and within minutes of a new version of each app
+  (a cheap fingerprint of its hashed files or stated version, seen twice in a
+  row). Silent unless something changed. An app with no hashed files and no
+  version is nightly only. Never switch it on without asking. See
+  `docs/watch.md`, "Watch with nothing to set up".
+
 ## Sending the takes to someone — `retake share`
 
 `retake share <demo>... [--name <share>] [--by <who>]` builds one page from

@@ -30,6 +30,7 @@ import { startWatch, type Watch } from "../watch.js";
 import { compareSnapshots, verdict, type Rect, type Snapshot } from "./compare.js";
 import { acceptRun, baselineDir, loadPicture, pruneQuietRuns, readBaseline, readSnapshots, writeRun, type RunRecord } from "./journey-store.js";
 import { readSteps, writeJson } from "./session.js";
+import { gate } from "./spaces.js";
 
 export const DESKTOP = { width: 1280, height: 800 };
 /** A journey that does not finish in this long has stopped, whatever it is waiting for. */
@@ -198,54 +199,63 @@ async function settle(page: Page) {
   await page.waitForTimeout(300);
 }
 
+/**
+ * Sign in on this page with the login saved for the site: the username, the
+ * password and, when one is saved, the authenticator code, on as many screens
+ * as the sign-in takes. `beforeTyping` runs once, before anything is typed,
+ * with the selectors of the fields (a journey masks them there). Used by the
+ * journey kit, and by exploring an app to suggest journeys.
+ */
+export async function signInOn(page: Page, url: string | undefined, o: SignInOptions = {}, hooks: { beforeTyping?: (sels: string[]) => Promise<void>; secrets?: Set<string> } = {}): Promise<void> {
+  const target = url ?? page.url();
+  const full = /^[a-z]+:\/\//i.test(target) ? target : `https://${target}`;
+  const site = siteOf(full);
+  const user = readLogin(site, "user"), password = readLogin(site, "password"), key = readLogin(site, "totp");
+  if (!user || !password) throw new MissingLogin(site, new URL(full).origin);
+  for (const v of [user, password, key]) if (v) hooks.secrets?.add(v);
+  const userSel = o.user ?? USER_SEL, passSel = o.password ?? PASS_SEL, codeSel = o.code ?? CODE_SEL;
+  // Hidden before anything is typed: the stream, the video, the pictures and the compared text.
+  await hooks.beforeTyping?.([userSel, passSel, codeSel]);
+  if (siteOf(page.url()) !== site) await page.goto(full, { waitUntil: "domcontentloaded" });
+  const tries = { user: 0, password: 0, code: 0 };
+  for (let screen = 0; screen < 10; screen++) {
+    await settle(page);
+    const code = key ? await visible(page, codeSel) : null;
+    const pass = await visible(page, passSel);
+    const name = await visible(page, userSel);
+    if (o.until === "password" && pass) return;
+    if (o.until === "code" && (code ?? (await visible(page, codeSel)))) return;
+    if (!code && !pass && !name) {
+      if (siteOf(page.url()) === site) return;
+      throw new Error(`the sign-in stopped on a screen it does not know (${new URL(page.url()).host}, “${(await page.title().catch(() => "")).slice(0, 60)}”)`);
+    }
+    if (code) {
+      if (++tries.code > 2) throw new Error("the authenticator code was refused twice — stopped, so the account is not locked");
+      let c = totp(key!);
+      // The same code twice is refused: wait for the next one.
+      if (c === lastCode) { await page.waitForTimeout(30_500 - (Date.now() % 30_000)); c = totp(key!); }
+      lastCode = c;
+      await code.fill(c);
+      await code.press("Enter");
+    } else if (pass) {
+      if (++tries.password > 1) throw new Error("the password was asked for again — it was refused, so this stopped rather than risk locking the account");
+      if (name && !(await name.inputValue().catch(() => ""))) await name.fill(user);
+      await pass.fill(password);
+      await pass.press("Enter");
+    } else if (name) {
+      if (++tries.user > 2) throw new Error("the sign-in asked for the username again — it was not accepted");
+      await name.fill(user);
+      await name.press("Enter");
+    }
+    await page.waitForEvent("framenavigated", { timeout: 15_000 }).catch(() => {});
+  }
+  throw new Error("the sign-in took more than ten screens — stopped");
+}
+
 function makeKit(page: Page, w: Watch, phone: boolean, secrets: Set<string>): JourneyKit {
   return {
     phone,
-    async signIn(url, o = {}) {
-      const target = url ?? page.url();
-      const full = /^[a-z]+:\/\//i.test(target) ? target : `https://${target}`;
-      const site = siteOf(full);
-      const user = readLogin(site, "user"), password = readLogin(site, "password"), key = readLogin(site, "totp");
-      if (!user || !password) throw new MissingLogin(site, new URL(full).origin);
-      for (const v of [user, password, key]) if (v) secrets.add(v);
-      const userSel = o.user ?? USER_SEL, passSel = o.password ?? PASS_SEL, codeSel = o.code ?? CODE_SEL;
-      // Hidden before anything is typed: the stream, the video, the pictures and the compared text.
-      await w.mask([userSel, passSel, codeSel]);
-      if (siteOf(page.url()) !== site) await page.goto(full, { waitUntil: "domcontentloaded" });
-      const tries = { user: 0, password: 0, code: 0 };
-      for (let screen = 0; screen < 10; screen++) {
-        await settle(page);
-        const code = key ? await visible(page, codeSel) : null;
-        const pass = await visible(page, passSel);
-        const name = await visible(page, userSel);
-        if (o.until === "password" && pass) return;
-        if (o.until === "code" && (code ?? (await visible(page, codeSel)))) return;
-        if (!code && !pass && !name) {
-          if (siteOf(page.url()) === site) return;
-          throw new Error(`the sign-in stopped on a screen it does not know (${new URL(page.url()).host}, “${(await page.title().catch(() => "")).slice(0, 60)}”)`);
-        }
-        if (code) {
-          if (++tries.code > 2) throw new Error("the authenticator code was refused twice — stopped, so the account is not locked");
-          let c = totp(key!);
-          // The same code twice is refused: wait for the next one.
-          if (c === lastCode) { await page.waitForTimeout(30_500 - (Date.now() % 30_000)); c = totp(key!); }
-          lastCode = c;
-          await code.fill(c);
-          await code.press("Enter");
-        } else if (pass) {
-          if (++tries.password > 1) throw new Error("the password was asked for again — it was refused, so this stopped rather than risk locking the account");
-          if (name && !(await name.inputValue().catch(() => ""))) await name.fill(user);
-          await pass.fill(password);
-          await pass.press("Enter");
-        } else if (name) {
-          if (++tries.user > 2) throw new Error("the sign-in asked for the username again — it was not accepted");
-          await name.fill(user);
-          await name.press("Enter");
-        }
-        await page.waitForEvent("framenavigated", { timeout: 15_000 }).catch(() => {});
-      }
-      throw new Error("the sign-in took more than ten screens — stopped");
-    },
+    signIn: (url, o = {}) => signInOn(page, url, o, { secrets, beforeTyping: (sels) => w.mask(sels) }),
   };
 }
 
@@ -263,7 +273,13 @@ export async function runJourney(o: {
   log?: (l: string) => void;
 }): Promise<RunRecord> {
   const log = o.log ?? (() => {});
-  const mod = (await import(pathToFileURL(o.file).href)) as JourneyModule;
+  // Data-changing journeys run only against an app marked as a test space.
+  const g = gate(o.root, { name: o.name, file: o.file });
+  if (!g.run) throw new Error(`not run — ${g.why}`);
+  // By its modified time too: a long-lived window or agent would otherwise
+  // keep running the version of the file it first imported.
+  const mtime = (() => { try { return fs.statSync(o.file).mtimeMs; } catch { return 0; } })();
+  const mod = (await import(`${pathToFileURL(o.file).href}?v=${mtime}`)) as JourneyModule;
   if (typeof mod.default !== "function") throw new Error(`${path.relative(o.root, o.file)} has no default export — it should be \`export default async function (page, w, kit) { … }\``);
   const viewport = mod.viewport && mod.viewport.width > 0 && mod.viewport.height > 0 ? { width: Math.round(mod.viewport.width), height: Math.round(mod.viewport.height) } : DESKTOP;
   const phone = viewport.width <= 480;

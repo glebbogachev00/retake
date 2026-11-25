@@ -811,22 +811,71 @@ server.registerTool("watch", {
     const s = summaryLine(all.map((j) => j.last));
     return text([...(s ? [s] : []), ...all.map((j) => `${j.name}: ${j.line}`)].join("\n"));
   }
-  const { runJourney } = await import("../watch/journeys.js");
+  const { runBatch } = await import("../watch/auto.js");
   const { describeChange } = await import("../watch/compare.js");
   let chosen;
   try { chosen = pickJourneys(listJourneys(ROOT), run); } catch (e) { return text((e as Error).message); }
-  const lines: string[] = [];
-  for (const j of chosen) {
-    await tell(`Running the journey ${j.name}…`);
-    try {
-      const r = await runJourney({ root: ROOT, name: j.name, file: j.file, out: OUT });
-      const c = r.changes[0];
-      lines.push(r.status === "failed" ? `${j.name}: failed — ${r.error ?? "a step did not pass"} (${r.dir})`
-        : r.status === "changed" ? `${j.name}: changed at step ${c.n} (${c.intent}) — ${describeChange(c)}${r.changes.length > 1 ? `, and ${r.changes.length - 1} more` : ""}. The person decides whether it is the new normal, in the window's Watch area. (${r.dir})`
-        : `${j.name}: unchanged${r.firstRun ? " — the first run, kept as normal" : ""}`);
-    } catch (e) { lines.push(`${j.name}: could not run — ${(e as Error).message.split("\n")[0]}`); }
-  }
+  const { runs, skipped } = await runBatch({ root: ROOT, out: OUT, journeys: chosen, trigger: "hand", log: (l) => { if (l.startsWith("▶")) void tell(`Running the journey ${l.slice(2)}…`); } });
+  const lines = runs.map((r) => {
+    const c = r.changes[0];
+    return r.status === "failed" ? `${r.journey}: failed — ${r.error ?? "a step did not pass"}${r.dir ? ` (${r.dir})` : ""}`
+      : r.status === "changed" ? `${r.journey}: changed at step ${c.n} (${c.intent}) — ${describeChange(c)}${r.changes.length > 1 ? `, and ${r.changes.length - 1} more` : ""}. The person decides whether it is the new normal, in the window's Watch area. (${r.dir})`
+      : `${r.journey}: unchanged${r.firstRun ? " — the first run, kept as normal" : ""}`;
+  });
+  for (const k of skipped) lines.push(`${k.name}: skipped — ${k.why}. Whether the app is a test space is the person's answer, in the window's Watch area.`);
   return text(lines.join("\n"));
+});
+
+server.registerTool("watch_suggest", {
+  description: "JOURNEYS FROM AN ADDRESS. Looks around a web app in a real browser (its pages, navigation, forms and sign-in; signed in when a test account is saved for the site) and proposes 4–8 journeys worth watching after every deploy, each with one line on what it checks, marked `reads only` or `changes data`, and with the steps Retake would write. Call it when the person wants their app watched, or asks which flows to watch. Show them the list in plain words and let THEM pick; journeys that change data are unticked unless they ask. If it says the app needs a sign-in, the login form is open in the window (or name the `retake login` line): the person saves a test account, then call this again to see what is behind it. Then call watch_write with their picks.",
+  inputSchema: { url: z.string().describe("the app's address, e.g. https://staging.example.com") },
+  annotations: { ...RETAKE_WRITE, openWorldHint: true },
+}, async ({ url }) => {
+  const { suggest } = await import("../watch/suggest.js");
+  const { hostName, spaceAnswer, spaceQuestion } = await import("../watch/spaces.js");
+  await tell(`Looking around ${url} for journeys worth watching…`);
+  let r;
+  try { r = await suggest(ROOT, url, { log: (l) => void tell(l) }); } catch (e) { return text(`✗ ${(e as Error).message.split("\n")[0]}`); }
+  const { suggestion: s, exploration: x } = r;
+  const lines: string[] = [];
+  if (s.signIn && !hasLogin(siteOf(s.origin))) {
+    let asked = false;
+    if (UI) {
+      asked = await fetch(`${UI}/api/logins/request`, { method: "POST", headers: uiHeaders(), body: JSON.stringify({ url: s.signIn.url, why: "This app needs a sign-in. Use a test account." }) }).then((x) => x.ok).catch(() => false);
+    }
+    lines.push(asked
+      ? `This app needs a sign-in. Tell the person: “Open ${UI} — this app needs a sign-in. Use a test account.” When they say done, call watch_suggest again to see what is behind it.`
+      : `This app needs a sign-in. Tell the person: “This app needs a sign-in. Use a test account: run \`retake login ${s.origin}\` in your Retake workspace.” When they say done, call watch_suggest again.`, "");
+  } else if (x.signInError) lines.push(`The saved sign-in did not work (${x.signInError}); only the pages before it were seen.`, "");
+  if (!s.proposals.length) return text([...lines, `Nothing worth watching was found at ${hostName(s.origin)}.`].join("\n"));
+  lines.push(`${hostName(s.origin)} — ${s.proposals.length} journeys (proposed by ${s.by}):`);
+  s.proposals.forEach((p, i) => lines.push(`${i + 1}. ${p.title} [${p.changes === "data" ? "changes data" : "reads only"}] — ${p.checks}`, `   steps: ${JSON.stringify(p.steps)}`));
+  if (s.proposals.some((p) => p.changes === "data") && spaceAnswer(ROOT, s.origin) === null) lines.push("", `Before any journey that changes data: ask the person “${spaceQuestion(s.origin)}” Pass their answer to watch_write as test_space.`);
+  lines.push("", "watch_write with url and pick (e.g. [1,3]) writes them from these steps; or pass code {\"<n>\": \"<the whole .mjs>\"} to write a journey yourself (see docs/watch.md for the shape). Each is added only after one run of it passes.");
+  return text(lines.join("\n"));
+});
+
+server.registerTool("watch_write", {
+  description: "Adds the journeys the person picked from watch_suggest: writes watch/<name>.mjs for each (from Retake's steps, or from `code` you wrote yourself, by proposal number), runs each once, and keeps only the ones whose run passes; that run becomes its normal. A journey that does not pass is not added, with one sentence why. Journeys that change data are added only where the app is a test space: pass test_space only with the person's own answer to “Is <app> a test space?”, never your guess. Never put a secret in code: sign in with `await signIn(url)` from the kit.",
+  inputSchema: {
+    url: z.string(),
+    pick: z.array(z.number().int().min(1)).min(1),
+    code: z.record(z.string(), z.string()).optional().describe("your own journey file for a proposal, keyed by its number"),
+    test_space: z.boolean().optional().describe("the person's answer: is this app a test space? Only when they said so"),
+  },
+  annotations: RETAKE_WRITE,
+}, async ({ url, pick, code, test_space }) => {
+  const { readSuggestion, addJourneys } = await import("../watch/suggest.js");
+  const { markSpace, spaceAnswer, hostName } = await import("../watch/spaces.js");
+  const s = readSuggestion(ROOT, url);
+  if (!s) return text(`No suggestions for ${url} yet — call watch_suggest first.`);
+  if (pick.some((n) => n > s.proposals.length)) return text(`pick from 1 to ${s.proposals.length}`);
+  if (test_space !== undefined && spaceAnswer(ROOT, s.origin) === null) markSpace(ROOT, s.origin, test_space);
+  const own = code ? Object.fromEntries(Object.entries(code).map(([k, v]) => [Number(k), v])) : undefined;
+  const res = await addJourneys({ root: ROOT, out: OUT, suggestion: s, pick, code: own, log: (l) => void tell(l) });
+  const n = res.filter((r) => r.added).length;
+  return text([...res.map((r) => (r.added ? `added: ${r.title} — watch/${r.name}.mjs` : `not added: ${r.title} — ${r.why}`)),
+    "", n ? `${n} added to ${hostName(s.origin)}'s journeys. Running them each night and whenever the app changes is the person's switch: \`retake watch schedule on\`. Never install it without asking.` : "Nothing was added."].join("\n"));
 });
 
 server.registerTool("sense", {
