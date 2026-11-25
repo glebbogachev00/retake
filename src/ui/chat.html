@@ -27,6 +27,11 @@
   .mark i { position:absolute; left:5.5px; height:2.5px; border-radius:2px; background:#eceee9; }
   .mark i:nth-child(1){top:4px;width:4px;opacity:.55} .mark i:nth-child(2){top:8px;width:7px;opacity:.8} .mark i:nth-child(3){top:12px;width:11px;background:var(--amber)} .mark i:nth-child(4){top:16px;width:7px;opacity:.8}
   .top h1 { font-size:15px; font-weight:600; margin:0; }
+  .areas { display:flex; gap:16px; margin-left:18px; font-size:14px; }
+  .areas[hidden] { display:none; }
+  .areas a { color:var(--muted); text-decoration:none; }
+  .areas a:hover, .areas a[aria-current="page"] { color:var(--ink); }
+  .areas a[aria-current="page"] { font-weight:600; }
   .controls { position:relative; display:flex; align-items:center; gap:8px; margin-left:8px; }
   /* `white-space: nowrap` because these are pills: without it "How it works"
      and "What's new" wrapped INSIDE their own borders on a phone, which reads
@@ -440,6 +445,8 @@
   <div class="top">
     <div class="mark"><i></i><i></i><i></i><i></i></div>
     <h1>Retake</h1>
+    <!-- The window's two areas. Watch is a plug-in: without it there is one area, and no nav. -->
+    <nav class="areas" id="areas" hidden><a href="/" aria-current="page">Demos</a><a href="/watch">Watch</a></nav>
     <span class="sp"></span>
     <button class="chip" id="guideBtn" title="How to ask an agent for a good recording">Guide</button>
     <button class="chip" id="routineBtn" title="How every recording here looks and sounds">Routine</button>
@@ -2034,6 +2041,8 @@ setInterval(pollRunning, 2000);
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };
 }
 
+// Watch, when it is installed, is the window's second area.
+api('/api/watch/where').then(() => { $('areas').hidden = false; }).catch(() => {});
 (async () => { settings = await api('/api/settings').catch(() => null); await drawDemos(); await newest(); watchActivity(); setInterval(drawDemos, 30000); })();
 </script>
 </body>
