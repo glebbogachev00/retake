@@ -16,6 +16,8 @@
   button { font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:8px 16px; cursor:pointer; }
   button:hover { background:var(--fill2); }
   button.go { background:var(--accent); color:#fff; }
+  a.btn { display:inline-block; background:var(--fill); border-radius:10px; padding:8px 16px; }
+  a.btn.go { background:var(--accent); color:#fff; }
   kbd { font:inherit; font-size:var(--small); color:var(--muted); margin-left:6px; }
   button.go kbd { color:rgba(255,255,255,.75); }
   .small { font-size:var(--small); color:var(--muted); }
@@ -60,6 +62,41 @@
   .list li a:hover { background:var(--fill); }
   .list .t { flex:1; } .list .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); display:inline-block; margin-right:8px; }
   .quiet { color:var(--muted); margin-top:30vh; text-align:center; }
+  /* The two areas of the window. Holds still while the page under it changes. */
+  nav.areas { display:flex; gap:18px; min-height:40px; align-items:center; margin-bottom:10px; }
+  nav.areas a { color:var(--muted); }
+  nav.areas a[aria-current="page"] { color:var(--ink); font-weight:600; }
+  .sum { font-size:var(--title); font-weight:600; margin:18px 0 0; }
+  ul.journeys { list-style:none; margin:18px 0 0; padding:0; }
+  ul.journeys li > * { display:flex; gap:16px; align-items:baseline; padding:12px 14px; border-radius:10px; }
+  ul.journeys li a:hover { background:var(--fill); }
+  ul.journeys .t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  ul.journeys .l { color:var(--muted); white-space:nowrap; }
+  ul.journeys .l.changed { color:var(--accent); font-weight:600; }
+  ul.journeys .l.failed { color:var(--fail); font-weight:600; }
+  .more { margin:22px 14px 0; font-size:var(--small); }
+  .more a { color:var(--muted); }
+  .quiet + .more { text-align:center; margin-left:0; margin-right:0; }
+  .more a:hover { color:var(--ink); }
+  .line { margin:6px 0 0; }
+  .line b.changed { color:var(--accent); } .line b.failed { color:var(--fail); }
+  .what { margin:2px 0 0; color:var(--muted); }
+  .diff { margin:10px 0 0; font-size:var(--small); }
+  .diff div { padding:1px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .diff .gone { color:var(--muted); text-decoration:line-through; }
+  .pair { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap:16px; margin-top:18px; }
+  .pair figure { margin:0; }
+  .pair .pic { position:relative; background:var(--fill); border-radius:14px; overflow:hidden; display:flex; justify-content:center; }
+  .pair .pic span.box { position:absolute; outline:2px solid var(--accent); border-radius:4px; pointer-events:none; }
+  .pair .pic .holder { position:relative; display:inline-block; max-width:100%; }
+  .pair img { display:block; max-width:100%; max-height:46vh; }
+  .pair .none { color:var(--muted); padding:48px 0; }
+  .pair figcaption { margin-top:6px; font-size:var(--small); color:var(--muted); }
+  .clip { margin-top:16px; background:var(--fill); border-radius:14px; overflow:hidden; display:flex; justify-content:center; }
+  .clip video { display:block; max-width:100%; max-height:30vh; }
+  .act a.quiet2 { color:var(--muted); padding:8px 6px; }
+  .act a.quiet2:hover { color:var(--ink); }
+  .others { margin-top:12px; font-size:var(--small); color:var(--muted); }
   @media (prefers-reduced-motion: no-preference) { main { animation: in .2s ease-out; } @keyframes in { from { opacity:0 } } }
 </style>
 </head>
@@ -72,22 +109,80 @@ const api = (p, body) => fetch(p, body === undefined ? { headers: H } : { method
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const clock = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const app = document.getElementById('app');
-const id = (location.pathname.match(/^\/watch\/([a-z0-9-]+)$/) || [])[1];
+const AREAS = '<nav class="areas"><a href="/">Demos</a><a href="/watch" aria-current="page">Watch</a></nav>';
+const journeyName = (location.pathname.match(/^\/watch\/j\/([a-z0-9-]+)$/) || [])[1];
+const id = journeyName ? null : (location.pathname.match(/^\/watch\/([a-z0-9-]+)$/) || [])[1];
 
-if (!id) home(); else session(id);
+if (journeyName) journey(journeyName);
+else if (id === 'sessions') sessions();
+else if (!id) home();
+else session(id);
 
-// ---------- the list: sessions, newest first ----------
+// ---------- the Watch area: each journey, one line ----------
 async function home() {
+  const J = await api('/api/watch/journeys');
+  if (J.live) { location.replace('/watch/' + J.live); return; }
+  const more = J.sessions ? `<p class="more"><a href="/watch/sessions">Sessions</a></p>` : '';
+  if (!J.journeys.length) { app.innerHTML = AREAS + '<p class="quiet">A journey is a script in this workspace’s watch/ folder.</p>' + more; setTimeout(home, 15000); return; }
+  app.innerHTML = AREAS + (J.summary ? `<h1 class="sum">${esc(J.summary)}</h1>` : '') + '<ul class="journeys">' + J.journeys.map(j => {
+    const href = j.status === 'changed' || j.status === 'failed' ? '/watch/j/' + j.name : j.session ? '/watch/' + j.session : null;
+    const inner = `<span class="t">${esc(j.title)}</span><span class="l ${esc(j.status || '')}">${esc(j.line)}</span>`;
+    return `<li>${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
+  }).join('') + '</ul>' + more;
+  setTimeout(home, 15000);
+}
+
+// ---------- a journey that changed or failed, at its moment ----------
+async function journey(name) {
+  const J = await api('/api/watch/journeys/' + name);
+  if (J.error && !J.name) { app.innerHTML = AREAS + `<p class="quiet">${esc(J.error)}</p>`; return; }
+  document.title = J.title + ' · Watch';
+  const m = J.moment;
+  const sessionHref = J.session ? `/watch/${J.session}${m && m.clip ? '?t=' + m.clip.start.toFixed(1) : ''}` : null;
+  let h = AREAS + `<header><a class="back" href="/watch">‹</a><h1>${esc(J.title)}</h1></header>`;
+  h += `<p class="line"><b class="${esc(J.status || '')}">${esc(J.line)}</b>${m ? ` · step ${m.n}: ${esc(m.intent)}` : ''}</p>`;
+  if (m) {
+    h += `<p class="what">${esc(m.what)}${m.note ? ' — ' + esc(m.note) : ''}</p>`;
+    if (m.text && (m.text.added.length || m.text.removed.length)) {
+      h += '<div class="diff">' + m.text.removed.slice(0, 4).map(t => `<div class="gone">${esc(t)}</div>`).join('') + m.text.added.slice(0, 4).map(t => `<div>${esc(t)}</div>`).join('') + '</div>';
+    }
+    const pic = (src, box, alt) => src
+      ? `<div class="pic"><span class="holder"><img src="${src}" alt="${alt}">${box ? `<span class="box" style="left:${box.x * 100}%;top:${box.y * 100}%;width:${box.width * 100}%;height:${box.height * 100}%"></span>` : ''}</span></div>`
+      : `<div class="pic"><span class="none">No picture</span></div>`;
+    const when = J.line.replace(/^(Changed|Failed) /, '');
+    h += '<div class="pair">'
+      + `<figure>${pic(m.before ? `/watch-journey/${name}/${m.before}` : null, null, 'Before')}<figcaption>Normal${J.accepted ? ' since ' + esc(J.accepted) : ''}</figcaption></figure>`
+      + `<figure>${pic(m.after && J.session ? `/watch-files/${J.session}/${m.after}` : null, m.box, 'After')}<figcaption>${esc(when[0].toUpperCase() + when.slice(1))}</figcaption></figure>`
+      + '</div>';
+    if (J.video && m.clip) h += `<div class="clip"><video id="clip" muted playsinline controls preload="auto" src="/watch-files/${J.session}/${esc(J.video)}#t=${m.clip.start.toFixed(2)},${m.clip.end.toFixed(2)}"></video></div>`;
+  }
+  h += '<div class="act">';
+  if (J.status === 'changed') h += `<button class="go" id="accept">Accept as normal</button>${sessionHref ? `<a class="quiet2" href="${sessionHref}">Open the session</a>` : ''}`;
+  else if (sessionHref) h += `<a class="btn go" href="${sessionHref}">Open the session</a>`;
+  h += '</div>';
+  if (J.others && J.others.length) h += `<p class="others">Also changed: ${J.others.map(o => 'step ' + o.n + ' · ' + esc(o.intent)).join(', ')}</p>`;
+  app.innerHTML = h;
+  const clip = document.getElementById('clip');
+  if (clip) clip.play().catch(() => {});
+  const acc = document.getElementById('accept');
+  if (acc) acc.onclick = async () => {
+    acc.disabled = true;
+    const r = await api(`/api/watch/journeys/${name}/accept`, {});
+    // One decision, then the next: the next journey that changed, or the list.
+    location.href = r.next ? '/watch/j/' + r.next : '/watch';
+  };
+}
+
+// ---------- every session, newest first ----------
+async function sessions() {
   const all = await api('/api/watch/sessions');
-  const live = all.find(s => s.live);
-  if (live) { location.replace('/watch/' + live.id); return; }
-  if (!all.length) { app.innerHTML = '<p class="quiet">Nothing has been watched yet.</p>'; return; }
-  app.innerHTML = '<header><h1>Watched</h1></header><ul class="list">' + all.map(s => {
+  if (!all.length) { app.innerHTML = AREAS + '<p class="quiet">Nothing has been watched yet.</p>'; return; }
+  app.innerHTML = AREAS + '<header><a class="back" href="/watch">‹</a><h1>Sessions</h1></header><ul class="list">' + all.map(s => {
     const d = new Date(s.startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
     const bits = [s.steps + ' steps', s.failed ? s.failed + ' failed' : '', s.flags ? s.flags + ' flagged' : ''].filter(Boolean).join(' · ');
     return `<li><a href="/watch/${s.id}"><span class="t">${s.live ? '<span class="dot"></span>' : ''}${esc(s.title)}</span><span class="small">${bits}</span><span class="small">${d}</span></a></li>`;
   }).join('') + '</ul>';
-  setTimeout(home, 5000);
+  setTimeout(sessions, 5000);
 }
 
 // ---------- one session ----------
@@ -143,7 +238,12 @@ function session(id) {
       video = $('vid');
       video.playbackRate = rate;
       video.addEventListener('timeupdate', () => { renderLine(); renderHead(); renderSteps(); });
-      video.addEventListener('loadedmetadata', () => { renderMarks(); video.play().catch(() => {}); });
+      video.addEventListener('loadedmetadata', () => {
+        // Opened from a journey's moment: start there.
+        const at = Number(new URLSearchParams(location.search).get('t'));
+        if (at > 0 && at < video.duration) video.currentTime = at;
+        renderMarks(); video.play().catch(() => {});
+      });
       video.addEventListener('click', () => video.paused ? video.play() : video.pause());
       video.addEventListener('ended', () => askFix());
       $('track').hidden = false;

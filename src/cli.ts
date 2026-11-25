@@ -27,6 +27,8 @@
  *   retake presets                                list quality presets
  *   retake list                                   manifests in ./demos
  *   retake golden add|list|score                  approved visual references and deterministic scorecards
+ *   retake watch run <journey|all>                run journeys in watch/, compared with the last accepted run
+ *   retake watch schedule daily --at 03:00        the nightly run: silent unless something changed
  *   retake describe <name> <url> "<what>"         scout + model → demos/<name>.yaml
  *
  * Run from a clone, the `.ts` source goes through tsx (`npm run retake -- …`);
@@ -1835,6 +1837,99 @@ program
       await serveShares(shareRoot(outRoot), port);
       say(`▶ serving ${path.relative(process.cwd(), shareRoot(outRoot))} on http://localhost:${port}/<share>/ — Ctrl-C to stop`);
     }
+  });
+
+// ---------- Watch: journeys, and the nightly run ----------
+// A plug-in: everything below is loaded only when `retake watch` is typed.
+
+const watchCmd = program
+  .command("watch")
+  .description("journeys: your app's key flows as scripts in watch/, run under Watch and compared with the last accepted run")
+  .action(async () => {
+    const { journeyStates, summaryLine } = await import("./watch/journey-store.js");
+    const all = journeyStates(process.cwd());
+    if (!all.length) { say("no journeys yet — a journey is a script at watch/<name>.mjs in this workspace"); return; }
+    const s = summaryLine(all.map((j) => j.last));
+    if (s) say(s);
+    for (const j of all) say(`${j.status === "failed" ? "✗" : j.status === "changed" ? "△" : j.status ? "✓" : "·"} ${j.name.padEnd(28)} ${j.line}`);
+  });
+
+watchCmd
+  .command("run")
+  .argument("<journey>", "a journey's name (watch/<name>.mjs), or all")
+  .option("--headed", "show the browser", false)
+  .option("--scheduled", "started by `retake watch schedule`: one notification, and only when something changed or failed", false)
+  .description("run journeys under Watch, compare each with its last accepted run, and keep the result")
+  .action(async (which: string, opts: { headed: boolean; scheduled: boolean }) => {
+    const { listJourneys, pickJourneys, nightlyNotice } = await import("./watch/journey-store.js");
+    const { describeChange } = await import("./watch/compare.js");
+    const root = process.cwd();
+    if (opts.scheduled) say(`\n═══ nightly run · ${new Date().toLocaleString()}`);
+    const { notify } = await import("./schedule.js");
+    let chosen: { name: string; file: string }[];
+    try { chosen = pickJourneys(listJourneys(root), which); }
+    catch (e) { if (opts.scheduled) notify("Retake Watch — the nightly run stopped", (e as Error).message.slice(0, 220)); throw e; }
+    const { runJourney } = await import("./watch/journeys.js");
+    const out = process.env.RETAKE_OUT?.trim() ? path.resolve(process.env.RETAKE_OUT.replace(/^~/, process.env.HOME ?? "")) : path.join(root, "outputs");
+    const runs = [];
+    for (const j of chosen) {
+      say(`▶ ${j.name}`);
+      try {
+        const r = await runJourney({ root, name: j.name, file: j.file, out, scheduled: opts.scheduled, headed: opts.headed, log: say });
+        runs.push(r);
+        const first = r.changes[0];
+        if (r.status === "failed") say(`✗ ${j.name} failed${r.error ? ` — ${r.error}` : ""}`);
+        else if (r.status === "changed") say(`△ ${j.name} changed at step ${first.n} (${first.intent}): ${describeChange(first).toLowerCase()}${r.changes.length > 1 ? `, and ${r.changes.length - 1} more step${r.changes.length === 2 ? "" : "s"}` : ""}`);
+        else say(`✓ ${j.name} unchanged${r.firstRun ? " — the first run, kept as normal" : ""}`);
+        say(`  ${path.relative(root, r.dir) || r.dir}`);
+      } catch (e) {
+        say(`✗ ${j.name} could not run — ${(e as Error).message.split("\n")[0]}`);
+        runs.push({ journey: j.name, title: j.name, at: new Date().toISOString(), session: "", dir: "", status: "failed" as const, scheduled: opts.scheduled, error: (e as Error).message, steps: 0, changes: [] });
+      }
+    }
+    if (runs.some((r) => r.status === "failed")) process.exitCode = 2;
+    else if (runs.some((r) => r.status === "changed")) process.exitCode = 3;
+    if (opts.scheduled) {
+      const n = nightlyNotice(runs);
+      if (n) notify(n.title, n.body);   // silent when nothing changed
+    } else if (runs.some((r) => r.status === "changed")) say(`  The window's Watch area shows what changed; \`retake watch accept <journey>\` makes it the new normal.`);
+  });
+
+watchCmd
+  .command("accept")
+  .argument("<journey>", "the journey whose last run is the new normal")
+  .description("accept a journey's last run as normal: later runs are compared with it")
+  .action(async (name: string) => {
+    const { acceptLast, listJourneys, pickJourneys } = await import("./watch/journey-store.js");
+    const [j] = pickJourneys(listJourneys(process.cwd()), name);
+    const r = acceptLast(process.cwd(), j.name);
+    say(`✓ ${j.name}: the run of ${new Date(r.at).toLocaleString()} is now normal.`);
+  });
+
+watchCmd
+  .command("schedule")
+  .argument("[every]", "daily | weekdays | off — omit to see the current schedule")
+  .option("--at <HH:MM>", "24-hour time")
+  .description("run every journey on a schedule, unattended: silent unless something changed or failed")
+  .action(async (every: string | undefined, opts: { at?: string }) => {
+    const { parseWatchSchedule, listJourneys } = await import("./watch/journey-store.js");
+    const { installSchedule, removeSchedule, readSchedule, scheduleLoaded, describeSchedule, logFile } = await import("./schedule.js");
+    const root = process.cwd();
+    const want = parseWatchSchedule(every, opts.at);
+    if (!want.every) {
+      const s = readSchedule(root, "watch");
+      if (!s) { say("not scheduled — `retake watch schedule daily` runs every journey each night at 03:00."); return; }
+      const live = scheduleLoaded(s.label);
+      say(`${live ? "✓" : "✗"} journeys run ${describeSchedule(s)} — ${live ? `held by ${s.mechanism}` : `written, but ${s.mechanism} is not holding it; schedule it again`}`);
+      say(`  log: ${path.relative(root, logFile(root, "watch"))}`);
+      return;
+    }
+    if (want.every === "off") { say(removeSchedule(root, "watch") ? "✓ unscheduled." : "nothing was scheduled."); return; }
+    const journeys = listJourneys(root);
+    const bin = entry("cli");
+    const s = installSchedule(root, { every: want.every, at: want.at, count: 1 }, [bin.command, ...bin.args, "watch", "run", "all", "--scheduled"], "watch");
+    say(`✓ journeys run ${describeSchedule(s)}: ${journeys.length ? journeys.map((j) => j.name).join(", ") : "none yet — add one at watch/<name>.mjs"}.`);
+    say(`  Silent when nothing changed; one notification when something did. \`retake watch schedule off\` stops it.`);
   });
 
 program.parseAsync(process.argv).catch((e) => {

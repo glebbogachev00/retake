@@ -16,8 +16,11 @@ import crypto from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 
 export type Every = "daily" | "weekdays";
+/** What a schedule runs. Each kind has its own label and its own state, so a
+    workspace can have a routine schedule and a Watch schedule at once. */
+export type ScheduleKind = "routine" | "watch";
 export type ScheduleSpec = { every: Every; at: string; count: number };
-export type Installed = ScheduleSpec & { label: string; root: string; installedAt: string; mechanism: "launchd" | "cron" };
+export type Installed = ScheduleSpec & { label: string; root: string; installedAt: string; mechanism: "launchd" | "cron"; kind?: ScheduleKind };
 
 export function parseAt(at: string): { hour: number; minute: number } {
   const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(at.trim());
@@ -25,16 +28,19 @@ export function parseAt(at: string): { hour: number; minute: number } {
   return { hour: Number(m[1]), minute: Number(m[2]) };
 }
 
-/** One schedule per workspace, named after it, so two workspaces never
-    overwrite each other's. */
-export function labelFor(root: string): string {
+/** One schedule of each kind per workspace, named after it, so two
+    workspaces never overwrite each other's, and a Watch schedule never
+    replaces a routine's. */
+export function labelFor(root: string, kind: ScheduleKind = "routine"): string {
   const slug = path.basename(root).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "workspace";
   const hash = crypto.createHash("sha1").update(path.resolve(root)).digest("hex").slice(0, 8);
-  return `app.retake.routine.${slug}.${hash}`;
+  return `app.retake.${kind}.${slug}.${hash}`;
 }
 
-export function describeSchedule(s: ScheduleSpec): string {
-  return `${s.every === "daily" ? "every day" : "every weekday"} at ${s.at}, ${s.count === 1 ? "one video" : `up to ${s.count} videos`}`;
+export function describeSchedule(s: ScheduleSpec & { kind?: ScheduleKind }): string {
+  const when = `${s.every === "daily" ? "every day" : "every weekday"} at ${s.at}`;
+  if (s.kind === "watch") return when;
+  return `${when}, ${s.count === 1 ? "one video" : `up to ${s.count} videos`}`;
 }
 
 const xml = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -72,21 +78,26 @@ export function cronLine(o: { label: string; program: string[]; root: string; sp
   return `${minute} ${hour} * * ${days} cd ${shq(o.root)} && ${env} ${o.program.map(shq).join(" ")} >> ${shq(o.log)} 2>&1 # ${o.label}`;
 }
 
-function stateFile(root: string): string {
-  return path.join(root, ".retake", "schedule.json");
+function stateFile(root: string, kind: ScheduleKind = "routine"): string {
+  return path.join(root, ".retake", kind === "routine" ? "schedule.json" : `${kind}-schedule.json`);
 }
 
-export function readSchedule(root: string): Installed | null {
-  try { return JSON.parse(fs.readFileSync(stateFile(root), "utf8")) as Installed; } catch { return null; }
+/** Where a schedule's runs write what they said. */
+export function logFile(root: string, kind: ScheduleKind = "routine"): string {
+  return path.join(root, ".retake", kind === "routine" ? "schedule.log" : `${kind}-schedule.log`);
+}
+
+export function readSchedule(root: string, kind: ScheduleKind = "routine"): Installed | null {
+  try { return JSON.parse(fs.readFileSync(stateFile(root, kind), "utf8")) as Installed; } catch { return null; }
 }
 
 const plistPath = (label: string) => path.join(os.homedir(), "Library", "LaunchAgents", `${label}.plist`);
 
-export function installSchedule(root: string, spec: ScheduleSpec, program: string[]): Installed {
+export function installSchedule(root: string, spec: ScheduleSpec, program: string[], kind: ScheduleKind = "routine"): Installed {
   parseAt(spec.at);
-  if (!Number.isInteger(spec.count) || spec.count < 1 || spec.count > 20) throw new Error("-n is how many videos per run, 1 to 20");
-  const label = labelFor(root);
-  const log = path.join(root, ".retake", "schedule.log");
+  if (kind === "routine" && (!Number.isInteger(spec.count) || spec.count < 1 || spec.count > 20)) throw new Error("-n is how many videos per run, 1 to 20");
+  const label = labelFor(root, kind);
+  const log = logFile(root, kind);
   fs.mkdirSync(path.dirname(log), { recursive: true });
   // What the shell had when the schedule was made: the scheduler's own PATH
   // finds neither node nor ffmpeg.
@@ -94,7 +105,7 @@ export function installSchedule(root: string, spec: ScheduleSpec, program: strin
   const o = { label, program, root, spec, log, env };
   let mechanism: Installed["mechanism"];
   if (process.platform === "darwin") {
-    removeSchedule(root);
+    removeSchedule(root, kind);
     const file = plistPath(label);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, plistXml(o));
@@ -103,7 +114,7 @@ export function installSchedule(root: string, spec: ScheduleSpec, program: strin
     if (r.status !== 0) throw new Error(`launchctl would not load the schedule: ${(r.stderr || r.stdout).trim()}`);
     mechanism = "launchd";
   } else if (process.platform === "linux") {
-    removeSchedule(root);
+    removeSchedule(root, kind);
     const current = spawnSync("crontab", ["-l"], { encoding: "utf8" });
     const lines = (current.status === 0 ? current.stdout : "").split("\n").filter((l) => l.trim());
     lines.push(cronLine(o));
@@ -111,15 +122,15 @@ export function installSchedule(root: string, spec: ScheduleSpec, program: strin
     if (w.status !== 0) throw new Error(`crontab would not take the schedule: ${(w.stderr || "").trim()}`);
     mechanism = "cron";
   } else {
-    throw new Error("scheduling uses launchd (macOS) or cron (Linux) — on this system, run `retake routine run` from the system's own task scheduler");
+    throw new Error(`scheduling uses launchd (macOS) or cron (Linux) — on this system, run \`${kind === "watch" ? "retake watch run all --scheduled" : "retake routine run"}\` from the system's own task scheduler`);
   }
-  const installed: Installed = { ...spec, label, root, installedAt: new Date().toISOString(), mechanism };
-  fs.writeFileSync(stateFile(root), JSON.stringify(installed, null, 2));
+  const installed: Installed = { ...spec, label, root, installedAt: new Date().toISOString(), mechanism, ...(kind === "routine" ? {} : { kind }) };
+  fs.writeFileSync(stateFile(root, kind), JSON.stringify(installed, null, 2));
   return installed;
 }
 
-export function removeSchedule(root: string): boolean {
-  const label = labelFor(root);
+export function removeSchedule(root: string, kind: ScheduleKind = "routine"): boolean {
+  const label = labelFor(root, kind);
   let removed = false;
   if (process.platform === "darwin") {
     const uid = String(process.getuid?.() ?? "");
@@ -135,7 +146,7 @@ export function removeSchedule(root: string): boolean {
       removed = true;
     }
   }
-  if (fs.existsSync(stateFile(root))) { fs.rmSync(stateFile(root)); removed = true; }
+  if (fs.existsSync(stateFile(root, kind))) { fs.rmSync(stateFile(root, kind)); removed = true; }
   return removed;
 }
 

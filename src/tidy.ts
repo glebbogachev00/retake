@@ -66,6 +66,8 @@ export function planTidy(outRoot: string, o: TidyOptions): Plan {
   for (const name of fs.readdirSync(outRoot)) {
     const dir = path.join(outRoot, name);
     if (!fs.statSync(dir).isDirectory()) continue;
+    // Watch sessions, and the nights journeys ran: not demos, and not tidy's.
+    if (name === "watch") continue;
     const takePath = path.join(dir, "take.json");
     const hasManifest = fs.existsSync(path.join(o.demosDir, `${name}.yaml`)) || fs.existsSync(path.join(o.demosDir, `${name}.json`));
 

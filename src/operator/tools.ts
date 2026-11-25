@@ -799,6 +799,36 @@ server.registerTool("notes", {
 }, async ({ all }) => text(notes(OUT, { all: all === true }).lines.join("\n")));
 
 
+server.registerTool("watch", {
+  description: "JOURNEYS: the app's key flows, kept as scripts at watch/<name>.mjs in this workspace and run every night under Watch. Without `run` it returns each journey with its one line (\"Unchanged since 3 Dec\", \"Changed last night\", \"Failed last night\") — call it when the person asks how their app is doing, or before changing a flow a journey covers. With run=\"<journey>\" or run=\"all\" it runs them now (a real browser, about a minute each) and says, per journey, whether it is unchanged, changed (at which step, and whether the text, the picture or the verdict moved) or failed, and why. A journey that stops on \"no saved login\" needs the person to run `retake login <url>` themselves; never ask for the values. Accepting a change as the new normal and scheduling the nightly run are the person's decisions, made in the window or at their terminal — not here.",
+  inputSchema: { run: z.string().optional() },
+  annotations: RETAKE_WRITE,
+}, async ({ run }) => {
+  const { journeyStates, listJourneys, pickJourneys, summaryLine } = await import("../watch/journey-store.js");
+  if (!run) {
+    const all = journeyStates(ROOT);
+    if (!all.length) return text("no journeys yet — a journey is a script at watch/<name>.mjs in this workspace, exporting `default async (page, w, { signIn }) => {…}` (see docs/watch.md)");
+    const s = summaryLine(all.map((j) => j.last));
+    return text([...(s ? [s] : []), ...all.map((j) => `${j.name}: ${j.line}`)].join("\n"));
+  }
+  const { runJourney } = await import("../watch/journeys.js");
+  const { describeChange } = await import("../watch/compare.js");
+  let chosen;
+  try { chosen = pickJourneys(listJourneys(ROOT), run); } catch (e) { return text((e as Error).message); }
+  const lines: string[] = [];
+  for (const j of chosen) {
+    await tell(`Running the journey ${j.name}…`);
+    try {
+      const r = await runJourney({ root: ROOT, name: j.name, file: j.file, out: OUT });
+      const c = r.changes[0];
+      lines.push(r.status === "failed" ? `${j.name}: failed — ${r.error ?? "a step did not pass"} (${r.dir})`
+        : r.status === "changed" ? `${j.name}: changed at step ${c.n} (${c.intent}) — ${describeChange(c)}${r.changes.length > 1 ? `, and ${r.changes.length - 1} more` : ""}. The person decides whether it is the new normal, in the window's Watch area. (${r.dir})`
+        : `${j.name}: unchanged${r.firstRun ? " — the first run, kept as normal" : ""}`);
+    } catch (e) { lines.push(`${j.name}: could not run — ${(e as Error).message.split("\n")[0]}`); }
+  }
+  return text(lines.join("\n"));
+});
+
 server.registerTool("sense", {
   description: "DOES THE RUN ADD UP. `verify` judges one frame — is the button readable. This judges the whole demo: everything the run typed, chose and clicked, against the frames that came out, through six bounded lenses (quantity, continuity, state, units and labels, order, dead ends). It found a real one on its first outing: a charter quote entered two legs, SGN→SIN and SIN→SGN, and showed a single unlabelled price. Nothing else was ever going to catch that — every step passed and every frame looked fine. It ASKS rather than fails, so treat what comes back as questions to settle, not defects to fix, and show them to the person rather than acting on them alone. Needs nothing declared in the manifest: the inputs are already in the take.",
   inputSchema: { name: z.string() },

@@ -119,6 +119,106 @@ window shows the latest status next to each note.
 `steps.json` and `flags.json` are written as the session goes, so a script
 that dies half-way still leaves what happened.
 
+## Journeys
+
+A journey is one of your app's key flows, written once as a script and kept in
+the workspace, so it can be run again every night without anybody there.
+
+```
+watch/<name>.mjs        one journey
+watch/_<anything>.mjs   shared code journeys import; never run on its own
+```
+
+```js
+// watch/licences.mjs
+export const title = 'Portal – licences';              // optional, defaults to the file name
+export const viewport = { width: 390, height: 844 };   // optional; 480 wide or less runs as a phone
+export default async function (page, w, { signIn }) {
+  await w.step('Sign in', 'The portal opens');
+  await page.goto('https://portal.example.com');
+  await signIn('https://portal.example.com');            // the login saved with `retake login`
+  await w.result(true);
+  await w.step('Open Licences', 'The licence is listed');
+  await page.click('nav >> text=Licences');
+  await w.result(await page.isVisible('table'), 'Listed');
+}
+```
+
+`page` is a fresh browser page, `w` is the Watch session (the same calls as
+above), and the third argument is the journey's kit:
+
+| | |
+|---|---|
+| `signIn(url?, { user?, password?, code?, until? })` | Signs in with the login saved for that site (`retake login <url>`, kept in the Keychain): the username, the password, and the authenticator code when a key is saved, on as many screens as the sign-in takes. Masks each field before typing into it. A refused password is never retried. With no login saved it stops with the exact `retake login` line to run. `until: 'password'` (or `'code'`) stops when that screen shows, with nothing typed into it, for a journey about the sign-in screens themselves. |
+| `phone` | True when the journey runs at phone width. |
+
+No secret ever lives in a journey.
+
+```
+retake watch                          each journey and where it stands
+retake watch run <journey|all>        run them now (--headed to see the browser)
+retake watch accept <journey>         the last run is the new normal
+retake watch schedule daily|weekdays|off [--at HH:MM]   the nightly run (03:00 unless said)
+```
+
+`run` exits 0 when nothing changed, 3 when something changed, 2 when a
+journey failed.
+
+### What counts as changed
+
+At every `w.result` the page is captured as it is then: its visible text,
+and its picture. Each step is put against the same step of the run accepted
+as normal (steps are matched by what they say they do, so a step added in the
+middle changes only itself). A step has changed when:
+
+- it passed and now fails (or the other way round);
+- the page's visible text is different (lines new or gone);
+- the picture differs by more than a small patch, about 20 × 20 pixels.
+
+Masked regions count for nothing in either: the text under a mask is left
+out, and the pixels under it are not compared. So mask anything that changes
+on its own (a clock, today's date, a carousel) the same way you mask a
+secret.
+
+A journey that throws, times out (10 minutes), or has a step that fails has
+**failed**. Failed beats changed.
+
+The first run that passes becomes the normal. After that only a person
+moves it: **Accept as normal** in the window, or `retake watch accept`.
+
+### The nightly run
+
+`retake watch schedule daily` asks the machine's scheduler (launchd on a Mac,
+cron on Linux) to run `retake watch run all --scheduled` at 03:00. It has its
+own label, so it never replaces a `retake routine schedule`. With nothing
+changed it is silent. When something changed or failed it sends one
+notification, for example "1 journey changed since last night: Portal –
+licences". Unchanged nights are tidied as the next one runs: only the newest
+is kept, along with every night that changed or failed, and any session
+someone left a note on. What the runs printed is in
+`.retake/watch-schedule.log`.
+
+### In the window
+
+The Watch area (`/watch`, next to Demos) lists the journeys, each with one
+line: "Unchanged since 3 Dec", "Changed last night", "Failed last night". A
+changed journey opens to the moment it changed: the accepted picture and
+last night's, side by side, with the changed patch outlined, the lines of
+text that changed, and the few seconds of video around it. The one button is
+**Accept as normal**; "Open the session" plays the whole run from that
+moment. Accepting moves on to the next journey that changed, or back to the
+list. Past sessions are under Sessions.
+
+### Where it is kept
+
+| | |
+|---|---|
+| `watch/.journeys/<name>/baseline/` | The run accepted as normal: `snapshots.json` and its pictures. A decision, kept with the journeys rather than in outputs/. |
+| `watch/.journeys/<name>/last.json` | What the newest run found. |
+| `watch/.journeys/<name>/runs.jsonl` | Every run, one line each. |
+| `outputs/watch/<session>/snapshots.json`, `snapshots/` | The run's own capture of each step. |
+| `outputs/watch/<session>/journey.json` | That run's verdict and every change. |
+
 ## Limits
 
 - The live picture and the video show the page's viewport only: no browser
