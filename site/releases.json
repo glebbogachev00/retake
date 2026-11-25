@@ -4,15 +4,16 @@
     {
       "version": "0.16.0",
       "date": "2026-11-25",
-      "headline": "Watch an AI test your app, and point at what looks unclear",
+      "headline": "Watch an AI test your app, and hear about it only when something changes",
       "notes": [
-        "Watch mode: when an AI or a test script tests your web app, you can watch it in the Retake window as it happens, or later as a replay. Before each step you see what it is about to do and what it expects, then whether it worked.",
-        "You set the pace. Watch pauses briefly after each step, Step waits until you press Next, and Fast does not stop. The test cannot change your choice.",
-        "Press Unclear, or the U key, on anything that works but does not look right, and add a few words if you like. Replays work the same way, on a timeline with a mark for every step.",
-        "When a session ends, your notes go out together as one fix request your coding agent can pick up, with a picture of each moment. You have ten seconds to undo, and if your agent reports back, you see its progress next to each note.",
-        "Passwords and other secrets the test names are blacked out in the live picture, the video and every screenshot.",
-        "Every session is kept: its video, each step with a picture, your notes and a short report.",
-        "The guide has a new page on Watch mode, for the person watching and for developers connecting their tests."
+        "Watch is new: a test, written by you or by your coding agent, uses your web app while you watch in the Retake window, as it happens or later as a replay. Before each step you see what it is about to do and what it expects, then whether it worked.",
+        "You set the pace. Watch pauses briefly after each step, Step waits until you press Next, and Fast does not stop.",
+        "Press Unclear, or the U key, on anything that works but does not look right, and add a few words if you like. When the session ends, your notes go to your coding agent as one request to fix, with a picture of each moment. You have ten seconds to undo.",
+        "Keep your app's key flows, such as signing in or booking, as journeys. They run again whenever you like, and every night if you turn that on.",
+        "Each night every journey is compared with the run you accepted as normal. If nothing changed, you hear nothing. If something changed or failed, you get one notification. Open that journey in the Watch area and it starts at the moment it changed: before and after side by side, the change outlined, and what the text used to say.",
+        "One button, Accept as normal, makes a change the new normal. If it is a mistake, leave it and ask your agent to fix it; the next night tells you whether it is back.",
+        "Passwords and other secrets a test names are blacked out in everything Watch keeps. A journey signs in with the login you saved once, so no password is ever written into it.",
+        "The guide has a new page on Watch, for the person watching and for developers writing the tests."
       ]
     },
     {
