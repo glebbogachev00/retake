@@ -82,8 +82,8 @@
         <h2>Watch it live</h2>
         <p>Keep the Retake window running (<code>retake ui</code>) and open <a href="http://localhost:4310/watch">http://localhost:4310/watch</a>. If a test is running, it opens straight onto it. If not, it lists past sessions, newest first. A test script also prints its own link when it starts.</p>
         <figure class="docs-figure">
-          <a href="/media/watch-live-v1.png"><img src="/media/watch-live-v1.png" alt="The Watch screen during a test. The app's page fills most of the screen, with a square region blacked out. Under it: the step “Open Licences, expecting the licence list”, the verdict “Passed”, the buttons Next and Unclear, and a note being typed: “Renew looks disabled at 45% opacity”. The pace switch at the top right is set to Step." width="1164" height="1020" loading="lazy"></a>
-          <figcaption>Live, at Step pace, while a note is being typed. Made with Retake’s self-test, which tests a small made-up app.</figcaption>
+          <a href="/media/watch-live-v2.jpg"><img src="/media/watch-live-v2.jpg" alt="The Watch screen during a test of Larkspur, a made-up room-booking app. The app’s room page for Juniper fills most of the screen. Under it: “Open Juniper, expecting the page for Juniper, with today’s schedule”, the verdict “Passed, free from 14:00 to 16:00”, the buttons Next and Unclear, and the note field. The pace switch at the top right is set to Watch, and the four steps so far are listed at the bottom." width="1122" height="1080" loading="lazy"></a>
+          <figcaption>Live, at Watch pace, four steps into a test of Larkspur, a made-up app built for these pictures.</figcaption>
         </figure>
         <p>The page is large and nothing else competes with it. Under it is one line: what the test is doing and what it expects, then its verdict, <strong>Passed</strong> or <strong>Failed</strong>. Below that is the list of steps so far, each marked as passed (✓), failed (✗) or flagged by you (⚑).</p>
         <h3 id="pace">Pick the pace</h3>
@@ -99,8 +99,8 @@
         <h2>Watch a replay</h2>
         <p>Every session is saved, so you can watch it later on the same screen. Open it from the list at <code>/watch</code>.</p>
         <figure class="docs-figure">
-          <a href="/media/watch-replay-v1.png"><img src="/media/watch-replay-v1.png" alt="The Watch screen replaying a finished session. The password field and authenticator key on the page are covered by black boxes. Under the page is a timeline with a mark for each step and two blue dots for flags, the buttons 1× and 2× at the top right, and the line “Sending 2 notes to fix in 9s” with an Undo link." width="1164" height="1090" loading="lazy"></a>
-          <figcaption>A replay, with secrets covered. Each tick on the timeline is a step; each blue dot is a note.</figcaption>
+          <a href="/media/watch-replay-v2.jpg"><img src="/media/watch-replay-v2.jpg" alt="The Watch screen replaying the finished session. The app shows the Bookings page with the new Design review booking. Under it, a timeline with a tick for each step and two blue dots for notes, the line “Find the new booking, Passed”, and the step list, where two steps carry the notes written about them." width="1122" height="1180" loading="lazy"></a>
+          <figcaption>A replay, paused on the last step. Each tick on the timeline is a step; each blue dot is a note.</figcaption>
         </figure>
         <ul>
           <li>Play at <strong>1×</strong> or <strong>2×</strong>.</li>
@@ -111,6 +111,10 @@
       <section id="notes" data-doc-section>
         <h2>Unclear &amp; notes</h2>
         <p>Press <strong>Unclear</strong>, or the <kbd>U</kbd> key, on anything that worked but did not look clear: a button that looks disabled, a form that flickers, a message nobody would understand. The flag is saved at once, with a screenshot and the page’s address, and the cursor moves to the note field. Type a few words and press <kbd>Enter</kbd>, or press <kbd>Esc</kbd> to keep the flag without words.</p>
+        <figure class="docs-figure">
+          <a href="/media/watch-note-v2.jpg"><img src="/media/watch-note-v2.jpg" alt="Part of the Watch screen at Step pace. The app shows the booking form with Start 14:00 and End 15:00. Under it, the step “Fill in a design review, 14:00 to 15:00”, Passed, and a note being typed after pressing Unclear: “Which time zone are these times in? The form doesn’t say.”" width="1122" height="686" loading="lazy"></a>
+          <figcaption>Unclear, then a few words. The form works, but it never says which time zone it means.</figcaption>
+        </figure>
         <p>You can also type in the note field at any moment and press <kbd>Enter</kbd>. While you are typing, a live test waits at its next pause until you are done, and a replay pauses.</p>
         <table class="docs-table">
           <thead><tr><th scope="col">Key</th><th scope="col">What it does</th></tr></thead>
@@ -127,8 +131,8 @@
         <h2>What happens to your notes</h2>
         <p>When a session ends with notes, the window says <strong>Sending 2 notes to fix in 10s</strong>, with an <strong>Undo</strong> link. If you do nothing, ten seconds later your notes go out together as one <strong>fix request</strong>: a short brief that lists each moment you flagged, what you wrote, the step it belongs to, what the test expected, the page’s address and a screenshot. A live session sends when the test ends; a replay sends when the video reaches its end, or when you leave the page.</p>
         <figure class="docs-figure">
-          <a href="/media/watch-sent-v1.png"><img src="/media/watch-sent-v1.png" alt="The bottom of the Watch screen after a replay: the timeline, the line “Sent 2 notes to fix.”, and the step list, where the flagged steps Open Licences and Click Renew each show the note that was written and the word “sent”." width="1164" height="300" loading="lazy"></a>
-          <figcaption>The notes have gone out. The status next to each note changes as an agent works on it.</figcaption>
+          <a href="/media/watch-sending-v2.png"><img src="/media/watch-sending-v2.png" alt="The bottom of the Watch screen after the replay ends: the timeline, the line “Sending 2 notes to fix in 6s” with an Undo link, and the step list with both notes under their steps." width="1122" height="495" loading="lazy"></a>
+          <figcaption>The ten seconds before your notes go out. Undo keeps them here.</figcaption>
         </figure>
         <p>Your coding agent can pick the request up from a queue that Retake keeps for agents. When the agent says it has taken a request, opened a pull request or finished, the window shows that next to each note. Notes you add later go out as a new request.</p>
         <p>The brief tells the agent to make each moment clear without changing what the app does, unless your note asks for that. Nothing is fixed on its own: an agent has to be told to watch the queue, or a developer has to switch on the optional fix command (see <a href="#agents">Fix requests, for agents</a>).</p>
@@ -136,6 +140,10 @@
       <section id="masks" data-doc-section>
         <h2>Hiding secrets</h2>
         <p>A test of a real app can show real secrets: a password, a recovery code, an authenticator key. The test script names what to hide, and Retake covers it with a black box, blurred at the edges, in the live picture, the video and every screenshot. The box is drawn by the page itself, so it is in every picture of the page and follows it across pages.</p>
+        <figure class="docs-figure">
+          <a href="/media/watch-mask-v2.jpg"><img src="/media/watch-mask-v2.jpg" alt="The live picture of Larkspur’s sign-in page. The email address is visible; the password field is covered by a black box." width="1066" height="735" loading="lazy"></a>
+          <figcaption>The password field, covered in the live picture. The same box is in the video and every screenshot.</figcaption>
+        </figure>
         <p class="docs-note"><strong>What masks do not cover.</strong> Check a session before you share any of it.</p>
         <ul>
           <li><strong>Only the page is captured.</strong> The picture is the page’s visible area: no browser bars, other tabs or popup windows. Masks work inside that area, in the page and its frames.</li>
@@ -224,6 +232,10 @@ await browser.close();</code></pre></div>
     fix-request.md        # the brief that went out, once notes are sent
     fix-request.json      # the same brief, for programs</code></pre></div>
         <p>Times in <code>steps.json</code> are milliseconds from the start, on the same clock as the video; times in <code>flags.json</code> are seconds. A second batch of notes from the same session goes out as <code>fix-request-2</code>, and so on.</p>
+        <figure class="docs-figure">
+          <a href="/media/watch-report-v2.png"><img src="/media/watch-report-v2.png" alt="The session’s report.md, rendered: the title “Larkspur · Book a room”, 8 steps, 8 passed, 0 failed, 2 flagged by you; then the two notes with their step, time and page address; then every step with what it expected and how it went." width="942" height="921" loading="lazy"></a>
+          <figcaption>The report: your notes first, then every step. Each “screenshot” is a link to the picture in <code>shots/</code>.</figcaption>
+        </figure>
       </section>
       <section id="agents" data-doc-section>
         <h2>Fix requests, for agents</h2>

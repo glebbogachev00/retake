@@ -12,6 +12,9 @@ writes the whole session to a folder.
 The public guide, with screenshots, is at
 https://www.useretake.app/docs/watch (`site/docs/watch.html`). This file is
 the developer's source; keep the two in step.
+Its pictures come from `scripts/watch-docs-shots.mjs`, a real session
+against Larkspur, a made-up app in `test/fixtures/larkspur/`: rerun it when
+the window changes.
 
 ## The script side
 
