@@ -230,7 +230,7 @@ export function renderReport(meta: SessionMeta, steps: StepRecord[], flags: Flag
   const passed = steps.filter((s) => s.result === "pass").length;
   const failed = steps.filter((s) => s.result === "fail").length;
   const out: string[] = [`# ${meta.title}`, ""];
-  out.push(`${new Date(meta.startedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })} · ${steps.length} steps · ${passed} passed · ${failed} failed · ${flags.length} flagged by you`);
+  out.push(`${new Date(meta.startedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${passed} passed · ${failed} failed · ${flags.length} flagged by you`);
   if (meta.video) out.push("", `Video: [${meta.video}](${meta.video})`);
   if (meta.problem) out.push("", `Note: ${meta.problem}`);
   out.push("");

@@ -34,10 +34,11 @@ import {
   type FlagRecord, type SessionMeta, type Speed, type StepRecord,
 } from "./watch/session.js";
 import { CURSOR_SCRIPT, maskScript } from "./watch/page-scripts.js";
+import { readWindow } from "./ui/guard.js";
 
 export type WatchOptions = {
   title: string;
-  /** The Retake window to show the session in. `false` for none. Default: $RETAKE_UI, else http://localhost:4310. */
+  /** The Retake window to show the session in. `false` for none. Default: $RETAKE_UI, else the window running for this workspace (it records its address in .retake/window.json), else http://localhost:4310. */
   ui?: string | false;
   /** Where outputs/ is. Sessions go to <out>/watch/<id>/. Default: the window's, else $RETAKE_OUT, else Retake's own outputs/. */
   out?: string;
@@ -63,6 +64,12 @@ export type Watch = {
   unmask(target: MaskTarget | MaskTarget[]): Promise<void>;
   end(): Promise<{ dir: string; flags: FlagRecord[] }>;
 };
+
+/** Retake's own use of a session, not for test scripts: `settleMasks` marks
+    everything masked again, now, in every frame, and waits until it is
+    painted. Journeys call it before every picture and every reading of the
+    page's text, so nothing that appeared since the last pass slips through. */
+export type WatchInternal = Watch & { settleMasks(): Promise<void> };
 
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const say = (l: string) => process.stdout.write(`retake watch: ${l}\n`);
@@ -134,13 +141,14 @@ function isLocator(t: unknown): t is Locator {
   return !!t && typeof t === "object" && typeof (t as Locator).evaluateAll === "function";
 }
 
-export async function startWatch(page: Page, opts: WatchOptions): Promise<Watch> {
+export async function startWatch(page: Page, opts: WatchOptions): Promise<WatchInternal> {
   const title = String(opts?.title ?? "").trim() || "Watch session";
   const t0 = Date.now();
   const startedAt = new Date(t0).toISOString();
 
   // ---- where it goes, and whether anybody is watching ----
-  const uiBase = opts.ui === false ? null : String(opts.ui || process.env.RETAKE_UI || "http://localhost:4310").replace(/\/+$/, "");
+  // The window: as said, else $RETAKE_UI, else the one running for this workspace, else the usual port.
+  const uiBase = opts.ui === false ? null : String(opts.ui || process.env.RETAKE_UI || readWindow(process.env.RETAKE_ROOT || process.cwd()) || "http://localhost:4310").replace(/\/+$/, "");
   const link = uiBase ? new WindowLink(uiBase) : null;
   const where = link ? await link.connect() : null;
   const outRoot = path.resolve(opts.out ?? process.env.RETAKE_OUT ?? where?.out ?? (process.env.RETAKE_ROOT ? path.join(process.env.RETAKE_ROOT, "outputs") : path.join(PKG_ROOT, "outputs")));
@@ -183,6 +191,14 @@ export async function startWatch(page: Page, opts: WatchOptions): Promise<Watch>
     }
   };
   const painted = () => page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(null))))).catch(() => {});
+  /** Every mask, again, at once: locators found and marked, the rules in every
+      frame (a frame that appeared since has none yet), then two frames painted. */
+  const settleMasks = async () => {
+    if (!css.size) return;
+    await markLocators();
+    await everyFrame(maskScript({ add: css.list() }));
+    await painted();
+  };
 
   const addMask = async (targets: MaskTarget[]) => {
     const add: string[] = [];
@@ -342,6 +358,7 @@ export async function startWatch(page: Page, opts: WatchOptions): Promise<Watch>
   const shoot = async (s: StepRecord) => {
     if (s.screenshot) return;
     try {
+      await settleMasks();
       const buf = await page.screenshot({ type: "jpeg", quality: 70, timeout: 5000 });
       saveShot(s, buf);
     } catch {
@@ -349,7 +366,7 @@ export async function startWatch(page: Page, opts: WatchOptions): Promise<Watch>
     }
   };
 
-  const w: Watch = {
+  const w: WatchInternal = {
     dir,
     link: sessionLink,
 
@@ -399,6 +416,7 @@ export async function startWatch(page: Page, opts: WatchOptions): Promise<Watch>
 
     async mask(target) { await addMask(Array.isArray(target) ? target : [target]); },
     async unmask(target) { await removeMask(Array.isArray(target) ? target : [target]); },
+    settleMasks,
 
     async end() {
       if (ended) return { dir, flags: readFlagsIn(dir) };
@@ -444,7 +462,7 @@ export async function startWatch(page: Page, opts: WatchOptions): Promise<Watch>
         writeReport(dir);
       }
       const flags = readFlagsIn(dir);
-      say(`done — ${steps.length} steps, ${flags.length} flagged. ${path.join(dir, "report.md")}`);
+      say(`done — ${steps.length} step${steps.length === 1 ? "" : "s"}, ${flags.length} flagged. ${path.join(dir, "report.md")}`);
       return { dir, flags };
     },
   };

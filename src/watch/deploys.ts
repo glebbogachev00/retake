@@ -345,3 +345,18 @@ export function scheduleStatusLine(o: {
   if (!o.nightly) return `✓ on, ${change.replace(/^and /, "")}${blind}`;
   return `✓ on — ${o.nightly.when}, ${change}${blind}`;
 }
+
+/** Journeys grouped by the app they are about, apps by address, journeys in
+    their own order within each; those with no known app last. */
+export function groupByApp<T extends { name: string }>(root: string, items: T[]): { origin: string | null; host: string | null; items: T[] }[] {
+  const files = new Map(listJourneys(root).map((j) => [j.name, j.file]));
+  const groups = new Map<string, { origin: string | null; host: string | null; items: T[] }>();
+  for (const it of items) {
+    const file = files.get(it.name);
+    const origin = file ? journeyOrigin(root, { name: it.name, file }) : null;
+    const k = origin ?? "";
+    if (!groups.has(k)) groups.set(k, { origin, host: origin ? hostOf(origin) : null, items: [] });
+    groups.get(k)!.items.push(it);
+  }
+  return [...groups.values()].sort((a, b) => (a.host === null ? 1 : b.host === null ? -1 : a.host.localeCompare(b.host)));
+}

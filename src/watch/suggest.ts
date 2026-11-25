@@ -25,7 +25,7 @@ import type { Page } from "playwright";
 import { launchChromium } from "../browser-home.js";
 import { hasLogin, siteOf } from "../logins.js";
 import { journeyNameOk, journeysDir, listJourneys } from "./journey-store.js";
-import { hostName, isTestSpace, originOf } from "./spaces.js";
+import { alreadyWatched, hostName, isTestSpace, originOf, withScheme } from "./spaces.js";
 import { readJson, writeJson } from "./session.js";
 import type { RunRecord } from "./journey-store.js";
 
@@ -151,7 +151,7 @@ export async function explore(url: string, o: { log?: (l: string) => void; maxPa
   const log = o.log ?? (() => {});
   const origin = originOf(url);
   if (!origin) throw new Error(`"${url}" is not an app's address — something like https://app.example.com`);
-  const entry = /^[a-z]+:\/\//i.test(url) ? url : `https://${url}`;
+  const entry = withScheme(url);
   const max = o.maxPages ?? 6;
   const browser = await launchChromium({ headless: true });
   try {
@@ -430,28 +430,29 @@ export function journeySource(p: Proposal, o: { origin: string; signInUrl?: stri
   // A value typed in and then looked for after a press: something was created.
   const typed = new Set(p.steps.flatMap((s) => (s.do === "fill" ? [s.value] : [])));
   const lands = new Set(p.steps.flatMap((s, i) => (s.do === "click" && p.steps[i + 1]?.do === "see" && typed.has((p.steps[i + 1] as { text: string }).text) ? [i] : [])));
+  const madeValues = [...lands].map((i) => (p.steps[i + 1] as { text: string }).text);
   const lines: string[] = [
     `// ${p.title}: ${p.checks}.`,
     `// Drafted by Retake from a look at ${o.origin}${o.from ? ` (${o.from})` : ""} on ${(o.at ?? new Date()).toISOString().slice(0, 10)}. Yours to change.`,
     `export const title = ${js(p.title)};`,
     `export const url = ${js(o.origin)};`,
     ...(p.changes === "data" ? [`export const changesData = true;   // runs only where this app is marked as a test space`] : []),
+    // What it makes, by its exact text: hidden from every journey's comparison on this app, so a
+    // list that grows each run never reads as a change, here or in the journeys that only look.
+    ...(p.changes === "data" && madeValues.length ? [`export const makes = ${JSON.stringify(madeValues)};`] : []),
     ``,
     `const seen = (page, text) => page.getByText(text).first().waitFor({ state: "visible", timeout: 10_000 }).then(() => true, () => false);`,
     ...(lands.size ? [
       `// One more of it than before: what was just sent landed.`,
       `const grew = async (page, text, before) => { for (let i = 0; i < 20; i++) { if ((await page.getByText(text, { exact: true }).count()) > before) return true; await page.waitForTimeout(500); } return false; };`,
-      `// The list it lands in grows every run: folded to one row (so nothing below it moves) and hidden`,
-      `// from the comparison, so only the check above counts.`,
-      `const growing = (page, w, text) => page.evaluate((t) => { const el = [...document.querySelectorAll("li, tr, [role=row], p")].reverse().find((e) => e.textContent.trim() === t); const box = el && (el.closest("ul, ol, table, [role=list], [role=table]") || el.parentElement); if (!box) return; box.style.height = Math.ceil(el.getBoundingClientRect().height) + "px"; box.style.overflow = "hidden"; box.setAttribute("data-retake-grows", ""); }, text).then(() => w.mask("[data-retake-grows]"));`,
     ] : []),
     ``,
     `export default async function (page, w, { signIn }) {`,
   ];
   const steps = p.steps;
-  // Something is made: one step, so the one picture of it is taken after the
-  // list it lands in is hidden. Taken earlier (signed in, on that page) the
-  // list would have grown since last time, and every run would read as changed.
+  // Something is made: one step, whose check is that one more of it appeared.
+  // What it made (`makes`) is hidden from every capture on this app, so the
+  // list it lands in looks the same run after run.
   const landsAt = [...lands][0];
   if (p.changes === "data" && landsAt !== undefined) {
     const made = (steps[landsAt + 1] as { text: string }).text;
@@ -460,7 +461,7 @@ export function journeySource(p: Proposal, o: { origin: string; signInUrl?: stri
       const s = steps[i];
       if (i === landsAt) {
         lines.push(`  const before = await page.getByText(${js(made)}, { exact: true }).count();`, `  await page.click(${js((s as { selector: string }).selector)}, { timeout: 10_000 });`,
-          `  const landed = await grew(page, ${js(made)}, before);`, `  await growing(page, w, ${js(made)});`, `  await w.result(landed, landed ? ${js(`“${made}” is there`)} : ${js(`“${made}” did not appear`)});`);
+          `  const landed = await grew(page, ${js(made)}, before);`, `  await w.result(landed, landed ? ${js(`“${made}” is there`)} : ${js(`“${made}” did not appear`)});`);
         break;
       }
       if (s.do === "signIn") lines.push(`  await page.goto(${js(signInUrl ?? o.origin)});`, `  await signIn(url);`);
@@ -489,7 +490,7 @@ export function journeySource(p: Proposal, o: { origin: string; signInUrl?: stri
       lines.push(`  const r${i} = await page.goto(new URL(${js(s.path)}, url).href);`, ...(next ? [] : [`  await w.result(!r${i} || r${i}.status() < 400, r${i} ? "Answered " + r${i}.status() : "");`]));
     } else if (s.do === "click" && lands.has(i)) {
       lines.push(`  const before${i} = await page.getByText(${js(next!)}, { exact: true }).count();`, `  await page.click(${js(s.selector)}, { timeout: 10_000 });`,
-        `  const landed${i} = await grew(page, ${js(next!)}, before${i});`, `  await growing(page, w, ${js(next!)});`, `  await w.result(landed${i}, landed${i} ? ${js(`“${next}” is there`)} : ${js(`“${next}” did not appear`)});`);
+        `  const landed${i} = await grew(page, ${js(next!)}, before${i});`, `  await w.result(landed${i}, landed${i} ? ${js(`“${next}” is there`)} : ${js(`“${next}” did not appear`)});`);
       i++;
       continue;
     } else if (s.do === "click") {
@@ -547,7 +548,12 @@ export const nameFor = (title: string, taken: Set<string>) => {
 
 // ---------- adding, behind one dry run ----------
 
-export type Added = { title: string; added: boolean; name?: string; why?: string };
+export type Added = { title: string; added: boolean; name?: string; why?: string; already?: boolean };
+
+/** Does this proposal sign in first? */
+export const signsIn = (p: Proposal) => p.steps.some((s) => s.do === "signIn");
+
+
 
 /** Why a dry run did not pass, in one sentence. */
 export function whyNot(r: Pick<RunRecord, "error" | "status"> & { steps?: number }, failedStep?: { intent: string; note: string } | null): string {
@@ -577,6 +583,8 @@ export async function addJourneys(o: {
     const p = o.suggestion.proposals[n - 1];
     if (!p) { results.push({ title: `#${n}`, added: false, why: "There is no such proposal." }); continue; }
     const own = o.code?.[n];
+    const have = alreadyWatched(o.root, o.suggestion.origin, p);
+    if (have) { results.push({ title: p.title, added: false, already: true, name: have, why: `Already watched, as watch/${have}.mjs.` }); continue; }
     const changes = p.changes === "data" || (own ? /export\s+const\s+changesData\s*=\s*true/.test(own) : false);
     if (changes && !isTestSpace(o.root, o.suggestion.origin)) {
       results.push({ title: p.title, added: false, why: `It changes data, and ${hostName(o.suggestion.origin)} is not marked as a test space.` });

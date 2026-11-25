@@ -56,8 +56,8 @@ import {
   writeFixRequest, writeReport, type FlagRecord, type Speed,
 } from "../watch/session.js";
 import { acceptLast, baselineDir, journeyNameOk, journeyStates, listJourneys, momentOf, readBaseline, readLast, readSnapshots, shortDate, summaryLine } from "../watch/journey-store.js";
-import { nightlyOnlyLine, outcomeWords, ranLine, readLastRun } from "../watch/deploys.js";
-import { gate, journeyMeta, markSpace, originOf, spaceAnswer, spaceQuestion } from "../watch/spaces.js";
+import { groupByApp, nightlyOnlyLine, outcomeWords, ranLine, readLastRun } from "../watch/deploys.js";
+import { alreadyWatched, gate, journeyMeta, markSpace, originOf, spaceAnswer, spaceQuestion, withScheme } from "../watch/spaces.js";
 import type { Added, Exploration, Suggestion } from "../watch/suggest.js";
 import { hasLogin, siteOf } from "../logins.js";
 
@@ -168,7 +168,14 @@ export function watchRoutes(deps: WatchDeps) {
   const jobView = (j: SuggestJob) => ({
     id: j.id, origin: j.origin, host: j.host, phase: j.phase, line: j.line, error: j.error, signInError: j.signInError,
     signIn: j.exploration?.signIn ?? null, signedIn: j.exploration?.signedIn ?? false, by: j.suggestion?.by ?? null,
-    proposals: j.suggestion?.proposals.map((p) => ({ title: p.title, checks: p.checks, changes: p.changes })) ?? [],
+    proposals: j.suggestion?.proposals.map((p) => {
+      const signsIn = p.steps.some((x) => x.do === "signIn");
+      const watched = alreadyWatched(deps.root, j.origin, p);
+      // Behind a sign-in nobody gave a test account for: it cannot pass its first run.
+      const noAccount = signsIn && !!j.exploration?.signIn && !j.exploration.signedIn && !hasLogin(siteOf(j.origin));
+      // Ticked to start with: reads only, not watched already, and able to run.
+      return { title: p.title, checks: p.checks, changes: p.changes, signsIn, watched, noAccount, ticked: p.changes === "reads" && !watched && !noAccount };
+    }) ?? [],
     testSpace: spaceAnswer(deps.root, j.origin), question: spaceQuestion(j.origin),
     results: j.results,
   });
@@ -348,11 +355,16 @@ export function watchRoutes(deps: WatchDeps) {
       return json(res, 200, {
         summary,
         // What started the last run, and when; how it went only when the summary does not say.
-        ran: lr ? `${ranLine(lr)}${summary ? "" : ` — ${outcomeWords(lr)}`}.` : null,
+        // How it went is said as things stand now: a change accepted since is no longer "changed".
+        ran: lr ? `${ranLine(lr)}${summary ? "" : ` — ${outcomeWords({ journeys: lr.journeys, changed: 0, failed: 0 })}`}.` : null,
         blind: nightlyOnlyLine(deps.root),
         ask,
         journeys: rows,
-        sessions: list().length, live: live?.id ?? null,
+        // By app, each under its address.
+        groups: groupByApp(deps.root, rows).map((g) => ({ host: g.host, names: g.items.map((r) => r.name) })),
+        sessions: list().length,
+        // A run going now is a line on the list, not a page that takes its place.
+        live: live?.id ?? null, liveTitle: live?.title ?? null,
       });
     }
     const mjr = /^\/api\/watch\/journeys\/([a-z0-9-]+)(\/accept)?$/.exec(p);
@@ -388,7 +400,7 @@ export function watchRoutes(deps: WatchDeps) {
     if (p === "/api/watch/suggest" && req.method === "POST") {
       const b = await body<{ url?: string }>();
       const raw = String(b.url ?? "").trim();
-      const url = /^[a-z]+:\/\//i.test(raw) ? raw : raw ? `https://${raw}` : "";
+      const url = withScheme(raw);
       const origin = originOf(url);
       if (!origin) return json(res, 400, { error: "That is not an app's address — something like app.example.com." });
       const going = [...jobs.values()].find((j) => j.origin === origin && (j.phase === "exploring" || j.phase === "adding"));

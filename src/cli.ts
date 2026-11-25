@@ -1852,7 +1852,14 @@ const watchCmd = program
     if (!all.length) { say("no journeys yet — a journey is a script at watch/<name>.mjs in this workspace"); return; }
     const s = summaryLine(all.map((j) => j.last));
     if (s) say(s);
-    for (const j of all) say(`${j.status === "failed" ? "✗" : j.status === "changed" ? "△" : j.status ? "✓" : "·"} ${j.name.padEnd(28)} ${j.line}`);
+    const { groupByApp } = await import("./watch/deploys.js");
+    // As wide as the longest name, so every line starts in the same column.
+    const width = Math.max(...all.map((j) => j.name.length));
+    const groups = groupByApp(process.cwd(), all);
+    groups.forEach((g, i) => {
+      if (groups.length > 1 || g.host) say(`${i ? "\n" : ""}${g.host ?? "Other journeys"}`);
+      for (const j of g.items) say(`${g.host || groups.length > 1 ? "  " : ""}${j.status === "failed" ? "✗" : j.status === "changed" ? "△" : j.status ? "✓" : "·"} ${j.name.padEnd(width)}  ${j.line}`);
+    });
   });
 
 const watchOut = (root: string) => process.env.RETAKE_OUT?.trim() ? path.resolve(process.env.RETAKE_OUT.replace(/^~/, process.env.HOME ?? "")) : path.join(root, "outputs");
@@ -1976,7 +1983,7 @@ watchCmd
   .description("look around an app and propose 4–8 journeys worth watching, each marked reads only or changes data")
   .action(async (url: string, opts: { plain: boolean }) => {
     const { suggest } = await import("./watch/suggest.js");
-    const { spaceAnswer, spaceQuestion, hostName } = await import("./watch/spaces.js");
+    const { spaceAnswer, spaceQuestion, hostName, alreadyWatched: alreadyWatchedFn } = await import("./watch/spaces.js");
     const { hasLogin, siteOf } = await import("./logins.js");
     const root = process.cwd();
     const { suggestion: s, exploration: x } = await suggest(root, url, { model: !opts.plain, log: (l) => process.stderr.write(`  ${l}\n`) });
@@ -1984,11 +1991,14 @@ watchCmd
       say(`This app needs a sign-in. Use a test account: \`retake login ${s.origin}\`, then suggest again to see what is behind it.`);
     } else if (x.signInError) say(`The sign-in did not work (${x.signInError}), so only the pages before it were seen.`);
     if (!s.proposals.length) { say(`Nothing worth watching was found at ${hostName(s.origin)} — it may need a sign-in, or be one page.`); return; }
+    const alreadyWatchedNow = (p: { title: string }) => alreadyWatchedFn(root, s.origin, p);
     say(`${hostName(s.origin)} — ${s.proposals.length} journeys worth watching:`);
     const w = Math.max(...s.proposals.map((p) => p.title.length));
-    s.proposals.forEach((p, i) => say(`  ${String(i + 1).padStart(2)}. ${p.title.padEnd(w)}  ${p.changes === "data" ? "changes data" : "reads only  "}  ${p.checks}`));
+    s.proposals.forEach((p, i) => { const have = alreadyWatchedNow(p); say(`  ${String(i + 1).padStart(2)}. ${p.title.padEnd(w)}  ${p.changes === "data" ? "changes data" : "reads only  "}  ${p.checks}${have ? ` (already watched: watch/${have}.mjs)` : ""}`); });
     const data = s.proposals.map((p, i) => (p.changes === "data" ? i + 1 : 0)).filter(Boolean);
-    const reads = s.proposals.map((p, i) => (p.changes === "reads" ? i + 1 : 0)).filter(Boolean);
+    // Suggested picks: reads only, not watched already, nothing behind a sign-in with no test account.
+    const noAccount = !!s.signIn && !s.signedIn;
+    const reads = s.proposals.map((p, i) => (p.changes === "reads" && !(noAccount && p.steps.some((x) => x.do === "signIn")) && !alreadyWatchedNow(p) ? i + 1 : 0)).filter(Boolean);
     say("");
     say(`  \`retake watch add ${s.origin} --pick ${(reads.length ? reads : data).slice(0, 4).join(",")}\` adds them (each runs once first).`);
     if (data.length && spaceAnswer(root, s.origin) === null) say(`  ${spaceQuestion(s.origin)} Add --test-space if it is.`);
@@ -2011,10 +2021,10 @@ watchCmd
     const asks = pick.some((n) => s.proposals[n - 1]?.changes === "data") && spaceAnswer(root, s.origin) === null;
     if (asks) say(`${spaceQuestion(s.origin)} Without --test-space, they are not added.`);
     const res = await addJourneys({ root, out: watchOut(root), suggestion: s, pick, log: (l) => process.stderr.write(`  ${l}\n`) });
-    for (const r of res) say(r.added ? `✓ ${r.title} — watch/${r.name}.mjs` : `✗ ${r.title} — ${r.why}`);
+    for (const r of res) say(r.added ? `✓ ${r.title} — watch/${r.name}.mjs` : r.already ? `· ${r.title} — ${r.why}` : `✗ ${r.title} — ${r.why}`);
     const added = res.filter((r) => r.added).length;
     if (added) say(`  ${added} added; each one's first run is its normal. \`retake watch schedule on\` runs them each night and whenever the app changes.`);
-    if (res.some((r) => !r.added)) process.exitCode = 2;
+    if (res.some((r) => !r.added && !r.already)) process.exitCode = 2;
   });
 
 program.parseAsync(process.argv).catch((e) => {

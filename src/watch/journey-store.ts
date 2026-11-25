@@ -18,7 +18,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { decodePng, describeChange, matchSteps, type JourneyStatus, type Snapshot, type StepChange } from "./compare.js";
+import { decodePng, describeChange, keyOf, matchSteps, type JourneyStatus, type Snapshot, type StepChange } from "./compare.js";
 import { readFlagsIn, readJson, writeJson } from "./session.js";
 
 export const JOURNEY_EXT = /\.(mjs|js)$/;
@@ -68,13 +68,22 @@ export type RunRecord = {
   error: string | null;
   steps: number;
   changes: StepChange[];
-  /** This run had nothing to compare with, so it became the normal. */
+  /** This run had nothing to compare with, so it became the normal (only its
+      passing steps, when one failed). */
   firstRun?: boolean;
+  /** Steps that got their normal on this run, at their first pass. */
+  adopted?: number;
   /** Set when a person accepted this run as normal. */
   acceptedAt?: string;
 };
 
-export type Baseline = { acceptedAt: string; from: string; steps: Snapshot[] };
+export type Baseline = {
+  acceptedAt: string; from: string; steps: Snapshot[];
+  /** Steps that did not pass when this normal was made, by what they say they
+      do. Each gets its normal the first time it passes, without anybody
+      having to accept it, because it never had one. */
+  waiting?: string[];
+};
 
 export const readLast = (root: string, name: string) => readJson<RunRecord | null>(path.join(stateDir(root, name), "last.json"), null);
 export const readBaseline = (root: string, name: string) => readJson<Baseline | null>(path.join(baselineDir(root, name), "snapshots.json"), null);
@@ -104,21 +113,54 @@ export function loadPicture(folder: string, s: Snapshot) {
  * Make a run the normal: its snapshots and their pictures become the
  * baseline, whole, or not at all.
  */
-export function acceptRun(root: string, name: string, sessionDir: string, sessionId: string): Baseline {
-  const steps = readSnapshots(sessionDir);
+export function acceptRun(root: string, name: string, sessionDir: string, sessionId: string, o: { passingOnly?: boolean } = {}): Baseline {
+  const all = readSnapshots(sessionDir);
+  // A run with a failing step still gives its passing steps a normal; the
+  // failing ones wait for their first pass.
+  const steps = o.passingOnly ? all.filter((s) => s.result === "pass") : all;
+  const waiting = o.passingOnly ? all.filter((s) => s.result !== "pass").map(keyOf) : [];
   if (!steps.length) throw new Error("that run kept nothing to compare with");
   const target = baselineDir(root, name);
   const tmp = `${target}.${process.pid}.tmp`;
   fs.rmSync(tmp, { recursive: true, force: true });
   fs.mkdirSync(path.join(tmp, "snapshots"), { recursive: true });
   for (const s of steps) if (s.shot && fs.existsSync(path.join(sessionDir, s.shot))) fs.copyFileSync(path.join(sessionDir, s.shot), path.join(tmp, s.shot));
-  const b: Baseline = { acceptedAt: new Date().toISOString(), from: sessionId, steps };
+  const b: Baseline = { acceptedAt: new Date().toISOString(), from: sessionId, steps, ...(waiting.length ? { waiting } : {}) };
   writeJson(path.join(tmp, "snapshots.json"), b);
   const old = `${target}.${process.pid}.old`;
   if (fs.existsSync(target)) fs.renameSync(target, old);
   fs.renameSync(tmp, target);
   fs.rmSync(old, { recursive: true, force: true });
   return b;
+}
+
+/**
+ * Steps the normal was waiting for, now passing: each joins the normal as it
+ * is in this run. Returns the keys it took in.
+ */
+export function adoptWaiting(root: string, name: string, sessionDir: string, after: Snapshot[]): string[] {
+  const b = readBaseline(root, name);
+  if (!b?.waiting?.length) return [];
+  const taken: string[] = [];
+  const dir = baselineDir(root, name);
+  for (const s of after) {
+    const k = keyOf(s);
+    if (s.result !== "pass" || !b.waiting.includes(k) || b.steps.some((x) => keyOf(x) === k)) continue;
+    let shot: string | null = null;
+    if (s.shot && fs.existsSync(path.join(sessionDir, s.shot))) {
+      shot = `snapshots/adopted-${String(s.n).padStart(2, "0")}-${Date.now().toString(36)}.png`;
+      fs.mkdirSync(path.join(dir, "snapshots"), { recursive: true });
+      fs.copyFileSync(path.join(sessionDir, s.shot), path.join(dir, shot));
+    }
+    b.steps.push({ ...s, shot });
+    b.waiting = b.waiting.filter((x) => x !== k);
+    taken.push(k);
+  }
+  if (taken.length) {
+    if (!b.waiting.length) delete b.waiting;
+    writeJson(path.join(dir, "snapshots.json"), b);
+  }
+  return taken;
 }
 
 /** Accept the newest run of a journey: what the window's one button does. */
@@ -153,6 +195,18 @@ export function pruneQuietRuns(root: string, name: string, keep: string): string
 }
 
 // ---------- words ----------
+
+/** Where a failed run failed, in one line: "failed at step 3: Open Licences — No table",
+    or why it could not run at all. */
+export function failureLine(rec: Pick<RunRecord, "dir" | "error">): string {
+  const st = rec.dir ? readJson<{ n: number; intent: string; note: string; result: string | null }[]>(path.join(rec.dir, "steps.json"), []) : [];
+  const f = st.find((s) => s.result === "fail");
+  if (f) {
+    const note = (f.note || rec.error || "").trim();
+    return `failed at step ${f.n}: ${f.intent}${note ? ` — ${note}` : ""}`;
+  }
+  return `failed${rec.error ? ` — ${rec.error}` : ""}`;
+}
 
 const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -250,12 +304,20 @@ export type Moment = {
   clip: { start: number; end: number } | null;
 };
 
+/** A step that starts the session (before this) and lasts less than CLIP_MIN_MS
+    gets no clip on the changed screen, only its pictures. */
+export const SESSION_START_MS = 500;
+export const CLIP_MIN_MS = 2000;
+
 /** The one moment a changed or failed journey opens to: the first step
     that changed, or the step that failed. */
 export function momentOf(rec: RunRecord, baseline: Baseline | null, after: Snapshot[], steps: { n: number; note: string; t: number; tEnd: number | null }[] = []): Moment | null {
   let m: Moment | null = null;
   // From the moment the step begins (its action, then the screen it leads to), and a breath after.
-  const clipOf = (t: number | null, tEnd: number | null) => (t === null ? null : { start: Math.max(0, (t - 300) / 1000), end: ((tEnd ?? t + 3000) + 1500) / 1000 });
+  // A step that opens the session and is over in a moment (a one-step journey's
+  // page opening) has only a blank page before it and the end of the video after
+  // it: a second of white. The two pictures say it better.
+  const clipOf = (t: number | null, tEnd: number | null) => (t === null || (t < SESSION_START_MS && tEnd !== null && tEnd - t < CLIP_MIN_MS) ? null : { start: Math.max(0, (t - 300) / 1000), end: ((tEnd ?? t + 3000) + 1500) / 1000 });
   if (rec.status === "failed") {
     const a = after.find((s) => s.result !== "pass") ?? after.at(-1);
     if (!a) return null;
