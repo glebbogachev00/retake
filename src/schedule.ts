@@ -18,8 +18,10 @@ import { execFileSync, spawnSync } from "node:child_process";
 export type Every = "daily" | "weekdays";
 /** What a schedule runs. Each kind has its own label and its own state, so a
     workspace can have a routine schedule and a Watch schedule at once. */
-export type ScheduleKind = "routine" | "watch";
-export type ScheduleSpec = { every: Every; at: string; count: number };
+export type ScheduleKind = "routine" | "watch" | "watch-check";
+/** `everyMinutes` makes it a light check that wakes every few minutes instead
+    of once at `at` (Watch's look for a new version of the app). */
+export type ScheduleSpec = { every: Every; at: string; count: number; everyMinutes?: number };
 export type Installed = ScheduleSpec & { label: string; root: string; installedAt: string; mechanism: "launchd" | "cron"; kind?: ScheduleKind };
 
 export function parseAt(at: string): { hour: number; minute: number } {
@@ -38,6 +40,7 @@ export function labelFor(root: string, kind: ScheduleKind = "routine"): string {
 }
 
 export function describeSchedule(s: ScheduleSpec & { kind?: ScheduleKind }): string {
+  if (s.everyMinutes) return `every ${s.everyMinutes} minutes`;
   const when = `${s.every === "daily" ? "every day" : "every weekday"} at ${s.at}`;
   if (s.kind === "watch") return when;
   return `${when}, ${s.count === 1 ? "one video" : `up to ${s.count} videos`}`;
@@ -50,6 +53,10 @@ export function plistXml(o: { label: string; program: string[]; root: string; sp
   const when = (weekday?: number) =>
     `<dict>${weekday !== undefined ? `<key>Weekday</key><integer>${weekday}</integer>` : ""}<key>Hour</key><integer>${hour}</integer><key>Minute</key><integer>${minute}</integer></dict>`;
   const interval = o.spec.every === "daily" ? when() : `<array>${[1, 2, 3, 4, 5].map((d) => when(d)).join("")}</array>`;
+  const wake = o.spec.everyMinutes
+    ? `<key>StartInterval</key><integer>${Math.round(o.spec.everyMinutes * 60)}</integer>`
+    : `<key>StartCalendarInterval</key>
+  ${interval}`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -60,8 +67,7 @@ export function plistXml(o: { label: string; program: string[]; root: string; sp
   <key>WorkingDirectory</key><string>${xml(o.root)}</string>
   <key>EnvironmentVariables</key>
   <dict>${Object.entries(o.env).map(([k, v]) => `<key>${xml(k)}</key><string>${xml(v)}</string>`).join("")}</dict>
-  <key>StartCalendarInterval</key>
-  ${interval}
+  ${wake}
   <key>StandardOutPath</key><string>${xml(o.log)}</string>
   <key>StandardErrorPath</key><string>${xml(o.log)}</string>
 </dict>
@@ -74,8 +80,9 @@ const shq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
 export function cronLine(o: { label: string; program: string[]; root: string; spec: ScheduleSpec; log: string; env: Record<string, string> }): string {
   const { hour, minute } = parseAt(o.spec.at);
   const days = o.spec.every === "daily" ? "*" : "1-5";
+  const when = o.spec.everyMinutes ? `*/${o.spec.everyMinutes} * * * *` : `${minute} ${hour} * * ${days}`;
   const env = Object.entries(o.env).map(([k, v]) => `${k}=${shq(v)}`).join(" ");
-  return `${minute} ${hour} * * ${days} cd ${shq(o.root)} && ${env} ${o.program.map(shq).join(" ")} >> ${shq(o.log)} 2>&1 # ${o.label}`;
+  return `${when} cd ${shq(o.root)} && ${env} ${o.program.map(shq).join(" ")} >> ${shq(o.log)} 2>&1 # ${o.label}`;
 }
 
 function stateFile(root: string, kind: ScheduleKind = "routine"): string {
@@ -122,7 +129,8 @@ export function installSchedule(root: string, spec: ScheduleSpec, program: strin
     if (w.status !== 0) throw new Error(`crontab would not take the schedule: ${(w.stderr || "").trim()}`);
     mechanism = "cron";
   } else {
-    throw new Error(`scheduling uses launchd (macOS) or cron (Linux) — on this system, run \`${kind === "watch" ? "retake watch run all --scheduled" : "retake routine run"}\` from the system's own task scheduler`);
+    const cmd = kind === "watch" ? "retake watch run all --scheduled" : kind === "watch-check" ? "retake watch check --scheduled" : "retake routine run";
+    throw new Error(`scheduling uses launchd (macOS) or cron (Linux) — on this system, run \`${cmd}\` from the system's own task scheduler`);
   }
   const installed: Installed = { ...spec, label, root, installedAt: new Date().toISOString(), mechanism, ...(kind === "routine" ? {} : { kind }) };
   fs.writeFileSync(stateFile(root, kind), JSON.stringify(installed, null, 2));

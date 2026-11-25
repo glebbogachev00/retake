@@ -35,6 +35,15 @@
  *   GET  /api/watch/journeys                  each journey with its one line
  *   GET  /api/watch/journeys/<name>           one journey: its last run and the moment
  *   POST /api/watch/journeys/<name>/accept    the last run is the new normal
+ *
+ * Adding an app (src/watch/suggest.ts) and the safety gate (src/watch/spaces.ts):
+ *
+ *   GET  /watch/add                           the address, then the proposals
+ *   POST /api/watch/suggest                   { url }: look around it, propose journeys
+ *   GET  /api/watch/suggest/<job>             where that stands
+ *   POST /api/watch/suggest/<job>/continue    after the sign-in was saved, or { skip: true }
+ *   POST /api/watch/suggest/<job>/add         { pick }: each runs once; only a pass is added
+ *   POST /api/watch/spaces                    { url, test }: the person's answer, asked once
  */
 import fs from "node:fs";
 import http from "node:http";
@@ -47,6 +56,25 @@ import {
   writeFixRequest, writeReport, type FlagRecord, type Speed,
 } from "../watch/session.js";
 import { acceptLast, baselineDir, journeyNameOk, journeyStates, listJourneys, momentOf, readBaseline, readLast, readSnapshots, shortDate, summaryLine } from "../watch/journey-store.js";
+import { nightlyOnlyLine, outcomeWords, ranLine, readLastRun } from "../watch/deploys.js";
+import { gate, journeyMeta, markSpace, originOf, spaceAnswer, spaceQuestion } from "../watch/spaces.js";
+import type { Added, Exploration, Suggestion } from "../watch/suggest.js";
+import { hasLogin, siteOf } from "../logins.js";
+
+/** Looking around an app and adding its journeys: minutes, so it runs on its
+    own and the window asks where it stands. */
+type SuggestJob = {
+  id: string; url: string; origin: string; host: string;
+  phase: "exploring" | "signin" | "ready" | "adding" | "done" | "error";
+  /** What it is doing, in a line, while it works. */
+  line: string;
+  exploration: Exploration | null;
+  suggestion: Suggestion | null;
+  signInError: string | null;
+  results: Added[] | null;
+  error: string | null;
+  at: number;
+};
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const FIX_UNDO_MS = 10_000;
@@ -90,6 +118,7 @@ export function watchRoutes(deps: WatchDeps) {
   const fixes = new Map<string, PendingFix>();
   const lastFix = new Map<string, { name: string; notes: number; at: number }>();
   const locks = new Map<string, Promise<unknown>>();
+  const jobs = new Map<string, SuggestJob>();
   const watchRoot = () => path.join(deps.outRoot(), "watch");
   const speedFile = path.join(deps.root, ".drafts", "watch-speed");
   let speed: Speed = (() => { try { const s = fs.readFileSync(speedFile, "utf8").trim(); return isSpeed(s) ? s : "watch"; } catch { return "watch"; } })();
@@ -113,6 +142,36 @@ export function watchRoutes(deps: WatchDeps) {
     locks.set(id, run.catch(() => {}));
     return run;
   };
+
+  /** Look around the app, then propose. A sign-in with no test account saved
+      stops it there first: that question comes before any waiting, and the
+      look after it (signed in) is the one worth proposing from. */
+  async function look(job: SuggestJob, again: boolean) {
+    try {
+      const { explore } = await import("../watch/suggest.js");
+      const x = await explore(job.url, { log: (l) => { job.line = l; } });
+      job.exploration = x;
+      job.signInError = x.signInError ?? null;
+      if (x.signIn && !hasLogin(siteOf(job.origin)) && !again) { job.phase = "signin"; return; }
+      await propose(job, x);
+    } catch (e) { job.phase = "error"; job.error = (e as Error).message.split("\n")[0]; }
+  }
+  async function propose(job: SuggestJob, x: Exploration) {
+    try {
+      const { proposeJourneys, keepSuggestion } = await import("../watch/suggest.js");
+      const { proposals, by } = await proposeJourneys(x, { log: (l) => { job.line = l; } });
+      job.suggestion = { origin: x.origin, at: new Date().toISOString(), by, signIn: x.signIn, signedIn: x.signedIn, proposals };
+      keepSuggestion(deps.root, job.suggestion);
+      job.phase = "ready";
+    } catch (e) { job.phase = "error"; job.error = (e as Error).message.split("\n")[0]; }
+  }
+  const jobView = (j: SuggestJob) => ({
+    id: j.id, origin: j.origin, host: j.host, phase: j.phase, line: j.line, error: j.error, signInError: j.signInError,
+    signIn: j.exploration?.signIn ?? null, signedIn: j.exploration?.signedIn ?? false, by: j.suggestion?.by ?? null,
+    proposals: j.suggestion?.proposals.map((p) => ({ title: p.title, checks: p.checks, changes: p.changes })) ?? [],
+    testSpace: spaceAnswer(deps.root, j.origin), question: spaceQuestion(j.origin),
+    results: j.results,
+  });
 
   function state(id: string) {
     const dir = dirFor(id);
@@ -272,9 +331,27 @@ export function watchRoutes(deps: WatchDeps) {
     if (p === "/api/watch/journeys" && req.method === "GET") {
       const all = journeyStates(deps.root);
       const live = list().find((x) => x.live);
+      const summary = summaryLine(all.map((j) => j.last));
+      const lr = readLastRun(deps.root);
+      const files = new Map(listJourneys(deps.root).map((j) => [j.name, j.file]));
+      // Data-changing journeys for an app nobody has been asked about: the one question, once.
+      let ask: { url: string; question: string } | null = null;
+      const rows = all.map((j) => {
+        const file = files.get(j.name)!;
+        const g = gate(deps.root, { name: j.name, file });
+        if (!g.run && g.origin && spaceAnswer(deps.root, g.origin) === null && !ask) ask = { url: g.origin, question: spaceQuestion(g.origin) };
+        let title = j.title;
+        if (title === j.name) { try { title = journeyMeta(fs.readFileSync(file, "utf8")).title ?? j.title; } catch { /* the name */ } }
+        return g.run ? { name: j.name, title, line: j.line, status: j.status, session: j.session }
+          : { name: j.name, title, line: "Skipped — not a test space", status: "skipped", session: j.session, why: g.why };
+      });
       return json(res, 200, {
-        summary: summaryLine(all.map((j) => j.last)),
-        journeys: all.map((j) => ({ name: j.name, title: j.title, line: j.line, status: j.status, session: j.session })),
+        summary,
+        // What started the last run, and when; how it went only when the summary does not say.
+        ran: lr ? `${ranLine(lr)}${summary ? "" : ` — ${outcomeWords(lr)}`}.` : null,
+        blind: nightlyOnlyLine(deps.root),
+        ask,
+        journeys: rows,
         sessions: list().length, live: live?.id ?? null,
       });
     }
@@ -302,6 +379,54 @@ export function watchRoutes(deps: WatchDeps) {
         acceptedAt: baseline?.acceptedAt ?? null, accepted: baseline ? shortDate(baseline.acceptedAt) : null, moment,
       });
     }
+    // ---- adding an app ----
+    if (p === "/api/watch/spaces" && req.method === "POST") {
+      const b = await body<{ url?: string; test?: boolean }>();
+      if (!b.url || !originOf(b.url) || typeof b.test !== "boolean") return json(res, 400, { error: "an app's address, and yes or no" });
+      return json(res, 200, { origin: markSpace(deps.root, b.url, b.test), test: b.test });
+    }
+    if (p === "/api/watch/suggest" && req.method === "POST") {
+      const b = await body<{ url?: string }>();
+      const raw = String(b.url ?? "").trim();
+      const url = /^[a-z]+:\/\//i.test(raw) ? raw : raw ? `https://${raw}` : "";
+      const origin = originOf(url);
+      if (!origin) return json(res, 400, { error: "That is not an app's address — something like app.example.com." });
+      const going = [...jobs.values()].find((j) => j.origin === origin && (j.phase === "exploring" || j.phase === "adding"));
+      if (going) return json(res, 200, jobView(going));
+      const job: SuggestJob = { id: "s" + Date.now().toString(36), url, origin, host: new URL(origin).host, phase: "exploring", line: "", exploration: null, suggestion: null, signInError: null, results: null, error: null, at: Date.now() };
+      jobs.set(job.id, job);
+      for (const [k, j] of jobs) if (Date.now() - j.at > 6 * 3600_000) jobs.delete(k);
+      void look(job, false);
+      return json(res, 200, jobView(job));
+    }
+    const ms = /^\/api\/watch\/suggest\/(s[a-z0-9]+)(?:\/(continue|add))?$/.exec(p);
+    if (ms) {
+      const job = jobs.get(ms[1]);
+      if (!job) return json(res, 404, { error: "That look is over — give the address again." });
+      if (!ms[2] && req.method === "GET") return json(res, 200, jobView(job));
+      if (req.method !== "POST") return json(res, 405, { error: "method not allowed" });
+      if (ms[2] === "continue") {
+        const b = await body<{ skip?: boolean }>();
+        if (b.skip && job.exploration) { job.phase = "exploring"; void propose(job, job.exploration); return json(res, 200, jobView(job)); }
+        job.phase = "exploring";
+        void look(job, true);
+        return json(res, 200, jobView(job));
+      }
+      const b = await body<{ pick?: number[] }>();
+      const pick = (b.pick ?? []).filter((n) => Number.isInteger(n) && n >= 1 && n <= (job.suggestion?.proposals.length ?? 0));
+      if (!job.suggestion || !pick.length) return json(res, 400, { error: "Tick at least one." });
+      job.phase = "adding"; job.line = "";
+      void (async () => {
+        try {
+          const { addJourneys } = await import("../watch/suggest.js");
+          job.results = await addJourneys({ root: deps.root, out: deps.outRoot(), suggestion: job.suggestion!, pick, log: (l) => { job.line = l.replace(/^[▶✓✗]\s*/, ""); } });
+          job.phase = "done";
+          deps.activity("journeys-added", { origin: job.origin, added: job.results.filter((r) => r.added).map((r) => r.name) });
+        } catch (e) { job.phase = "error"; job.error = (e as Error).message.split("\n")[0]; }
+      })();
+      return json(res, 200, jobView(job));
+    }
+
     if (p === "/api/watch/speed" && req.method === "POST") {
       const b = await body<{ speed?: string }>();
       if (!isSpeed(b.speed)) return json(res, 400, { error: "speed is watch, step or fast" });

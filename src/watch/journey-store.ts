@@ -212,14 +212,15 @@ export function journeyStates(root: string, now = new Date()) {
     of the night, when nobody is using the app or the Mac. */
 export const NIGHTLY_AT = "03:00";
 
-/** `retake watch schedule [daily|weekdays|off] [--at HH:MM]`: what was asked
-    for. Null `every` means "show me the current one". */
-export function parseWatchSchedule(every: string | undefined, at: string | undefined): { every: "daily" | "weekdays" | "off" | null; at: string } {
+/** `retake watch schedule [on|off|daily|weekdays] [--at HH:MM]`: what was
+    asked for. Null `every` means "show me the current one". `on` is the one
+    switch: the nightly run and a run whenever the app changes. */
+export function parseWatchSchedule(every: string | undefined, at: string | undefined): { every: "on" | "daily" | "weekdays" | "off" | null; at: string } {
   const e = every?.trim().toLowerCase();
   const t = (at ?? NIGHTLY_AT).trim();
   if (!/^([01]?\d|2[0-3]):([0-5]\d)$/.test(t)) throw new Error(`"${t}" is not a time — 24-hour HH:MM, e.g. ${NIGHTLY_AT}`);
   if (!e) return { every: null, at: t };
-  if (e !== "daily" && e !== "weekdays" && e !== "off") throw new Error("say daily, weekdays or off");
+  if (e !== "on" && e !== "daily" && e !== "weekdays" && e !== "off") throw new Error("say daily, weekdays or off — or on, for each night and whenever the app changes");
   return { every: e, at: t };
 }
 

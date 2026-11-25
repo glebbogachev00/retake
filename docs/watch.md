@@ -207,6 +207,141 @@ list. Past sessions are under Sessions.
 | `outputs/watch/<session>/snapshots.json`, `snapshots/` | The run's own capture of each step. |
 | `outputs/watch/<session>/journey.json` | That run's verdict and every change. |
 
+## Watch with nothing to set up
+
+No CI, no webhooks, no ops agent. Give Retake an app's address and it
+suggests the journeys; switch the schedule on and it runs them every night
+and whenever the app has a new version.
+
+### Journeys from an address
+
+In the window, the Watch area with no journeys asks for one thing: the app's
+address (later, **Add an app** under the list). Retake looks around the app
+in a real browser: the entry page, the pages its navigation leads to, its
+forms and its sign-in. Looking only follows links (never one that signs out
+or deletes); it never presses a button or sends a form. Then it proposes 4 to 8 journeys in plain words, each
+with one line on what it checks ("Sign in", "Create a project", "Invite a
+teammate", "Check the pricing page"), and each marked **Reads only** or
+**Changes data**. Journeys that change data start unticked. Untick what you
+don't want and press **Add journeys**.
+
+- **A sign-in** found while looking opens the login form: "This app needs a
+  sign-in. Use a test account." It is the same saved login as `retake login`
+  (the Keychain on a Mac), never a file, and the journeys sign in with it
+  through `signIn(url)`. Retake then looks again, signed in, to see what is
+  behind it. **Not now** proposes from the pages before the sign-in.
+- **Every journey runs once before it is added.** A run that passes is kept,
+  and becomes its normal. One that doesn't is not added, with one sentence
+  why ("It did not pass its first run: “Open the team page” failed").
+- **Journeys that change data run only on a test space.** The first time you
+  tick one, the window asks: "Is app.example.com a test space? Journeys that
+  change data run only there." The answer is kept per app in
+  `watch/.spaces.json`. Without a yes, they are not added. A journey file that
+  says `export const changesData = true` on an app without a yes is skipped
+  on every run, and the list says "Skipped — not a test space". If a journey
+  like that is already there (an agent wrote it), the Watch area asks the
+  question once, at the top.
+- **The proposals** come from the drafting model `describe` uses (`.env`,
+  `RETAKE_MODEL`), given what was found on the pages. They are checked before
+  you see them: a step that types, chooses, or presses a button that sends is
+  marked as changing data, whatever the model called it. With no model, the
+  pages themselves are the proposals.
+- **A data journey Retake writes** checks that one more of the thing it made
+  appeared (a count before and after), and hides the list it lands in from the
+  comparison, because that list grows every run.
+
+From a terminal:
+
+```
+retake watch suggest <url>                      the proposals, numbered (--plain: no model)
+retake watch add <url> --pick 1,3,4             write them; each runs once first
+retake watch add <url> --pick 5 --test-space    this app is a test space
+```
+
+`suggest` keeps its list in `watch/.suggest/<host>.json`, so `add --pick`
+means the same numbers.
+
+Over MCP, the person's coding agent writes the journeys: `watch_suggest`
+returns the proposals with the steps Retake would write, the agent shows them
+to the person, and `watch_write` adds the ones they picked: from Retake's
+steps, or from the agent's own file for a proposal (`code`). The same rules
+apply: one passing run first, and data journeys only on a test space, answered
+by the person.
+
+A written journey says which app it is about and whether it writes:
+
+```js
+export const title = "Create a project";
+export const url = "https://staging.example.com";   // the app: what the deploy check watches
+export const changesData = true;                     // runs only where this app is a test space
+```
+
+### Noticing a new version by itself
+
+Every 5 minutes a light check looks at each app's live address and takes a
+cheap fingerprint of what is deployed there. Unchanged means nothing happens.
+When the fingerprint moves, and the new one is seen on **two checks in a
+row** (so a deploy still rolling out, with old and new servers answering in
+turn, runs nothing yet), that app's journeys run, and you are told with the
+same rule as the nightly run: silent when nothing changed, and one
+notification naming the app when something did:
+
+> app.example.com has a new version — 1 changed: Create a project
+
+The fingerprint, strongest first:
+
+1. **The files the page links to.** Script and style addresses whose names
+   carry a content hash (`index-B7f3a9Lk.js`, `main.3f2a1b9c.css`,
+   `/_next/static/<buildId>/…`). A new build makes new names, and nothing
+   else does. Every common bundler does this by default.
+2. **A version the app states.** `<meta name="version|build|generator">`,
+   `data-build` / `data-version` on `<html>` or `<body>`, Next.js's
+   `buildId`, an `x-build` / `x-version` style header, or a version field
+   (`version`, `build`, `commit`, `sha`, `release`…) from `/version`,
+   `/healthz` or `/readyz` when the app has one.
+3. **The entry page's ETag**, when there is nothing better.
+
+Per-request noise never counts: nonces and CSRF tokens are attributes and
+meta tags that are not read, inline scripts are not read, and query values
+that are tokens, cache-busters or timestamps are dropped from file addresses.
+
+**An app with none of these** (no hashed files, no stated version, no ETag)
+can't be told apart from one version to the next by a cheap look. It is still
+run every night, and the Watch area says so in one line: "app.example.com
+shows no version to watch, so it is checked each night only."
+
+The app a journey is about is its `export const url`, or the address its
+accepted run was on. Apps that don't answer are skipped, not run.
+
+### One switch
+
+```
+retake watch schedule on     each night at 03:00, and whenever an app has a new version
+retake watch schedule off    neither
+retake watch schedule        where it stands, in one line
+```
+
+`retake watch schedule daily` (or `weekdays`, with `--at HH:MM`) still works,
+and turns on the check for new versions too. `on` keeps a nightly time already
+chosen. The check is its own scheduler entry (`retake watch check --scheduled`,
+label `app.retake.watch-check.<workspace>.<hash>`, launchd's `StartInterval`
+or a `*/5` cron line), next to the nightly one; neither replaces a routine's.
+One run at a time per workspace: a check that finds a run going leaves it be,
+and the nightly run waits for a run a deploy started. `retake watch check`
+by hand says, per app, what it found.
+
+The Watch area's header line says what started the last run: "Ran at 14:02
+because app.example.com changed", or "Ran at 03:00 as it does every night",
+followed by "6 journeys, nothing unexpected" when nothing did.
+
+| | |
+|---|---|
+| `.retake/watch-deploys.json` | Per app: the fingerprint the journeys last ran against, and a new one waiting to be seen again. |
+| `.retake/watch-last-run.json` | When the last run was, what started it, and how it went. |
+| `.retake/watch-check-schedule.log` | What the checks did: only the times something ran. |
+| `watch/.spaces.json` | Which apps are test spaces: the person's answers. |
+| `watch/.suggest/<host>.json` | The last proposals for an app. |
+
 ## Limits
 
 - The live picture and the video show the page's viewport only: no browser

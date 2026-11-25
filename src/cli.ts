@@ -28,7 +28,8 @@
  *   retake list                                   manifests in ./demos
  *   retake golden add|list|score                  approved visual references and deterministic scorecards
  *   retake watch run <journey|all>                run journeys in watch/, compared with the last accepted run
- *   retake watch schedule daily --at 03:00        the nightly run: silent unless something changed
+ *   retake watch schedule on                      each night, and whenever the app has a new version
+ *   retake watch suggest <url>                    journeys worth watching on an app; `watch add <url> --pick 1,3` writes them
  *   retake describe <name> <url> "<what>"         scout + model → demos/<name>.yaml
  *
  * Run from a clone, the `.ts` source goes through tsx (`npm run retake -- …`);
@@ -1854,6 +1855,8 @@ const watchCmd = program
     for (const j of all) say(`${j.status === "failed" ? "✗" : j.status === "changed" ? "△" : j.status ? "✓" : "·"} ${j.name.padEnd(28)} ${j.line}`);
   });
 
+const watchOut = (root: string) => process.env.RETAKE_OUT?.trim() ? path.resolve(process.env.RETAKE_OUT.replace(/^~/, process.env.HOME ?? "")) : path.join(root, "outputs");
+
 watchCmd
   .command("run")
   .argument("<journey>", "a journey's name (watch/<name>.mjs), or all")
@@ -1862,37 +1865,26 @@ watchCmd
   .description("run journeys under Watch, compare each with its last accepted run, and keep the result")
   .action(async (which: string, opts: { headed: boolean; scheduled: boolean }) => {
     const { listJourneys, pickJourneys, nightlyNotice } = await import("./watch/journey-store.js");
-    const { describeChange } = await import("./watch/compare.js");
+    const { runBatch } = await import("./watch/auto.js");
+    const { takeRunLock } = await import("./watch/deploys.js");
     const root = process.cwd();
     if (opts.scheduled) say(`\n═══ nightly run · ${new Date().toLocaleString()}`);
     const { notify } = await import("./schedule.js");
     let chosen: { name: string; file: string }[];
     try { chosen = pickJourneys(listJourneys(root), which); }
     catch (e) { if (opts.scheduled) notify("Retake Watch — the nightly run stopped", (e as Error).message.slice(0, 220)); throw e; }
-    const { runJourney } = await import("./watch/journeys.js");
-    const out = process.env.RETAKE_OUT?.trim() ? path.resolve(process.env.RETAKE_OUT.replace(/^~/, process.env.HOME ?? "")) : path.join(root, "outputs");
-    const runs = [];
-    for (const j of chosen) {
-      say(`▶ ${j.name}`);
-      try {
-        const r = await runJourney({ root, name: j.name, file: j.file, out, scheduled: opts.scheduled, headed: opts.headed, log: say });
-        runs.push(r);
-        const first = r.changes[0];
-        if (r.status === "failed") say(`✗ ${j.name} failed${r.error ? ` — ${r.error}` : ""}`);
-        else if (r.status === "changed") say(`△ ${j.name} changed at step ${first.n} (${first.intent}): ${describeChange(first).toLowerCase()}${r.changes.length > 1 ? `, and ${r.changes.length - 1} more step${r.changes.length === 2 ? "" : "s"}` : ""}`);
-        else say(`✓ ${j.name} unchanged${r.firstRun ? " — the first run, kept as normal" : ""}`);
-        say(`  ${path.relative(root, r.dir) || r.dir}`);
-      } catch (e) {
-        say(`✗ ${j.name} could not run — ${(e as Error).message.split("\n")[0]}`);
-        runs.push({ journey: j.name, title: j.name, at: new Date().toISOString(), session: "", dir: "", status: "failed" as const, scheduled: opts.scheduled, error: (e as Error).message, steps: 0, changes: [] });
-      }
-    }
-    if (runs.some((r) => r.status === "failed")) process.exitCode = 2;
-    else if (runs.some((r) => r.status === "changed")) process.exitCode = 3;
-    if (opts.scheduled) {
-      const n = nightlyNotice(runs);
-      if (n) notify(n.title, n.body);   // silent when nothing changed
-    } else if (runs.some((r) => r.status === "changed")) say(`  The window's Watch area shows what changed; \`retake watch accept <journey>\` makes it the new normal.`);
+    // The nightly run waits for a run a new version started, rather than racing it.
+    let release = opts.scheduled ? takeRunLock(root) : null;
+    for (let i = 0; opts.scheduled && !release && i < 180; i++) { await new Promise((ok) => setTimeout(ok, 10_000)); release = takeRunLock(root); }
+    try {
+      const { runs } = await runBatch({ root, out: watchOut(root), journeys: chosen, trigger: opts.scheduled ? "nightly" : "hand", scheduled: opts.scheduled, headed: opts.headed, log: say });
+      if (runs.some((r) => r.status === "failed")) process.exitCode = 2;
+      else if (runs.some((r) => r.status === "changed")) process.exitCode = 3;
+      if (opts.scheduled) {
+        const n = nightlyNotice(runs);
+        if (n) notify(n.title, n.body);   // silent when nothing changed
+      } else if (runs.some((r) => r.status === "changed")) say(`  The window's Watch area shows what changed; \`retake watch accept <journey>\` makes it the new normal.`);
+    } finally { release?.(); }
   });
 
 watchCmd
@@ -1907,29 +1899,122 @@ watchCmd
   });
 
 watchCmd
+  .command("check")
+  .option("--scheduled", "started by `retake watch schedule`: quiet unless an app has a new version", false)
+  .description("look at each app's live address for a new version; run that app's journeys when there is one (seen twice in a row)")
+  .action(async (opts: { scheduled: boolean }) => {
+    const { checkForDeploys } = await import("./watch/auto.js");
+    const { notify } = await import("./schedule.js");
+    const root = process.cwd();
+    // By hand, the terminal is where the person is looking: the same sentence, no notification.
+    const results = await checkForDeploys({ root, out: watchOut(root), scheduled: opts.scheduled, log: say, notify: opts.scheduled ? notify : (_t, b) => say(b) });
+    if (results === null) { if (!opts.scheduled) say("a run is already going — this look can wait for the next one"); return; }
+    const ran = results.flatMap((r) => r.runs ?? []);
+    if (ran.some((r) => r.status === "failed")) process.exitCode = 2;
+    else if (ran.some((r) => r.status === "changed")) process.exitCode = 3;
+    if (opts.scheduled) return;   // every few minutes: the log holds only what happened
+    if (!results.length) { say("no journeys name an app yet — a journey says which with `export const url = \"https://…\"`"); return; }
+    for (const r of results) {
+      if (r.changed) continue;   // said above, as it ran
+      const s = r.state;
+      say(s.down ? `· ${r.host} did not answer` : s.basis === "none" ? `· ${r.host} shows no version to watch — checked each night only`
+        : s.candidate ? `· ${r.host} has something new — it runs once it is seen again, in a few minutes` : `✓ ${r.host} unchanged (${s.basis === "assets" ? "its files" : s.basis === "marker" ? "its version" : "its ETag"})`);
+    }
+  });
+
+watchCmd
   .command("schedule")
-  .argument("[every]", "daily | weekdays | off — omit to see the current schedule")
-  .option("--at <HH:MM>", "24-hour time")
-  .description("run every journey on a schedule, unattended: silent unless something changed or failed")
+  .argument("[every]", "on | off | daily | weekdays — omit to see where it stands")
+  .option("--at <HH:MM>", "24-hour time of the nightly run")
+  .description("run every journey unattended: each night, and whenever the app has a new version. Silent unless something changed or failed")
   .action(async (every: string | undefined, opts: { at?: string }) => {
     const { parseWatchSchedule, listJourneys } = await import("./watch/journey-store.js");
-    const { installSchedule, removeSchedule, readSchedule, scheduleLoaded, describeSchedule, logFile } = await import("./schedule.js");
+    const { installSchedule, removeSchedule, readSchedule, scheduleLoaded, describeSchedule } = await import("./schedule.js");
+    const { CHECK_EVERY_MIN, scheduleStatusLine, journeysByOrigin, hostOf, observe, advance, readDeploys, writeDeploys } = await import("./watch/deploys.js");
     const root = process.cwd();
     const want = parseWatchSchedule(every, opts.at);
-    if (!want.every) {
-      const s = readSchedule(root, "watch");
-      if (!s) { say("not scheduled — `retake watch schedule daily` runs every journey each night at 03:00."); return; }
-      const live = scheduleLoaded(s.label);
-      say(`${live ? "✓" : "✗"} journeys run ${describeSchedule(s)} — ${live ? `held by ${s.mechanism}` : `written, but ${s.mechanism} is not holding it; schedule it again`}`);
-      say(`  log: ${path.relative(root, logFile(root, "watch"))}`);
+    const hosts = () => [...journeysByOrigin(root).keys()].map(hostOf);
+    const status = () => {
+      const n = readSchedule(root, "watch"), c = readSchedule(root, "watch-check");
+      const blind = Object.values(readDeploys(root)).filter((s) => s.basis === "none").map((s) => hostOf(s.origin));
+      return scheduleStatusLine({
+        nightly: n ? { when: describeSchedule(n), loaded: scheduleLoaded(n.label), mechanism: n.mechanism } : null,
+        check: c ? { loaded: scheduleLoaded(c.label), mechanism: c.mechanism } : null,
+        hosts: hosts(), blind,
+      });
+    };
+    if (!want.every) { say(status()); return; }
+    if (want.every === "off") {
+      const a = removeSchedule(root, "watch"), b = removeSchedule(root, "watch-check");
+      say(a || b ? "✓ off — nothing runs by itself." : "nothing was scheduled.");
       return;
     }
-    if (want.every === "off") { say(removeSchedule(root, "watch") ? "✓ unscheduled." : "nothing was scheduled."); return; }
-    const journeys = listJourneys(root);
+    // One switch: `on` keeps the nightly time already chosen, or 03:00.
+    const had = readSchedule(root, "watch");
+    const cadence = want.every === "on" ? (had?.every ?? "daily") : want.every;
+    const at = opts.at ?? (want.every === "on" && had ? had.at : want.at);
     const bin = entry("cli");
-    const s = installSchedule(root, { every: want.every, at: want.at, count: 1 }, [bin.command, ...bin.args, "watch", "run", "all", "--scheduled"], "watch");
-    say(`✓ journeys run ${describeSchedule(s)}: ${journeys.length ? journeys.map((j) => j.name).join(", ") : "none yet — add one at watch/<name>.mjs"}.`);
-    say(`  Silent when nothing changed; one notification when something did. \`retake watch schedule off\` stops it.`);
+    installSchedule(root, { every: cadence, at, count: 1 }, [bin.command, ...bin.args, "watch", "run", "all", "--scheduled"], "watch");
+    installSchedule(root, { every: "daily", at: "00:00", count: 1, everyMinutes: CHECK_EVERY_MIN }, [bin.command, ...bin.args, "watch", "check", "--scheduled"], "watch-check");
+    // The first look now: what is deployed today is the version nothing needs to run for,
+    // and an app with no version to watch is known straight away.
+    const all = readDeploys(root);
+    for (const [origin] of journeysByOrigin(root)) {
+      if (all[origin]?.current) continue;
+      all[origin] = advance(all[origin], origin, await observe(origin)).next;
+    }
+    writeDeploys(root, all);
+    say(status());
+    if (!listJourneys(root).length) say("  No journeys yet — `retake watch suggest <the app's address>` proposes some.");
+    else say("  Silent when nothing changed; one notification when something did. `retake watch schedule off` stops both.");
+  });
+
+watchCmd
+  .command("suggest")
+  .argument("<url>", "the app's address")
+  .option("--plain", "read the pages only, without asking the drafting model", false)
+  .description("look around an app and propose 4–8 journeys worth watching, each marked reads only or changes data")
+  .action(async (url: string, opts: { plain: boolean }) => {
+    const { suggest } = await import("./watch/suggest.js");
+    const { spaceAnswer, spaceQuestion, hostName } = await import("./watch/spaces.js");
+    const { hasLogin, siteOf } = await import("./logins.js");
+    const root = process.cwd();
+    const { suggestion: s, exploration: x } = await suggest(root, url, { model: !opts.plain, log: (l) => process.stderr.write(`  ${l}\n`) });
+    if (s.signIn && !hasLogin(siteOf(s.origin))) {
+      say(`This app needs a sign-in. Use a test account: \`retake login ${s.origin}\`, then suggest again to see what is behind it.`);
+    } else if (x.signInError) say(`The sign-in did not work (${x.signInError}), so only the pages before it were seen.`);
+    if (!s.proposals.length) { say(`Nothing worth watching was found at ${hostName(s.origin)} — it may need a sign-in, or be one page.`); return; }
+    say(`${hostName(s.origin)} — ${s.proposals.length} journeys worth watching:`);
+    const w = Math.max(...s.proposals.map((p) => p.title.length));
+    s.proposals.forEach((p, i) => say(`  ${String(i + 1).padStart(2)}. ${p.title.padEnd(w)}  ${p.changes === "data" ? "changes data" : "reads only  "}  ${p.checks}`));
+    const data = s.proposals.map((p, i) => (p.changes === "data" ? i + 1 : 0)).filter(Boolean);
+    const reads = s.proposals.map((p, i) => (p.changes === "reads" ? i + 1 : 0)).filter(Boolean);
+    say("");
+    say(`  \`retake watch add ${s.origin} --pick ${(reads.length ? reads : data).slice(0, 4).join(",")}\` adds them (each runs once first).`);
+    if (data.length && spaceAnswer(root, s.origin) === null) say(`  ${spaceQuestion(s.origin)} Add --test-space if it is.`);
+  });
+
+watchCmd
+  .command("add")
+  .argument("<url>", "the app's address, as suggested")
+  .requiredOption("--pick <numbers>", "which proposals, e.g. 1,3,4")
+  .option("--test-space", "this app is a test space: journeys that change data may run here", false)
+  .option("--plain", "read the pages only, if they have to be looked at again", false)
+  .description("write the picked journeys; each is added only after one run of it passes")
+  .action(async (url: string, opts: { pick: string; testSpace: boolean; plain: boolean }) => {
+    const { readSuggestion, suggest, addJourneys, parsePick } = await import("./watch/suggest.js");
+    const { markSpace, spaceAnswer, spaceQuestion } = await import("./watch/spaces.js");
+    const root = process.cwd();
+    const s = readSuggestion(root, url) ?? (await suggest(root, url, { model: !opts.plain, log: (l) => process.stderr.write(`  ${l}\n`) })).suggestion;
+    const pick = parsePick(opts.pick, s.proposals.length);
+    if (opts.testSpace) markSpace(root, s.origin, true);
+    const asks = pick.some((n) => s.proposals[n - 1]?.changes === "data") && spaceAnswer(root, s.origin) === null;
+    if (asks) say(`${spaceQuestion(s.origin)} Without --test-space, they are not added.`);
+    const res = await addJourneys({ root, out: watchOut(root), suggestion: s, pick, log: (l) => process.stderr.write(`  ${l}\n`) });
+    for (const r of res) say(r.added ? `✓ ${r.title} — watch/${r.name}.mjs` : `✗ ${r.title} — ${r.why}`);
+    const added = res.filter((r) => r.added).length;
+    if (added) say(`  ${added} added; each one's first run is its normal. \`retake watch schedule on\` runs them each night and whenever the app changes.`);
+    if (res.some((r) => !r.added)) process.exitCode = 2;
   });
 
 program.parseAsync(process.argv).catch((e) => {
