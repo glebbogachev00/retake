@@ -16,15 +16,36 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { journeysDir } from "./journey-store.js";
+import { journeysDir, listJourneys } from "./journey-store.js";
 import { readJson, writeJson } from "./session.js";
 
 type Answer = { test: boolean; at: string };
 const file = (root: string) => path.join(journeysDir(root), ".spaces.json");
 const readAll = (root: string) => readJson<Record<string, Answer>>(file(root), {});
 
+/** A host that lives on this computer or this network: served over plain
+    http, nearly always. localhost, *.local, 127.x, 10.x, 192.168.x,
+    172.16–31.x, 0.0.0.0, ::1. */
+export function isLocalHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h === "0.0.0.0" || h === "::1") return true;
+  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(h);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
+
+/** An address as typed, with its scheme: as given, else http:// for an app on
+    this computer or network (127.0.0.1:4563, localhost:3000), else https://. */
+export function withScheme(raw: string): string {
+  const t = raw.trim();
+  if (!t || /^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return t;
+  const host = t.replace(/[/?#].*$/, "").replace(/:\d+$/, "");
+  return `${isLocalHost(host) ? "http" : "https"}://${t}`;
+}
+
 export const originOf = (url: string): string | null => {
-  try { const u = new URL(/^[a-z]+:\/\//i.test(url) ? url : `https://${url}`); return /^https?:$/.test(u.protocol) ? u.origin : null; } catch { return null; }
+  try { const u = new URL(withScheme(url)); return /^https?:$/.test(u.protocol) ? u.origin : null; } catch { return null; }
 };
 
 /** True, false, or null when nobody has been asked about this app yet. */
@@ -48,9 +69,13 @@ export function markSpace(root: string, url: string, test: boolean): string {
 }
 
 /** What a journey file says about itself, read without running it. */
-export function journeyMeta(source: string): { url: string | null; changesData: boolean; title: string | null } {
+export function journeyMeta(source: string): { url: string | null; changesData: boolean; title: string | null; makes: string[] } {
   const str = (name: string) => new RegExp(`export\\s+const\\s+${name}\\s*=\\s*(["'\`])((?:\\\\.|(?!\\1).)*)\\1`).exec(source)?.[2] ?? null;
-  return { url: str("url"), changesData: /export\s+const\s+changesData\s*=\s*true\b/.test(source), title: str("title") };
+  // What a data journey creates, by its exact text: `export const makes = ["Watch check"]`.
+  let makes: string[] = [];
+  const m = /export\s+const\s+makes\s*=\s*(\[[^\]]*\])/.exec(source);
+  if (m) { try { makes = (JSON.parse(m[1]) as unknown[]).filter((x): x is string => typeof x === "string" && x.trim().length > 0); } catch { /* not plain JSON: none */ } }
+  return { url: str("url"), changesData: /export\s+const\s+changesData\s*=\s*true\b/.test(source), title: str("title"), makes };
 }
 
 export const hostName = (url: string) => { try { return new URL(originOf(url) ?? url).host; } catch { return url; } };
@@ -69,3 +94,14 @@ export function gate(root: string, j: { name: string; file: string }, originGues
 
 /** The question, asked once per app, word for word. */
 export const spaceQuestion = (url: string) => `Is ${hostName(url)} a test space? Journeys that change data run only there.`;
+
+/** The journey already watching this on this app, by its title, or null:
+    adding the same app twice must not make two of everything. */
+export function alreadyWatched(root: string, origin: string, p: { title: string }): string | null {
+  for (const j of listJourneys(root)) {
+    let m: ReturnType<typeof journeyMeta>;
+    try { m = journeyMeta(fs.readFileSync(j.file, "utf8")); } catch { continue; }
+    if ((m.title ?? j.name).trim().toLowerCase() === p.title.trim().toLowerCase() && m.url && originOf(m.url) === origin) return j.name;
+  }
+  return null;
+}

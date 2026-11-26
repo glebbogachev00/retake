@@ -14,7 +14,7 @@ import {
   advance, deployLine, deployNotice, hostOf, journeysByOrigin, lastRunOf, observe as look, readDeploys, takeRunLock,
   writeDeploys, writeLastRun, type Fingerprint, type OriginState, type Trigger,
 } from "./deploys.js";
-import type { RunRecord } from "./journey-store.js";
+import { failureLine, type RunRecord } from "./journey-store.js";
 import { gate, journeyMeta } from "./spaces.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -35,7 +35,10 @@ export async function runBatch(o: {
     const { runJourney } = await import("./journeys.js");
     return runJourney({ root: o.root, name: j.name, file: j.file, out: o.out, scheduled: o.scheduled, headed: o.headed, log });
   });
-  for (const j of o.journeys) {
+  // Journeys that only read go first, so what a data journey makes is not there yet when they look.
+  const writes = (j: { file: string }) => { try { return journeyMeta(fs.readFileSync(j.file, "utf8")).changesData; } catch { return false; } };
+  const ordered = [...o.journeys.filter((j) => !writes(j)), ...o.journeys.filter((j) => writes(j))];
+  for (const j of ordered) {
     const g = gate(o.root, j);
     if (!g.run) { skipped.push({ name: j.name, why: g.why }); log(`– ${j.name} skipped: ${g.why}`); continue; }
     log(`▶ ${j.name}`);
@@ -43,9 +46,9 @@ export async function runBatch(o: {
       const r = await runOne(j);
       runs.push(r);
       const first = r.changes[0];
-      if (r.status === "failed") log(`✗ ${j.name} failed${r.error ? ` — ${r.error}` : ""}`);
+      if (r.status === "failed") log(`✗ ${j.name} ${failureLine(r)}${r.firstRun ? " (its passing steps are kept as normal)" : ""}`);
       else if (r.status === "changed") log(`△ ${j.name} changed at step ${first.n} (${first.intent}): ${describeChange(first).toLowerCase()}${r.changes.length > 1 ? `, and ${r.changes.length - 1} more step${r.changes.length === 2 ? "" : "s"}` : ""}`);
-      else log(`✓ ${j.name} unchanged${r.firstRun ? " — the first run, kept as normal" : ""}`);
+      else log(`✓ ${j.name} unchanged${r.firstRun ? " — the first run, kept as normal" : ""}${r.adopted ? ` — ${r.adopted} step${r.adopted === 1 ? "" : "s"} passed for the first time and joined the normal` : ""}`);
       log(`  ${path.relative(o.root, r.dir) || r.dir}`);
     } catch (e) {
       log(`✗ ${j.name} could not run — ${(e as Error).message.split("\n")[0]}`);

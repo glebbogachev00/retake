@@ -26,11 +26,13 @@ import type { Page } from "playwright";
 import { launchChromium } from "../browser-home.js";
 import { readLogin, siteOf } from "../logins.js";
 import { totp } from "../manifest.js";
-import { startWatch, type Watch } from "../watch.js";
-import { compareSnapshots, verdict, type Rect, type Snapshot } from "./compare.js";
-import { acceptRun, baselineDir, loadPicture, pruneQuietRuns, readBaseline, readSnapshots, writeRun, type RunRecord } from "./journey-store.js";
+import { startWatch, type Watch, type WatchInternal } from "../watch.js";
+import { readWindow } from "../ui/guard.js";
+import { compareSnapshots, keyOf, verdict, type Rect, type Snapshot } from "./compare.js";
+import { acceptRun, adoptWaiting, baselineDir, listJourneys, loadPicture, pruneQuietRuns, readBaseline, readSnapshots, writeRun, type RunRecord } from "./journey-store.js";
 import { readSteps, writeJson } from "./session.js";
-import { gate } from "./spaces.js";
+import { gate, journeyMeta, withScheme } from "./spaces.js";
+import { journeyOrigin } from "./deploys.js";
 
 export const DESKTOP = { width: 1280, height: 800 };
 /** A journey that does not finish in this long has stopped, whatever it is waiting for. */
@@ -54,12 +56,17 @@ export type JourneyKit = {
   signIn(url?: string, o?: SignInOptions): Promise<void>;
   /** True when the journey runs at phone width. */
   phone: boolean;
+  /** The app's address, from the journey's `export const url`, or null when
+      it does not say. Helpers take it from here rather than spelling it out. */
+  url: string | null;
 };
 
 export type JourneyModule = {
   default: (page: Page, w: Watch, kit: JourneyKit) => Promise<void>;
   title?: string;
   viewport?: { width: number; height: number };
+  url?: string;
+  changesData?: boolean;
 };
 
 /** No login is saved for the site a journey signs in to. */
@@ -133,11 +140,45 @@ async function stillShot(page: Page): Promise<Buffer> {
   return prev;
 }
 
-async function capture(page: Page, dir: string, n: number): Promise<Pick<Snapshot, "text" | "shot" | "masks" | "width" | "height">> {
+/** Rows that Watch's own data journeys made on this app (a project called
+    "Watch check"), hidden for the moment of capture and then put back, so
+    the comparison sees the app as if they had never run. A row is the
+    nearest list item or table row around text that is exactly one of them. */
+const HIDE_MADE = `(values) => {
+  const vs = new Set(values.map((v) => v.trim()));
+  const own = (e) => (e.textContent || "").replace(/\\s+/g, " ").trim();
+  for (const el of document.querySelectorAll("body *")) {
+    if (!vs.has(own(el)) || [...el.children].some((c) => own(c) === own(el))) continue;
+    const row = el.closest("li, tr, [role=row], [role=listitem], [role=option]") || el;
+    if (row === document.body || row.hasAttribute("data-retake-made")) continue;
+    row.setAttribute("data-retake-made", row.style.getPropertyValue("display") + "|" + row.style.getPropertyPriority("display"));
+    row.style.setProperty("display", "none", "important");
+  }
+}`;
+const SHOW_MADE = `() => {
+  for (const row of document.querySelectorAll("[data-retake-made]")) {
+    const [v, pr] = (row.getAttribute("data-retake-made") || "|").split("|");
+    if (v) row.style.setProperty("display", v, pr); else row.style.removeProperty("display");
+    row.removeAttribute("data-retake-made");
+  }
+}`;
+const inFrames = (page: Page, fn: string, arg?: unknown) => Promise.all(page.frames().map((f) => f.evaluate(`(${fn})(${JSON.stringify(arg ?? null)})`).catch(() => {})));
+
+async function capture(page: Page, dir: string, n: number, settleMasks: () => Promise<void>, made: string[] = []): Promise<Pick<Snapshot, "text" | "shot" | "masks" | "width" | "height">> {
   await page.waitForLoadState("domcontentloaded", { timeout: 5000 }).catch(() => {});
+  if (made.length) await inFrames(page, HIDE_MADE, made);
+  try { return await captureNow(page, dir, n, settleMasks); }
+  finally { if (made.length) await inFrames(page, SHOW_MADE); }
+}
+
+async function captureNow(page: Page, dir: string, n: number, settleMasks: () => Promise<void>): Promise<Pick<Snapshot, "text" | "shot" | "masks" | "width" | "height">> {
   let text: string[] = [], shot: string | null = null, masks: Rect[] = [], width = 0, height = 0;
+  // Masks are marked again a few times a second; something that appeared since
+  // (a date, a clock) would be read before then. Marked now, right before each reading.
+  await settleMasks().catch(() => {});
   try { text = (await page.evaluate(TEXT_SCRIPT)) as string[]; } catch { /* a page mid-navigation has no text yet */ }
   try {
+    await settleMasks().catch(() => {});
     const png = await stillShot(page);
     const rel = `snapshots/step-${String(n).padStart(2, "0")}.png`;
     fs.mkdirSync(path.join(dir, "snapshots"), { recursive: true });
@@ -152,7 +193,7 @@ async function capture(page: Page, dir: string, n: number): Promise<Pick<Snapsho
 
 /** The Watch the journey is given: the same calls, plus a capture at every
     result, kept as snapshots.json in the session folder. */
-function tracked(w: Watch, page: Page): { w: Watch; open: () => boolean; snapshots: Snapshot[] } {
+function tracked(w: WatchInternal, page: Page, made: string[] = []): { w: Watch; open: () => boolean; snapshots: Snapshot[] } {
   let n = 0, open = false;
   const snapshots: Snapshot[] = [];
   const t: Watch = {
@@ -162,7 +203,7 @@ function tracked(w: Watch, page: Page): { w: Watch; open: () => boolean; snapsho
     async step(intent, expect) { await w.step(intent, expect); n++; open = true; },
     async result(ok, note) {
       if (n === 0) n = 1;
-      const snap = await capture(page, w.dir, n);
+      const snap = await capture(page, w.dir, n, () => w.settleMasks(), made);
       await w.result(ok, note);
       open = false;
       const s = readSteps(w.dir).find((x) => x.n === n);
@@ -208,7 +249,7 @@ async function settle(page: Page) {
  */
 export async function signInOn(page: Page, url: string | undefined, o: SignInOptions = {}, hooks: { beforeTyping?: (sels: string[]) => Promise<void>; secrets?: Set<string> } = {}): Promise<void> {
   const target = url ?? page.url();
-  const full = /^[a-z]+:\/\//i.test(target) ? target : `https://${target}`;
+  const full = withScheme(target);
   const site = siteOf(full);
   const user = readLogin(site, "user"), password = readLogin(site, "password"), key = readLogin(site, "totp");
   if (!user || !password) throw new MissingLogin(site, new URL(full).origin);
@@ -252,10 +293,12 @@ export async function signInOn(page: Page, url: string | undefined, o: SignInOpt
   throw new Error("the sign-in took more than ten screens — stopped");
 }
 
-function makeKit(page: Page, w: Watch, phone: boolean, secrets: Set<string>): JourneyKit {
+function makeKit(page: Page, w: Watch, phone: boolean, secrets: Set<string>, appUrl: string | null): JourneyKit {
   return {
     phone,
-    signIn: (url, o = {}) => signInOn(page, url, o, { secrets, beforeTyping: (sels) => w.mask(sels) }),
+    url: appUrl,
+    // With no address given: the journey's own app, else wherever the page is.
+    signIn: (url, o = {}) => signInOn(page, url ?? appUrl ?? undefined, o, { secrets, beforeTyping: (sels) => w.mask(sels) }),
   };
 }
 
@@ -266,6 +309,22 @@ const scrub = (s: string, secrets: Set<string>) => {
 };
 
 // ---------- the run ----------
+
+/** Everything the data journeys of this journey's app say they make. */
+export function madeOnApp(root: string, j: { name: string; file: string }): string[] {
+  const origin = journeyOrigin(root, j);
+  if (!origin) return [];
+  const all = new Set<string>();
+  const files = [...listJourneys(root), j];
+  for (const k of files) {
+    let src = "";
+    try { src = fs.readFileSync(k.file, "utf8"); } catch { continue; }
+    const m = journeyMeta(src);
+    if (!m.makes.length || journeyOrigin(root, k) !== origin) continue;
+    for (const v of m.makes) all.add(v);
+  }
+  return [...all];
+}
 
 export async function runJourney(o: {
   root: string; name: string; file: string; out: string;
@@ -291,14 +350,16 @@ export async function runJourney(o: {
   try {
     const context = await browser.newContext({ viewport, deviceScaleFactor: phone ? 2 : 1, isMobile: phone, hasTouch: phone });
     const page = await context.newPage();
-    const watch = await startWatch(page, { title, ui: o.ui, out: o.out });
-    const t = tracked(watch, page);
+    // The window running for this workspace, wherever it listens.
+    const ui = o.ui !== undefined ? o.ui : process.env.RETAKE_UI || readWindow(o.root) || undefined;
+    const watch = await startWatch(page, { title, ui, out: o.out });
+    const t = tracked(watch, page, madeOnApp(o.root, { name: o.name, file: o.file }));
     const startedAt = new Date().toISOString();
     let error: string | null = null;
     try {
       let timer: NodeJS.Timeout | undefined;
       const late = new Promise<never>((_, no) => { timer = setTimeout(() => no(new Error(`the journey took longer than ${JOURNEY_TIMEOUT_MS / 60_000} minutes`)), JOURNEY_TIMEOUT_MS); });
-      try { await Promise.race([mod.default(page, t.w, makeKit(page, t.w, phone, secrets)), late]); } finally { clearTimeout(timer); }
+      try { await Promise.race([mod.default(page, t.w, makeKit(page, t.w, phone, secrets, typeof mod.url === "string" && /^https?:\/\//i.test(mod.url) ? mod.url : null)), late]); } finally { clearTimeout(timer); }
       if (t.open()) await t.w.result(true, "");
     } catch (e) {
       error = scrub((e as Error)?.message ?? String(e), secrets);
@@ -310,13 +371,23 @@ export async function runJourney(o: {
     const { dir } = await watch.end();
     const session = path.basename(dir);
     const after = readSnapshots(dir);
+    // Steps that had no normal because they failed when it was made, passing now: theirs from today.
+    const adopted = new Set(adoptWaiting(o.root, o.name, dir, after));
     const baseline = readBaseline(o.root, o.name);
     const bdir = baselineDir(o.root, o.name);
-    const changes = baseline ? compareSnapshots(baseline.steps, after, (s, side) => loadPicture(side === "before" ? bdir : dir, s)) : [];
+    const waiting = new Set(baseline?.waiting ?? []);
+    const changes = baseline
+      ? compareSnapshots(baseline.steps, after, (s, side) => loadPicture(side === "before" ? bdir : dir, s))
+        // A step still waiting for its first pass is not "new": its failure is the verdict's business.
+        .filter((c) => !(c.kinds.length === 1 && c.kinds[0] === "new" && waiting.has(keyOf(c))))
+      : [];
     const status = verdict({ error, steps: after, changes });
     rec = { journey: o.name, title, at: startedAt, session, dir, status, scheduled: !!o.scheduled, error, steps: after.length, changes };
-    // The first run that passes is the normal until a person says otherwise.
+    if (adopted.size) rec.adopted = adopted.size;
+    // The first run is the normal until a person says otherwise: all of it when
+    // it passes; its passing steps when one failed, so they are compared from now on.
     if (!baseline && status === "unchanged") { const b = acceptRun(o.root, o.name, dir, session); rec.firstRun = true; rec.acceptedAt = b.acceptedAt; }
+    else if (!baseline && status === "failed" && after.some((s) => s.result === "pass")) { const b = acceptRun(o.root, o.name, dir, session, { passingOnly: true }); rec.firstRun = true; rec.acceptedAt = b.acceptedAt; }
     writeRun(o.root, rec);
     if (o.scheduled) {
       const gone = pruneQuietRuns(o.root, o.name, session);

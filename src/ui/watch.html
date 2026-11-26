@@ -45,6 +45,8 @@
   .act { display:flex; gap:10px; align-items:center; margin-top:14px; }
   .act input { flex:1; font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:8px 14px; outline:none; }
   .act input:focus { background:var(--fill2); }
+  /* On a phone, as on the landing's drawing: the buttons on one line, the note on its own, full width. */
+  @media (max-width: 640px) { .act { flex-wrap:wrap; } .act input { flex:1 1 100%; min-width:0; } }
   .fixline { margin-top:10px; min-height:1.45em; font-size:var(--small); color:var(--muted); }
   .fixline button { background:none; padding:0 4px; color:var(--accent); font-size:var(--small); }
   ol.steps { list-style:none; margin:26px 0 0; padding:0; columns:2 380px; column-gap:40px; }
@@ -98,6 +100,11 @@
   .act a.quiet2:hover { color:var(--ink); }
   .others { margin-top:12px; font-size:var(--small); color:var(--muted); }
   .ran { margin:6px 0 0; color:var(--muted); }
+  h2.app { font-size:var(--small); font-weight:600; color:var(--muted); margin:22px 14px 0; }
+  h2.app + ul.journeys { margin-top:4px; }
+  p.live { margin:8px 0 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  p.live .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); }
+  p.live a { color:var(--accent); }
   .sum + .ran { margin-top:4px; }
   .blind { margin:2px 0 0; color:var(--muted); font-size:var(--small); }
   ul.journeys .l.skipped { color:var(--muted); }
@@ -178,23 +185,30 @@ async function home() {
   clearTimeout(homeTimer);
   const J = await api('/api/watch/journeys').catch(() => null);
   if (!J) { homeTimer = setTimeout(home, 3000); return; }
-  if (J.live) { location.replace('/watch/' + J.live); return; }
   // Nothing to watch yet: the one thing to ask is the app's address.
   if (!J.journeys.length) { addApp(); return; }
   const more = `<p class="more"><a href="/watch/add">Add an app</a>${J.sessions ? ' · <a href="/watch/sessions">Sessions</a>' : ''}</p>`;
-  let h = AREAS + (J.summary ? `<h1 class="sum">${esc(J.summary)}</h1>` : '');
+  let h = AREAS + liveLine(J) + (J.summary ? `<h1 class="sum">${esc(J.summary)}</h1>` : '');
   if (J.ran) h += `<p class="ran">${esc(J.ran)}</p>`;
   if (J.blind) h += `<p class="blind">${esc(J.blind)}</p>`;
   if (J.ask) h += `<div class="ask"><p>${esc(J.ask.question)}</p><div class="btns"><button data-test="yes">Yes, a test space</button><button data-test="no">No</button></div></div>`;
-  h += '<ul class="journeys">' + J.journeys.map(j => {
+  const row = j => {
     const href = j.status === 'changed' || j.status === 'failed' ? '/watch/j/' + j.name : j.session ? '/watch/' + j.session : null;
     const inner = `<span class="t">${esc(j.title)}</span><span class="l ${esc(j.status || '')}"${j.why ? ` title="${esc(j.why)}"` : ''}>${esc(j.line)}</span>`;
     return `<li>${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
-  }).join('') + '</ul>' + more;
+  };
+  // By app: each under its address. One app with no address known needs no heading.
+  const byName = new Map(J.journeys.map(j => [j.name, j]));
+  const groups = J.groups && J.groups.length ? J.groups : [{ host: null, names: J.journeys.map(j => j.name) }];
+  const headed = groups.length > 1 || groups.some(g => g.host);
+  h += groups.map(g => (headed ? `<h2 class="app">${esc(g.host || 'Other journeys')}</h2>` : '') + '<ul class="journeys">' + g.names.map(n => row(byName.get(n))).join('') + '</ul>').join('') + more;
   app.innerHTML = h;
   app.querySelectorAll('[data-test]').forEach(b => b.onclick = async () => { await api('/api/watch/spaces', { url: J.ask.url, test: b.dataset.test === 'yes' }); home(); });
   homeTimer = setTimeout(home, 15000);
 }
+
+/** A run going now: one line at the top, with the way to watch it. */
+const liveLine = J => J.live ? `<p class="live"><span class="dot"></span>Running now: ${esc(J.liveTitle || 'a session')} · <a href="/watch/${esc(J.live)}">Watch it live</a></p>` : '';
 
 // ---------- adding an app: its address, then what is worth watching ----------
 /** Waiting writes itself: one faded line types a phrase, holds it, erases it. */
@@ -219,7 +233,7 @@ async function addApp() {
   if (job) return follow(job);
   history.replaceState(null, '', '/watch/add');
   const J = await api('/api/watch/journeys').catch(() => ({ journeys: [] }));
-  app.innerHTML = AREAS + `<section class="add">
+  app.innerHTML = AREAS + liveLine(J) + `<section class="add">
       <h1>${J.journeys.length ? 'Add an app' : 'What should Watch keep an eye on?'}</h1>
       <p class="sub">The app’s address. Retake looks around it and suggests what to watch.</p>
       <form id="f"><input id="u" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="app.example.com" aria-label="The app’s address"><button class="go" type="submit">Look around</button></form>
@@ -304,7 +318,10 @@ function proposals(J) {
     : J.signIn && !J.signedIn ? '<p class="sub">Only the pages before the sign-in were seen.</p>' : '';
   app.innerHTML = AREAS + `<section class="add wide">
       <h1>Worth watching on ${esc(J.host)}</h1>${note}
-      <ul class="picks">${J.proposals.map((p, i) => `<li><label><input type="checkbox" value="${i + 1}"${p.changes === 'data' ? '' : ' checked'}><span class="pt">${esc(p.title)}</span><span class="pk ${p.changes === 'data' ? 'data' : ''}">${p.changes === 'data' ? 'Changes data' : 'Reads only'}</span><span class="pc">${esc(p.checks)}</span></label></li>`).join('')}</ul>
+      <ul class="picks">${J.proposals.map((p, i) => {
+        const why = p.watched ? ' · Already watched' : p.noAccount ? ' · Needs the test account' : '';
+        return `<li><label><input type="checkbox" value="${i + 1}"${p.ticked ? ' checked' : ''}${p.watched ? ' disabled' : ''}><span class="pt">${esc(p.title)}</span><span class="pk ${p.changes === 'data' ? 'data' : ''}">${p.changes === 'data' ? 'Changes data' : 'Reads only'}</span><span class="pc">${esc(p.checks)}${esc(why)}</span></label></li>`;
+      }).join('')}</ul>
       <div class="row"><span class="sp"></span><button class="go" id="addb">Add journeys</button></div>
       <p class="err" id="err"></p>
     </section>`;
@@ -340,11 +357,11 @@ async function add(J, pick) {
 function finished(J) {
   const res = J.results || [];
   // Everything went in: the list it went into is the ending.
-  if (res.length && res.every(r => r.added)) { history.replaceState(null, '', '/watch'); home(); return; }
+  if (res.length && res.every(r => r.added || r.already)) { history.replaceState(null, '', '/watch'); home(); return; }
   const n = res.filter(r => r.added).length;
   app.innerHTML = AREAS + `<section class="add">
       <h1>${n ? `${n} added` : 'Nothing added'}</h1>
-      <ul class="done">${res.map(r => `<li class="${r.added ? 'ok' : 'no'}"><span class="m">${r.added ? '✓' : '✗'}</span><span>${esc(r.title)}${r.added ? '' : `<span class="why">${esc(r.why)}</span>`}</span></li>`).join('')}</ul>
+      <ul class="done">${res.map(r => `<li class="${r.added ? 'ok' : r.already ? '' : 'no'}"><span class="m">${r.added ? '✓' : r.already ? '·' : '✗'}</span><span>${esc(r.title)}${r.added ? '' : `<span class="why">${esc(r.why)}</span>`}</span></li>`).join('')}</ul>
       <div class="row"><a class="btn go" href="/watch">Done</a></div>
     </section>`;
 }
@@ -396,7 +413,7 @@ async function sessions() {
   if (!all.length) { app.innerHTML = AREAS + '<p class="quiet">Nothing has been watched yet.</p>'; return; }
   app.innerHTML = AREAS + '<header><a class="back" href="/watch">‹</a><h1>Sessions</h1></header><ul class="list">' + all.map(s => {
     const d = new Date(s.startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-    const bits = [s.steps + ' steps', s.failed ? s.failed + ' failed' : '', s.flags ? s.flags + ' flagged' : ''].filter(Boolean).join(' · ');
+    const bits = [s.steps + (s.steps === 1 ? ' step' : ' steps'), s.failed ? s.failed + ' failed' : '', s.flags ? s.flags + ' flagged' : ''].filter(Boolean).join(' · ');
     return `<li><a href="/watch/${s.id}"><span class="t">${s.live ? '<span class="dot"></span>' : ''}${esc(s.title)}</span><span class="small">${bits}</span><span class="small">${d}</span></a></li>`;
   }).join('') + '</ul>';
   setTimeout(sessions, 5000);
