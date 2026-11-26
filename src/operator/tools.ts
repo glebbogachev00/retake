@@ -813,12 +813,13 @@ server.registerTool("watch", {
   }
   const { runBatch } = await import("../watch/auto.js");
   const { describeChange } = await import("../watch/compare.js");
+  const { failureLine } = await import("../watch/journey-store.js");
   let chosen;
   try { chosen = pickJourneys(listJourneys(ROOT), run); } catch (e) { return text((e as Error).message); }
   const { runs, skipped } = await runBatch({ root: ROOT, out: OUT, journeys: chosen, trigger: "hand", log: (l) => { if (l.startsWith("▶")) void tell(`Running the journey ${l.slice(2)}…`); } });
   const lines = runs.map((r) => {
     const c = r.changes[0];
-    return r.status === "failed" ? `${r.journey}: failed — ${r.error ?? "a step did not pass"}${r.dir ? ` (${r.dir})` : ""}`
+    return r.status === "failed" ? `${r.journey}: ${failureLine(r)}${r.dir ? ` (${r.dir})` : ""}`
       : r.status === "changed" ? `${r.journey}: changed at step ${c.n} (${c.intent}) — ${describeChange(c)}${r.changes.length > 1 ? `, and ${r.changes.length - 1} more` : ""}. The person decides whether it is the new normal, in the window's Watch area. (${r.dir})`
       : `${r.journey}: unchanged${r.firstRun ? " — the first run, kept as normal" : ""}`;
   });

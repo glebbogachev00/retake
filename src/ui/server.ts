@@ -46,7 +46,7 @@ import { findOrphans } from "../ext/heal.js";
 import { readChecks } from "../ext/checked.js";
 import { productName } from "../ext/intent.js";
 import { running } from "../progress.js";
-import { MAX_BODY, checkRequest, clearToken, newToken, readBodyLimited, writeToken } from "./guard.js";
+import { MAX_BODY, checkRequest, clearToken, clearWindow, newToken, readBodyLimited, writeToken, writeWindow } from "./guard.js";
 import { startOffer, startApp, listeningPorts } from "../appserver.js";
 import { PKG_ROOT, PROJECT_ROOT, VERSION, entry, isDemoFile } from "../paths.js";
 import { SECRET_NAME, missingSecrets, writeEnvFile } from "../env.js";
@@ -506,7 +506,7 @@ export function serve(port: number) {
   // so the browser has it. A site on the open web can do neither.
   const TOKEN = newToken();
   writeToken(ROOT, TOKEN);
-  for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) process.on(sig, () => { clearToken(ROOT); if (sig !== "exit") process.exit(0); });
+  for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) process.on(sig, () => { clearToken(ROOT); clearWindow(ROOT); if (sig !== "exit") process.exit(0); });
   // Watch mode: a person watching an AI test their app (src/ui/watch-routes.ts).
   // A plug-in: loaded, not linked. Without it the window is Demos alone.
   const watchP: Promise<ReturnType<typeof watchRoutes> | null> = import("./watch-routes.js")
@@ -1380,6 +1380,6 @@ export function serve(port: number) {
       json(res, 500, { error: (e as Error).message });
     }
   });
-  server.listen(port, "127.0.0.1", () => process.stdout.write(`retake ui → http://localhost:${port}\n`));
+  server.listen(port, "127.0.0.1", () => { writeWindow(ROOT, port); process.stdout.write(`retake ui → http://localhost:${port}\n`); });
   return server;
 }

@@ -42,6 +42,36 @@ export function readToken(root: string): string | null {
   try { return fs.readFileSync(tokenFile(root), "utf8").trim() || null; } catch { return null; }
 }
 
+/** Where a local process finds the window running for this workspace, and
+    on which port: `retake watch run` and test scripts look here before
+    falling back to the usual port. */
+const windowFile = (root: string) => path.join(root, ".retake", "window.json");
+
+export function writeWindow(root: string, port: number): void {
+  try {
+    fs.mkdirSync(path.dirname(windowFile(root)), { recursive: true });
+    fs.writeFileSync(windowFile(root), JSON.stringify({ url: `http://localhost:${port}`, port, pid: process.pid }) + "\n");
+  } catch { /* the usual port still works */ }
+}
+
+/** The running window's address for this workspace, or null when none is
+    recorded or the process that recorded it is gone. */
+export function readWindow(root: string): string | null {
+  try {
+    const w = JSON.parse(fs.readFileSync(windowFile(root), "utf8")) as { url?: string; pid?: number };
+    if (!w.url || !w.pid) return null;
+    try { process.kill(w.pid, 0); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "EPERM") return null; }
+    return w.url;
+  } catch { return null; }
+}
+
+export function clearWindow(root: string): void {
+  try {
+    const w = JSON.parse(fs.readFileSync(windowFile(root), "utf8")) as { pid?: number };
+    if (w.pid === process.pid) fs.rmSync(windowFile(root), { force: true });
+  } catch { /* none */ }
+}
+
 export function clearToken(root: string): void {
   try { fs.rmSync(tokenFile(root), { force: true }); } catch { /* going away anyway */ }
 }

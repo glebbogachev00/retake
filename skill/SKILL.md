@@ -844,12 +844,17 @@ A journey is one of the app's key flows, kept as a script at
 arguments says where each one stands, in one line: "Unchanged since 3 Dec",
 "Changed last night", "Failed last night". `watch` with `run` runs them now
 and says, per journey, unchanged, changed (the step, and whether the text,
-the picture or the pass/fail moved) or failed, and why.
+the picture or the pass/fail moved) or failed, naming the step and why:
+"failed at step 2: Open Licences — No table". A first run with a failing step
+still makes its passing steps the normal; the failing one joins it when it
+first passes.
 
 Writing one is ordinary Watch-mode code: `export default async (page, w,
-{ signIn }) => {…}`, with `w.step` / `w.result` around each move. Sign in with
-`signIn("<the app's url>")`, which uses the login the person saved with
-`retake login`; never put a value in the script. If it stops on "no saved
+{ signIn, url }) => {…}`, with `w.step` / `w.result` around each move. Name
+the app it is about with `export const url = "https://…"`; the kit hands it
+back as `url`, so helpers never spell it out. Sign in with `signIn()` (the
+journey's `url`, or pass an address), which uses the login the person saved
+with `retake login`; never put a value in the script. If it stops on "no saved
 login", tell the person the `retake login` line it names and wait. Mask
 secrets and anything that changes by itself (a clock, today's date) with
 `w.mask`: masked parts never count as a change.
@@ -866,7 +871,11 @@ Show them in plain words and let the person pick, then `watch_write` with
 their picks (Retake writes them, or pass your own file per proposal as
 `code`). Each runs once first and is added only if it passes. A journey that
 changes data says `export const changesData = true` and runs only where the
-person said the app is a test space; never answer that for them. `retake watch
+person said the app is a test space; never answer that for them. It also says
+what it makes, by its exact text: `export const makes = ["Watch check"]`.
+Those rows are hidden from every capture of every journey on that app, and
+journeys that only read run first, so the list it adds to never reads as a
+change anywhere. Don't fold or mask that list yourself. `retake watch
 schedule on` (theirs to switch) runs every journey each night and within
 minutes of a new version of the app.
 

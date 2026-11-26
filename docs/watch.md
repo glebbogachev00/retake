@@ -38,7 +38,7 @@ const { dir, flags } = await w.end();                 // writes the folder, retu
 
 | Call | What it does |
 |---|---|
-| `startWatch(page, { title, ui?, out?, mask?, fix? })` | Starts the live picture and the session folder. `ui` is the Retake window (default `$RETAKE_UI`, else `http://localhost:4310`; `false` for none). `out` is the outputs folder (default `$RETAKE_OUT`, else the window's; with neither, Retake's own install folder, so set it when there is no window). `mask` hides things from the very first frame. |
+| `startWatch(page, { title, ui?, out?, mask?, fix? })` | Starts the live picture and the session folder. `ui` is the Retake window (default `$RETAKE_UI`, else the window running for this workspace, which records its address in `.retake/window.json`, else `http://localhost:4310`; `false` for none). `out` is the outputs folder (default `$RETAKE_OUT`, else the window's; with neither, Retake's own install folder, so set it when there is no window). `mask` hides things from the very first frame. |
 | `w.scenario(name)` | Groups the steps that follow under a heading. |
 | `w.step(intent, expect)` | Starts a step. Its screenshot is taken once the next action has settled (the first change on screen, then half a second of stillness), or at `result` if nothing changed. |
 | `w.result(ok, note?)` | Ends the step: pass or fail, and a short note. |
@@ -75,7 +75,9 @@ person's notes go out. Its output goes to `fix-request.log` beside the brief.
 ## The window
 
 Open `http://localhost:4311/watch` (the port of whichever window the script
-names). It opens the live session, or lists past sessions, newest first.
+names). The Watch area lists the journeys; a session running now is one line
+at the top of it ("Running now: Client portal – licences · Watch it live"),
+and past sessions are under Sessions, newest first.
 
 - The page, large. Under it, one line: what the AI is doing and what it
   expects, then its verdict.
@@ -133,10 +135,11 @@ watch/_<anything>.mjs   shared code journeys import; never run on its own
 // watch/licences.mjs
 export const title = 'Portal – licences';              // optional, defaults to the file name
 export const viewport = { width: 390, height: 844 };   // optional; 480 wide or less runs as a phone
-export default async function (page, w, { signIn }) {
+export const url = 'https://portal.example.com';       // the app it is about; in the kit as `url`
+export default async function (page, w, { signIn, url }) {
   await w.step('Sign in', 'The portal opens');
-  await page.goto('https://portal.example.com');
-  await signIn('https://portal.example.com');            // the login saved with `retake login`
+  await page.goto(url);
+  await signIn();                                        // the login saved with `retake login`, for `url`
   await w.result(true);
   await w.step('Open Licences', 'The licence is listed');
   await page.click('nav >> text=Licences');
@@ -149,7 +152,8 @@ above), and the third argument is the journey's kit:
 
 | | |
 |---|---|
-| `signIn(url?, { user?, password?, code?, until? })` | Signs in with the login saved for that site (`retake login <url>`, kept in the Keychain): the username, the password, and the authenticator code when a key is saved, on as many screens as the sign-in takes. Masks each field before typing into it. A refused password is never retried. With no login saved it stops with the exact `retake login` line to run. `until: 'password'` (or `'code'`) stops when that screen shows, with nothing typed into it, for a journey about the sign-in screens themselves. |
+| `url` | The app's address, from the journey's `export const url`, or `null` when it does not say. Helpers take it from here rather than spelling it out. |
+| `signIn(url?, { user?, password?, code?, until? })` | With no address, signs in to `url` (else wherever the page is). Signs in with the login saved for that site (`retake login <url>`, kept in the Keychain): the username, the password, and the authenticator code when a key is saved, on as many screens as the sign-in takes. Masks each field before typing into it. A refused password is never retried. With no login saved it stops with the exact `retake login` line to run. `until: 'password'` (or `'code'`) stops when that screen shows, with nothing typed into it, for a journey about the sign-in screens themselves. |
 | `phone` | True when the journey runs at phone width. |
 
 No secret ever lives in a journey.
@@ -162,7 +166,11 @@ retake watch schedule daily|weekdays|off [--at HH:MM]   the nightly run (03:00 u
 ```
 
 `run` exits 0 when nothing changed, 3 when something changed, 2 when a
-journey failed.
+journey failed. A failure names its step and why, for example
+`✗ licences failed at step 2: Open Licences — No table`; a journey that
+stopped with an error says so on the step it stopped at. `retake watch` lists
+the journeys grouped under their app's address, the names in one column
+however long.
 
 ### What counts as changed
 
@@ -173,18 +181,34 @@ middle changes only itself). A step has changed when:
 
 - it passed and now fails (or the other way round);
 - the page's visible text is different (lines new or gone);
-- the picture differs by more than a small patch, about 20 × 20 pixels.
+- the picture differs by more than a small patch, about 20 × 20 pixels. A
+  pixel only counts as different when nothing within one pixel of it matches
+  in the other picture, so text that reflowed by a pixel (a masked clock a
+  digit narrower) is not a change.
 
 Masked regions count for nothing in either: the text under a mask is left
 out, and the pixels under it are not compared. So mask anything that changes
 on its own (a clock, today's date, a carousel) the same way you mask a
-secret.
+secret. Masks are applied again, in every frame, right before each reading
+of the text and each picture, so something that appears just before a
+capture is still hidden.
+
+Rows that a data journey made are not part of the app either. A journey that
+creates things says what, by their exact text: `export const makes =
+["Watch check"]`. At every capture of every journey on that app, list items
+and table rows with exactly that text are hidden for the moment of the
+capture and then put back, so a list that grows each run never reads as a
+change, in that journey or in one that only looks. And in every run, the
+journeys that only read go first, the ones that change data after.
 
 A journey that throws, times out (10 minutes), or has a step that fails has
 **failed**. Failed beats changed.
 
-The first run that passes becomes the normal. After that only a person
-moves it: **Accept as normal** in the window, or `retake watch accept`.
+The first run that passes becomes the normal. When a step of the first run
+fails, its passing steps become the normal anyway and are compared from then
+on; the failing step waits, and joins the normal the first time it passes.
+After that only a person moves it: **Accept as normal** in the window, or
+`retake watch accept`.
 
 ### The nightly run
 
@@ -200,11 +224,16 @@ someone left a note on. What the runs printed is in
 
 ### In the window
 
-The Watch area (`/watch`, next to Demos) lists the journeys, each with one
-line: "Unchanged since 3 Dec", "Changed last night", "Failed last night". A
+The Watch area (`/watch`, next to Demos) lists the journeys, grouped under
+the address of the app each is about (journeys that do not say come last,
+under Other journeys), each with one line: "Unchanged since 3 Dec", "Changed
+last night", "Failed last night". A run going on is one line at the top,
+"Running now: … · Watch it live"; the list stays where it is. A
 changed journey opens to the moment it changed: the accepted picture and
 last night's, side by side, with the changed patch outlined, the lines of
-text that changed, and the few seconds of video around it. The one button is
+text that changed, and the few seconds of video around it (not for a step
+that opens the session and is over in a moment, which would be a second of
+blank page: the two pictures say it). The one button is
 **Accept as normal**; "Open the session" plays the whole run from that
 moment. Accepting moves on to the next journey that changed, or back to the
 list. Past sessions are under Sessions.
@@ -218,6 +247,7 @@ list. Past sessions are under Sessions.
 | `watch/.journeys/<name>/runs.jsonl` | Every run, one line each. |
 | `outputs/watch/<session>/snapshots.json`, `snapshots/` | The run's own capture of each step. |
 | `outputs/watch/<session>/journey.json` | That run's verdict and every change. |
+| `.retake/window.json` | Where the window running for this workspace listens, while it runs. Runs and scripts look here after `$RETAKE_UI` and before port 4310. |
 
 ## Watch with nothing to set up
 
@@ -259,8 +289,14 @@ don't want and press **Add journeys**.
   marked as changing data, whatever the model called it. With no model, the
   pages themselves are the proposals.
 - **A data journey Retake writes** checks that one more of the thing it made
-  appeared (a count before and after), and hides the list it lands in from the
-  comparison, because that list grows every run.
+  appeared (a count before and after), and says what it makes
+  (`export const makes = ["Watch check"]`), so those rows are hidden from every
+  capture on that app (see What counts as changed).
+- **After "Not now"** on the sign-in, journeys that need it start unticked. An
+  app added again shows what is already watched, and never adds it twice.
+- **A bare address** gets `http://` when it is on this computer or network
+  (`localhost:3000`, `127.0.0.1:4563`, `192.168.x`, `10.x`, `*.local`), and
+  `https://` otherwise.
 
 From a terminal:
 
@@ -286,6 +322,7 @@ A written journey says which app it is about and whether it writes:
 export const title = "Create a project";
 export const url = "https://staging.example.com";   // the app: what the deploy check watches
 export const changesData = true;                     // runs only where this app is a test space
+export const makes = ["Watch check"];                // what it creates: hidden from every capture on this app
 ```
 
 ### Noticing a new version by itself

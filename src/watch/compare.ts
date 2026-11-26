@@ -121,8 +121,33 @@ export type PictureDiff = {
   sizeChanged?: boolean;
 };
 
+/** How far, in pixels, a pixel may have moved and still be the same: text
+    that reflows by one pixel (a masked clock a digit narrower, a rounding
+    change in the layout) is not a change. */
+export const SHIFT_TOLERANCE = 1;
+
+const near = (a: Uint8Array, o: number, b: Uint8Array, q: number) =>
+  Math.abs(a[o] - b[q]) <= PIXEL_DELTA && Math.abs(a[o + 1] - b[q + 1]) <= PIXEL_DELTA && Math.abs(a[o + 2] - b[q + 2]) <= PIXEL_DELTA;
+
+/** Is the pixel at (x, y) of `p` found within SHIFT_TOLERANCE of (x, y) in `q`? */
+function foundNear(p: Uint8Array, q: Uint8Array, x: number, y: number, W: number, H: number): boolean {
+  const o = (y * W + x) * 4;
+  for (let dy = -SHIFT_TOLERANCE; dy <= SHIFT_TOLERANCE; dy++) {
+    const yy = y + dy;
+    if (yy < 0 || yy >= H) continue;
+    for (let dx = -SHIFT_TOLERANCE; dx <= SHIFT_TOLERANCE; dx++) {
+      const xx = x + dx;
+      if (xx < 0 || xx >= W) continue;
+      if (near(p, o, q, (yy * W + xx) * 4)) return true;
+    }
+  }
+  return false;
+}
+
 /** How much two pictures differ, leaving out the regions in `ignore` (the
-    masks, in either picture). */
+    masks, in either picture). A pixel differs only when nothing within a
+    pixel of it in the other picture matches it, either way round: a shift by
+    one pixel is not a change, an icon gone or a word replaced is. */
 export function pictureDiff(a: Picture, b: Picture, ignore: Rect[] = []): PictureDiff {
   const cols = Math.ceil(b.width / BLOCK), rows = Math.ceil(b.height / BLOCK);
   if (a.width !== b.width || a.height !== b.height) {
@@ -145,7 +170,8 @@ export function pictureDiff(a: Picture, b: Picture, ignore: Rect[] = []): Pictur
           const p = y * W + x;
           if (skip[p]) continue;
           const o = p * 4;
-          if (Math.abs(a.data[o] - b.data[o]) > PIXEL_DELTA || Math.abs(a.data[o + 1] - b.data[o + 1]) > PIXEL_DELTA || Math.abs(a.data[o + 2] - b.data[o + 2]) > PIXEL_DELTA) {
+          if (near(a.data, o, b.data, o)) continue;
+          if (!foundNear(b.data, a.data, x, y, W, H) || !foundNear(a.data, b.data, x, y, W, H)) {
             if (++n >= BLOCK_PIXELS) break;
           }
         }
@@ -222,7 +248,7 @@ export type StepChange = {
 
 /** Steps are matched by what they say they do, not by number: a step added
     in the middle must not make every later step "change". */
-const keyOf = (s: Pick<Snapshot, "scenario" | "intent">) => `${s.scenario ?? ""}\u0000${normLine(s.intent)}`;
+export const keyOf = (s: Pick<Snapshot, "scenario" | "intent">) => `${s.scenario ?? ""}\u0000${normLine(s.intent)}`;
 
 export function matchSteps(before: Snapshot[], after: Snapshot[]): { pairs: [Snapshot | null, Snapshot | null][] } {
   const pool = new Map<string, Snapshot[]>();

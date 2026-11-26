@@ -190,7 +190,7 @@ test("a journey that changes data runs only where the app is a test space; the q
   const reads = path.join(root, "watch", "pricing.mjs"), writes = path.join(root, "watch", "create.mjs");
   fs.writeFileSync(reads, `export const url = "https://app.example.com";\nexport default async () => {};\n`);
   fs.writeFileSync(writes, `export const title = "Create a project";\nexport const url = "https://app.example.com/projects";\nexport const changesData = true;\nexport default async () => {};\n`);
-  assert.deepEqual(journeyMeta(fs.readFileSync(writes, "utf8")), { url: "https://app.example.com/projects", changesData: true, title: "Create a project" });
+  assert.deepEqual(journeyMeta(fs.readFileSync(writes, "utf8")), { url: "https://app.example.com/projects", changesData: true, title: "Create a project", makes: [] });
   assert.equal(journeyMeta(`export const changesData = false;`).changesData, false);
   assert.deepEqual(gate(root, { name: "pricing", file: reads }), { run: true });
   const no = gate(root, { name: "create", file: writes });
@@ -282,11 +282,10 @@ test("without a model, the pages themselves are the proposals; writes start unti
 test("a journey written from a proposal says which app it is about, whether it writes, and never holds a secret", () => {
   const ps = plainProposals(X);
   const src = journeySource(ps[2], { origin: X.origin, signInUrl: X.signIn!.url, at: new Date("2026-11-25T10:00:00Z") });
-  assert.deepEqual(journeyMeta(src), { url: "https://app.example.com", changesData: true, title: "Create a project" });
+  assert.deepEqual(journeyMeta(src), { url: "https://app.example.com", changesData: true, title: "Create a project", makes: ["Watch check"] });
   assert.match(src, /await signIn\(url\);/);
   assert.match(src, /const before = await page\.getByText\("Watch check", \{ exact: true \}\)\.count\(\);/, "it checks one more landed, not that one exists");
-  assert.equal((src.match(/w\.step\(/g) ?? []).length, 1, "one step: its one picture is taken with the growing list hidden");
-  assert.match(src, /w\.mask\("\[data-retake-grows\]"\)/, "the list that grows every run is left out of the comparison");
+  assert.equal((src.match(/w\.step\(/g) ?? []).length, 1, "one step: made, then checked");
   assert.ok(!/password|correct-horse/i.test(src));
   const read = journeySource(ps[1], { origin: X.origin });
   assert.ok(!read.includes("changesData"));
