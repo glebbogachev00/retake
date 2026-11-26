@@ -1221,12 +1221,16 @@ program
     const q = resolve(manifest);
     // The video is the page area plus the caption band, so say the real number
     // here rather than letting it surprise someone after a two-minute take.
+    // The finished video is always the preset's frame (render fits the page
+    // into it), so that is the number to say; the page is said beside it.
     const { bandHeightFor } = await import("./captions.js");
-    const outW = q.layout === "card" ? q.width : q.viewport.width;
-    const band = bandHeightFor(q, manifest.steps.flatMap((s) => (s.action === "scene" && s.caption ? [s.caption] : [])));
-    const outH = (q.layout === "card" ? q.height : q.viewport.height) + (q.layout === "band" ? band : 0);
+    const band = q.layout === "band" ? bandHeightFor(q, manifest.steps.flatMap((s) => (s.action === "scene" && s.caption ? [s.caption] : []))) : 0;
+    const area = { w: q.width, h: q.height - band };
+    const page = `page ${q.viewport.width}×${q.viewport.height}`;
+    const fitted = q.viewport.width !== area.w || q.viewport.height !== area.h ? `, fitted into ${area.w}×${area.h}` : "";
+    const detail = q.layout !== "band" ? "" : band ? ` (${page}${fitted} + a ${band}px caption band)` : fitted ? ` (${page}${fitted}, captions off)` : " (captions off — the page fills the frame)";
     say(`ok: ${manifest.name} · ${manifest.steps.length} steps · ${manifest.steps.filter((s) => s.action === "scene").length} scenes`);
-    say(`   ${q.name} · video ${outW}×${outH}${q.layout === "band" ? (band ? ` (page ${q.viewport.width}×${q.viewport.height} + a ${band}px caption band)` : " (captions off — the page fills the frame)") : ""} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
+    say(`   ${q.name} · video ${q.width}×${q.height}${detail} @ ${q.fps}fps${q.gif ? ` · gif ${q.gif.width}px` : ""}`);
     for (const w of warnings(manifest)) say(`⚠ ${w}`);
   });
 

@@ -1117,19 +1117,44 @@ export async function render(m: Manifest, takeIn: Take, outDir: string, opts: Re
  * as a moment rather than a picture. Per-scene stills cannot do this — they
  * cannot show a caption going false *inside* a scene, and they carry no clock.
  */
-export function contactSheetFile(mp4: string, out: string, everySec = 2, width = 420, log?: (l: string) => void): string {
-  if (!fs.existsSync(mp4)) throw new Error(`video does not exist: ${mp4}`);
-  const dur = probe(mp4).duration;
-  const last = Math.max(0, dur - 0.05);
+/** When the video's last frame is shown. The container's duration runs a
+    frame or more past it (and past it again when audio is longer), so a
+    target taken from the duration can land after the final frame and pick
+    nothing. Read the last half second instead; fall back to the duration. */
+export function lastFrameTime(mp4: string): number {
+  const r = spawnSync(ffmpegBin(), ["-hide_banner", "-sseof", "-1", "-copyts", "-i", mp4, "-map", "0:v:0", "-vf", "showinfo", "-f", "null", "-"], { encoding: "utf8" });
+  const times = [...String(r.stderr).matchAll(/pts_time:([\d.]+)/g)].map((m) => Number(m[1]));
+  return times.length ? Math.max(...times) : Math.max(0, probe(mp4).duration - 0.05);
+}
+
+/** The moments a contact sheet shows: every `everySec` from the start, and the last frame. */
+export function contactTimes(last: number, everySec: number): number[] {
   const times: number[] = [];
   for (let time = 0; time < last - 0.1; time += everySec) times.push(time);
   if (!times.length || last - times[times.length - 1] > 0.1) times.push(last);
+  return times;
+}
+
+/** One frame per moment: the first frame at or after it. A window of time
+    (what this used to select) holds two frames at 30fps, so the tile grid
+    filled with doubles and ran out of cells halfway through the video. */
+export function contactSelect(times: number[]): string {
+  return times.map((time, i) => {
+    const t = (i === times.length - 1 ? time - 0.001 : time).toFixed(3);
+    return `gte(t\\,${t})*(lt(prev_t\\,${t})+isnan(prev_t))`;
+  }).join("+");
+}
+
+export function contactSheetFile(mp4: string, out: string, everySec = 2, width = 420, log?: (l: string) => void): string {
+  if (!fs.existsSync(mp4)) throw new Error(`video does not exist: ${mp4}`);
+  const last = lastFrameTime(mp4);
+  const times = contactTimes(last, everySec);
   const cells = times.length;
   const cols = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(cells))));
   const rows = Math.ceil(cells / cols);
   const fontFile = DEFAULT_FONTS.find((f) => fs.existsSync(f));
   const font = fontFile ? `fontfile='${fontFile}':` : "";
-  const select = times.map((time) => `between(t\\,${time.toFixed(3)}\\,${Math.min(dur, time + 0.06).toFixed(3)})`).join("+");
+  const select = contactSelect(times);
   fs.mkdirSync(path.dirname(out), { recursive: true });
   // Select explicit source timestamps, including the final frame. The timestamp
   // overlay runs before tiling and therefore preserves the source clock.
