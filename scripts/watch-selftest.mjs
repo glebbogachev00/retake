@@ -47,7 +47,8 @@ await page.goto(APP);
 
 // The person opens the window.
 await viewer.goto(w.link);
-await viewer.click('button[data-speed="watch"]');
+await viewer.waitForSelector("#playpause");
+if ((await viewer.getAttribute("#playpause", "aria-pressed")) === "true") await viewer.click("#playpause");   // Play
 await viewer.waitForFunction(() => { const i = document.getElementById("live"); return i && i.naturalWidth > 0; }, null, { timeout: 15000 });
 say("live picture is streaming");
 
@@ -64,7 +65,7 @@ say(`watch pace held ${watchMs} ms`);
 
 // 2 — Step: waits for Next. Unclear + a note while it waits.
 await w.scenario("L4 Licence running out");
-await viewer.click('button[data-speed="step"]');
+await viewer.click("#playpause");   // Pause: stop at the next step
 await w.step("Open Licences", "The licence list, with the one running out");
 await page.click("#go");
 await page.waitForSelector("#renew");
@@ -93,16 +94,16 @@ assert.equal(live[0].step, 2);
 assert.ok(fs.existsSync(path.join(w.dir, live[0].screenshot)));
 say("Unclear + note wrote a live flag with a screenshot and the URL " + live[0].url);
 
-// 3 — Fast: no pause.
-await viewer.click('button[data-speed="fast"]');
+// 3 — Play again: the run goes on by itself, with only the short hold.
+await viewer.click("#playpause");
 await viewer.waitForTimeout(300);
 await w.step("Click Renew", "The request form opens, already filled in");
 await page.click("#renew");
 await page.waitForSelector("#form:not([hidden])");
 await w.result(true, "Form pre-filled: Survey Suite, 1 seat");
-t = Date.now(); await w.beat(); const fastMs = Date.now() - t;
-assert.ok(fastMs < 300, `fast should not pause (${fastMs} ms)`);
-say(`fast pace: ${fastMs} ms`);
+t = Date.now(); await w.beat(); const playMs = Date.now() - t;
+assert.ok(playMs < 4000, `Play should only hold briefly (${playMs} ms)`);
+say(`play pace: ${playMs} ms`);
 await page.waitForTimeout(600);
 
 const { dir, flags } = await w.end();

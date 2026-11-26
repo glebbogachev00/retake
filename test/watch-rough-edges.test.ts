@@ -179,7 +179,8 @@ test("`retake watch` lines up long names and groups journeys under their app's a
 const ask = (routes: ReturnType<typeof watchRoutes>) => async (p: string, method = "GET", payload: unknown = {}) => {
   let body = "", code = 0;
   const res = { headersSent: false, writeHead: (c: number) => { code = c; }, end: (b?: string) => { body = b ?? ""; } } as unknown as http.ServerResponse;
-  await routes.handleApi({ method } as http.IncomingMessage, res, new URL(p, "http://x"), p, async () => JSON.stringify(payload));
+  const u = new URL(p, "http://x");
+  await routes.handleApi({ method } as http.IncomingMessage, res, u, u.pathname, async () => JSON.stringify(payload));
   return { code, json: JSON.parse(body) };
 };
 
@@ -190,7 +191,12 @@ test("the window groups journeys by app, and a run going on is a line on the lis
   fs.writeFileSync(path.join(root, "watch", "c.mjs"), `export default async () => {};\n`);
   const routes = watchRoutes({ root, outRoot: () => path.join(root, "outputs"), token: "t", activity: () => {} });
   const J = (await ask(routes)("/api/watch/journeys")).json;
-  assert.deepEqual(J.groups, [{ host: "a.example.com", names: ["b"] }, { host: "b.example.com", names: ["a"] }, { host: null, names: ["c"] }]);
+  // One project per registrable domain for journeys kept directly in watch/; a.example.com and b.example.com are one.
+  assert.deepEqual(J.projects.map((p: { id: string }) => p.id), ["example", "other"]);
+  assert.equal(J.project, "example");
+  assert.deepEqual(J.groups.map((g: { host: string; names: string[] }) => ({ host: g.host, names: g.names })), [{ host: "a.example.com", names: ["b"] }, { host: "b.example.com", names: ["a"] }]);
+  const other = (await ask(routes)("/api/watch/journeys?project=other")).json;
+  assert.deepEqual(other.groups.map((g: { host: string; names: string[] }) => ({ host: g.host, names: g.names })), [{ host: null, names: ["c"] }]);
   assert.ok("liveTitle" in J);
   const page = fs.readFileSync("src/ui/watch.html", "utf8");
   assert.ok(!/location\.replace\('\/watch\/' \+ J\.live\)/.test(page), "the list no longer jumps to the live session");
@@ -357,6 +363,7 @@ test("on a phone the live controls wrap: Next and Unclear on one line, the note 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
     const body = () => new Promise<string>((ok) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => ok(b)); });
+    if (url.pathname === "/brand.css") { res.writeHead(200, { "content-type": "text/css" }); res.end(fs.readFileSync("src/ui/brand.css")); return; }
     if (url.pathname.startsWith("/api/")) { if (await routes.handleApi(req, res, url, url.pathname, body)) return; }
     else if (routes.handlePage(req, res, url.pathname)) return;
     res.writeHead(404); res.end();

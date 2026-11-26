@@ -1,11 +1,14 @@
 /** The share page: one take playing, what it shows under it, one obvious next
-    move (Next), and the rest of the takes in order beside it. Retake's own look
-    (site/landing.css): warm paper, ink, one amber accent, mono labels. The
-    Retake mark is on the page frame, never on a client's video.
+    move (Next), and the rest of the takes in order beside it. Retake's own look,
+    the same as the window and the Watch share (src/ui/brand.css): warm paper,
+    ink, one amber accent, bracket labels, framed players; light or dark as the
+    viewer's own system is. The Retake mark is on the page frame, never on a
+    client's video.
 
     Every word on it comes from someone's manifest, so it is data: it goes in
     as JSON and onto the page through textContent, never as markup. */
 import type { ShareTake } from "./share.js";
+import { brandCss, markSvg } from "./brand.js";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const MARK = `<rect width="64" height="64" rx="14" fill="#1a1c1e"/><g fill="#eceee9"><rect x="16" y="12" width="12" height="6" rx="3" opacity=".55"/><rect x="16" y="21" width="20" height="6" rx="3" opacity=".8"/><rect x="16" y="39" width="20" height="6" rx="3" opacity=".8"/><rect x="16" y="48" width="12" height="6" rx="3" opacity=".55"/></g><rect x="16" y="30" width="36" height="6" rx="3" fill="#e8b04b"/>`;
@@ -24,54 +27,54 @@ export function sharePage(o: { title: string; by?: string; recorded?: Date; take
 <title>${esc(o.title)} · Retake</title>
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${MARK}</svg>`)}">
 <style>
-  :root { --paper:#fbfaf7; --panel:#fffefa; --ink:#252720; --muted:#72736b; --line:#e6e5dd; --line-dark:#d4d3c9; --accent:#dda547; --accent-ink:#8a601e; --tint:#f4eedf; --red:#a3462f;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; color-scheme:light; }
+${brandCss()}
+  :root { --accent:var(--amber); --accent-ink:var(--amber-ink); --red:var(--fail); }
   * { box-sizing:border-box; } html,body { margin:0; }
   body { background:var(--paper); color:var(--ink); font:15px/1.55 var(--sans); -webkit-font-smoothing:antialiased; }
   a { color:inherit; text-decoration:none; } button { font:inherit; cursor:pointer; }
   button:focus-visible, a:focus-visible { outline:2px solid var(--accent-ink); outline-offset:4px; }
   .wrap { width:min(1120px, calc(100% - 32px)); margin-inline:auto; }
   .bar { display:flex; align-items:center; justify-content:space-between; gap:16px; height:72px; border-bottom:1px solid var(--line); }
-  .brand { display:inline-flex; align-items:center; gap:10px; font-size:19px; font-weight:650; letter-spacing:-.6px; }
-  .brand svg { width:26px; height:26px; display:block; }
+  .brand { display:inline-flex; align-items:center; gap:10px; font-size:18px; font-weight:650; letter-spacing:-.6px; }
   .bar-note { font:11px/1.4 var(--mono); color:var(--muted); text-align:right; }
   .intro { padding:44px 0 28px; display:grid; gap:14px; }
   .eyebrow { font:11px/1.6 var(--mono); color:var(--muted); margin:0; }
   h1 { margin:0; font-size:clamp(30px,4vw,46px); font-weight:500; line-height:1.1; letter-spacing:-1.8px; text-wrap:balance; overflow-wrap:anywhere; }
   .lede { margin:0; color:var(--muted); font-size:16px; max-width:64ch; }
-  .tag { display:inline-flex; align-items:center; font:10px/1 var(--mono); padding:5px 7px; border-radius:3px; border:1px solid; white-space:nowrap; color:var(--red); border-color:#e3c4b8; background:#f7ebe5; }
+  .tag { display:inline-flex; align-items:center; font:10px/1 var(--mono); padding:5px 7px; border-radius:3px; border:1px solid; white-space:nowrap; color:var(--red); border-color:var(--fail); background:var(--fail-soft); }
   .tag[hidden] { display:none; }
   .layout { display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:28px; align-items:start; padding-bottom:56px; }
   .layout.one { grid-template-columns:minmax(0,1fr); max-width:860px; }
-  .shell { border:1px solid var(--line-dark); background:var(--panel); border-radius:8px; overflow:hidden; box-shadow:0 10px 32px -22px #30281940; }
-  .player-top { height:36px; display:flex; align-items:center; gap:14px; padding:0 15px; font:10px var(--mono); color:#808176; border-bottom:1px solid var(--line); }
-  .player-dots { display:flex; gap:4px; } .player-dots i { width:6px; height:6px; border:1px solid #d9d8ce; border-radius:50%; background:#eeede6; }
+  .shell { border:1px solid var(--line-dark); background:var(--panel); border-radius:10px; overflow:hidden; box-shadow:var(--shadow); }
+  .player-top { height:36px; display:flex; align-items:center; gap:14px; padding:0 15px; font:10px var(--mono); color:var(--muted); border-bottom:1px solid var(--line); }
+  .player-dots { display:flex; gap:4px; } .player-dots i { width:6px; height:6px; border:0; border-radius:50%; background:var(--line-dark); }
   .player-top .right { margin-left:auto; color:var(--muted); }
-  video { display:block; width:100%; aspect-ratio:16/9; background:#eeeade; }
+  video { display:block; width:100%; aspect-ratio:16/9; background:var(--soft); }
   .caption { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px 20px; padding:16px 18px; border-top:1px solid var(--line); }
   .caption h2 { margin:0; font-size:19px; font-weight:550; letter-spacing:-.4px; line-height:1.3; text-wrap:balance; overflow-wrap:anywhere; }
   .caption .who { margin:4px 0 0; font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
   .next { display:inline-flex; align-items:center; gap:14px; padding:12px 16px; min-height:44px; border:0; border-radius:6px; background:var(--ink); color:var(--panel); font-size:13px; font-weight:600; text-align:left; }
-  .next:hover { background:#45463d; } .next[hidden] { display:none; } .next .arrow { font-family:var(--mono); }
-  .notes { border-top:1px solid var(--line); padding:18px; display:grid; gap:14px; background:#f8f8f2; }
-  .label { font:10px var(--mono); color:var(--accent-ink); margin:0; letter-spacing:.02em; }
+  .next:hover { background:var(--ink-hover); } .next[hidden] { display:none; } .next .arrow { font-family:var(--mono); }
+  .notes { border-top:1px solid var(--line); padding:18px; display:grid; gap:14px; background:var(--soft); }
+  .label { font:10.5px var(--mono); color:var(--muted); margin:0; letter-spacing:.07em; text-transform:uppercase; }
+  .label::before { content:"[ "; color:var(--faint); } .label::after { content:" ]"; color:var(--faint); }
   .note { margin:0; font-size:14px; line-height:1.7; max-width:68ch; white-space:pre-line; } .note:empty { display:none; }
   .scenes { list-style:none; margin:0; padding:0; display:grid; gap:2px; counter-reset:s; }
-  .scenes li { counter-increment:s; display:grid; grid-template-columns:26px 1fr; font-size:13px; color:#53574b; line-height:1.6; }
+  .scenes li { counter-increment:s; display:grid; grid-template-columns:26px 1fr; font-size:13px; color:var(--ink); line-height:1.6; }
   .scenes li::before { content:counter(s, decimal-leading-zero); font:10px/2.1 var(--mono); color:var(--muted); }
   .scenes li.fail { color:var(--red); } .scenes small { grid-column:2; color:var(--muted); font-size:12px; }
   .takes { border:1px solid var(--line-dark); background:var(--panel); border-radius:8px; overflow:hidden; }
-  .takes-head { display:flex; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line); background:#f6f5ef; font:10px var(--mono); color:var(--muted); }
+  .takes-head { display:flex; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--soft); font:10px var(--mono); color:var(--muted); }
   .takes ol { list-style:none; margin:0; padding:0; } .takes li + li { border-top:1px solid var(--line); }
   .takes a { display:grid; grid-template-columns:26px 1fr; gap:4px 6px; padding:12px 16px; position:relative; color:var(--muted); }
-  .takes a:hover { background:#f7f5ee; }
+  .takes a:hover { background:var(--soft); }
   .takes a[aria-current="true"] { background:var(--tint); color:var(--ink); }
   .takes a[aria-current="true"]::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
-  .takes .n { font:10px/1.9 var(--mono); color:#969480; } .takes a[aria-current="true"] .n { color:var(--accent-ink); }
+  .takes .n { font:10px/1.9 var(--mono); color:var(--faint); } .takes a[aria-current="true"] .n { color:var(--accent-ink); }
   .takes strong { display:block; font-size:13px; font-weight:550; color:var(--ink); line-height:1.4; overflow-wrap:anywhere; }
   .takes .sub { grid-column:2; display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; font-size:11px; }
   footer { border-top:1px solid var(--line); padding:22px 0 30px; display:flex; flex-wrap:wrap; gap:10px 24px; align-items:center; font-size:11px; color:var(--muted); }
-  footer .brand { font-size:15px; letter-spacing:-.4px; color:var(--ink); } footer .brand svg { width:20px; height:20px; }
+  footer .brand { font-size:15px; letter-spacing:-.4px; color:var(--ink); }
   footer a.site { margin-left:auto; font-family:var(--mono); } footer a.site:hover { color:var(--accent-ink); }
   .comments { border-top:1px solid var(--line); padding:18px; display:grid; gap:12px; }
   .comments[hidden], .comments ol:empty { display:none; }
@@ -93,9 +96,8 @@ export function sharePage(o: { title: string; by?: string; recorded?: Date; take
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mark" viewBox="0 0 64 64">${MARK}</symbol></svg>
 <header class="wrap bar">
-  <a class="brand" href="https://www.useretake.app"><svg aria-hidden="true"><use href="#mark"/></svg>retake</a>
+  <a class="brand" href="https://www.useretake.app">${markSvg(26)}Retake</a>
   ${o.by ? `<span class="bar-note">Shared with you by ${esc(o.by)}</span>` : ""}
 </header>
 <main class="wrap">
@@ -106,7 +108,7 @@ export function sharePage(o: { title: string; by?: string; recorded?: Date; take
   </section>
   <div class="layout${one ? " one" : ""}">
     <section class="shell" aria-live="polite">
-      <div class="player-top"><span class="player-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="file"></span><span class="right" id="pos"></span></div>
+      <div class="player-top rt-win-top"><span class="rt-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="rt-label" id="file"></span><span class="right" id="pos"></span></div>
       <video id="player" controls preload="metadata" playsinline></video>
       <div class="caption">
         <div><h2 id="title"></h2><p class="who"><span id="len"></span><span id="state" class="tag" hidden>A step failed</span></p></div>
@@ -132,7 +134,7 @@ export function sharePage(o: { title: string; by?: string; recorded?: Date; take
   </div>
 </main>
 <footer class="wrap">
-  <span class="brand"><svg aria-hidden="true"><use href="#mark"/></svg>retake</span>
+  <span class="brand">${markSvg(20)}Retake</span>
   <span>Every take is a real browser run, recorded from a script.</span>
   <a class="site" href="https://www.useretake.app">useretake.app</a>
 </footer>

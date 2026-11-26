@@ -29,28 +29,44 @@ export const journeysDir = (root: string) => path.join(root, "watch");
 const stateDir = (root: string, name: string) => path.join(journeysDir(root), ".journeys", name);
 export const baselineDir = (root: string, name: string) => path.join(stateDir(root, name), "baseline");
 
-/** The journeys in a workspace, by name. Files starting with `_` or `.` are
-    helpers, not journeys. */
-export function listJourneys(root: string): { name: string; file: string }[] {
-  let files: string[] = [];
-  try { files = fs.readdirSync(journeysDir(root)); } catch { return []; }
-  return files
-    .filter((f) => JOURNEY_EXT.test(f) && !/^[_.]/.test(f))
-    .map((f) => ({ name: f.replace(JOURNEY_EXT, ""), file: path.join(journeysDir(root), f) }))
-    .filter((j) => journeyNameOk(j.name))
-    .sort((a, b) => a.name.localeCompare(b.name));
+/** The journeys in a workspace, by name: watch/<name>.mjs, and
+    watch/<project>/<name>.mjs for a project kept in its own folder. Files
+    and folders starting with `_` or `.` are helpers, not journeys. A name is
+    one journey across the workspace; a second file of the same name is
+    left out. */
+export function listJourneys(root: string): { name: string; file: string; folder?: string }[] {
+  const out: { name: string; file: string; folder?: string }[] = [];
+  const seen = new Set<string>();
+  const take = (dir: string, folder?: string) => {
+    let files: string[] = [];
+    try { files = fs.readdirSync(dir); } catch { return; }
+    for (const f of files.sort()) {
+      if (!JOURNEY_EXT.test(f) || /^[_.]/.test(f)) continue;
+      const name = f.replace(JOURNEY_EXT, "");
+      if (!journeyNameOk(name) || seen.has(name)) continue;
+      seen.add(name);
+      out.push({ name, file: path.join(dir, f), ...(folder ? { folder } : {}) });
+    }
+  };
+  take(journeysDir(root));
+  let dirs: fs.Dirent[] = [];
+  try { dirs = fs.readdirSync(journeysDir(root), { withFileTypes: true }); } catch { /* no watch/ yet */ }
+  for (const d of dirs.filter((x) => x.isDirectory() && !/^[_.]/.test(x.name) && journeyNameOk(x.name)).sort((a, b) => a.name.localeCompare(b.name))) take(path.join(journeysDir(root), d.name), d.name);
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** `all`, or one journey by name. A name that is not there says which are. */
-export function pickJourneys(all: { name: string; file: string }[], which: string): { name: string; file: string }[] {
+/** `all`, a project, or one journey by name. A name that is not there says which are. */
+export function pickJourneys<J extends { name: string; file: string; folder?: string }>(all: J[], which: string, projectOf?: (j: J) => string): J[] {
   const w = which.trim().replace(JOURNEY_EXT, "").replace(/^watch\//, "");
   if (w === "all") {
     if (!all.length) throw new Error("no journeys yet — a journey is a script at watch/<name>.mjs in this workspace");
     return all;
   }
   const one = all.find((j) => j.name === w);
-  if (!one) throw new Error(`no journey called "${w}"${all.length ? ` — there are: ${all.map((j) => j.name).join(", ")}` : " — a journey is a script at watch/<name>.mjs in this workspace"}`);
-  return [one];
+  if (one) return [one];
+  const project = all.filter((j) => j.folder === w || (projectOf && projectOf(j) === w));
+  if (project.length) return project;
+  throw new Error(`no journey or project called "${w}"${all.length ? ` — there are: ${all.map((j) => j.name).join(", ")}` : " — a journey is a script at watch/<name>.mjs in this workspace"}`);
 }
 
 // ---------- runs ----------
@@ -217,15 +233,29 @@ export function shortDate(iso: string, now = new Date()): string {
   return `${d.getDate()} ${MONTH[d.getMonth()]}${d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : ""}`;
 }
 
-/** When a run was, the way a person says it the morning after: "last night"
-    for the evening before or the small hours, then "today", "yesterday",
-    "on 3 Dec". */
+const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+/** When a run was, said honestly, with the clock time while it is recent:
+    "last night at 03:02" for the small hours, "today at 11:46",
+    "yesterday at 21:21", then "on 3 Dec". The evening before is not "last
+    night": a run at 21:21 is yesterday at 21:21. */
 export function whenWord(iso: string, now = new Date()): string {
   const d = new Date(iso);
   const days = Math.round((dayStart(now) - dayStart(d)) / 86_400_000);
-  if ((days === 0 && d.getHours() < 6) || (days === 1 && d.getHours() >= 18)) return "last night";
+  if (days === 0 && d.getHours() < 6) return `last night at ${hhmm(d)}`;
+  if (days === 0) return `today at ${hhmm(d)}`;
+  if (days === 1) return `yesterday at ${hhmm(d)}`;
+  return `on ${shortDate(iso, now)}`;
+}
+
+/** The same, to the day, for a line about several runs: "last night",
+    "today", "yesterday evening", "yesterday", "on 3 Dec". */
+export function dayWord(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const days = Math.round((dayStart(now) - dayStart(d)) / 86_400_000);
+  if (days === 0 && d.getHours() < 6) return "last night";
   if (days === 0) return "today";
-  if (days === 1) return "yesterday";
+  if (days === 1) return d.getHours() >= 18 ? "yesterday evening" : "yesterday";
   return `on ${shortDate(iso, now)}`;
 }
 
@@ -237,18 +267,33 @@ export function journeyLine(last: RunRecord | null, baseline: Baseline | null, n
   return `Unchanged since ${shortDate(baseline?.acceptedAt ?? last.acceptedAt ?? last.at, now)}`;
 }
 
-/** "1 journey changed since last night", or null when nothing did. */
+/** "1 journey changed since last night", or null when nothing did. Each
+    kind says its own day when the changes and the failures came on
+    different ones: "1 journey changed today and 4 failed yesterday evening". */
 export function summaryLine(lasts: (RunRecord | null)[], now = new Date()): string | null {
   const changed = lasts.filter((l) => l?.status === "changed") as RunRecord[];
   const failed = lasts.filter((l) => l?.status === "failed") as RunRecord[];
   if (!changed.length && !failed.length) return null;
-  const newest = [...changed, ...failed].map((l) => l.at).sort().at(-1)!;
-  const when = whenWord(newest, now);
-  const since = when === "last night" ? "since last night" : when;
+  const newest = (rs: RunRecord[]) => rs.map((l) => l.at).sort().at(-1)!;
+  const since = (w: string) => w === "last night" ? "since last night" : w;
   const n = (k: number, what: string) => `${k} journey${k === 1 ? "" : "s"} ${what}`;
-  if (changed.length && failed.length) return `${n(changed.length, "changed")} and ${failed.length} failed ${since}`;
-  if (changed.length) return `${n(changed.length, "changed")} ${since}`;
-  return `${n(failed.length, "failed")} ${when}`;
+  if (changed.length && failed.length) {
+    const wc = dayWord(newest(changed), now), wf = dayWord(newest(failed), now);
+    if (wc === wf) return `${n(changed.length, "changed")} and ${failed.length} failed ${since(wc)}`;
+    return `${n(changed.length, "changed")} ${since(wc)} and ${failed.length} failed ${wf}`;
+  }
+  if (changed.length) return `${n(changed.length, "changed")} ${since(dayWord(newest(changed), now))}`;
+  return `${n(failed.length, "failed")} ${dayWord(newest(failed), now)}`;
+}
+
+/** What broke and what to do about it, in words a person can act on, from
+    a failed run's raw reason. A missing sign-in is the common one: it names
+    the site and the one thing that fixes it. */
+export function problemOf(reason: string): { broke: string; todo: string | null; signIn: string | null; command: string | null } {
+  const r = reason.trim();
+  const login = /^no saved login for (\S+) — run `(retake login (\S+))`/.exec(r);
+  if (login) return { broke: `There is no saved sign-in for ${login[1]}.`, todo: "Save the test account’s sign-in once. Every journey on that site uses it from then on.", signIn: login[3], command: login[2] };
+  return { broke: r, todo: null, signIn: null, command: null };
 }
 
 /** Each journey with its line, for the window and for `retake watch`. */

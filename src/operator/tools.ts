@@ -800,7 +800,7 @@ server.registerTool("notes", {
 
 
 server.registerTool("watch", {
-  description: "JOURNEYS: the app's key flows, kept as scripts at watch/<name>.mjs in this workspace and run every night under Watch. Without `run` it returns each journey with its one line (\"Unchanged since 3 Dec\", \"Changed last night\", \"Failed last night\") — call it when the person asks how their app is doing, or before changing a flow a journey covers. With run=\"<journey>\" or run=\"all\" it runs them now (a real browser, about a minute each) and says, per journey, whether it is unchanged, changed (at which step, and whether the text, the picture or the verdict moved) or failed, and why. A journey that stops on \"no saved login\" needs the person to run `retake login <url>` themselves; never ask for the values. Accepting a change as the new normal and scheduling the nightly run are the person's decisions, made in the window or at their terminal — not here.",
+  description: "JOURNEYS: the app's key flows, kept as scripts at watch/<name>.mjs in this workspace and run every night under Watch. Without `run` it returns each journey with its one line (\"Unchanged since 3 Dec\", \"Changed last night at 03:02\", \"Failed yesterday at 21:21\") — call it when the person asks how their app is doing, or before changing a flow a journey covers. With run=\"<journey>\", run=\"<project>\" (a folder under watch/) or run=\"all\" it runs them now (a real browser, about a minute each) and says, per journey, whether it is unchanged, changed (at which step, and whether the text, the picture or the verdict moved) or failed, and why. A journey that stops on \"no saved login\" needs the person to run `retake login <url>` themselves; never ask for the values. Accepting a change as the new normal and scheduling the nightly run are the person's decisions, made in the window or at their terminal — not here.",
   inputSchema: { run: z.string().optional() },
   annotations: RETAKE_WRITE,
 }, async ({ run }) => {
@@ -815,7 +815,9 @@ server.registerTool("watch", {
   const { describeChange } = await import("../watch/compare.js");
   const { failureLine } = await import("../watch/journey-store.js");
   let chosen;
-  try { chosen = pickJourneys(listJourneys(ROOT), run); } catch (e) { return text((e as Error).message); }
+  const { listProjects, projectOfJourney } = await import("../watch/projects.js");
+  const projects = listProjects(ROOT);
+  try { chosen = pickJourneys(listJourneys(ROOT), run, (j) => projectOfJourney(projects, j.name)?.id ?? ""); } catch (e) { return text((e as Error).message); }
   const { runs, skipped } = await runBatch({ root: ROOT, out: OUT, journeys: chosen, trigger: "hand", log: (l) => { if (l.startsWith("▶")) void tell(`Running the journey ${l.slice(2)}…`); } });
   const lines = runs.map((r) => {
     const c = r.changes[0];
@@ -1008,6 +1010,18 @@ server.registerTool("share", { description: "Make ONE shareable page for finishe
     SHARE_SERVER ??= ensureShareServer(shareRoot(OUT)).catch((e) => { SHARE_SERVER = null; throw e; });
     const port = await SHARE_SERVER;
     return text(shareReport(s, shareUrl(s.name, port), port).join("\n"));
+  } catch (e) {
+    return text(`✗ ${(e as Error).message}`);
+  }
+});
+
+server.registerTool("watch_share", { description: "Make ONE page to send someone (a client, a partner) about Watch runs: how they stand in one line, then one thing at a time with Next — what needs a look first (journeys stopped by the same missing sign-in are one item), each with a picture of the problem, its replay and its steps with pass or fail, then the rest. Pass a project (a folder under watch/), a journey, a session id, or \"all\". The page holds only the runs' videos, pictures and words: no sign-ins, no tokens, and the person's notes only with notes=true, which you set only when they ask for their notes to be on it. Masks stay applied. Returns the link, which opens on this Mac only: say exactly what the result says about reaching it from elsewhere, and never call it public.", inputSchema: { what: z.string().describe("a project, a journey, a session id, or all"), notes: z.boolean().optional().describe("put the person's notes on the page — only if they asked"), name: z.string().optional().describe("the share's name and address; default watch-<what>"), by: z.string().optional().describe("adds \"Shared with you by …\" — only if the person asked for it") }, annotations: RETAKE_WRITE }, async ({ what, notes, name, by }) => {
+  try {
+    const { buildWatchShare, watchShareReport } = await import("../watch/share.js");
+    const s = buildWatchShare({ root: ROOT, outRoot: OUT, what, notes: notes === true, name, by });
+    SHARE_SERVER ??= ensureShareServer(shareRoot(OUT)).catch((e) => { SHARE_SERVER = null; throw e; });
+    const port = await SHARE_SERVER;
+    return text(watchShareReport(s, shareUrl(s.name, port), port, { notes: notes === true }).join("\n"));
   } catch (e) {
     return text(`✗ ${(e as Error).message}`);
   }

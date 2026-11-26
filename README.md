@@ -24,7 +24,7 @@ You choose what to show: a URL and one sentence about the result. Your coding ag
 
 The steps are saved as a small text file (a YAML manifest), so when a button moves your agent changes one line instead of re-shooting, and when the app changes you rerun the same file. Your agent dry-runs every step, has Retake record a preview, reads the proof log, fixes what failed, and only then makes the final take. `retake ui` is the window you watch it in. `retake install` connects Claude Code; `retake agent` prints the configuration for Codex, Cursor and other MCP clients.
 
-<p align="center"><img src="assets/window.png" width="900" alt="The Retake window: your demos on the left, the video and its scenes in the middle"></p>
+<p align="center"><img src="assets/window.png" width="900" alt="The Retake window: your demos on the left, the video in its frame in the middle, and its frames below"></p>
 
 ## If you are a coding agent reading this
 

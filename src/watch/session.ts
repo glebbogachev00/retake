@@ -17,8 +17,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-export type Speed = "watch" | "step" | "fast";
-export const SPEEDS: Speed[] = ["watch", "step", "fast"];
+/** The person's one switch: "watch" plays (a short hold after each step), "step" is Pause:
+    the run stops at the next step until Play or Next. */
+export type Speed = "watch" | "step";
+export const SPEEDS: Speed[] = ["watch", "step"];
 export const isSpeed = (s: unknown): s is Speed => typeof s === "string" && (SPEEDS as string[]).includes(s);
 
 /** Human pace: the hold on each new screen. */
@@ -110,13 +112,13 @@ export const clock = (sec: number) => {
 /**
  * Whether the run may go on now, or how long to wait before asking again.
  *
- * Next always lets it go. Fast never waits. Watch holds the screen for
- * WATCH_PAUSE_MS, longer while the person is writing a note. Step waits for
- * Next — unless nobody can press it, because no window is open.
+ * Next always lets it go. Play ("watch") holds the screen for
+ * WATCH_PAUSE_MS, longer while the person is writing a note. Pause ("step")
+ * waits for Play or Next — unless nobody can press them, because no window
+ * is open.
  */
 export function gateDecision(s: { speed: Speed; elapsedMs: number; pressed: boolean; hold: boolean; ui: boolean; pauseMs?: number }): { go: true } | { go: false; waitMs: number } {
   if (s.pressed) return { go: true };
-  if (s.speed === "fast") return { go: true };
   if (s.hold && s.ui) return { go: false, waitMs: 1000 };
   if (s.speed === "step" && s.ui) return { go: false, waitMs: 25_000 };
   const left = (s.pauseMs ?? WATCH_PAUSE_MS) - s.elapsedMs;

@@ -50,7 +50,7 @@ test('every call and option of the script side is documented on the page and in 
 test('every retake watch command the CLI has is on the page, with the nightly wording', async () => {
   const cli = await read('src/cli.ts');
   const subs = [...cli.matchAll(/watchCmd\s*\.command\("([a-z]+)"\)/g)].map(match => match[1]);
-  assert.deepEqual([...subs].sort(), ['accept', 'add', 'check', 'run', 'schedule', 'suggest']);
+  assert.deepEqual([...subs].sort(), ['accept', 'add', 'check', 'run', 'schedule', 'share', 'suggest']);
   for (const sub of subs) assert.ok(html.includes(`retake watch ${sub}`), `Not on the page: retake watch ${sub}`);
   for (const text of ['Accept as normal', 'Unchanged since', 'Changed last night', 'watch/']) assert.ok(html.includes(text), text);
 });

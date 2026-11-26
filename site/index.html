@@ -68,29 +68,31 @@
     <div class="watch-grid">
       <div class="watch-copy">
         <h2 id="watch-title">Retake Watch<br><span>Testing you can watch.</span></h2>
-        <p class="watch-lede">Your agent runs your app’s key flows in a real browser. Watch it live or replay it, and say where something looks unclear.</p>
+        <p class="watch-lede">Give it your app’s address. Retake suggests the flows worth checking, your agent runs them in a real browser, and you watch live or replay later. Every step is compared with the last good run.</p>
         <ul class="watch-points">
-          <li><strong>Live, or as a replay.</strong> Each step at your pace, or the finished session later.</li>
+          <li><strong>Nothing to write.</strong> Retake looks around your app and suggests what to check. Tick the ones you want.</li>
+          <li><strong>Watch live, or replay later.</strong> One step at a time, or the whole run at 2×.</li>
+          <li><strong>Catches what tests miss.</strong> Each step is checked against the last good run: the words and the picture.</li>
           <li><strong>Your notes become fixes.</strong> Press Unclear, say why, and the note goes to your agent.</li>
-          <li><strong>Checked after deploys, and every night.</strong> Silent unless something changed.</li>
+          <li><strong>Quiet until something changes.</strong> Checked after every deploy and every night. Send a run to your team as one link.</li>
         </ul>
-        <div class="watch-start"><code>npx retake-demos https://your.app</code><span>Opens Retake on your machine and suggests what to watch. Nothing to set up.</span></div>
+        <div class="watch-start"><code>npx retake-demos https://your.app</code><span>Opens Retake on your machine and suggests what to watch. Nothing to set up. Free and open source.</span></div>
         <a class="setup-docs-link" href="/docs/watch">How Watch works ↗</a>
       </div>
       <figure class="watch-shot">
-        <div class="wscreen" role="img" aria-label="The Retake Watch window during a test of a room-booking app, at Step pace. The step Book Juniper, expecting the booking form, has passed. Under it are the Next and Unclear buttons and a note field, and the step list, where Open Juniper carries the note: Which time zone are these times in?">
+        <div class="wscreen" role="img" aria-label="The Retake Watch window during a live test of Capture, a thought-catching app. The project switcher reads Capture. The session, Capture · Read a thread, is paused, so the button reads Play. The picture shows Capture’s Pricing thread: where it stands, and what is next. Under it: Open the Pricing thread, expecting where it stands and what is next, Passed. Then the Next and Unclear buttons and a note field, and the steps, where Open Threads carries the note: Which thread did I add to last?">
           <div class="ws-chrome" aria-hidden="true"><span class="ws-dots"><i></i><i></i><i></i></span><span class="ws-url">localhost:4310/watch</span></div>
+          <div class="ws-top" aria-hidden="true"><span class="ws-brand"><svg viewBox="0 0 64 64" width="18" height="18"><rect width="64" height="64" rx="14" fill="#1a1c1e"/><g fill="#eceee9"><rect x="16" y="12" width="12" height="6" rx="3" opacity=".55"/><rect x="16" y="21" width="20" height="6" rx="3" opacity=".8"/><rect x="16" y="39" width="20" height="6" rx="3" opacity=".8"/><rect x="16" y="48" width="12" height="6" rx="3" opacity=".55"/></g><rect x="16" y="30" width="36" height="6" rx="3" fill="#e8b04b"/></svg>Retake</span><span class="ws-proj">Capture <i>▾</i></span><span class="ws-areas"><span class="on">Watch</span><span>Demos</span></span></div>
           <div class="ws-main" aria-hidden="true">
-            <div class="ws-head"><span class="ws-back">‹</span><span class="ws-title">Larkspur · Book a room</span><span class="ws-seg"><span>Watch</span><span class="on">Step</span><span>Fast</span></span></div>
-            <div class="ws-stage"><div class="ws-page"><div class="ws-nav"><i></i><i></i><i></i></div><div class="ws-h">Juniper · Floor 3</div><div class="ws-lines"><i></i><i class="short"></i></div><div class="ws-cards"><i></i><i></i></div><div class="ws-cta">Book Juniper</div><svg class="ws-cursor" viewBox="0 0 12 18" width="12" height="18"><path d="M1 1v14l3.6-3.4 2.4 5.4 2.2-1-2.4-5.3H12z" fill="#1b1b19" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg></div></div>
-            <p class="ws-now">Book Juniper <span class="ws-exp">— expecting the booking form</span></p>
-            <p class="ws-verdict"><b>Passed</b> — The form opens with Juniper filled in</p>
+            <div class="ws-head"><span class="ws-back">‹</span><span class="ws-title">Capture · Read a thread</span><span class="ws-pp"><svg width="9" height="9" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg>Play</span></div>
+            <div class="ws-stage"><div class="ws-win-top"><span class="ws-dots"><i></i><i></i><i></i></span><span class="ws-rec"><span>[</span> <i></i>REC · LIVE <span>]</span></span><span class="ws-addr">localhost:3179/app</span></div><img src="/media/watch-capture-thread.jpg" alt="" width="1280" height="640" loading="lazy"></div>
+            <p class="ws-now">Open the Pricing thread <span class="ws-exp">— expecting where it stands, and what is next</span></p>
+            <p class="ws-verdict"><b>Passed</b> — Leaning towards seats; next, a one-page pricing outline</p>
             <div class="ws-act"><span class="ws-btn go">Next</span><span class="ws-btn">Unclear<kbd>U</kbd></span><span class="ws-note">Note on this moment…</span></div>
             <ol class="ws-steps">
-              <li class="pass"><span class="ws-h2">Book a room</span><span class="row"><span class="m">✓</span><span>Sign in as Maya</span></span></li>
-              <li class="pass"><span class="row"><span class="m">✓</span><span>Open Rooms</span></span></li>
-              <li class="flagged"><span class="row"><span class="m">⚑</span><span>Open Juniper<span class="n">“Which time zone are these times in?”</span></span></span></li>
-              <li class="pass"><span class="row"><span class="m">✓</span><span>Book Juniper</span></span></li>
+              <li class="pass"><span class="ws-h2">Read a thread</span><span class="row"><span class="m">✓</span><span>Open the board</span></span></li>
+              <li class="flagged"><span class="row"><span class="m">⚑</span><span>Open Threads<span class="n">“Which thread did I add to last?”</span></span></span></li>
+              <li class="pass"><span class="row"><span class="m">✓</span><span>Open the Pricing thread</span></span></li>
             </ol>
           </div>
         </div>

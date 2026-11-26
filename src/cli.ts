@@ -4,7 +4,7 @@
  *
  * Two areas (src/areas.ts):
  *
- *   retake watch run <journey|all>                run journeys in watch/, compared with the last accepted run
+ *   retake watch run <journey|project|all>        run journeys in watch/, compared with the last accepted run
  *   retake watch sessions | journeys              what has been watched, newest first
  *   retake watch accept <journey>                 the last run is the new normal
  *   retake watch schedule on                      each night, and whenever the app has a new version
@@ -1886,7 +1886,7 @@ const watchOut = (root: string) => process.env.RETAKE_OUT?.trim() ? path.resolve
 
 watchCmd
   .command("run")
-  .argument("<journey>", "a journey's name (watch/<name>.mjs), or all")
+  .argument("<journey>", "a journey's name (watch/<name>.mjs), a project (watch/<project>/), or all")
   .option("--headed", "show the browser", false)
   .option("--scheduled", "started by `retake watch schedule`: one notification, and only when something changed or failed", false)
   .description("run journeys under Watch, compare each with its last accepted run, and keep the result")
@@ -1898,7 +1898,9 @@ watchCmd
     if (opts.scheduled) say(`\n═══ nightly run · ${new Date().toLocaleString()}`);
     const { notify } = await import("./schedule.js");
     let chosen: { name: string; file: string }[];
-    try { chosen = pickJourneys(listJourneys(root), which); }
+    const { listProjects, projectOfJourney } = await import("./watch/projects.js");
+    const projects = listProjects(root);
+    try { chosen = pickJourneys(listJourneys(root), which, (j) => projectOfJourney(projects, j.name)?.id ?? ""); }
     catch (e) { if (opts.scheduled) notify("Retake Watch — the nightly run stopped", (e as Error).message.slice(0, 220)); throw e; }
     // The nightly run waits for a run a new version started, rather than racing it.
     let release = opts.scheduled ? takeRunLock(root) : null;
@@ -1923,6 +1925,31 @@ watchCmd
     const [j] = pickJourneys(listJourneys(process.cwd()), name);
     const r = acceptLast(process.cwd(), j.name);
     say(`✓ ${j.name}: the run of ${new Date(r.at).toLocaleString()} is now normal.`);
+  });
+
+watchCmd
+  .command("share")
+  .argument("<what>", "all, a journey, or a session")
+  .option("--notes", "put your notes on these runs on the page too", false)
+  .option("--name <name>", "the share's name, and its address (default: watch, or watch-<what>)")
+  .option("--title <title>", "the page's heading (default: how the run stands, in a line)")
+  .option("--by <who>", "adds \"Shared with you by <who>\" to the page")
+  .option("--serve", "serve the shares on this Mac and keep running", false)
+  .option("--port <port>", "port for --serve", String(SHARE_PORT))
+  .description("one page to send someone: each journey's replay, its steps, what changed and what failed, in plain words")
+  .action(async (what: string, opts: { notes: boolean; name?: string; title?: string; by?: string; serve: boolean; port: string }) => {
+    const { buildWatchShare, watchShareReport } = await import("./watch/share.js");
+    const root = process.cwd();
+    const port = Number(opts.port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("--port is a port number");
+    const outRoot = watchOut(root);
+    const s = buildWatchShare({ root, outRoot, what, name: opts.name, title: opts.title, by: opts.by, notes: opts.notes });
+    for (const l of watchShareReport(s, shareUrl(s.name, port), port, { notes: opts.notes })) say(l);
+    if (opts.serve) {
+      if (await shareServerUp(port)) { say(`· shares are already being served on port ${port}`); return; }
+      await serveShares(shareRoot(outRoot), port);
+      say(`▶ serving ${path.relative(process.cwd(), shareRoot(outRoot))} on http://localhost:${port}/<share>/ — Ctrl-C to stop`);
+    } else if (!(await shareServerUp(port))) say(`  Nothing is serving it yet: retake watch share ${what} --serve${port === SHARE_PORT ? "" : ` --port ${port}`}`);
   });
 
 watchCmd
@@ -2030,8 +2057,9 @@ watchCmd
   .requiredOption("--pick <numbers>", "which proposals, e.g. 1,3,4")
   .option("--test-space", "this app is a test space: journeys that change data may run here", false)
   .option("--plain", "read the pages only, if they have to be looked at again", false)
+  .option("--project <name>", "the project to add them to (default: the one already watching this site, else a new one named after it)")
   .description("write the picked journeys; each is added only after one run of it passes")
-  .action(async (url: string, opts: { pick: string; testSpace: boolean; plain: boolean }) => {
+  .action(async (url: string, opts: { pick: string; testSpace: boolean; plain: boolean; project?: string }) => {
     const { readSuggestion, suggest, addJourneys, parsePick } = await import("./watch/suggest.js");
     const { markSpace, spaceAnswer, spaceQuestion } = await import("./watch/spaces.js");
     const root = process.cwd();
@@ -2040,7 +2068,12 @@ watchCmd
     if (opts.testSpace) markSpace(root, s.origin, true);
     const asks = pick.some((n) => s.proposals[n - 1]?.changes === "data") && spaceAnswer(root, s.origin) === null;
     if (asks) say(`${spaceQuestion(s.origin)} Without --test-space, they are not added.`);
-    const res = await addJourneys({ root, out: watchOut(root), suggestion: s, pick, log: (l) => process.stderr.write(`  ${l}\n`) });
+    const { listProjects, projectFolder, projectForSite } = await import("./watch/projects.js");
+    const w = projectForSite(root, s.origin);
+    const named = opts.project ? listProjects(root).find((x) => x.id === opts.project || x.name.toLowerCase() === opts.project!.toLowerCase()) : null;
+    const target = w.existing ?? named ?? (opts.project ? { id: opts.project.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || w.fresh.id, name: opts.project } : w.fresh);
+    const folder = projectFolder(root, target, !(w.existing ?? named));
+    const res = await addJourneys({ root, out: watchOut(root), suggestion: s, pick, folder, log: (l) => process.stderr.write(`  ${l}\n`) });
     for (const r of res) say(r.added ? `✓ ${r.title} — watch/${r.name}.mjs` : r.already ? `· ${r.title} — ${r.why}` : `✗ ${r.title} — ${r.why}`);
     const added = res.filter((r) => r.added).length;
     if (added) say(`  ${added} added; each one's first run is its normal. \`retake watch schedule on\` runs them each night and whenever the app changes.`);

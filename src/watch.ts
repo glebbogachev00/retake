@@ -387,7 +387,7 @@ export async function startWatch(page: Page, opts: WatchOptions): Promise<WatchI
       current = s;
       writeSteps(dir, steps);
       await event("step", { step: s });
-      if ((ui?.state.speed ?? "watch") !== "fast") await sleep(WATCH_INTENT_MS);
+      await sleep(WATCH_INTENT_MS);
       armed = { step: s, since: frameCount };
     },
 

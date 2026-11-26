@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 import {
-  MaskList, WATCH_PAUSE_MS, appendFlag, concatList, gateDecision, isCssSelector, jpegSize, nextFixName, queueStatus,
+  MaskList, WATCH_PAUSE_MS, appendFlag, concatList, gateDecision, isCssSelector, isSpeed, jpegSize, nextFixName, queueStatus,
   readFlagsIn, readSteps, renderReport, sessionId, slugify, stamp, stepAt, updateFlag, writeFixRequest, writeMeta, writeSteps,
   type SessionMeta, type StepRecord,
 } from "../src/watch/session.js";
@@ -48,18 +48,18 @@ test("a moment belongs to the step running then, or the last one that had starte
   assert.equal(stepAt(steps, 99_000), 3);       // the step still running
 });
 
-test("the pace: Next always goes, Fast never waits, Watch holds about 1.5 s, Step waits for Next", () => {
-  assert.deepEqual(gateDecision({ speed: "fast", elapsedMs: 0, pressed: false, hold: false, ui: true }), { go: true });
+test("the pace: Next always goes, Play holds about 1.5 s, Pause waits for Play or Next", () => {
+  // One switch, Play or Pause: there is no "fast" any more.
+  assert.equal(isSpeed("fast"), false);
   assert.deepEqual(gateDecision({ speed: "step", elapsedMs: 60_000, pressed: true, hold: false, ui: true }), { go: true });
   const w = gateDecision({ speed: "watch", elapsedMs: 400, pressed: false, hold: false, ui: true });
   assert.deepEqual(w, { go: false, waitMs: WATCH_PAUSE_MS - 400 });
   assert.deepEqual(gateDecision({ speed: "watch", elapsedMs: WATCH_PAUSE_MS, pressed: false, hold: false, ui: true }), { go: true });
   const s = gateDecision({ speed: "step", elapsedMs: 60_000, pressed: false, hold: false, ui: true });
   assert.equal(s.go, false);
-  // Writing a note holds Watch past its pause; Fast does not stop for it.
+  // Writing a note holds Play past its pause.
   assert.equal(gateDecision({ speed: "watch", elapsedMs: 5000, pressed: false, hold: true, ui: true }).go, false);
-  assert.equal(gateDecision({ speed: "fast", elapsedMs: 0, pressed: false, hold: true, ui: true }).go, true);
-  // Nobody can press Next without a window: Step falls back to Watch's pause.
+  // Nobody can press Next without a window: Pause falls back to Play's hold.
   assert.deepEqual(gateDecision({ speed: "step", elapsedMs: 0, pressed: false, hold: false, ui: false }), { go: false, waitMs: WATCH_PAUSE_MS });
   assert.deepEqual(gateDecision({ speed: "step", elapsedMs: WATCH_PAUSE_MS, pressed: false, hold: false, ui: false }), { go: true });
 });
@@ -185,6 +185,7 @@ test("in the window's two-column step list, a scenario's heading stays in the co
     await page.route("http://watch.test/**", (route) => {
       const u = new URL(route.request().url());
       if (u.pathname === "/watch/s") return route.fulfill({ contentType: "text/html", body: html.replace("</head>", `<script>window.__retakeToken="t"</script></head>`) });
+      if (u.pathname === "/brand.css") return route.fulfill({ contentType: "text/css", body: fs.readFileSync(path.join(import.meta.dirname, "..", "src", "ui", "brand.css"), "utf8") });
       if (u.pathname === "/api/watch/s/stream") return route.fulfill({ contentType: "text/event-stream", body: `event: state\ndata: ${JSON.stringify(state)}\n\n` });
       return route.fulfill({ contentType: "application/json", body: "{}" });
     });

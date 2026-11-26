@@ -13,7 +13,7 @@
  *   GET  /api/watch/where            where sessions go, and the chosen speed
  *   GET  /api/watch/sessions         every session, newest first
  *   POST /api/watch/sessions         a script starts one
- *   POST /api/watch/speed            the person's pace (watch | step | fast)
+ *   POST /api/watch/speed            Play or Pause: "watch" plays, "step" stops at the next step
  *   GET  /api/watch/<id>             its state
  *   GET  /api/watch/<id>/stream      SSE: its state, whenever it changes
  *   GET  /api/watch/<id>/live.mjpg   the live picture
@@ -26,13 +26,17 @@
  *   POST /api/watch/<id>/note        the words for a flag
  *   POST /api/watch/<id>/fix         send the notes to be fixed (after 10 s)
  *   POST /api/watch/<id>/fix/undo    …unless taken back
+ *   POST /api/watch/<id>/flag/remove a note taken back (Undo after "Tell your agent")
  *
  * Journeys (src/watch/journey-store.ts):
  *
  *   GET  /watch/j/<name>                      a changed or failed journey, at its moment
  *   GET  /watch/sessions                      every session, newest first
  *   GET  /watch-journey/<name>/<file>         the accepted run's pictures
- *   GET  /api/watch/journeys                  each journey with its one line
+ *   GET  /api/watch/journeys[?project=]       one project: its line, its journeys, its sites, the order Next walks
+ *   GET  /api/watch/order?journey=|session=   where one sits in its project's order, and what comes next
+ *   POST /api/watch/run                       { project }: run its journeys now ("Run all now")
+ *   POST /api/watch/share                     { what, notes }: the page to send someone, and its local link
  *   GET  /api/watch/journeys/<name>           one journey: its last run and the moment
  *   POST /api/watch/journeys/<name>/accept    the last run is the new normal
  *
@@ -48,14 +52,17 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ffmpegBin } from "../media-bin.js";
 import {
-  appendFlag, isSpeed, queueStatus, readFlagsIn, readMeta, readSteps, runFix, safeId, stepAt, unsent, updateFlag,
+  appendFlag, isSpeed, queueStatus, readFlagsIn, readMeta, readSteps, runFix, safeId, stepAt, unsent, updateFlag, writeFlagsIn,
   writeFixRequest, writeReport, type FlagRecord, type Speed,
 } from "../watch/session.js";
-import { acceptLast, baselineDir, journeyNameOk, journeyStates, listJourneys, momentOf, readBaseline, readLast, readSnapshots, shortDate, summaryLine } from "../watch/journey-store.js";
+import { acceptLast, baselineDir, journeyNameOk, journeyStates, listJourneys, momentOf, problemOf, readBaseline, readLast, readSnapshots, shortDate, summaryLine, whenWord, type RunRecord } from "../watch/journey-store.js";
+import { describeChange } from "../watch/compare.js";
+import { groupName } from "../watch/names.js";
+import { listProjects, projectFolder, projectForSite, projectOfJourney } from "../watch/projects.js";
 import { groupByApp, nightlyOnlyLine, outcomeWords, ranLine, readLastRun } from "../watch/deploys.js";
 import { alreadyWatched, gate, journeyMeta, markSpace, originOf, spaceAnswer, spaceQuestion, withScheme } from "../watch/spaces.js";
 import type { Added, Exploration, Suggestion } from "../watch/suggest.js";
@@ -110,7 +117,32 @@ export type WatchDeps = {
   token: string;
   /** Tell the activity feed: anybody watching it can pick the fix up. */
   activity: (type: string, data: unknown) => void;
+  /** The window's port, so a run it starts shows up in it. */
+  port?: number;
 };
+
+/** What the list shows of a journey that needs a look: a picture of the
+    moment, when it says something (not for a missing sign-in), one plain
+    line on what is wrong, and when. A failure for want of a sign-in names
+    the site, so the list can put every journey that needs it on one card. */
+function glance(last: RunRecord | null): { thumb: string | null; reason: string | null; when: string | null; signIn: string | null; site: string | null } {
+  const none = { thumb: null, reason: null, when: null, signIn: null, site: null };
+  if (!last?.dir || !fs.existsSync(last.dir)) return none;
+  const when = whenWord(last.at);
+  if (last.status !== "failed" && last.status !== "changed") return { ...none, when };
+  const steps = readSteps(last.dir);
+  const file = (rel: string | null | undefined) => rel && fs.existsSync(path.join(last.dir, rel)) ? `/watch-files/${last.session}/${rel}` : null;
+  const lower = (t: string) => t.replace(/^\p{Lu}(?!\p{Lu})/u, (c) => c.toLowerCase());
+  if (last.status === "failed") {
+    const f = steps.find((s) => s.result === "fail");
+    const p = problemOf((f?.note || last.error || "").trim());
+    if (p.signIn) return { thumb: null, reason: p.broke, when, signIn: p.signIn, site: new URL(p.signIn).host };
+    return { thumb: file(f?.screenshot), reason: f ? `“${f.intent}” failed${p.broke ? `: ${lower(p.broke)}` : "."}` : p.broke || "It did not finish.", when, signIn: null, site: null };
+  }
+  const c = last.changes[0];
+  if (!c) return { ...none, when };
+  return { thumb: file(c.after) ?? file(steps.find((s) => s.n === c.n)?.screenshot), reason: `“${c.intent}”: ${lower(describeChange(c))}.`, when, signIn: null, site: null };
+}
 
 export function watchRoutes(deps: WatchDeps) {
   const live = new Map<string, Live>();
@@ -119,6 +151,62 @@ export function watchRoutes(deps: WatchDeps) {
   const lastFix = new Map<string, { name: string; notes: number; at: number }>();
   const locks = new Map<string, Promise<unknown>>();
   const jobs = new Map<string, SuggestJob>();
+  let running: import("node:child_process").ChildProcess | null = null;
+
+  /** The journey a session is the last run of, if any. */
+  const journeyOfSession = (session: string) => journeyStates(deps.root).find((j) => j.session === session)?.name ?? null;
+  const projectOfSession = (session: string) => { const j = journeyOfSession(session); return j ? projectOfJourney(listProjects(deps.root), j)?.id ?? null : null; };
+
+  /** One project as the list shows it: its line, its journeys, its sites, and the order Next walks.
+      With no project asked for, the first that needs a look, else the first. */
+  function projectView(asked: string | null) {
+    const projects = listProjects(deps.root);
+    const all = journeyStates(deps.root);
+    const files = new Map(listJourneys(deps.root).map((j) => [j.name, j.file]));
+    const loud = (names: string[]) => all.filter((j) => names.includes(j.name) && (j.status === "failed" || j.status === "changed")).length;
+    const chosen = projects.find((x) => x.id === asked) ?? projects.find((x) => loud(x.journeys)) ?? projects[0] ?? null;
+    const mine = all.filter((j) => chosen?.journeys.includes(j.name));
+    // Data-changing journeys for an app nobody has been asked about: the one question, once.
+    let ask: { url: string; question: string } | null = null;
+    const rows = mine.map((j) => {
+      const file = files.get(j.name)!;
+      const g = gate(deps.root, { name: j.name, file });
+      if (!g.run && g.origin && spaceAnswer(deps.root, g.origin) === null && !ask) ask = { url: g.origin, question: spaceQuestion(g.origin) };
+      let title = j.title;
+      if (title === j.name) { try { title = journeyMeta(fs.readFileSync(file, "utf8")).title ?? j.title; } catch { /* the name */ } }
+      const look = glance(j.last);
+      return g.run ? { name: j.name, title, line: j.line, status: j.status, session: j.session, ...look }
+        : { name: j.name, title, line: "Skipped — not a test space", status: "skipped" as const, session: j.session, why: g.why, when: look.when, thumb: null, reason: null, signIn: null, site: null };
+    });
+    // Sites, named in words ("Shop", "Sign-in screens"), each journey by the rest of its title; the address is for a hover.
+    const groups = groupByApp(deps.root, rows).map((g) => {
+      // Named from the journeys the list shows under it (those needing a look are on cards above).
+      const quiet = g.items.filter((r) => r.status !== "failed" && r.status !== "changed");
+      const n = groupName((quiet.length ? quiet : g.items).map((r) => r.title), g.host);
+      return { host: g.host, name: n.name, names: g.items.map((r) => r.name), short: Object.fromEntries(g.items.map((r) => [r.name, n.short(r.title)])) };
+    });
+    // The order the list shows and Next walks: what needs a look (failures, those sharing a
+    // missing sign-in together, then changes), then the rest, site by site.
+    const order: { name: string; href: string; loud: boolean }[] = [];
+    const put = (r: (typeof rows)[number], isLoud: boolean) => { if (!order.some((o) => o.name === r.name)) order.push({ name: r.name, href: isLoud ? `/watch/j/${r.name}` : r.session ? `/watch/${r.session}` : `/watch/j/${r.name}`, loud: isLoud }); };
+    const failed = rows.filter((r) => r.status === "failed");
+    for (const r of failed) { put(r, true); if (r.signIn) for (const o of failed) if (o.signIn && o.site === r.site) put(o, true); }
+    for (const r of rows.filter((x) => x.status === "changed")) put(r, true);
+    const byName = new Map(rows.map((r) => [r.name, r]));
+    for (const g of groups) for (const n of g.names) { const r = byName.get(n)!; if (r.status !== "failed" && r.status !== "changed") put(r, false); }
+    return {
+      project: chosen?.id ?? null,
+      projects: projects.map((x) => ({ id: x.id, name: x.name, loud: loud(x.journeys) })),
+      summary: summaryLine(mine.map((j) => j.last)),
+      // What started the last run, and when (for agents and the CLI; the list itself says only the one line).
+      ran: (() => { const lr = readLastRun(deps.root); const sm = summaryLine(mine.map((j) => j.last)); return lr ? `${ranLine(lr)}${sm ? "" : ` — ${outcomeWords({ journeys: lr.journeys, changed: 0, failed: 0 })}`}.` : null; })(),
+      blind: nightlyOnlyLine(deps.root),
+      ask,
+      journeys: rows,
+      groups,
+      order,
+    };
+  }
   const watchRoot = () => path.join(deps.outRoot(), "watch");
   const speedFile = path.join(deps.root, ".drafts", "watch-speed");
   let speed: Speed = (() => { try { const s = fs.readFileSync(speedFile, "utf8").trim(); return isSpeed(s) ? s : "watch"; } catch { return "watch"; } })();
@@ -178,6 +266,8 @@ export function watchRoutes(deps: WatchDeps) {
     }) ?? [],
     testSpace: spaceAnswer(deps.root, j.origin), question: spaceQuestion(j.origin),
     results: j.results,
+    // The project its journeys go in: decided when the site is already watched, else asked.
+    ...(() => { const w = projectForSite(deps.root, j.origin); return { projectDecided: w.existing ? { id: w.existing.id, name: w.existing.name } : null, newProject: w.fresh, projects: listProjects(deps.root).map((x) => ({ id: x.id, name: x.name })) }; })(),
   });
 
   function state(id: string) {
@@ -336,36 +426,35 @@ export function watchRoutes(deps: WatchDeps) {
 
     // ---- journeys ----
     if (p === "/api/watch/journeys" && req.method === "GET") {
-      const all = journeyStates(deps.root);
+      const v = projectView(url.searchParams.get("project"));
       const live = list().find((x) => x.live);
-      const summary = summaryLine(all.map((j) => j.last));
-      const lr = readLastRun(deps.root);
-      const files = new Map(listJourneys(deps.root).map((j) => [j.name, j.file]));
-      // Data-changing journeys for an app nobody has been asked about: the one question, once.
-      let ask: { url: string; question: string } | null = null;
-      const rows = all.map((j) => {
-        const file = files.get(j.name)!;
-        const g = gate(deps.root, { name: j.name, file });
-        if (!g.run && g.origin && spaceAnswer(deps.root, g.origin) === null && !ask) ask = { url: g.origin, question: spaceQuestion(g.origin) };
-        let title = j.title;
-        if (title === j.name) { try { title = journeyMeta(fs.readFileSync(file, "utf8")).title ?? j.title; } catch { /* the name */ } }
-        return g.run ? { name: j.name, title, line: j.line, status: j.status, session: j.session }
-          : { name: j.name, title, line: "Skipped — not a test space", status: "skipped", session: j.session, why: g.why };
-      });
+      const liveProject = live ? projectOfSession(live.id) : null;
       return json(res, 200, {
-        summary,
-        // What started the last run, and when; how it went only when the summary does not say.
-        // How it went is said as things stand now: a change accepted since is no longer "changed".
-        ran: lr ? `${ranLine(lr)}${summary ? "" : ` — ${outcomeWords({ journeys: lr.journeys, changed: 0, failed: 0 })}`}.` : null,
-        blind: nightlyOnlyLine(deps.root),
-        ask,
-        journeys: rows,
-        // By app, each under its address.
-        groups: groupByApp(deps.root, rows).map((g) => ({ host: g.host, names: g.items.map((r) => r.name) })),
+        ...v,
         sessions: list().length,
-        // A run going now is a line on the list, not a page that takes its place.
-        live: live?.id ?? null, liveTitle: live?.title ?? null,
+        // A run going now is a line in the header, in whichever project it is.
+        live: live?.id ?? null, liveTitle: live?.title ?? null, liveProject,
       });
+    }
+    // Where a journey (or the session of one) sits in its project's order, and what comes next.
+    if (p === "/api/watch/order" && req.method === "GET") {
+      const journey = url.searchParams.get("journey") ?? (url.searchParams.get("session") ? journeyOfSession(url.searchParams.get("session")!) : null);
+      if (!journey) return json(res, 200, { at: null });
+      const pr = projectOfJourney(listProjects(deps.root), journey);
+      const v = projectView(pr?.id ?? null);
+      const i = v.order.findIndex((o) => o.name === journey);
+      if (i < 0) return json(res, 200, { at: null });
+      const next = v.order[i + 1] ?? null;
+      return json(res, 200, { at: i + 1, total: v.order.length, next: next?.href ?? null, lastLoud: v.order[i].loud && !!next && !next.loud, project: v.project });
+    }
+    // Look again, now: every journey of a project (or all), in a run of their own.
+    if (p === "/api/watch/run" && req.method === "POST") {
+      const b = await body<{ project?: string }>();
+      if (running && running.exitCode === null) return json(res, 409, { error: "A run is already going." });
+      const which = b.project && /^[a-z0-9][a-z0-9-]*$/.test(b.project) ? b.project : "all";
+      running = spawn(process.execPath, [...process.execArgv, process.argv[1], "watch", "run", which], { cwd: deps.root, env: { ...process.env, RETAKE_UI: `http://localhost:${deps.port ?? 4310}` }, stdio: "ignore" });
+      running.on("error", () => { running = null; });
+      return json(res, 200, { started: which });
     }
     const mjr = /^\/api\/watch\/journeys\/([a-z0-9-]+)(\/accept)?$/.exec(p);
     if (mjr) {
@@ -384,12 +473,31 @@ export function watchRoutes(deps: WatchDeps) {
       const session = last?.dir && fs.existsSync(last.dir) ? last.session : null;
       const moment = last && session ? momentOf(last, baseline, readSnapshots(last.dir), readSteps(last.dir)) : null;
       const meta = session && last ? readMeta(last.dir) : null;
+      const steps = session && last ? readSteps(last.dir) : [];
+      const at = moment ? steps.find((x) => x.n === moment.n) : undefined;
+      // A failure in words a person can act on: what broke, and what to do.
+      const problem = last?.status === "failed" ? problemOf((moment?.note || last.error || "").trim()) : null;
       return json(res, 200, {
         name, title: st.title, line: st.line, status: last?.status ?? null, at: last?.at ?? null, error: last?.error ?? null,
+        when: last ? whenWord(last.at) : null, steps: steps.length, expect: at?.expect ?? null, problem,
+        // Where on the session's clock the moment shows its result: a note sent from here lands on that step.
+        stepAt: at ? Math.max(0, (at.tEnd ?? at.t) - 100) / 1000 : null,
         session, video: meta?.video ?? null, changes: last?.changes.length ?? 0,
         others: last ? last.changes.slice(1).map((c) => ({ n: c.n, intent: c.intent })) : [],
         acceptedAt: baseline?.acceptedAt ?? null, accepted: baseline ? shortDate(baseline.acceptedAt) : null, moment,
       });
+    }
+    // ---- a page to send someone ----
+    if (p === "/api/watch/share" && req.method === "POST") {
+      const b = await body<{ what?: string; notes?: boolean }>();
+      const what = String(b.what ?? "all");
+      try {
+        const { buildWatchShare } = await import("../watch/share.js");
+        const { ensureShareServer, shareRoot, shareUrl } = await import("../share.js");
+        const s = buildWatchShare({ root: deps.root, outRoot: deps.outRoot(), what, notes: b.notes === true });
+        const port = await ensureShareServer(shareRoot(deps.outRoot()));
+        return json(res, 200, { url: shareUrl(s.name, port), title: s.title, runs: s.items.length, notes: b.notes === true });
+      } catch (e) { return json(res, 400, { error: (e as Error).message }); }
     }
     // ---- adding an app ----
     if (p === "/api/watch/spaces" && req.method === "POST") {
@@ -424,14 +532,18 @@ export function watchRoutes(deps: WatchDeps) {
         void look(job, true);
         return json(res, 200, jobView(job));
       }
-      const b = await body<{ pick?: number[] }>();
+      const b = await body<{ pick?: number[]; project?: string }>();
       const pick = (b.pick ?? []).filter((n) => Number.isInteger(n) && n >= 1 && n <= (job.suggestion?.proposals.length ?? 0));
       if (!job.suggestion || !pick.length) return json(res, 400, { error: "Tick at least one." });
+      // Which project: the one already watching this site, else the person's pick, else a new one for it.
+      const w = projectForSite(deps.root, job.origin);
+      const picked = w.existing ?? listProjects(deps.root).find((x) => x.id === b.project) ?? null;
+      const folder = projectFolder(deps.root, picked ?? w.fresh, !picked);
       job.phase = "adding"; job.line = "";
       void (async () => {
         try {
           const { addJourneys } = await import("../watch/suggest.js");
-          job.results = await addJourneys({ root: deps.root, out: deps.outRoot(), suggestion: job.suggestion!, pick, log: (l) => { job.line = l.replace(/^[▶✓✗]\s*/, ""); } });
+          job.results = await addJourneys({ root: deps.root, out: deps.outRoot(), suggestion: job.suggestion!, pick, folder, log: (l) => { job.line = l.replace(/^[▶✓✗]\s*/, ""); } });
           job.phase = "done";
           deps.activity("journeys-added", { origin: job.origin, added: job.results.filter((r) => r.added).map((r) => r.name) });
         } catch (e) { job.phase = "error"; job.error = (e as Error).message.split("\n")[0]; }
@@ -441,7 +553,7 @@ export function watchRoutes(deps: WatchDeps) {
 
     if (p === "/api/watch/speed" && req.method === "POST") {
       const b = await body<{ speed?: string }>();
-      if (!isSpeed(b.speed)) return json(res, 400, { error: "speed is watch, step or fast" });
+      if (!isSpeed(b.speed)) return json(res, 400, { error: "speed is watch (Play) or step (Pause)" });
       speed = b.speed;
       try { fs.mkdirSync(path.dirname(speedFile), { recursive: true }); fs.writeFileSync(speedFile, speed); } catch { /* kept in memory */ }
       for (const l of live.values()) { wake(l); push(l.id); }
@@ -463,7 +575,7 @@ export function watchRoutes(deps: WatchDeps) {
       return json(res, 200, { ok: true, ...control(l) });
     }
 
-    const m = /^\/api\/watch\/([a-z0-9-]+)(?:\/(stream|live\.mjpg|frame|event|wait|next|hold|flag|note|fix|fix\/undo))?$/.exec(p);
+    const m = /^\/api\/watch\/([a-z0-9-]+)(?:\/(stream|live\.mjpg|frame|event|wait|next|hold|flag|flag\/remove|note|fix|fix\/undo))?$/.exec(p);
     if (!m) return json(res, 404, { error: "not found" });
     const id = m[1], sub = m[2] ?? "";
     const dir = dirFor(id);
@@ -599,6 +711,23 @@ export function watchRoutes(deps: WatchDeps) {
       if (l && !l.ended) return json(res, 409, { error: "the session is still running" });
       const pf = fixes.get(id) ?? scheduleFix(id);
       return json(res, 200, { pending: pf ? { sendAt: pf.sendAt, notes: pf.notes } : null });
+    }
+    // Taking a note back: the window's Undo after "Tell your agent" undoes all of it.
+    // A note already sent to be fixed stays: that request has gone.
+    if (sub === "flag/remove" && req.method === "POST") {
+      const b = await body<{ n?: number }>();
+      const n = Number(b.n);
+      const removed = await serial(id, async () => {
+        const flags = readFlagsIn(dir);
+        const f = flags.find((x) => x.n === n);
+        if (!f || f.fix) return false;
+        writeFlagsIn(dir, flags.filter((x) => x !== f));
+        if (f.screenshot && /^shots\/flag-\d+\.jpg$/.test(f.screenshot)) fs.rmSync(path.join(dir, f.screenshot), { force: true });
+        if (readMeta(dir)?.endedAt) writeReport(dir);
+        return true;
+      });
+      push(id);
+      return json(res, removed ? 200 : 409, removed ? { removed: n } : { error: "no such note, or it has already gone to be fixed" });
     }
     if (sub === "fix/undo" && req.method === "POST") {
       const pf = fixes.get(id);
