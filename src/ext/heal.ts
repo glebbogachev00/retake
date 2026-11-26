@@ -111,7 +111,7 @@ export function describeOrphans(orphans: Orphan[], applied: string[] | null): st
   for (const o of orphans) out.push(`  ${o.name.padEnd(24)} recorded ${when(o)}${o.seconds !== null ? ` · ${o.seconds}s` : ""}${o.rendered ? "" : " · never rendered"}${o.fragment ? " · a fragment of another demo, left as it is" : ""}`);
   if (applied === null) {
     out.push("");
-    out.push("`retake heal --apply` writes each one back from the copy Retake kept inside its own folder.");
+    out.push("`retake demo heal --apply` writes each one back from the copy Retake kept inside its own folder.");
     return out;
   }
   out.push("");

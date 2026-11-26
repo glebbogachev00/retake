@@ -39,7 +39,7 @@ have.
 
 ## Absent has to work
 
-`rm -rf src/ext` and `retake run` still records. That is the property, and it
+`rm -rf src/ext` and `retake demo run` still records. That is the property, and it
 is tested rather than promised. Anything that would break if an extension were
 missing belongs in the core, not in `ext/`.
 

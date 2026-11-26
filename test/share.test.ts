@@ -137,5 +137,5 @@ test("agents know the share tools, and when to reach for them", () => {
   assert.match(tools, /registerTool\("share_comments"/);
   const skill = fs.readFileSync("skill/SKILL.md", "utf8");
   assert.match(skill, /share link|shareable link/i);
-  assert.match(fs.readFileSync("AGENTS.md", "utf8"), /retake share/);
+  assert.match(fs.readFileSync("AGENTS.md", "utf8"), /retake demo share/);
 });

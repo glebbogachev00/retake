@@ -48,7 +48,7 @@ export function nativeTargetProblem(s: string): string | null {
   if (role && !NATIVE_ROLES[role] && !/^AX/.test(role)) {
     return `"${role}" is not a role Retake knows in an app. Use one of: ${Object.keys(NATIVE_ROLES).join(", ")}, or an accessibility role as written (e.g. AXDisclosureTriangle)`;
   }
-  return `"${s}" is not an app target. An app has no CSS: write role=<role>[name="<name>"], e.g. role=button[name="Sign in"] (add >> nth=1 for the second of several). \`retake scout --app\` prints them`;
+  return `"${s}" is not an app target. An app has no CSS: write role=<role>[name="<name>"], e.g. role=button[name="Sign in"] (add >> nth=1 for the second of several). \`retake demo scout --app\` prints them`;
 }
 
 /** The internal address of an app demo. Everything that groups or names

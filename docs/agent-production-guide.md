@@ -77,11 +77,11 @@ Test every example value during reconnaissance. Some unfunded financial forms re
 Run this path:
 
 ```bash
-npm run retake -- validate demos/<name>.yaml
-npm run retake -- dry demos/<name>.yaml
-npm run retake -- run demos/<name>.yaml --preview --fresh --no-master
-npm run retake -- check outputs/<name>
-npm run retake -- render outputs/<name> demos/<name>.yaml \
+npm run retake -- demo validate demos/<name>.yaml
+npm run retake -- demo dry demos/<name>.yaml
+npm run retake -- demo run demos/<name>.yaml --preview --fresh --no-master
+npm run retake -- demo check outputs/<name>
+npm run retake -- demo render outputs/<name> demos/<name>.yaml \
   --final --preset post-landscape --no-master
 ```
 
@@ -148,7 +148,7 @@ A successful command is not approval. Review the exact MP4 intended for sharing.
 
 Required gates:
 
-1. `retake check` passes.
+1. `retake demo check` passes.
 
 2. The full MP4 decodes without errors.
 

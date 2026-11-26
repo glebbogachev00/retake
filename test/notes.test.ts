@@ -173,7 +173,7 @@ test("the report is capped at five, problems first, and says how many it held ba
   const out = notes(rt);
   const shown = out.lines.filter((l) => /^ {2}[✗·→]/.test(l));
   assert.ok(shown.length <= 5, `showed ${shown.length}`);
-  assert.match(out.lines.join("\n"), /more — `retake notes --all`/);
+  assert.match(out.lines.join("\n"), /more — `retake demo notes --all`/);
   assert.ok(notes(rt, { all: true }).lines.filter((l) => /^ {2}[✗·→]/.test(l)).length > 5);
 });
 

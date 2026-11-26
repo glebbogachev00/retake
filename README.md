@@ -13,6 +13,13 @@
 
 ---
 
+Retake has two areas. Every command lives in one of them.
+
+- **Retake Watch** (`retake watch`), testing you can watch: your agent runs your app's key flows while you watch live or replay them, you flag what looks unclear, and the nightly run says something only when a step changed or broke. See [docs/watch.md](docs/watch.md).
+- **Retake Demos** (`retake demo`), videos: everything below. A short manifest in, a product walkthrough out.
+
+Works with websites, web apps and Mac apps. `retake install`, `retake ui`, `retake login`, `retake doctor` and `retake tidy` are shared and stay top-level. `retake --help` shows the two areas; `retake watch --help` and `retake demo --help` show the rest. The old top-level names (`retake run`, `retake verify`, …) still work.
+
 You choose what to show: a URL and one sentence about the result. Your coding agent looks at the page and prepares the steps: what to click, type and wait for. Retake performs them in a browser (Chromium) and records the page. You get an MP4 of your site doing what you asked, a still of every scene, and a proof log of each step. Captions and voiceover are optional. Retake records websites and web apps in one browser tab, not your desktop or native mobile apps.
 
 The steps are saved as a small text file (a YAML manifest), so when a button moves your agent changes one line instead of re-shooting, and when the app changes you rerun the same file. Your agent dry-runs every step, has Retake record a preview, reads the proof log, fixes what failed, and only then makes the final take. `retake ui` is the window you watch it in. `retake install` connects Claude Code; `retake agent` prints the configuration for Codex, Cursor and other MCP clients.
@@ -31,6 +38,14 @@ Someone pasted this link and wants demos recorded. Do this, in order, and say wh
 6. Read [`skill/SKILL.md`](skill/SKILL.md) once: it is the method (order of operations, failures as text, when to stop) and it is what Claude Code loads automatically after step 2.
 
 Everything below is for the person; it is accurate for you too.
+
+## Try it in one line
+
+```bash
+npx retake-demos https://your.app
+```
+
+No setup first. Retake makes a workspace at `~/Retake`, opens its window at Watch's "Add an app" with your address filled in, looks around the app and suggests what to watch. Pick the journeys; each runs once, and you have your first Watch session. `npx retake-demos` on its own opens the same screen and asks for the address.
 
 ## Install
 
@@ -79,7 +94,7 @@ outputs/<name>/
   cover.png       launch mode: the title card, settled
   cover-titled.png launch mode: a real frame with the title over it
   proof-log.md    result, shot list, every step's timing, pass/fail, what was on screen when it failed
-  contact.png     launch cuts: one timestamped grid of the whole video (`retake contact`)
+  contact.png     launch cuts: one timestamped grid of the whole video (`retake demo contact`)
   take.json       the raw timeline the renderer reads
 ```
 
@@ -90,37 +105,37 @@ In the window: play it, switch speed (0.75× to 1.3×, re-rendered in seconds), 
 Everything an agent does, you can do from the terminal:
 
 ```bash
-retake validate demos/x.yaml   # schema + warnings, instant
-retake dry demos/x.yaml        # every selector and wait, no camera (~30s)
-retake run demos/x.yaml --preset draft   # first take, quarter-size, fast
-retake check outputs/x         # resolution, fps, duration, files: pass/fail
-retake golden approve finished.mp4 --id short-landscape --title "Short landscape" --approved-by "Your name" --rubric story=pass,framing=pass,timing=pass,text=pass,motion=pass  # interactive human approval
-retake golden add finished.mp4 --approval-receipt goldens/.approvals/short-landscape-<hash>.json  # store evidence; never copies the MP4
-retake golden verify           # integrity plus the required 5–8 visual families
-retake golden score candidate.mp4 --against short-landscape  # cheap deterministic media scorecard
-retake verify outputs/x        # did it LOOK right: each scene's `expect`, judged (exit 3 on failure)
-retake run demos/x.yaml --brisk  # the steps without the pacing — for iterating, not for keeping
-retake intent                 # what your product IS — context every visual check needs
-retake sweep outputs/x        # every frame as a whole: the ten ways a picture can be wrong
-retake flag demos/x.yaml --scene s --expect "…"   # this one is real — watch it from now on
-retake fixed x                # did what you flagged get fixed, with the clip that shows it
-retake heal                   # demo files back for recordings whose manifest went missing
-retake sense outputs/x        # does the run ADD UP — what went in against what came out
-retake destroy demos/x.yaml   # the flows nobody wrote down: nine ways to abuse this demo
-retake notes                  # read every take back: what keeps going wrong, and what it costs
-retake run demos/x.yaml        # the real one
-retake render outputs/x        # captions/camera/speed changed? re-render, no browser
+retake demo validate demos/x.yaml             # schema + warnings, instant
+retake demo dry demos/x.yaml                  # every selector and wait, no camera (~30s)
+retake demo run demos/x.yaml --preset draft   # first take, quarter-size, fast
+retake demo check outputs/x                   # resolution, fps, duration, files: pass/fail
+retake demo golden approve finished.mp4 --id short-landscape --title "Short landscape" --approved-by "Your name" --rubric story=pass,framing=pass,timing=pass,text=pass,motion=pass  # interactive human approval
+retake demo golden add finished.mp4 --approval-receipt goldens/.approvals/short-landscape-<hash>.json  # store evidence; never copies the MP4
+retake demo golden verify                     # integrity plus the required 5–8 visual families
+retake demo golden score candidate.mp4 --against short-landscape  # cheap deterministic media scorecard
+retake demo verify outputs/x                  # did it LOOK right: each scene's `expect`, judged (exit 3 on failure)
+retake demo run demos/x.yaml --brisk          # the steps without the pacing — for iterating, not for keeping
+retake demo intent                            # what your product IS — context every visual check needs
+retake demo sweep outputs/x                   # every frame as a whole: the ten ways a picture can be wrong
+retake demo flag demos/x.yaml --scene s --expect "…"   # this one is real — watch it from now on
+retake demo fixed x                           # did what you flagged get fixed, with the clip that shows it
+retake demo heal                              # demo files back for recordings whose manifest went missing
+retake demo sense outputs/x                   # does the run ADD UP — what went in against what came out
+retake demo destroy demos/x.yaml              # the flows nobody wrote down: nine ways to abuse this demo
+retake demo notes                             # read every take back: what keeps going wrong, and what it costs
+retake demo run demos/x.yaml                  # the real one
+retake demo render outputs/x                  # captions/camera/speed changed? re-render, no browser
 ```
 
 The expensive step comes last on purpose. `dry` catches most failures in seconds and prints the step, the error, and the text that was on screen; a failed `run` costs a minute and a confusing video. When a step fails during `run`, Retake stops, keeps what it has, and the proof log says which step and why — an agent fixes it from that text, never from watching the video.
 
 Exit codes: `0` good · `2` a step failed or the video is a raw fallback · `3` `dry`/`check` failed.
 
-To join separate recordings, use [`retake stitch`](docs/stitch.md). Supply existing output folders or video files, a new MP4 path, and one transition style.
+To join separate recordings, use [`retake demo stitch`](docs/stitch.md). Supply existing output folders or video files, a new MP4 path, and one transition style.
 
-**Send several takes as one page.** `retake share admin-overview client-view --name portal` builds a page that plays them in that order, one at a time with a Next button, with each manifest's `notes:` and scenes under the video and a mark where a step failed. Viewers can leave a comment at any moment of a take; `retake share --comments portal` reads them. `retake share --serve` serves it at http://localhost:4790/portal/. The link opens on this Mac; with Tailscale, `tailscale serve` can reach your other devices. Hosted links for clients are not available yet. Ask your agent for "a share link for these takes" and it uses the same thing.
+**Send several takes as one page.** `retake demo share admin-overview client-view --name portal` builds a page that plays them in that order, one at a time with a Next button, with each manifest's `notes:` and scenes under the video and a mark where a step failed. Viewers can leave a comment at any moment of a take; `retake demo share --comments portal` reads them. `retake demo share --serve` serves it at http://localhost:4790/portal/. The link opens on this Mac; with Tailscale, `tailscale serve` can reach your other devices. Hosted links for clients are not available yet. Ask your agent for "a share link for these takes" and it uses the same thing.
 
-**Mac apps.** A demo can name a Mac app instead of a page: `app: TextEdit` in place of `url:`. Targets are role and name (`role=button[name="Sign in"]`), and `retake scout --app TextEdit` lists them. The take records only the app's window, at Retina size, with a Mac arrow drawn where each click lands, and the app can stay behind your own windows while it records. It needs a one-time setup ([cua-driver](https://github.com/trycua/cua) to drive the app, and Retake's window recorder, built once on your Mac with `retake build-native`, which needs Xcode's command-line tools); `retake doctor --native` lists each item and its fix, and the Retake window shows the same list when you type an app's name.
+**Mac apps.** A demo can name a Mac app instead of a page: `app: TextEdit` in place of `url:`. Targets are role and name (`role=button[name="Sign in"]`), and `retake demo scout --app TextEdit` lists them. The take records only the app's window, at Retina size, with a Mac arrow drawn where each click lands, and the app can stay behind your own windows while it records. It needs a one-time setup ([cua-driver](https://github.com/trycua/cua) to drive the app, and Retake's window recorder, built once on your Mac with `retake demo build-native`, which needs Xcode's command-line tools); `retake doctor --native` lists each item and its fix, and the Retake window shows the same list when you type an app's name.
 
 ## The recording environment — what has to be true before the camera
 
@@ -132,9 +147,9 @@ one output folder. Every one is cheap to assert and expensive to read off a
 frame.
 
 ```bash
-retake env up        # restart it clean, clear its state, then PROVE it
-retake env check     # prove the running one without restarting
-retake env down
+retake demo env up      # restart it clean, clear its state, then PROVE it
+retake demo env check   # prove the running one without restarting
+retake demo env down
 ```
 
 `demos/environment.yaml` declares it:
@@ -161,7 +176,7 @@ expect:
 
 `absent` is the one that earns its place. A present-only check cannot see real
 data leaking in, and you cannot assert the absence of something you did not
-think of — so name it. `retake routine run` picks the file up automatically and
+think of — so name it. `retake demo routine run` picks the file up automatically and
 **refuses to record** if the environment is not what it claims.
 
 ## Routines — the settings nobody should decide twice
@@ -177,7 +192,7 @@ writes the story; the routine writes the settings; they never argue.
 **A new product in one step.** Point at the app and at one video you love:
 
 ```bash
-retake routine setup http://localhost:3000/app --like "~/Videos/the-one-we-liked.mp4"
+retake demo routine setup http://localhost:3000/app --like "~/Videos/the-one-we-liked.mp4"
 ```
 
 Everything that can be read off those two arrives decided: the shape, the
@@ -193,19 +208,19 @@ defaults — an opinion wearing the clothes of a standard, which `apply` then
 stamps over everything with confidence. Read it off demos you already shipped:
 
 ```bash
-retake routine learn                 # what your existing manifests actually agree on
-retake routine learn --write         # make that the standard
+retake demo routine learn           # what your existing manifests actually agree on
+retake demo routine learn --write   # make that the standard
 ```
 
 It reports what did *not* agree rather than quietly picking, so a split shows up
 as a question instead of a silent decision.
 
 ```bash
-retake routine init                  # or start from Retake's defaults instead
-retake routine voices                # hear the named voices once, then stop discussing speed
-retake routine set voice neutral
-retake routine set rate -8           # too fast, once, for every video that follows
-retake routine                       # what every recording here will look and sound like
+retake demo routine init          # or start from Retake's defaults instead
+retake demo routine voices        # hear the named voices once, then stop discussing speed
+retake demo routine set voice neutral
+retake demo routine set rate -8   # too fast, once, for every video that follows
+retake demo routine               # what every recording here will look and sound like
 ```
 
 Three styles, because a style is a shape and not a theme:
@@ -219,7 +234,7 @@ Three styles, because a style is a shape and not a theme:
 **Proving they match.** A standard nobody measures is a hope.
 
 ```bash
-retake routine check          # measures the finished files, not the manifests
+retake demo routine check   # measures the finished files, not the manifests
 ```
 
 It reads back size, frame rate, whether there is a voice and how loud it is, and
@@ -236,13 +251,13 @@ change what is on screen).
 **Start from a north star.** One approved video that every cut is held to:
 
 ```bash
-retake routine reference "~/Videos/the-one-we-liked.mp4"
+retake demo routine reference "~/Videos/the-one-we-liked.mp4"
 ```
 
 Before anything records, it says what this routine cannot reproduce — "the
 reference is narrated, the routine is silent", "the routine uses Retake's own
 card, not a branded one" — so a take is never the thing that discovers it.
-After, `retake routine check` scores each cut against it: the opening card, the
+After, `retake demo routine check` scores each cut against it: the opening card, the
 closing card and the frame around the app, as structural similarity, plus
 size, frame rate and how loud the voice is.
 
@@ -257,18 +272,18 @@ sped up.
 stories, written by whoever has the ideas. A routine never invents one.
 
 ```bash
-retake routine run              # everything not done yet
-retake routine run -n 3         # three videos, then stop
-retake routine run --only hero  # re-record one
+retake demo routine run               # everything not done yet
+retake demo routine run -n 3          # three videos, then stop
+retake demo routine run --only hero   # re-record one
 ```
 
 **Letting it run itself.** Once a routine has a plan and a north star, nobody
 needs to be at the keyboard:
 
 ```bash
-retake routine schedule weekdays 09:00   # the next drafted video, every weekday morning
-retake routine schedule                  # what is scheduled, and whether the machine holds it
-retake routine schedule off
+retake demo routine schedule weekdays 09:00   # the next drafted video, every weekday morning
+retake demo routine schedule                  # what is scheduled, and whether the machine holds it
+retake demo routine schedule off
 ```
 
 Each run brings the app up isolated, records one video, judges it against the
@@ -283,10 +298,10 @@ batch resumes where it stopped, and one broken selector does not cost the other
 four videos. Two failures in a row stops the batch and asks whether the app is
 actually running.
 
-**Two standards, two products.** `retake routine new techtutor-vn`, then
-`retake routine set voice vi-VN-HoaiMyNeural --as techtutor-vn`. The language
+**Two standards, two products.** `retake demo routine new techtutor-vn`, then
+`retake demo routine set voice vi-VN-HoaiMyNeural --as techtutor-vn`. The language
 rides on the voice, so there is no second setting that could disagree with the
-first. `retake routine use <name>` switches; `--as <name>` is a one-off.
+first. `retake demo routine use <name>` switches; `--as <name>` is a one-off.
 
 **What a routine will not do:** turn narration on. That needs a script and a
 person who has heard it — the routine only says which voice reads it, and how
@@ -298,7 +313,7 @@ fast, once somebody has written one.
 name: first-project
 title: "Creating your first project"
 url: http://localhost:3000
-preset: post-landscape            # `retake presets` — 1920×1080 page + caption band
+preset: post-landscape       # `retake demo presets` — 1920×1080 page + caption band
 viewport: { width: 1440, height: 1080 }
 scale: 1.8                        # page drawn at 1.8× so text stays crisp
 reducedMotion: true
@@ -329,7 +344,7 @@ On a new workspace, `retake ui` opens the first-demo flow and writes the manifes
 
 **Scenes** are the spine: `{ action: scene, label, caption }` at each beat. They take their timestamps from the actual run, so captions land on the frames they describe even when the app took 3 seconds this time and 11 the last. **Labels must be unique** — `thumbnail`, `until`, the stills and the proof log all address scenes by label, so two scenes called the same thing make every one of those ambiguous. `validate` rejects it.
 
-**Two kinds of take.** `mode: demo` (the default) proves how something works — a client walkthrough, a PR clip, a lesson — and keeps everything but the product out of the frame. `mode: launch` presents the product in public and may carry a title card, music, emphasis and a branded ending. `validate` warns if a demo is carrying launch furniture. **The launch cut.** `compressIdle: true` shows the app's long waits as ~1.5 s each (your own pacing `wait`s are never touched); `voiceover: true` reads the captions aloud (edge-tts, `pipx install edge-tts` once). **Local voices** run on an Apple Silicon Mac and send nothing anywhere: `retake routine set voice heart` (Kokoro, female), `michael` (Kokoro, male) or `aiden` (Qwen3). They need [uv](https://docs.astral.sh/uv/) (`brew install uv`). The first narrated video downloads the voice and the engine that runs it, once: about 0.9 GB for Kokoro, about 2.4 GB for Aiden (the ~600 MB engine is shared). Kokoro reads demo words the demo way ("press re-CORD", "deh-mohz") and every local voice is levelled to Edge's loudness; `typing: brisk` makes typed text land fast with the pauses carrying the meaning. All render-time except typing. **Music.** `music: track.mp3` (or `{ file, gainDb, fadeOutMs }`) mixes a bed under the video at render time, looped or trimmed to fit and faded out at the end. Bring your own track — it ships inside your video, so it must be one you may use (CC0 or licensed). **Cards and callouts.** `intro:`/`outro:` add a title card in Retake's own look — rendered at render time, so changing a word is a re-render, and the intro's settled frame is written as `cover.png`, the poster. `{ action: callout, selector, label, ms }` draws an animated ring and label around an element while the take holds — recorded coordinates, drawn at render, moving with the camera. Sparingly: the captions carry the story.
+**Two kinds of take.** `mode: demo` (the default) proves how something works — a client walkthrough, a PR clip, a lesson — and keeps everything but the product out of the frame. `mode: launch` presents the product in public and may carry a title card, music, emphasis and a branded ending. `validate` warns if a demo is carrying launch furniture. **The launch cut.** `compressIdle: true` shows the app's long waits as ~1.5 s each (your own pacing `wait`s are never touched); `voiceover: true` reads the captions aloud (edge-tts, `pipx install edge-tts` once). **Local voices** run on an Apple Silicon Mac and send nothing anywhere: `retake demo routine set voice heart` (Kokoro, female), `michael` (Kokoro, male) or `aiden` (Qwen3). They need [uv](https://docs.astral.sh/uv/) (`brew install uv`). The first narrated video downloads the voice and the engine that runs it, once: about 0.9 GB for Kokoro, about 2.4 GB for Aiden (the ~600 MB engine is shared). Kokoro reads demo words the demo way ("press re-CORD", "deh-mohz") and every local voice is levelled to Edge's loudness; `typing: brisk` makes typed text land fast with the pauses carrying the meaning. All render-time except typing. **Music.** `music: track.mp3` (or `{ file, gainDb, fadeOutMs }`) mixes a bed under the video at render time, looped or trimmed to fit and faded out at the end. Bring your own track — it ships inside your video, so it must be one you may use (CC0 or licensed). **Cards and callouts.** `intro:`/`outro:` add a title card in Retake's own look — rendered at render time, so changing a word is a re-render, and the intro's settled frame is written as `cover.png`, the poster. `{ action: callout, selector, label, ms }` draws an animated ring and label around an element while the take holds — recorded coordinates, drawn at render, moving with the camera. Sparingly: the captions carry the story.
 
 **Seeds** put the app in a known state before the camera: write a JSON file, run JS in the page, or run a shell command. **Setup** is the stuff that runs before recording and is trimmed off the front — logins live there. **`tempo`** speeds the finished video up or down at render time; **`lock`** names a shared resource so two demos that touch the same backend don't record over each other.
 
@@ -347,9 +362,9 @@ Think in the publishing format, not the browser window.
 | `docs-gif` | 1440×900 | 1440×800 | README and docs GIFs |
 | `master` | 1920×1080 | 1920×930 | archive, CRF 12 |
 
-**One preset, one size — and size is not recorded.** The caption band sits inside the canvas, so `post-landscape` is always exactly 1920×1080 and two demos of the same app are never different shapes. Better still, the shape is decided at render: the take is fitted into whichever canvas you ask for, so `retake render outputs/x --preset post-vertical` gives you a 9:16 cut of a demo you recorded landscape — seconds, no browser, no re-record. Setting `viewport` in a manifest overrides the page and `validate` warns, because that is how one demo ends up a different shape from the rest.
+**One preset, one size — and size is not recorded.** The caption band sits inside the canvas, so `post-landscape` is always exactly 1920×1080 and two demos of the same app are never different shapes. Better still, the shape is decided at render: the take is fitted into whichever canvas you ask for, so `retake demo render outputs/x --preset post-vertical` gives you a 9:16 cut of a demo you recorded landscape — seconds, no browser, no re-record. Setting `viewport` in a manifest overrides the page and `validate` warns, because that is how one demo ends up a different shape from the rest.
 
-**Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text reads on a phone. **Camera** is still by default — a calm demo reads as real. `camera: auto` eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at; per scene: `camera: { focus: ".result", zoom: 1.3 }`. Zoom is something you ask for after seeing a take, not something that happens to you. Captions, camera, speed, trim, format and layout are all render-time: change them and `retake render` takes seconds, never touches the browser.
+**Page scale** is what makes it crisp: the page lays out as if the viewport were smaller and every glyph is drawn at 2×, so 1080p text reads on a phone. **Camera** is still by default — a calm demo reads as real. `camera: auto` eases toward whatever the demo just touched, at render time, clamped so it can never crop the thing it points at; per scene: `camera: { focus: ".result", zoom: 1.3 }`. Zoom is something you ask for after seeing a take, not something that happens to you. Captions, camera, speed, trim, format and layout are all render-time: change them and `retake demo render` takes seconds, never touches the browser.
 
 ## Behind a login
 
@@ -415,7 +430,7 @@ Recording and the cursor come from [testreel](https://github.com/greentfrapp/tes
 git clone https://github.com/glebbogachev00/retake && cd retake
 npm install                      # also builds dist/
 npx playwright install chromium
-npm run retake -- run demos/todo-basics.yaml --preset draft   # a public app, no setup
+npm run retake -- demo run demos/todo-basics.yaml --preset draft   # a public app, no setup
 npm test && npm run typecheck
 ```
 

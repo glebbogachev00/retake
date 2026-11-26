@@ -223,7 +223,7 @@ export function notes(root: string, opts: { all?: boolean; days?: number } = {})
   lines.push(`Across ${runs.length} demo${runs.length === 1 ? "" : "s"}:`);
   lines.push("");
   for (const n of shown) lines.push(`  ${n.kind === "problem" ? "✗" : n.kind === "cost" ? "·" : "→"} ${n.line}`);
-  if (sorted.length > shown.length) lines.push(`\n  (${sorted.length - shown.length} more — \`retake notes --all\`)`);
+  if (sorted.length > shown.length) lines.push(`\n  (${sorted.length - shown.length} more — \`retake demo notes --all\`)`);
 
   const policies = shown.map((n) => n.policy).filter((p): p is string => !!p);
   if (policies.length) {

@@ -226,7 +226,7 @@ server.registerTool("secrets", {
   let missing = missingSecrets(ROOT, names);
   if (!missing.length) return text(`All set: ${names.join(", ")} are in the workspace .env. ${how} Continue.`);
 
-  const link = UI || "http://localhost:4310";
+  const link = `${UI || "http://localhost:4310"}/demos`;   // the forms open in the Demos area
   const list = missing.join(" and ");
   // Is the window actually there? A dead URL must not leave the person
   // staring at a link that does nothing.
@@ -300,7 +300,7 @@ server.registerTool("login", {
   const now = ready();
   if (now) return text(now);
 
-  const link = UI || "http://localhost:4310";
+  const link = `${UI || "http://localhost:4310"}/demos`;   // the forms open in the Demos area
   const windowUp = UI ? await fetch(`${UI}/api/settings`, { headers: uiHeaders() }).then((r) => r.ok).catch(() => false) : false;
   if (windowUp) {
     const pending = await fetch(`${UI}/api/logins/pending`, { headers: uiHeaders() }).then((r) => r.json()).catch(() => []) as { id: string; site: string }[];
@@ -351,7 +351,7 @@ server.registerTool("style", {
 });
 
 server.registerTool("env", {
-  description: "Is the app under test actually what it claims? Reads demos/environment.yaml and checks the RUNNING app: that the screens you need are there, and — the one that matters — that real data has NOT leaked into the demo instance. Call it before the first take of a session. It only looks; bringing the app up or restarting it is the person's `retake env up`, because it starts processes and rewrites their state.",
+  description: "Is the app under test actually what it claims? Reads demos/environment.yaml and checks the RUNNING app: that the screens you need are there, and — the one that matters — that real data has NOT leaked into the demo instance. Call it before the first take of a session. It only looks; bringing the app up or restarting it is the person's `retake demo env up`, because it starts processes and rewrites their state.",
   inputSchema: {},
   annotations: READ_ONLY,
 }, async () => {
@@ -363,7 +363,7 @@ server.registerTool("env", {
     const spec = loadEnvSpec(file);
     const lines: string[] = [];
     const v = await verify(spec, (l) => lines.push(l));
-    return text(`environment ${spec.name}\n${lines.join("\n")}\n\n${v.ok ? "Proven — safe to record." : "NOT what it claims. Do not record; tell the person to run `retake env up`."}`);
+    return text(`environment ${spec.name}\n${lines.join("\n")}\n\n${v.ok ? "Proven — safe to record." : "NOT what it claims. Do not record; tell the person to run `retake demo env up`."}`);
   } catch (e) {
     return text(`Could not check the environment: ${(e as Error).message}`);
   }
@@ -986,20 +986,20 @@ server.registerTool("calibrate", {
   // you to run the CLI instead. An advertised parameter that cannot do the
   // thing it names is a worse lie than an absent one: an agent plans around
   // it, calls it, and reports back that it measured something.
-  description: "HOW MUCH TO TRUST `sweep`. READS the last measurement; it cannot make one, because measuring records a full take per defect and takes about ten minutes — that is `retake calibrate demos/<name>.yaml` at a terminal. A working demo is recorded once per known visual defect — clipped text, overlap, unreadable contrast, content off the edge, a doubled element, a stuck spinner, broken media, a dev badge — plus a control where nothing is wrong. Recall is how many seeded faults were found; false positives are findings on the control; stability is whether the control gave the same answer twice. Read this BEFORE telling somebody how much a sweep result is worth, and quote the numbers rather than your impression. Its limits are printed with it and should be repeated: the seeds were written by somebody who has read the checklist, so recall is an upper bound; injected faults are cleaner than real ones; and the run names outright which checklist items nothing seeds.",
+  description: "HOW MUCH TO TRUST `sweep`. READS the last measurement; it cannot make one, because measuring records a full take per defect and takes about ten minutes — that is `retake demo calibrate demos/<name>.yaml` at a terminal. A working demo is recorded once per known visual defect — clipped text, overlap, unreadable contrast, content off the edge, a doubled element, a stuck spinner, broken media, a dev badge — plus a control where nothing is wrong. Recall is how many seeded faults were found; false positives are findings on the control; stability is whether the control gave the same answer twice. Read this BEFORE telling somebody how much a sweep result is worth, and quote the numbers rather than your impression. Its limits are printed with it and should be repeated: the seeds were written by somebody who has read the checklist, so recall is an upper bound; injected faults are cleaner than real ones; and the run names outright which checklist items nothing seeds.",
   inputSchema: { name: z.string().describe("the demo whose calibration to read") },
   annotations: READ_ONLY,
 }, async ({ name }) => {
   if (!safe(name)) return text(`no demo "${name}"`);
   const file = path.join(OUT, ".calibrate", name, "report.json");
-  if (!fs.existsSync(file)) return text(`${name} has never been calibrated, so there is no measured answer to how much its sweep results are worth. \`retake calibrate demos/${name}.yaml\` produces one — at a terminal, not from here.`);
+  if (!fs.existsSync(file)) return text(`${name} has never been calibrated, so there is no measured answer to how much its sweep results are worth. \`retake demo calibrate demos/${name}.yaml\` produces one — at a terminal, not from here.`);
   const r = JSON.parse(fs.readFileSync(file, "utf8")) as { at: string; results: Parameters<typeof describeCalibration>[0]; stability?: Stability };
   return text([...describeCalibration(r.results, r.stability ?? null), "", `measured ${r.at}`].join("\n"));
 });
 
 // The page a person sends instead of a pile of MP4s. Served from this
 // process when nothing else is serving shares: it lives as long as the agent
-// session does, which `retake share --serve` outlives if they need longer.
+// session does, which `retake demo share --serve` outlives if they need longer.
 let SHARE_SERVER: Promise<number> | null = null;
 server.registerTool("share", { description: "Make ONE shareable page for finished takes: the videos in watching order, one playing at a time with a Next button, and under each one its notes, its scenes, and whether every step worked. Use it when the person asks for a share link, a link for a client, a link to send someone, or to send several takes together — after the takes are rendered and the person has watched them. Pass the demos in the order the viewer should watch them. It takes the title, `notes:` and scene captions from each manifest; if the viewer needs a sentence the video cannot say (what this take proves, what to look for), add a top-level `notes:` (and scene `notes:`) to the manifest first — they appear only on the page, never in the video, and need no re-render. Returns the link. The link opens on this Mac only: tell the person exactly what the result says about reaching it from elsewhere, and never claim it is a public or client-ready link. A share contains only the videos, posters and notes.", inputSchema: { demos: z.array(z.string()).min(1).describe("demo names, in watching order"), name: z.string().optional().describe("the share's name and address; default: the first demo's"), title: z.string().optional().describe("the page heading; default: the demo's title, or \"N recordings\""), by: z.string().optional().describe("adds \"Shared with you by …\" — only if the person asked for it") }, annotations: RETAKE_WRITE }, async ({ demos, name, title, by }) => {
   try {

@@ -98,7 +98,7 @@ export function planTidy(outRoot: string, o: TidyOptions): Plan {
     }
   }
 
-  add("re-renderable", "master, stills, thumbnails, gifs, working files — all come back from `retake render`, in seconds", derived);
+  add("re-renderable", "master, stills, thumbnails, gifs, working files — all come back from `retake demo render`, in seconds", derived);
   if (o.failed) add("failed takes", "THE WHOLE FOLDER, raw recording included — their steps did not pass", failed);
   if (o.orphans) add("orphaned folders", "no manifest in demos/ — nothing here can be re-recorded or re-rendered", orphaned);
   if (o.deep) add("deliverables", "demo.mp4 — re-renders from the recording, but it IS the file you hand over", deliverables);

@@ -126,7 +126,7 @@ export async function checkFlags(manifestFile: string, _m: Manifest, outDir: str
   const flags = readFlags(manifestFile);
   if (!flags.length) {
     say("nothing flagged on this demo yet.");
-    say("When `sense` raises something real, `retake flag` turns it into a check that every later recording answers — and shows you the few seconds that prove it.");
+    say("When `sense` raises something real, `retake demo flag` turns it into a check that every later recording answers — and shows you the few seconds that prove it.");
     return { checked: [], lines, judge: "none" };
   }
 

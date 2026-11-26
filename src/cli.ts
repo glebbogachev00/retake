@@ -1,36 +1,25 @@
 #!/usr/bin/env node
 /**
- * retake — demo-as-code.
+ * retake — video recording for your coding agent: demos of your app, and testing you can watch.
  *
- *   retake install                                set up Claude Code / Codex + this folder as the workspace
- *   retake init                                   just the workspace: demos/, outputs/, .env, .gitignore
- *   retake routine                                the house standard — format, captions, voice, music
- *   retake routine run                            work demos/plan.json: stamp, dry, record, finish
- *   retake doctor                                 is everything in place?
- *   retake ui                                     the review window on :4310
- *   retake run demos/x.yaml                       record + render → outputs/x/
- *   retake run demos/x.yaml --headed --no-render  watch the browser, keep only the raw take
- *   retake render outputs/x                       re-render from the existing take (--preset to switch)
- *   retake check outputs/x                        pass/fail on resolution, fps, duration, files
- *   retake verify outputs/x                       did it LOOK right — each scene's `expect`, judged
- *   retake calibrate demos/x.yaml               how much to trust `sweep` — seed defects, count what it finds
- *   retake intent                                 what this product IS — context every visual check needs
- *   retake sweep outputs/x                        look at every frame as a whole — what nobody thought to ask about
- *   retake sense outputs/x                        does the run ADD UP — what went in vs what came out
- *   retake destroy demos/x.yaml                   the flows nobody wrote down — abuse this demo nine ways
- *   retake flag demos/x.yaml --scene s --expect "…"  this one is real: watch it from now on
- *   retake fixed x                                did what you flagged get fixed — with the clip that shows it
- *   retake heal                                  demo files back for recordings whose manifest went missing
- *   retake notes                                  read outputs/ back: what keeps going wrong, and what it costs
- *   retake dry demos/x.yaml                       every selector and wait, no camera
- *   retake validate demos/x.yaml                  schema check only
- *   retake presets                                list quality presets
- *   retake list                                   manifests in ./demos
- *   retake golden add|list|score                  approved visual references and deterministic scorecards
+ * Two areas (src/areas.ts):
+ *
  *   retake watch run <journey|all>                run journeys in watch/, compared with the last accepted run
+ *   retake watch sessions | journeys              what has been watched, newest first
+ *   retake watch accept <journey>                 the last run is the new normal
  *   retake watch schedule on                      each night, and whenever the app has a new version
  *   retake watch suggest <url>                    journeys worth watching on an app; `watch add <url> --pick 1,3` writes them
- *   retake describe <name> <url> "<what>"         scout + model → demos/<name>.yaml
+ *
+ *   retake demo describe <name> <url> "<what>"    scout + model → demos/<name>.yaml
+ *   retake demo validate | dry demos/x.yaml       schema check; every selector and wait, no camera
+ *   retake demo run demos/x.yaml                  record + render → outputs/x/
+ *   retake demo render outputs/x                  re-render from the existing take (--preset to switch)
+ *   retake demo check | verify | sweep | sense outputs/x   the checks that judge a take
+ *   retake demo routine                           the house standard — format, captions, voice, music
+ *   retake demo --help                            the rest: destroy, calibrate, flag, fixed, notes, share…
+ *
+ * Shared, top-level: install, ui, login, logins, doctor, tidy.
+ * The old top-level names (`retake run`, `retake verify`, …) still work.
  *
  * Run from a clone, the `.ts` source goes through tsx (`npm run retake -- …`);
  * installed from npm, dist/cli.js is the `retake` binary. Same file.
@@ -65,6 +54,8 @@ import { bringUp, loadEnvSpec, stopEnvironment, verify as verifyEnv } from "./re
 import { STYLES, VOICES, RoutineSchema, applyToManifest, environmentFor, compare as compareRoutine, compareToReference, preflightAgainst, learnFrom, measure as measureOutputs, readPlan, describe as describeRoutine, pick as pickRoutine, readRoutines, runRoutine, routineFile, starter, voiceId, writeRoutines, type Routine } from "./routine.js";
 import { SECRET_NAME, writeEnvFile } from "./env.js";
 import { captureMatchesTake, notePreviewCapture, notePreviewRender, readPreviewReceipt } from "./preview.js";
+import { SENTENCE, organise, withAliases } from "./areas.js";
+import { asAddress, firstRun, viaNpx } from "./first-run.js";
 
 // The manifest may reference ${VARS}; load .env before any command reads one.
 // (`describe` and the UI used to do this individually, so a plain `run` from
@@ -76,9 +67,31 @@ try {
 } catch { /* .env is optional */ }
 
 const program = new Command();
-program.name("retake").description("Rerun the demo instead of re-recording it.").version(VERSION);
+program.name("retake").description(SENTENCE).version(VERSION);
+// Two areas, `watch` and `demo` (src/areas.ts). The commands below are defined
+// as they always were; just before the line is parsed, the video ones move
+// under `demo`, and an old top-level name (`retake run`) gets `demo` put in
+// front of it, so it runs exactly what it always ran.
+const parseLine = program.parseAsync.bind(program);
+program.parseAsync = async (argv?: readonly string[], o?: Parameters<typeof parseLine>[1]) => {
+  organise(program);
+  const line = [...(argv ?? process.argv)];
+  // The front door: an address (`retake https://your.app`), or `npx retake-demos`
+  // alone, opens the window at Watch's "Add an app" — no workspace needed first.
+  const address = line.length === 3 ? asAddress(line[2]) : null;
+  if (address || (line.length === 2 && viaNpx())) {
+    await firstRun(address, {
+      init: (root) => initWorkspace(root, () => {}),
+      cli: entry("cli"),
+      browser: { present: () => !!chromiumPath(), install: installChromium },
+      say,
+    });
+    return program;
+  }
+  return parseLine(withAliases(line), o);
+};
 
-// `retake notes | head` closes the pipe before the writer is done, and node
+// `retake demo notes | head` closes the pipe before the writer is done, and node
 // turns that into an unhandled EPIPE and a stack trace. A command-line tool
 // should stop quietly when whoever was reading walks away.
 process.stdout.on("error", (e: NodeJS.ErrnoException) => { if (e.code === "EPIPE") process.exit(0); throw e; });
@@ -143,13 +156,14 @@ export function costHints(m: Manifest, outDir: string, opts: { preset?: string; 
   const ways: string[] = [];
   if (!draft) ways.push("`--preset draft` records the same layout and timing at a quarter of the pixels — use it while the demo is still changing, then run the real preset once");
   if (!opts.until) ways.push("`--until <scene>` stops after one beat, so fixing the ending does not re-record the beginning");
-  ways.push("captions, speed, zoom, cards, poster and SIZE are all re-renders — `retake render outputs/" + m.name + " --preset <other>` never needs the camera again");
+  ways.push("captions, speed, zoom, cards, poster and SIZE are all re-renders — `retake demo render outputs/" + m.name + " --preset <other>` never needs the camera again");
   for (const w of ways) out.push(`  · ${w}`);
   return out;
 }
 
 program
   .command("run")
+  .description("record the demo and render the video into outputs/<name>")
   .argument("<manifest>", "demo .yaml / .json")
   .option("-o, --out <dir>", "output root", "outputs")
   .option("--headed", "show the browser", false)
@@ -207,7 +221,7 @@ program
 
     if (!opts.preview && !opts.fresh && previous && receiptMatches && captureMatchesTake(previous, manifest, dir)) {
       releaseLock(outDir);
-      throw new Error(`this demo already has a reusable preview capture; final quality must not record again. Run: retake render ${path.relative(process.cwd(), outDir)} ${path.relative(process.cwd(), file)} --final --preset post-landscape --no-master`);
+      throw new Error(`this demo already has a reusable preview capture; final quality must not record again. Run: retake demo render ${path.relative(process.cwd(), outDir)} ${path.relative(process.cwd(), file)} --final --preset post-landscape --no-master`);
     }
     if (opts.preview && !opts.fresh && previous && receiptMatches && captureMatchesTake(previous, manifest, dir)) {
       if (previewReceipt?.finalizedAt) {
@@ -296,24 +310,24 @@ program
     if (!kept.length) { say(`no kept versions of ${path.basename(dir)} — the current take is the only one.`); return; }
     say(`kept versions of ${path.basename(dir)} (newest first). Only the recording is stored; everything else re-renders.`);
     for (const k of kept) say(`  ${k.id}  ${k.seconds}s · ${k.steps} steps · ${k.mb} MB`);
-    say(`\nGo back to one:  retake restore ${path.relative(process.cwd(), dir)} <id>`);
+    say(`\nGo back to one:  retake demo restore ${path.relative(process.cwd(), dir)} <id>`);
   });
 
 program
   .command("restore")
   .description("make a kept version the current take again, and re-render it")
   .argument("<dir>", "an outputs/<name> dir")
-  .argument("<id>", "a version id from `retake takes`")
+  .argument("<id>", "a version id from `retake demo takes`")
   .argument("[manifest]", "manifest to render with (default demos/<name>.yaml)")
   .action(async (dir: string, id: string, manifestFile?: string) => {
     const outDir = path.resolve(dir);
     const name = path.basename(outDir);
     acquireLock(outDir);
     try {
-      if (!restoreKept(outDir, id)) throw new Error(`no version "${id}" of ${name} — \`retake takes ${path.relative(process.cwd(), outDir)}\` lists them`);
+      if (!restoreKept(outDir, id)) throw new Error(`no version "${id}" of ${name} — \`retake demo takes ${path.relative(process.cwd(), outDir)}\` lists them`);
       say(`restored ${id} as the current take`);
       const file = manifestFile ?? path.join("demos", `${name}.yaml`);
-      if (!fs.existsSync(file)) { say(`re-render it with:  retake render ${path.relative(process.cwd(), outDir)} <manifest>`); return; }
+      if (!fs.existsSync(file)) { say(`re-render it with:  retake demo render ${path.relative(process.cwd(), outDir)} <manifest>`); return; }
       const { manifest } = loadManifest(file);
       const take = JSON.parse(fs.readFileSync(path.join(outDir, "take.json"), "utf8")) as Take;
       const a = await render(manifest, take, outDir, { log: (l) => { if (!l.startsWith("$")) say(l); } });
@@ -349,7 +363,7 @@ program
       return;
     }
     const freed = applyTidy(plan);
-    say(`\nfreed ${mb(freed)}. Every demo can still be rebuilt with \`retake render outputs/<name>\`.`);
+    say(`\nfreed ${mb(freed)}. Every demo can still be rebuilt with \`retake demo render outputs/<name>\`.`);
   });
 
 
@@ -369,7 +383,7 @@ program
     if ("error" in r) { say(`✗ ${r.error}`); process.exitCode = 2; return; }
     say(`flagged on ${opts.scene}: "${r.flag.expect}"`);
     say(`Every recording from here on answers it — \`verify\` and \`fixed\` both.`);
-    say(`\`retake fixed ${path.basename(file).replace(/\.[^.]+$/, "")}\` after the next take.`);
+    say(`\`retake demo fixed ${path.basename(file).replace(/\.[^.]+$/, "")}\` after the next take.`);
   });
 
 
@@ -584,6 +598,7 @@ program
 
 program
   .command("render")
+  .description("render the video again from the take already recorded: seconds, no browser")
   .argument("<dir>", "an outputs/<name> dir containing take.json")
   .argument("[manifest]", "manifest to use (default: from take.json's sibling manifest path or demos/<name>.yaml)")
   .option("--preset <name>", "override the manifest's preset for this render")
@@ -876,7 +891,7 @@ program
     say("Cursor / anything else that speaks MCP — .cursor/mcp.json or equivalent:");
     say(JSON.stringify(cfg, null, 2) + "\n");
     say("Then just say: “record a demo of my app at localhost:3000 showing the sign-up flow”.");
-    say(`Keep ${o.ui} open while it works — the plan, the run and the video appear there.`);
+    say(`Keep ${o.ui}/demos open while it works — the plan, the run and the video appear there.`);
     say("Retake will not start your app from outside its own window unless you add RETAKE_ALLOW_START=1 above.");
   });
 
@@ -1198,6 +1213,7 @@ program
 
 program
   .command("validate")
+  .description("check a manifest against the schema, and say what looks wrong (instant)")
   .argument("<manifest>")
   .action(async (file: string) => {
     const { manifest } = loadManifest(file);
@@ -1238,7 +1254,7 @@ program
     const file = path.resolve("demos", `${name}.yaml`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, d.yaml);
-    say(`✓ ${path.relative(process.cwd(), file)}${d.retried ? " (after one retry)" : ""} — read it, then: retake run ${path.relative(process.cwd(), file)}`);
+    say(`✓ ${path.relative(process.cwd(), file)}${d.retried ? " (after one retry)" : ""} — read it, then: retake demo run ${path.relative(process.cwd(), file)}`);
   });
 
 program
@@ -1249,7 +1265,7 @@ program
     serve(Number(opts.port));
   });
 
-program.command("list").action(() => {
+program.command("list").description("the demos in ./demos, with their titles").action(() => {
   const dir = path.resolve("demos");
   for (const f of fs.readdirSync(dir).filter((f) => /\.(ya?ml|json)$/.test(f))) {
     try {
@@ -1270,7 +1286,7 @@ function guessManifest(name: string): string {
 }
 
 /** Drop playwright's raw .webm and testreel debug files. The raw take mp4
-    (take.video) stays — `retake render` re-renders from it. */
+    (take.video) stays — `retake demo render` re-renders from it. */
 function cleanRaw(outDir: string, take: Take, finalMp4?: string) {
   for (const f of fs.readdirSync(outDir)) {
     const p = path.join(outDir, f);
@@ -1296,7 +1312,7 @@ function envFile(named?: string): string {
   if (named) return path.resolve(named);
   const file = readRoutines(DEMOS_DIR());
   const found = environmentFor(DEMOS_DIR(), file ? file.routines[file.use] : undefined);
-  if (!found) throw new Error("no environment declared — `retake routine setup <app-url>` drafts one, or write demos/environment.yaml");
+  if (!found) throw new Error("no environment declared — `retake demo routine setup <app-url>` drafts one, or write demos/environment.yaml");
   return found;
 }
 
@@ -1380,13 +1396,13 @@ routine
   .description("what every recording will look and sound like")
   .action((name?: string) => {
     const file = readRoutines(DEMOS_DIR());
-    if (!file) { say("no routine yet.\n\n  retake routine init    write the house standard\n"); return; }
+    if (!file) { say("no routine yet.\n\n  retake demo routine init    write the house standard\n"); return; }
     const which = name ?? file.use;
     const r = file.routines[which];
     if (!r) throw new Error(`no routine called "${which}" — have: ${Object.keys(file.routines).join(", ")}`);
     say(describeRoutine(which, r));
     const others = Object.keys(file.routines).filter((n) => n !== which);
-    if (others.length) say(`\n  also here: ${others.join(", ")} — \`retake routine use <name>\` to switch.`);
+    if (others.length) say(`\n  also here: ${others.join(", ")} — \`retake demo routine use <name>\` to switch.`);
   });
 
 routine
@@ -1414,13 +1430,13 @@ routine
   .description("write demos/routine.json with the house standard: showcase, captions on, silent")
   .action(() => {
     const f = routineFile(DEMOS_DIR());
-    if (fs.existsSync(f)) throw new Error(`${path.relative(process.cwd(), f)} already exists — \`retake routine set\` changes it`);
+    if (fs.existsSync(f)) throw new Error(`${path.relative(process.cwd(), f)} already exists — \`retake demo routine set\` changes it`);
     const data = starter();
     writeRoutines(DEMOS_DIR(), data);
     say(`✓ ${path.relative(process.cwd(), f)}\n`);
     say(describeRoutine("default", data.routines.default));
     say(`\n  Silent on purpose: the first video should exist before anyone is asked`);
-    say(`  about narration. \`retake routine voices\` when you want one.`);
+    say(`  about narration. \`retake demo routine voices\` when you want one.`);
   });
 
 routine
@@ -1442,7 +1458,7 @@ routine
       say(`\n  Not everything agreed:`);
       for (const n of notes) say(`  · ${n}`);
     }
-    if (!opts.write) { say(`\n  Nothing saved. \`retake routine learn --write\` to make this the standard.`); return; }
+    if (!opts.write) { say(`\n  Nothing saved. \`retake demo routine learn --write\` to make this the standard.`); return; }
     const data = file ?? starter();
     data.routines[name] = learned;
     data.use = name;
@@ -1460,7 +1476,7 @@ routine
     if (file.routines[name]) throw new Error(`"${name}" already exists`);
     file.routines[name] = RoutineSchema.parse({});
     writeRoutines(DEMOS_DIR(), file);
-    say(`✓ routine ${name} — \`retake routine set <key> <value> --as ${name}\` to shape it`);
+    say(`✓ routine ${name} — \`retake demo routine set <key> <value> --as ${name}\` to shape it`);
   });
 
 routine
@@ -1469,7 +1485,7 @@ routine
   .description("make this the standard new recordings get")
   .action((name: string) => {
     const file = readRoutines(DEMOS_DIR());
-    if (!file) throw new Error("no routine yet — `retake routine init`");
+    if (!file) throw new Error("no routine yet — `retake demo routine init`");
     if (!file.routines[name]) throw new Error(`no routine called "${name}" — have: ${Object.keys(file.routines).join(", ")}`);
     file.use = name;
     writeRoutines(DEMOS_DIR(), file);
@@ -1484,7 +1500,7 @@ routine
   .description("change the standard once, for every recording that follows")
   .action((key: string, value: string, opts: { as?: string }) => {
     const file = readRoutines(DEMOS_DIR());
-    if (!file) throw new Error("no routine yet — `retake routine init`");
+    if (!file) throw new Error("no routine yet — `retake demo routine init`");
     const which = opts.as ?? file.use;
     const current = file.routines[which];
     if (!current) throw new Error(`no routine called "${which}" — have: ${Object.keys(file.routines).join(", ")}`);
@@ -1499,7 +1515,7 @@ routine
         // who starts slower — carrying the number across is how a routine
         // ended up sounding sluggish after a voice change.
         if (value !== current.voice && current.rate !== 0) {
-          say(`ℹ pace reset from ${current.rate > 0 ? "+" : ""}${current.rate}% to natural — a pace set for ${current.voice} does not carry to ${value}. \`retake routine voices --rate <n>\` to hear and choose.`);
+          say(`ℹ pace reset from ${current.rate > 0 ? "+" : ""}${current.rate}% to natural — a pace set for ${current.voice} does not carry to ${value}. \`retake demo routine voices --rate <n>\` to hear and choose.`);
           next.rate = 0;
         }
         next.voice = value; break;
@@ -1558,7 +1574,7 @@ routine
       case "logo": {
         if (!fs.existsSync(path.resolve(value))) throw new Error(`no such file: ${value}`);
         if (!/\.(svg|png|jpe?g)$/i.test(value)) throw new Error("the card draws an SVG, PNG or JPEG mark");
-        if (!current.card) throw new Error("this routine has no card style yet — `retake routine setup` reads one off a north star");
+        if (!current.card) throw new Error("this routine has no card style yet — `retake demo routine setup` reads one off a north star");
         next.card = { ...current.card, logo: value }; break;
       }
       default:
@@ -1568,7 +1584,7 @@ routine
     const parsed = RoutineSchema.safeParse(next);
     if (!parsed.success) throw new Error(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     if (key === "voice" && value !== "silent" && !VOICES[value] && !/^[a-z]{2}-[A-Z]{2}-/.test(value) && !/^(kokoro|qwen):[a-z_]+$/.test(value)) {
-      say(`ℹ "${value}" is not one of ${Object.keys(VOICES).join(", ")} and does not look like an edge-tts id (en-US-AriaNeural) or a local one (kokoro:af_heart). \`retake routine voices\` lists what is here.`);
+      say(`ℹ "${value}" is not one of ${Object.keys(VOICES).join(", ")} and does not look like an edge-tts id (en-US-AriaNeural) or a local one (kokoro:af_heart). \`retake demo routine voices\` lists what is here.`);
     }
     if (typeof parsed.data.music === "string" && !fs.existsSync(path.resolve(parsed.data.music))) {
       say(`ℹ ${parsed.data.music} is not there yet — the render will fail until it is. It ships inside your video, so it must be a track you may use.`);
@@ -1597,8 +1613,8 @@ routine
       try { synthesize(opts.line, v.id, out, rate); process.stdout.write(`${path.relative(process.cwd(), out)}\n`); }
       catch (e) { process.stdout.write(`✗ ${(e as Error).message}\n`); break; }
     }
-    say(`\n  Listen, then lock it in:  retake routine set voice <name>`);
-    say(`  Too fast or too slow is a rate, set once:  retake routine set rate -8`);
+    say(`\n  Listen, then lock it in:  retake demo routine set voice <name>`);
+    say(`  Too fast or too slow is a rate, set once:  retake demo routine set rate -8`);
   });
 
 routine
@@ -1634,12 +1650,12 @@ routine
   .description("set the one approved video every cut is held to, and hear up front what this routine cannot reproduce")
   .action(async (video: string | undefined, opts: { as?: string }) => {
     const file = readRoutines(DEMOS_DIR());
-    if (!file) throw new Error("no routine yet — `retake routine init`");
+    if (!file) throw new Error("no routine yet — `retake demo routine init`");
     const name = opts.as ?? file.use;
     const r = file.routines[name];
     if (!r) throw new Error(`no routine called "${name}"`);
     const target = video ? path.resolve(video.replace(/^~/, process.env.HOME ?? "~")) : r.reference;
-    if (!target) { say(`routine ${name} has no reference. \`retake routine reference <video>\` — the one cut you would be happy to get every time.`); return; }
+    if (!target) { say(`routine ${name} has no reference. \`retake demo routine reference <video>\` — the one cut you would be happy to get every time.`); return; }
     if (!fs.existsSync(target)) throw new Error(`no such video: ${target}`);
     const { ffmpegBin } = await import("./media-bin.js");
     const [facts] = await measureOutputs([{ name: path.basename(target), file: target }], ffmpegBin());
@@ -1657,7 +1673,7 @@ routine
         outro: grabFrame(ff, target, Math.max(0, facts.seconds - 0.8)),
       }, facts);
       next = { ...next, style: look.style, cards: look.cards, mode: look.cards ? "launch" : r.mode, ...(look.theme ? { theme: look.theme } : {}), ...(look.card ? { card: { ...look.card, weight: 560, ornament: "none" as const } } : {}) };
-      if (look.card || look.theme) say(`ℹ these colours are the north star's — if it is another product's video, \`retake routine set brand ground=#… matte=#…\` gives this product its own.`);
+      if (look.card || look.theme) say(`ℹ these colours are the north star's — if it is another product's video, \`retake demo routine set brand ground=#… matte=#…\` gives this product its own.`);
       say(`taken from it: ${look.style}${look.cards ? `, cards on ${look.card!.background} in ${look.card!.ink}` : ", no cards"}${look.theme ? `, inset on ${look.theme.background}` : ""}`);
       for (const n of look.notes) say(`  · ${n}`);
     }
@@ -1666,7 +1682,7 @@ routine
       say(`\n✗ before you record — routine ${name} cannot reproduce this yet:`);
       for (const g of gaps) say(`  · ${g}`);
     } else {
-      say(`\n✓ nothing in the routine contradicts the reference. \`retake routine check\` scores each cut against it.`);
+      say(`\n✓ nothing in the routine contradicts the reference. \`retake demo routine check\` scores each cut against it.`);
     }
     if (video) {
       file.routines[name] = next;
@@ -1687,7 +1703,7 @@ routine
     const files = done
       .map((i) => ({ name: i.name, file: path.join(outRoot, i.name, "demo.mp4") }))
       .filter((f) => fs.existsSync(f.file));
-    if (!files.length) throw new Error(`nothing recorded yet under ${path.relative(process.cwd(), outRoot)} — \`retake routine run\` first`);
+    if (!files.length) throw new Error(`nothing recorded yet under ${path.relative(process.cwd(), outRoot)} — \`retake demo routine run\` first`);
 
     const { ffmpegBin } = await import("./media-bin.js");
     say(`routine ${name} · measuring ${files.length} finished video${files.length === 1 ? "" : "s"}…\n`);
@@ -1722,7 +1738,7 @@ routine
     }
     say(`\n✗ these would not read as one set:`);
     for (const p of problems) say(`  · ${p}`);
-    say(`\n  Size and frame rate are a re-render, not a re-record: \`retake render outputs/<name> --preset ${STYLES[r.style].preset}\`.`);
+    say(`\n  Size and frame rate are a re-render, not a re-record: \`retake demo render outputs/<name> --preset ${STYLES[r.style].preset}\`.`);
     process.exitCode = 2;
   });
 
@@ -1738,7 +1754,7 @@ routine
   .option("--rate <percent>", "just this batch: a different pace")
   .option("--captions <on|off>", "just this batch")
   .option("-e, --env <path>", "environment file — bring the app up clean and prove it before recording")
-  .option("--scheduled", "started by `retake routine schedule`: say how it went in a notification", false)
+  .option("--scheduled", "started by `retake demo routine schedule`: say how it went in a notification", false)
   .description("work the plan: stamp, dry-run, record and finish each demo that is not done")
   .action(async (opts: { as?: string; only?: string; limit?: string; preview: boolean; out: string; voice?: string; style?: string; rate?: string; captions?: string; env?: string; scheduled: boolean }) => {
     if (!opts.scheduled) { await runPlan(opts); return; }
@@ -1790,7 +1806,7 @@ routine
     const root = process.cwd();
     if (!every) {
       const s = readSchedule(root);
-      if (!s) { say("not scheduled — `retake routine schedule weekdays 09:00` records the next planned video every weekday morning."); return; }
+      if (!s) { say("not scheduled — `retake demo routine schedule weekdays 09:00` records the next planned video every weekday morning."); return; }
       const live = scheduleLoaded(s.label);
       say(`${live ? "✓" : "✗"} ${describeSchedule(s)} — ${live ? `held by ${s.mechanism}` : `written, but ${s.mechanism} is not holding it; schedule it again`}`);
       say(`  log: ${path.relative(root, path.join(root, ".retake", "schedule.log"))}`);
@@ -1806,8 +1822,8 @@ routine
     const s = installSchedule(root, { every, at, count: Number(opts.count) }, [bin.command, ...bin.args, "routine", "run", "--scheduled", "-n", String(Number(opts.count))]);
     say(`✓ routine ${name} runs ${describeSchedule(s)} — the next planned video, judged against the north star${r.deliver ? `, delivered to ${r.deliver}` : ""}.`);
     say(`  ${drafted.length ? `${drafted.length} drafted and waiting: ${drafted.slice(0, 4).map((i) => i.name).join(", ")}${drafted.length > 4 ? "…" : ""}` : "nothing drafted is waiting — add stories to demos/plan.json and draft them, or the runs will have nothing to do"}`);
-    if (!r.reference) say(`  ℹ no north star: every take will be delivered unjudged. \`retake routine reference <video>\`.`);
-    say(`  A notification says how each run went. \`retake routine schedule off\` stops it.`);
+    if (!r.reference) say(`  ℹ no north star: every take will be delivered unjudged. \`retake demo routine reference <video>\`.`);
+    say(`  A notification says how each run went. \`retake demo routine schedule off\` stops it.`);
   });
 
 program
@@ -1826,11 +1842,11 @@ program
     if (opts.comments) { say(describeComments(shareRoot(outRoot), opts.comments)); return; }
     const port = Number(opts.port);
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("--port is a port number");
-    if (!demos.length && !opts.serve) throw new Error("name the demos to share, in watching order: retake share <demo> [<demo>...]");
+    if (!demos.length && !opts.serve) throw new Error("name the demos to share, in watching order: retake demo share <demo> [<demo>...]");
     if (demos.length) {
       const s = buildShare({ outRoot, demosDir: DEMOS_DIR(), demos, name: opts.name, title: opts.title, by: opts.by });
       for (const l of shareReport(s, shareUrl(s.name, port), port)) say(l);
-      if (!opts.serve && !(await shareServerUp(port))) say(`  Nothing is serving it yet: retake share --serve${port === SHARE_PORT ? "" : ` --port ${port}`}`);
+      if (!opts.serve && !(await shareServerUp(port))) say(`  Nothing is serving it yet: retake demo share --serve${port === SHARE_PORT ? "" : ` --port ${port}`}`);
     }
     if (opts.serve) {
       if (await shareServerUp(port)) { say(`· shares are already being served on port ${port}`); return; }

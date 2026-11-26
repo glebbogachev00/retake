@@ -121,7 +121,7 @@ async function visit(width: number, run: (p: import("playwright").Page) => Promi
   p.on("console", (m) => { if (m.type() === "error") errs.push("console: " + m.text()); });
   const failed: string[] = [];
   p.on("response", (r) => { if (r.url().includes(`:${PORT}/`) && r.status() >= 400) failed.push(`${r.status()} ${new URL(r.url()).pathname}`); });
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "domcontentloaded" });
+  await p.goto(`http://127.0.0.1:${PORT}/demos`, { waitUntil: "domcontentloaded" });
   await p.locator("#demos").waitFor({ state: "visible" });
   await p.waitForTimeout(1500);
   await run(p);
@@ -244,7 +244,7 @@ test("nothing scrolls sideways on a phone, and the pills keep their shape", asyn
   const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errs: string[] = [];
   p.on("pageerror", (e) => errs.push(String(e)));
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
+  await p.goto(`http://127.0.0.1:${PORT}/demos`, { waitUntil: "networkidle" });
   await p.waitForTimeout(1200);
   // A pill that wraps inside its own border is taller than one line of it.
   const h = await p.locator(".chip").first().evaluate((e) => e.getBoundingClientRect().height);
@@ -301,7 +301,7 @@ test("a first-time user can describe one demo and make an honest narration choic
     contentType: "application/json",
     body: JSON.stringify({ files: [] }),
   }));
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
+  await p.goto(`http://127.0.0.1:${PORT}/demos`, { waitUntil: "networkidle" });
 
   assert.ok(await p.locator("#onboarding").isVisible(), "an empty library should open the first-run flow");
   assert.equal(await p.locator("[data-voice]").count(), 4, "silent, Edge, Aiden, and Kokoro should be visible choices");
@@ -387,7 +387,7 @@ test("an expired agent sign-in is one button, and the draft starts again by itse
     if (r.request().method() === "POST") loginStarted = true; else polls++;
     await r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ signedIn: polls >= 2, waiting: polls < 2, failed: false }) });
   });
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
+  await p.goto(`http://127.0.0.1:${PORT}/demos`, { waitUntil: "networkidle" });
   await p.locator("#onboard-url").fill("https://example.com");
   await p.locator("#onboard-next").click();
   await p.waitForFunction(() => /could not be read/.test(document.getElementById("brand-lead")?.textContent || ""));
@@ -433,7 +433,7 @@ test("a failed first draft retries without asking for the request again", async 
   }));
   // A site whose colours cannot be read still goes on — in Retake's own.
   await p.route("**/api/brand", async (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ name: "example", brand: null }) }));
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
+  await p.goto(`http://127.0.0.1:${PORT}/demos`, { waitUntil: "networkidle" });
   await p.locator("#onboard-url").fill("https://example.com");
   await p.locator("#onboard-next").click();
   await p.waitForFunction(() => /could not be read/.test(document.getElementById("brand-lead")?.textContent || ""));
@@ -494,7 +494,7 @@ test("someone who types a Mac app gets its setup card, and the draft starts with
     : { ready: false, lines: [{ ok: true, text: "macOS 26.5.1" }, { ok: false, text: "cua-driver telemetry is on", fix: "cua-driver telemetry disable" }, { ok: false, text: "<img src=x onerror=alert(1)>" }] }) }));
   await p.route("**/api/operator", async (r) => { sent = r.request().postDataJSON(); await r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "app-test", provider: "codex" }) }); });
   await p.route("**/api/operator/app-test/stream*", (r) => r.fulfill({ status: 200, contentType: "text/event-stream", body: "retry: 1000\n\n" }));
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "networkidle" });
+  await p.goto(`http://127.0.0.1:${PORT}/demos`, { waitUntil: "networkidle" });
 
   await p.locator("#onboard-url").fill("TextEdit");
   await p.locator("#onboard-next").click();
