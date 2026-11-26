@@ -1,0 +1,50 @@
+/* Retake Watch, the first section under the hero. Reuses the page's marker, h2 and link styles. */
+.watch-section{padding-top:30px}
+.watch-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:56px;align-items:center;margin:22px 0 60px}
+.watch-copy h2{margin-bottom:18px}
+.watch-lede{color:var(--muted);font-size:14px;line-height:1.75;max-width:420px;margin-bottom:22px}
+.watch-points{list-style:none;margin:0 0 26px;padding:0;border-top:1px solid var(--line)}
+.watch-points li{font-size:12px;line-height:1.7;color:var(--muted);padding:12px 0;border-bottom:1px solid var(--line)}
+.watch-points strong{display:block;color:var(--ink);font-weight:550;font-size:13px}
+.watch-start{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+.watch-start code{font:12px/1 var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line-dark);border-radius:6px;padding:14px 16px;width:max-content;max-width:100%;overflow-wrap:anywhere}
+.watch-start span{font-size:11px;color:var(--muted)}
+.watch-shot{margin:0;min-width:0}
+.watch-shot img{display:block;width:100%;height:auto;border-radius:8px}
+.works-with{font-size:12px;color:var(--muted);text-align:center;margin-top:28px;margin-bottom:0}
+.example-section .section-heading{margin-top:22px}
+@media(max-width:760px){.watch-grid{grid-template-columns:1fr;gap:28px;margin-bottom:40px}.watch-shot{order:-1}.watch-start code{font-size:11px;width:auto}}
+/* The Watch session screen (src/ui/watch.html), drawn in text so it stays sharp: same layout, words and colours.
+   On phones the stand-in page goes; the narration, the controls and the steps stay. */
+.wscreen{--w-paper:#f6f6f3;--w-ink:#1b1b19;--w-muted:#6c6c66;--w-fill:#ebebe6;--w-fill2:#e2e2dc;--w-pass:#2f7d4f;--w-accent:#0a84ff;background:var(--w-paper);color:var(--w-ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;border:1px solid var(--line-dark);border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(37,39,32,.32)}
+@supports (color:AccentColor){.wscreen{--w-accent:AccentColor}}
+.ws-chrome{display:flex;align-items:center;gap:12px;height:34px;padding:0 12px;background:#fdfdfb;border-bottom:1px solid #e4e4de}
+.ws-dots{display:inline-flex;gap:5px}.ws-dots i{width:8px;height:8px;border-radius:50%;background:#dcdcd6}
+.ws-url{margin:0 auto;transform:translateX(-24px);font:11px var(--mono);color:var(--w-muted);background:#f0f0ec;border-radius:6px;padding:3px 14px}
+.ws-main{padding:16px 20px 20px}
+.ws-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.ws-back{color:var(--w-muted)}
+.ws-title{flex:1;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-seg{display:inline-flex;background:var(--w-fill);border-radius:10px;padding:3px;font-size:13px}
+.ws-seg span{padding:4px 11px;border-radius:8px}.ws-seg .on{background:var(--w-paper)}
+.ws-stage{background:var(--w-fill);border-radius:14px;overflow:hidden;aspect-ratio:16/8}
+.ws-page{position:relative;width:100%;height:100%;background:#f7f7f4;display:flex;flex-direction:column;gap:10px;padding:0 20px 16px}
+.ws-nav{display:flex;gap:8px;align-items:center;margin:0 -20px;padding:12px 20px;background:#fff}.ws-nav i{height:8px;width:44px;border-radius:4px;background:#e6e6e1}.ws-nav i:first-child{width:22px;background:#d8d8d2}
+.ws-h{font-size:16px;font-weight:600;margin-top:4px}
+.ws-lines{display:flex;flex-direction:column;gap:7px}.ws-lines i{height:7px;border-radius:4px;background:#ededE8;width:78%}.ws-lines i.short{width:46%}
+.ws-cards{flex:1;display:grid;grid-template-columns:1.6fr 1fr;gap:12px;min-height:0}.ws-cards i{border-radius:8px;background:#fff;box-shadow:0 0 0 1px #ececE7}
+.ws-cta{align-self:flex-start;font-size:12px;font-weight:600;color:#fff;background:#4a4a46;border-radius:7px;padding:6px 12px}
+.ws-cursor{position:absolute;left:112px;bottom:6px}
+.ws-now{margin:14px 0 0}.ws-exp{color:var(--w-muted)}
+.ws-verdict{margin:2px 0 0;color:var(--w-muted)}.ws-verdict b{color:var(--w-pass);font-weight:600}
+.ws-act{display:flex;gap:8px;align-items:center;margin-top:12px}
+.ws-btn{background:var(--w-fill);border-radius:10px;padding:7px 14px;white-space:nowrap}.ws-btn.go{background:var(--w-accent);color:#fff}
+.ws-btn kbd{font:inherit;font-size:13px;color:var(--w-muted);margin-left:6px}
+.ws-note{flex:1;min-width:0;background:var(--w-fill);border-radius:10px;padding:7px 12px;color:#8e8e88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-steps{list-style:none;margin:20px 0 0;padding:0;font-size:13px}
+.ws-steps li{padding:3px 0}.ws-steps .row{display:flex;gap:10px}
+.ws-steps .ws-h2{display:block;color:var(--w-muted);padding:0 0 3px}
+.ws-steps .m{width:16px;flex:none;text-align:center;color:var(--w-muted)}
+.ws-steps li.pass .m{color:var(--w-pass)}.ws-steps li.flagged .m{color:var(--w-accent)}
+.ws-steps .n{display:block;color:var(--w-muted)}
+@media(max-width:640px){.ws-stage{display:none}.ws-main{padding:14px 14px 16px}.ws-title{font-size:15px}.ws-seg{font-size:12px}.ws-seg span{padding:4px 8px}.ws-url{transform:none}.ws-now{margin-top:4px}.ws-act{flex-wrap:wrap}.ws-note{flex-basis:100%}}

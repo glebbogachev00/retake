@@ -19,6 +19,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEMO_AREA } from "../src/areas.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (f: string) => fs.readFileSync(path.join(ROOT, f), "utf8");
@@ -41,9 +42,10 @@ const HUMAN_ONLY = new Set([
 
 /**
  * Every VERB the CLI exposes, straight from the source — the commands hung off
- * `program`, not the sub-commands hung off them. `retake routine set` is not a
- * verb an agent reaches for; `retake routine` is, and it is the one that has to
- * have a tool and a mention in the docs.
+ * `program` (the video ones then move under `retake demo`, see src/areas.ts),
+ * not the sub-commands hung off them. `retake demo routine set` is not a verb
+ * an agent reaches for; `retake demo routine` is, and it is the one that has
+ * to have a tool and a mention in the docs.
  */
 function cliVerbs(): string[] {
   const src = read("src/cli.ts");
@@ -71,7 +73,7 @@ test("every agent-facing verb appears in the documents an agent reads", () => {
   const missing: string[] = [];
   for (const v of cliVerbs()) {
     if (HUMAN_ONLY.has(v)) continue;
-    const named = new RegExp(`(retake ${v}\\b|\`${v}\`)`);
+    const named = new RegExp(`(retake ${DEMO_AREA.has(v) ? "demo " : ""}${v}\\b|\`${v}\`)`);
     if (!named.test(agents)) missing.push(`${v} → AGENTS.md`);
     if (!named.test(skill)) missing.push(`${v} → skill/SKILL.md`);
   }
@@ -102,6 +104,16 @@ test("the checks that judge a picture are all reachable, and all documented", ()
 test("the README lists the verbs a person types", () => {
   const readme = read("README.md");
   for (const v of ["verify", "sweep", "sense", "destroy", "notes", "fixed"]) {
-    assert.match(readme, new RegExp(`retake ${v}`), `${v} is missing from the README`);
+    assert.match(readme, new RegExp(`retake demo ${v}`), `${v} is missing from the README`);
+  }
+});
+
+test("the docs name the video commands by their area", () => {
+  // The old top-level names still run, but a reader copying from the docs
+  // should learn the new ones. One line per file may say what the old name was.
+  const old = new RegExp(`(?<!npm run )\\bretake (${[...DEMO_AREA].join("|")})\\b(?![-\\w])`, "g");
+  for (const f of ["AGENTS.md", "CLAUDE.md", "README.md", "skill/SKILL.md", "llms.txt", "docs/watch.md", "docs/stitch.md"]) {
+    const hits = [...read(f).matchAll(old)].map((m) => m[0]);
+    assert.ok(hits.length <= 2, `${f} still uses old names: ${hits.join(", ")}`);
   }
 });

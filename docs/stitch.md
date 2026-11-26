@@ -5,11 +5,11 @@
 From a source checkout:
 
 ```sh
-npm run retake -- stitch outputs/first outputs/second outputs/third \
+npm run retake -- demo stitch outputs/first outputs/second outputs/third \
   --out outputs/launch/demo.mp4 --transition fade --transition-ms 400
 ```
 
-With the installed CLI, use `retake stitch` with the same arguments.
+With the installed CLI, use `retake demo stitch` with the same arguments.
 
 ## Inputs and output
 

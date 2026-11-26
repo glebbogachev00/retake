@@ -197,7 +197,7 @@ export const Step = z.discriminatedUnion("action", [
     label: z.string().min(1),
     /** What a person should be able to SEE at this moment, in plain words —
         "the board shows two items", "the Continue button is readable against
-        its background". `retake verify` puts this question to a vision model
+        its background". `retake demo verify` puts this question to a vision model
         against the scene's own still and fails the run if the answer is no.
         
         Deliberately a question about the PICTURE, not a selector. Every
@@ -216,7 +216,7 @@ export const Step = z.discriminatedUnion("action", [
     nudge: z.number().int().min(-60_000).max(60_000).optional(),
     caption: z.string().optional(),
     /** For the person you send the video to, not for the video: shown under
-        it on a share page (`retake share`). Never drawn on a frame. */
+        it on a share page (`retake demo share`). Never drawn on a frame. */
     notes: z.string().optional(),
     holdMs: z.number().positive().optional(),
     /** Where the camera looks during this scene. Omitted → the manifest's
@@ -279,7 +279,7 @@ export const ManifestShape = z.object({
   name: z.string().regex(/^[a-z0-9-]+$/, "kebab-case only"),
   title: z.string().optional(),
   /** What this take shows and why, for whoever it is sent to. A share page
-      (`retake share`) puts it under the video; the video never carries it. */
+      (`retake demo share`) puts it under the video; the video never carries it. */
   notes: z.string().optional(),
   /** Where the demo happens: a web page. Or, instead, `app:`. */
   url: z.string().url().optional(),

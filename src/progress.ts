@@ -2,7 +2,7 @@
  * What this run is doing right now, on disk.
  *
  * The window used to know only what something chose to tell it. An agent
- * driving Retake over MCP reported progress; a person running `retake run` in
+ * driving Retake over MCP reported progress; a person running `retake demo run` in
  * a terminal reported nothing — so a seventeen-minute recording looked
  * identical to an idle machine, and the honest answer to "what is it doing?"
  * was "no idea".

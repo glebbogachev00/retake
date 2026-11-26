@@ -7,7 +7,7 @@
  * the same take renders the same twice — and styled with the same theme as
  * the caption band, so cards look like Retake, not like a slide deck.
  *
- * All of it is render-time: change a title, `retake render`, seconds.
+ * All of it is render-time: change a title, `retake demo render`, seconds.
  */
 import { launchChromium } from "./browser-home.js";
 import fs from "node:fs";

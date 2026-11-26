@@ -157,4 +157,4 @@ export function intentBlock(demosDir: string, demo?: string): string {
 
 /** Said out loud when there is none, so nobody mistakes silence for context. */
 export const NO_INTENT_NOTE =
-  "no demos/product.md — the judge is looking at this as a generic web page, so anything deliberate about it may come back as a defect. `retake intent` writes a starter.";
+  "no demos/product.md — the judge is looking at this as a generic web page, so anything deliberate about it may come back as a defect. `retake demo intent` writes a starter.";

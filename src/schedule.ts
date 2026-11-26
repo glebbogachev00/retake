@@ -2,7 +2,7 @@
    A routine with a plan and a north star needs nobody at the keyboard: the
    environment starts itself, every cut is judged, only a match is delivered.
    What was missing was the morning — someone still had to type
-   `retake routine run`. A schedule is that one line, said once.
+   `retake demo routine run`. A schedule is that one line, said once.
 
    One video per run by default: a schedule exists to keep a cadence (a post a
    day), not to empty the plan in one night, and one result is one thing to
@@ -129,7 +129,7 @@ export function installSchedule(root: string, spec: ScheduleSpec, program: strin
     if (w.status !== 0) throw new Error(`crontab would not take the schedule: ${(w.stderr || "").trim()}`);
     mechanism = "cron";
   } else {
-    const cmd = kind === "watch" ? "retake watch run all --scheduled" : kind === "watch-check" ? "retake watch check --scheduled" : "retake routine run";
+    const cmd = kind === "watch" ? "retake watch run all --scheduled" : kind === "watch-check" ? "retake watch check --scheduled" : "retake demo routine run";
     throw new Error(`scheduling uses launchd (macOS) or cron (Linux) — on this system, run \`${cmd}\` from the system's own task scheduler`);
   }
   const installed: Installed = { ...spec, label, root, installedAt: new Date().toISOString(), mechanism, ...(kind === "routine" ? {} : { kind }) };

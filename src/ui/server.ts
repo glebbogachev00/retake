@@ -237,7 +237,7 @@ function listDemos(project?: string) {
   //   4. the name in a product note written for another demo of the same app
   //   5. the app's address, which is where this started and helps nobody
   //
-  // Four is new. Writing `retake intent --demo checkout "# Acme"` named the
+  // Four is new. Writing `retake demo intent --demo checkout "# Acme"` named the
   // checkout folder and left the other six Acme demos in a fold called
   // "localhost:3200", which is the exact complaint the naming was added to
   // answer.
@@ -307,7 +307,7 @@ function listDemos(project?: string) {
 
 /**
  * Recordings whose demo file is gone, in the shape the library expects.
- * The finding of them lives in src/ext/heal.ts so the window and `retake heal`
+ * The finding of them lives in src/ext/heal.ts so the window and `retake demo heal`
  * can never disagree about what is hidden.
  */
 function orphanedRecordings(known: string[]) {
@@ -321,7 +321,7 @@ function orphanedRecordings(known: string[]) {
       valid: true, settings: {} as Record<string, unknown>,
       lastTake: o.finishedAt ? { finishedAt: o.finishedAt, ok: true, partial: null, duration: o.seconds ?? 0 } : null,
       needsRecord: true,
-      /** The demo file is gone; `retake heal` writes it back. */
+      /** The demo file is gone; `retake demo heal` writes it back. */
       orphan: true,
     }));
 }
@@ -526,7 +526,13 @@ export function serve(port: number) {
         const watch = p.startsWith("/api/watch") ? await watchP : null;
         if (watch && await watch.handleApi(req, res, url, p, () => readBody(req))) return;
       } else if (p.startsWith("/watch")) { const watch = await watchP; if (watch?.handlePage(req, res, p)) return; }
-      if (p === "/" && req.method === "GET") {
+      // Watch is the front door: `/` opens it, and Demos lives at /demos.
+      // Without Watch the window is Demos alone, at `/` as it always was.
+      if (p === "/" && req.method === "GET" && await watchP) {
+        res.writeHead(302, { location: "/watch" + url.search, "cache-control": "no-store" });
+        return res.end();
+      }
+      if ((p === "/" || p === "/demos") && req.method === "GET") {
         // Never cached. The page carries this window's token and whatever the
         // build says today; a browser holding yesterday's copy is how somebody
         // ends up staring at a version that no longer exists and concluding
@@ -911,7 +917,7 @@ export function serve(port: number) {
         return json(res, 200, { ok: true });
       }
       // What is happening right now, read off disk rather than reported. A
-      // `retake run` in a terminal shows up here exactly like an agent's.
+      // `retake demo run` in a terminal shows up here exactly like an agent's.
       if (p === "/api/running" && req.method === "GET") return json(res, 200, { running: running(outRoot()) });
       if (p === "/api/activity" && req.method === "GET") return json(res, 200, withStaleness(activity));
 

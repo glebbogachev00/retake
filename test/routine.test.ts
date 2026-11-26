@@ -131,7 +131,7 @@ test("settings land with the settings, not after the steps", () => {
 test("the file round-trips, and a missing routine says what to do", () => {
   const { demos } = workspace(DRIFTED);
   assert.equal(readRoutines(demos), null);
-  assert.throws(() => pick(demos), /retake routine init/);
+  assert.throws(() => pick(demos), /retake demo routine init/);
 
   const data = starter();
   data.routines["techtutor-vn"] = RoutineSchema.parse({ voice: "vi-VN-HoaiMyNeural", style: "mobile" });

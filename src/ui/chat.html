@@ -445,8 +445,8 @@
   <div class="top">
     <div class="mark"><i></i><i></i><i></i><i></i></div>
     <h1>Retake</h1>
-    <!-- The window's two areas. Watch is a plug-in: without it there is one area, and no nav. -->
-    <nav class="areas" id="areas" hidden><a href="/" aria-current="page">Demos</a><a href="/watch">Watch</a></nav>
+    <!-- The window's two areas, Watch first. Without Watch there is one area, and no nav. -->
+    <nav class="areas" id="areas" hidden><a href="/watch">Watch</a><a href="/demos" aria-current="page">Demos</a></nav>
     <span class="sp"></span>
     <button class="chip" id="guideBtn" title="How to ask an agent for a good recording">Guide</button>
     <button class="chip" id="routineBtn" title="How every recording here looks and sounds">Routine</button>
@@ -1103,7 +1103,7 @@ $('routineBtn').onclick = async () => {
     if (about.brief) facts.push(['Brief', about.brief.exists ? `${esc(about.brief.path)} — what an agent reads before writing a step` : `<span class="miss">${esc(about.brief.path)} is missing</span>`]);
     if (name === data.use) facts.push(['Runs', data.schedule
       ? (data.schedule.live ? esc(data.schedule.text) + ' — by itself' : `<span class="miss">${esc(data.schedule.text)} — not loaded; schedule it again</span>`)
-      : 'when someone types <code>retake routine run</code> · <code>retake routine schedule weekdays 09:00</code> makes it run itself']);
+      : 'when someone types <code>retake demo routine run</code> · <code>retake demo routine schedule weekdays 09:00</code> makes it run itself']);
     if (about.environment) facts.push(['App', `${esc(about.environment.name || about.environment.path)}${about.environment.port ? ` on :${about.environment.port}` : ''} — started isolated and proven before every take`]);
     q('#rtStar').innerHTML = (font ? `<style>${font}</style>` : '') + `
       <h4>North star</h4>
@@ -1111,7 +1111,7 @@ $('routineBtn').onclick = async () => {
         ? `<p class="rt-why">The one video every recording is held to. A cut that does not match it never reaches the folder you post from.</p>
            <video src="/routine/${esc(name)}/reference" controls playsinline preload="metadata" class="${cur.style === 'mobile' ? 'tall' : ''}"></video>`
         : `<p class="rt-why">${ref ? `<span class="miss">${esc(ref.path)} is missing.</span> ` : 'None yet. '}The one video you would be happy to get every time — its cards, colours and shape become the routine's.</p>
-           <code class="rt-cmd">retake routine reference &lt;video&gt;</code>`}
+           <code class="rt-cmd">retake demo routine reference &lt;video&gt;</code>`}
       ${cards}
       ${facts.length ? `<dl class="rt-facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}`;
   }
@@ -1443,7 +1443,7 @@ $('vidCover').onclick = () => setCover({ at: $('vid').currentTime });
 }
 
 // What you said was wrong here, and whether it still is. Reads the answer that
-// `retake fixed` already wrote — this never judges anything itself, so opening
+// `retake demo fixed` already wrote — this never judges anything itself, so opening
 // a demo costs nothing and a recording is never waiting on it.
 // Has anyone actually looked at this take, or was it only recorded? The
 // checks write a line each when they run; this reads it back. Anything
@@ -1950,7 +1950,7 @@ function drawProgress(a) {
 // What is actually happening, read from disk rather than reported.
 //
 // The panel above only ever knew what something chose to tell it, so a
-// `retake run` in a terminal was invisible — seventeen minutes of recording
+// `retake demo run` in a terminal was invisible — seventeen minutes of recording
 // and a blank window. Every run now writes its phase into its own folder, and
 // this reads it. An agent's work and a person's look the same here, because
 // they are the same thing.
@@ -2041,7 +2041,7 @@ setInterval(pollRunning, 2000);
   es.onerror = () => { es.close(); setTimeout(watchActivity, 3000); };
 }
 
-// Watch, when it is installed, is the window's second area.
+// Watch, when it is installed, is the window's first area.
 api('/api/watch/where').then(() => { $('areas').hidden = false; }).catch(() => {});
 (async () => { settings = await api('/api/settings').catch(() => null); await drawDemos(); await newest(); watchActivity(); setInterval(drawDemos, 30000); })();
 </script>

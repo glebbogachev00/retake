@@ -199,7 +199,7 @@ export async function ensureShareServer(root: string): Promise<number> {
     if (await shareServerUp(port)) return port;
     try { await serveShares(root, port); return port; } catch { /* taken: try the next */ }
   }
-  throw new Error(`ports ${SHARE_PORT}-${SHARE_PORT + 9} are all taken; run \`retake share --serve --port <free port>\` yourself`);
+  throw new Error(`ports ${SHARE_PORT}-${SHARE_PORT + 9} are all taken; run \`retake demo share --serve --port <free port>\` yourself`);
 }
 
 export const shareUrl = (name: string, port = SHARE_PORT) => `http://localhost:${port}/${name}/`;

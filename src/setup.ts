@@ -283,7 +283,7 @@ export function environmentYaml(o: { name: string; command: string; cwd: string;
     expect: { path: o.path, present: o.present, absent: [] },
   });
   doc.commentBefore = [
-    ` The app under test, declared — drafted by \`retake routine setup\`.`,
+    ` The app under test, declared — drafted by \`retake demo routine setup\`.`,
     ` It runs on its own port so your open tabs cannot reach it.`,
   ].join("\n");
   const env = doc.getIn(["start", "env"], true) as YAML.YAMLMap | undefined;
@@ -305,7 +305,7 @@ export function briefMarkdown(o: {
   return [
     `# Recording ${o.title} — the brief`,
     ``,
-    `Read all of this before writing a step. Drafted by \`retake routine setup\`;`,
+    `Read all of this before writing a step. Drafted by \`retake demo routine setup\`;`,
     `every rule added below should be one that cost a take. If something here is`,
     `wrong, fix this file — the next agent reads it first.`,
     ``,
@@ -313,10 +313,10 @@ export function briefMarkdown(o: {
     ``,
     o.reference
       ? `A video that looks and sounds like the north star: \`${o.reference}\`${o.facts ? ` (${o.facts})` : ""}. Watch it first.`
-      : `No north star yet. \`retake routine reference <video>\` sets the one every cut is held to.`,
+      : `No north star yet. \`retake demo routine reference <video>\` sets the one every cut is held to.`,
     ``,
     `The \`${o.name}\` routine stamps the format, voice, cards and colours onto every`,
-    `manifest (\`retake routine\` shows it). Never set \`preset\`, \`layout\`, \`scale\`,`,
+    `manifest (\`retake demo routine\` shows it). Never set \`preset\`, \`layout\`, \`scale\`,`,
     `\`captions\`, \`theme\`, \`card\`, \`intro\`, \`outro\`, \`voiceover.voice\`, \`voiceover.ratePercent\`,`,
     `\`voiceover.align\` or \`music\` yourself.`,
     ``,
@@ -332,15 +332,15 @@ export function briefMarkdown(o: {
     o.local
       ? [
           `Record against \`${o.url}\` only — the isolated instance in \`${o.environment}\`.`,
-          `\`retake env up\` starts it, resets it and proves it before anything records.`,
+          `\`retake demo env up\` starts it, resets it and proves it before anything records.`,
           o.blank.length ? `These are blanked so a take cannot reach real data: ${o.blank.map((b) => `\`${b}\``).join(", ")}.` : `Nothing in its .env files reaches a real account.`,
-          `Never open a browser tab on it yourself; probe with \`retake dry\`.`,
+          `Never open a browser tab on it yourself; probe with \`retake demo dry\`.`,
         ].join("\n")
       : `A live site: \`${o.url}\`. There is nothing to start or reset — a take shows what the site shows that day.`,
     ``,
     `## Selectors seen on the first screen`,
     ``,
-    `Seen by \`retake routine setup\`, not yet proven by a dry run. Move a row to`,
+    `Seen by \`retake demo routine setup\`, not yet proven by a dry run. Move a row to`,
     `"verified" once a dry run has resolved it.`,
     ``,
     `| What | Selector |`,
@@ -354,10 +354,10 @@ export function briefMarkdown(o: {
     `## Recording`,
     ``,
     "```bash",
-    ...(o.local ? [`retake env up                       # isolated, reset, proven`] : []),
-    `retake validate demos/<name>.yaml   # warnings mean something is wrong`,
-    `retake dry demos/<name>.yaml        # every selector, no camera`,
-    `retake routine run                  # record → render → check → deliver`,
+    ...(o.local ? [`retake demo env up                       # isolated, reset, proven`] : []),
+    `retake demo validate demos/<name>.yaml   # warnings mean something is wrong`,
+    `retake demo dry demos/<name>.yaml        # every selector, no camera`,
+    `retake demo routine run                  # record → render → check → deliver`,
     "```",
     ``,
   ].join("\n");
@@ -611,7 +611,7 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
   const name = o.name ?? productName(o.url, projectDir ?? undefined);
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error("the name must be kebab-case — pass --as <name>");
   const existing = readRoutines(o.demosDir);
-  if (existing?.routines[name]) throw new Error(`a routine called "${name}" already exists — \`retake routine use ${name}\`, or pass --as <another-name>`);
+  if (existing?.routines[name]) throw new Error(`a routine called "${name}" already exists — \`retake demo routine use ${name}\`, or pass --as <another-name>`);
 
   const wrote: string[] = [];
   const next: string[] = [];
@@ -644,7 +644,7 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
     o.log(`  north star  ${facts} — the format: ${look.style}${look.cards ? `, opening and closing cards${look.card?.ornament ? " with corner circles" : ""}` : ", no cards"}`);
     for (const n of look.notes) o.log(`             ${n}`);
   } else {
-    next.push(`retake routine reference <video>   — the one cut you would be happy to get every time; the cards and colours come from it`);
+    next.push(`retake demo routine reference <video>   — the one cut you would be happy to get every time; the cards and colours come from it`);
   }
 
   // 2 · the app — for a local one, its own isolated instance. Nothing below
@@ -674,7 +674,7 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
     try {
       await bringUp(loadEnvSpec(environment), (l) => o.log(`  ${l.trim()}`));
     } catch (e) {
-      next.unshift(`the isolated app did not start: ${(e as Error).message}. Fix that, then \`retake env up\`.`);
+      next.unshift(`the isolated app did not start: ${(e as Error).message}. Fix that, then \`retake demo env up\`.`);
       target = "";
     }
   }
@@ -702,7 +702,7 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
     }
     if (look?.cards) {
       if (read.logo) { logo = rel(read.logo); wrote.push(logo); o.log(`  mark        ${logo}`); }
-      else next.push(`no mark the card can draw was found on the page (an SVG or a large PNG) — put one at demos/brand/${name}-mark.svg, then \`retake routine set logo <file>\``);
+      else next.push(`no mark the card can draw was found on the page (an SVG or a large PNG) — put one at demos/brand/${name}-mark.svg, then \`retake demo routine set logo <file>\``);
     }
     if (environment && seen.length) {
       // Proof the right app answered: two things the first screen showed.
@@ -733,7 +733,7 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
     inheritVoice: current ? { voice: current.voice, rate: current.rate } : undefined,
     reference: reference && rel(reference), brief: rel(brief), environment: environment && rel(environment), logo, brand,
   });
-  if (!brand && look?.card) next.push(`the app's colours could not be read, so the cards and frame use the north star's — \`retake routine set brand ground=#… matte=#…\``);
+  if (!brand && look?.card) next.push(`the app's colours could not be read, so the cards and frame use the north star's — \`retake demo routine set brand ground=#… matte=#…\``);
   const file = existing ?? starter();
   if (!existing) delete (file.routines as Record<string, Routine>).default;
   file.routines[name] = routine;
@@ -747,9 +747,9 @@ export async function setupProduct(o: SetupOptions): Promise<SetupResult> {
     const [ref] = await measure([{ name, file: reference }], ffmpegBin());
     for (const g of preflightAgainst(ref, routine)) next.push(g);
   }
-  if (look?.cards) next.push(`the north star closes on a card, and its words cannot be read off a video — \`retake routine set outro "<its line>"\``);
-  if (environment && target) next.push(`the isolated app is still running on ${new URL(target).host} — \`retake env down\` stops it`);
+  if (look?.cards) next.push(`the north star closes on a card, and its words cannot be read off a video — \`retake demo routine set outro "<its line>"\``);
+  if (environment && target) next.push(`the isolated app is still running on ${new URL(target).host} — \`retake demo env down\` stops it`);
   if (environment) next.push(`name one thing from your real data in ${rel(environment)} → expect.absent — the check that catches a leak before it is recorded`);
-  if (previous && previous !== name) next.push(`\`retake routine use ${previous}\` switches back`);
+  if (previous && previous !== name) next.push(`\`retake demo routine use ${previous}\` switches back`);
   return { name, routine, wrote, next };
 }

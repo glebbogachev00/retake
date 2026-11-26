@@ -160,8 +160,8 @@ No secret ever lives in a journey.
 
 ```
 retake watch                          each journey and where it stands
-retake watch run <journey|all>        run them now (--headed to see the browser)
-retake watch accept <journey>         the last run is the new normal
+retake watch run <journey|all>   run them now (--headed to see the browser)
+retake watch accept <journey>    the last run is the new normal
 retake watch schedule daily|weekdays|off [--at HH:MM]   the nightly run (03:00 unless said)
 ```
 
@@ -214,7 +214,7 @@ After that only a person moves it: **Accept as normal** in the window, or
 
 `retake watch schedule daily` asks the machine's scheduler (launchd on a Mac,
 cron on Linux) to run `retake watch run all --scheduled` at 03:00. It has its
-own label, so it never replaces a `retake routine schedule`. With nothing
+own label, so it never replaces a `retake demo routine schedule`. With nothing
 changed it is silent. When something changed or failed it sends one
 notification, for example "1 journey changed since last night: Portal –
 licences". Unchanged nights are tidied as the next one runs: only the newest

@@ -210,7 +210,7 @@ export function writeRoutines(demosDir: string, data: RoutineFile): void {
 
 export function pick(demosDir: string, name?: string): { name: string; routine: Routine } {
   const file = readRoutines(demosDir);
-  if (!file) throw new Error("no routine yet — `retake routine init` writes one, then `retake routine` shows it");
+  if (!file) throw new Error("no routine yet — `retake demo routine init` writes one, then `retake demo routine` shows it");
   const which = name ?? file.use;
   const routine = file.routines[which];
   if (!routine) throw new Error(`no routine called "${which}" — have: ${Object.keys(file.routines).join(", ")}`);
@@ -358,10 +358,10 @@ export function describe(name: string, r: Routine): string {
     ...(r.reference ? [`  north star ${r.reference}`] : []),
     ...(r.deliver ? [`  delivers  ${r.deliver} — only videos that match the north star`] : []),
     ...(r.brief ? [`  brief      ${r.brief} — read it before writing anything for this product`] : []),
-    ...(r.environment ? [`  app        ${r.environment} — \`retake env up\` starts it isolated and proves it`] : []),
+    ...(r.environment ? [`  app        ${r.environment} — \`retake demo env up\` starts it isolated and proves it`] : []),
     ``,
     `  Every demo recorded by this routine comes out this way. Change it here,`,
-    `  never per video: \`retake routine set <key> <value>\`.`,
+    `  never per video: \`retake demo routine set <key> <value>\`.`,
   ].join("\n");
 }
 
@@ -579,7 +579,7 @@ export async function runRoutine(o: RoutineRun): Promise<ItemResult[]> {
       // Two in a row usually means the app is not up, not that two demos are
       // wrong. Stopping costs one failure; carrying on costs the whole batch.
       if (results.slice(-2).length === 2 && results.slice(-2).every((x) => x.status === "failed")) {
-        o.log(`\nstopped after two failures in a row — is the app running? Start it, then \`retake routine run\` again; the ones already finished are skipped.`);
+        o.log(`\nstopped after two failures in a row — is the app running? Start it, then \`retake demo routine run\` again; the ones already finished are skipped.`);
         break;
       }
       continue;

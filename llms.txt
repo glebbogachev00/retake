@@ -2,6 +2,8 @@
 
 > Demo-as-code for coding agents: a YAML manifest in, a product walkthrough video out. Rerun the demo instead of re-recording it.
 
+Retake has two areas: Watch (`retake watch`, testing you can watch: your agent runs your app's key flows and says what broke or looks unclear) and Demos (`retake demo`, product walkthrough videos from a short YAML manifest). Shared commands stay top-level: install, ui, login, logins, doctor, tidy. The old top-level names (`retake run`) still work; write the new ones.
+
 An agent that was handed this repository should read README.md first — its "If you are a coding agent" section is the setup sequence — then AGENTS.md (the CLI loop, manifests, logins, what trips agents up) and skill/SKILL.md (the method Claude Code loads as a skill).
 
 - README.md: https://raw.githubusercontent.com/glebbogachev00/retake/main/README.md
