@@ -12,7 +12,8 @@
         "Retake notices when you deploy a new version and checks your app again within minutes. When nothing changed, you hear nothing.",
         "One switch turns on both: the check every night, and the check after each new version.",
         "Try it with one line: npx retake-demos followed by your app's address. There is nothing to set up first. Retake opens its window on your app and starts looking around, and you can have your first check running in about a minute.",
-        "Retake's commands now come in two groups: retake watch for checking your app, and retake demo for videos. The old names still work, so nothing you already use breaks."
+        "Retake's commands now come in two groups: retake watch for checking your app, and retake demo for videos. The old names still work, so nothing you already use breaks.",
+        "Smaller fixes: the contact sheet shows each moment of the video once, all the way to the last frame; checking a demo now tells you the real size of the finished video and points out a setting it does not recognise; and a recording of the Watch screen keeps its buttons in view at every video size."
       ]
     },
     {

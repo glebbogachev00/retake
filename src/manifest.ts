@@ -631,6 +631,48 @@ function appRules(m: z.infer<typeof ManifestShape>, ctx: z.RefinementCtx): void 
 
 export type LoadedManifest = { manifest: Manifest; file: string; dir: string };
 
+/* A key the schema does not know is dropped without a word, so a typo such as
+   `captionz: false` validated as "ok" and the demo quietly kept its captions.
+   Steps were already strict; everything else is listed here and said out loud
+   by warnings(), with the nearest real key. A warning, not an error, so a
+   manifest written by another version still runs. */
+const UNKNOWN = new WeakMap<object, string[]>();
+type Def = { type?: string; innerType?: z.ZodType; options?: z.ZodType[]; in?: z.ZodType; shape?: Record<string, z.ZodType> };
+const defOf = (s: z.ZodType): Def => (s as unknown as { _zod: { def: Def } })._zod.def;
+function shapesOf(s: z.ZodType): Record<string, z.ZodType>[] {
+  const d = defOf(s);
+  if (d.type === "object") return [(s as unknown as { shape: Record<string, z.ZodType> }).shape];
+  if (d.innerType) return shapesOf(d.innerType);              // optional, nullable, default, prefault
+  if (d.options) return d.options.flatMap(shapesOf);          // union
+  if (d.in) return shapesOf(d.in);                            // pipe, transform
+  return [];
+}
+function distance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]; row[0] = i;
+    for (let j = 1; j <= b.length; j++) { const t = row[j]; row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; }
+  }
+  return row[b.length];
+}
+/** Every key in `data` that `schema` would drop, as a sentence with the nearest real key. */
+export function unknownKeys(schema: z.ZodType, data: unknown, at = ""): string[] {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return [];
+  const shapes = shapesOf(schema);
+  if (!shapes.length) return [];
+  const known = [...new Set(shapes.flatMap((sh) => Object.keys(sh)))];
+  const out: string[] = [];
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (!known.includes(key)) {
+      const near = known.map((k) => [k, distance(key.toLowerCase(), k.toLowerCase())] as const).sort((x, y) => x[1] - y[1])[0];
+      out.push(`\`${at}${key}\` is not a manifest key, so it is ignored${near && near[1] <= Math.max(2, Math.floor(key.length / 3)) ? ` — did you mean \`${at}${near[0]}\`?` : ""}`);
+      continue;
+    }
+    for (const sh of shapes) if (sh[key]) { out.push(...unknownKeys(sh[key], value, `${at}${key}.`)); break; }
+  }
+  return out;
+}
+
 export function loadManifest(file: string): LoadedManifest {
   const abs = path.resolve(file);
   const raw = fs.readFileSync(abs, "utf8");
@@ -662,6 +704,7 @@ export function loadManifest(file: string): LoadedManifest {
   // A fixture page can live next to its manifest: `url: file://./page.html`
   // resolves against the manifest's folder, so a cloned repo's demos work.
   const m = parsed.data;
+  UNKNOWN.set(m, unknownKeys(ManifestShape, data));
   const rel = /^file:\/\/(\.{1,2}\/.*)$/.exec(m.url);
   if (rel) m.url = "file://" + path.resolve(dir, rel[1]);
   return { manifest: m, file: abs, dir };
@@ -727,12 +770,15 @@ export function warnings(m: Manifest): string[] {
   // A held opening frame is the point of a launch cut, not a mistake.
   const launch = m.mode === "launch";
   if (m.viewport) {
-    const p = PRESETS[m.preset] ?? PRESETS[DEFAULT_PRESET];
-    const band = m.captions === false ? 0 : p.bandHeight;
-    if (m.viewport.width !== p.width || m.viewport.height !== p.height - band) {
-      w.push(`\`viewport\` overrides the preset, so this video will be ${m.viewport.width}×${m.viewport.height + band} instead of ${p.name}'s ${p.width}×${p.height}. Two demos of the same app then come out different shapes and players letterbox them. Drop \`viewport\` unless the app genuinely needs it.`);
+    const q = resolve(m);
+    const area = { w: q.width, h: q.height - (q.layout === "band" ? q.bandHeight : 0) };
+    if (m.viewport.width !== area.w || m.viewport.height !== area.h) {
+      // Render always delivers the preset's frame; a different page is fitted into it.
+      const sameShape = Math.abs(m.viewport.width / m.viewport.height - area.w / area.h) < 0.01;
+      w.push(`\`viewport\` overrides the preset: the page records at ${m.viewport.width}×${m.viewport.height} and is ${sameShape ? "scaled" : "fitted, with margins,"} into ${q.name}'s ${q.width}×${q.height} video${q.layout === "band" && q.bandHeight ? ` (${area.w}×${area.h} above the captions)` : ""}. Drop \`viewport\` unless the app genuinely needs it.`);
     }
   }
+  for (const u of UNKNOWN.get(m) ?? []) w.push(u);
   // A navigation that only changes the #fragment does not reload the document.
   // An SPA keeps every bit of in-memory state, so a stub armed just before it
   // is never fetched — and the screen looks plausible, just stale, which is
