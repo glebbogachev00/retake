@@ -24,6 +24,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/landing.css">
 <link rel="stylesheet" href="/split.css">
+<link rel="stylesheet" href="/watch-landing.css">
 <script src="/landing.js" defer></script>
 <script src="/split.js" defer></script>
 </head>
@@ -31,7 +32,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="header wrap">
   <a class="brand" href="#" aria-label="Retake home"><svg class="mark" viewBox="0 0 64 64" width="29" height="29" aria-hidden="true" focusable="false"><rect class="mark-tile" width="64" height="64" rx="14"/><rect class="take t1" x="16" y="12" width="12" height="6" rx="3"/><rect class="take t2" x="16" y="21" width="20" height="6" rx="3"/><rect class="take t4" x="16" y="39" width="20" height="6" rx="3"/><rect class="take t5" x="16" y="48" width="12" height="6" rx="3"/><rect class="take keep" x="16" y="30" width="36" height="6" rx="3"/></svg><span>Retake</span></a>
-  <nav aria-label="Main navigation"><a href="#examples">Examples</a><a href="#workflow">How it works</a><a href="/docs/">Docs <span aria-hidden="true">↗</span></a></nav>
+  <nav aria-label="Main navigation"><a href="#watch">Watch</a><a href="#examples">Demos</a><a href="#workflow">How it works</a><a href="/docs/">Docs <span aria-hidden="true">↗</span></a></nav>
   <div class="header-actions"><a class="mobile-docs" href="/docs/">Docs</a><a class="nav-cta" href="#connect"><span class="desktop-setup-label">Connect your agent</span><span class="mobile-setup-label">Setup</span><span aria-hidden="true">↗</span></a></div>
 </header>
 <main id="main">
@@ -41,7 +42,7 @@
     <div class="hero-copy">
     <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> An open-source tool for coding agents</p>
     <h1 id="hero-title">Video recording<br>for your <span class="agent-word">coding agent<span class="bracket left" aria-hidden="true"></span><span class="bracket right" aria-hidden="true"></span></span>.</h1>
-    <p class="lede">Tell your agent what to show in a web app.<br class="wide-only"> It records the walkthrough. You review the take.</p>
+    <p class="lede">Tell your agent what to show, or what to check.<br class="wide-only"> It records it. You review the take.</p>
     <div class="hero-actions"><a class="button primary" href="#connect">Connect your agent <span aria-hidden="true">↗</span></a><a class="button quiet" href="#examples" id="watch-demo"><span class="play-triangle" aria-hidden="true"></span> Watch the narrated demo</a></div>
     <p class="hero-note">Voiceover optional <span>·</span> Captions optional <span>·</span> Runs on your machine</p>
     </div>
@@ -62,8 +63,44 @@
     <div class="timeline" aria-hidden="true"><div class="timeline-ticks"></div><span class="timeline-head"></span><span class="tl-time t0">00:00</span><span class="tl-time t1">00:15</span><span class="tl-time t2">00:30</span><span class="tl-time t3">00:45</span><span class="tl-time t4">01:00</span></div>
   </section>
 
+  <section class="watch-section wrap" id="watch" aria-labelledby="watch-title">
+    <div class="section-marker"><span>Retake Watch</span><span class="mono marker-right">retake watch</span></div>
+    <div class="watch-grid">
+      <div class="watch-copy">
+        <h2 id="watch-title">Retake Watch<br><span>Testing you can watch.</span></h2>
+        <p class="watch-lede">Your agent runs your app’s key flows in a real browser. Watch it live or replay it, and say where something looks unclear.</p>
+        <ul class="watch-points">
+          <li><strong>Live, or as a replay.</strong> Each step at your pace, or the finished session later.</li>
+          <li><strong>Your notes become fixes.</strong> Press Unclear, say why, and the note goes to your agent.</li>
+          <li><strong>Checked after deploys, and every night.</strong> Silent unless something changed.</li>
+        </ul>
+        <div class="watch-start"><code>npx retake-demos https://your.app</code><span>Opens Retake on your machine and suggests what to watch. Nothing to set up.</span></div>
+        <a class="setup-docs-link" href="/docs/watch">How Watch works ↗</a>
+      </div>
+      <figure class="watch-shot">
+        <div class="wscreen" role="img" aria-label="The Retake Watch window during a test of a room-booking app, at Step pace. The step Book Juniper, expecting the booking form, has passed. Under it are the Next and Unclear buttons and a note field, and the step list, where Open Juniper carries the note: Which time zone are these times in?">
+          <div class="ws-chrome" aria-hidden="true"><span class="ws-dots"><i></i><i></i><i></i></span><span class="ws-url">localhost:4310/watch</span></div>
+          <div class="ws-main" aria-hidden="true">
+            <div class="ws-head"><span class="ws-back">‹</span><span class="ws-title">Larkspur · Book a room</span><span class="ws-seg"><span>Watch</span><span class="on">Step</span><span>Fast</span></span></div>
+            <div class="ws-stage"><div class="ws-page"><div class="ws-nav"><i></i><i></i><i></i></div><div class="ws-h">Juniper · Floor 3</div><div class="ws-lines"><i></i><i class="short"></i></div><div class="ws-cards"><i></i><i></i></div><div class="ws-cta">Book Juniper</div><svg class="ws-cursor" viewBox="0 0 12 18" width="12" height="18"><path d="M1 1v14l3.6-3.4 2.4 5.4 2.2-1-2.4-5.3H12z" fill="#1b1b19" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg></div></div>
+            <p class="ws-now">Book Juniper <span class="ws-exp">— expecting the booking form</span></p>
+            <p class="ws-verdict"><b>Passed</b> — The form opens with Juniper filled in</p>
+            <div class="ws-act"><span class="ws-btn go">Next</span><span class="ws-btn">Unclear<kbd>U</kbd></span><span class="ws-note">Note on this moment…</span></div>
+            <ol class="ws-steps">
+              <li class="pass"><span class="ws-h2">Book a room</span><span class="row"><span class="m">✓</span><span>Sign in as Maya</span></span></li>
+              <li class="pass"><span class="row"><span class="m">✓</span><span>Open Rooms</span></span></li>
+              <li class="flagged"><span class="row"><span class="m">⚑</span><span>Open Juniper<span class="n">“Which time zone are these times in?”</span></span></span></li>
+              <li class="pass"><span class="row"><span class="m">✓</span><span>Book Juniper</span></span></li>
+            </ol>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
   <section class="example-section wrap" id="examples" aria-labelledby="examples-title">
-    <div class="section-marker"><span id="examples-title">One tool. Different things to show.</span><span class="mono marker-right">Real recordings, not mockups</span></div>
+    <div class="section-marker"><span>Retake Demos</span><span class="mono marker-right">retake demo · Real recordings, not mockups</span></div>
+    <div class="section-heading"><h2 id="examples-title">Retake Demos<br><span>One tool. Different things to show.</span></h2><p>Product videos, lessons and walkthroughs, recorded from the real app by your agent.</p></div>
     <div class="example-shell">
       <div class="example-tabs" role="tablist" aria-label="Recording examples">
         <button id="tab-product" role="tab" aria-selected="true" aria-controls="example-panel" tabindex="0" data-example="product"><span class="tab-index">01</span> Product videos</button>
@@ -83,9 +120,10 @@
         </figure>
       </div>
     </div>
-    <div class="example-meta"><p class="example-footnote" id="example-footnote">The full Capture video published on X, with its original voiceover. The example brief is illustrative.</p><a id="example-source" href="https://x.com/trycapturez/status/2102280223316471854">View on X ↗</a></div><div class="usecase-tags" aria-label="Recording use cases"><span>Product demos</span><span>Content for X</span><span>Lessons &amp; tutorials</span><span>Client walkthroughs</span></div>
+    <div class="example-meta"><p class="example-footnote" id="example-footnote">The full Capture video published on X, with its original voiceover. The example brief is illustrative.</p><a id="example-source" href="https://x.com/trycapturez/status/2102280223316471854">View on X ↗</a></div>
     <div class="proof-strip"><p>Built while recording<br><strong>real work.</strong></p><a href="https://www.trycapture.app" class="capture-wordmark">capture<span>.</span></a><a href="https://techtutor.academy" class="techtutor-wordmark">Tech<span>Tutor</span><small>Lessons &amp; coding projects</small></a><a href="https://github.com/glebbogachev00/retake" class="retake-wordmark"><img src="/favicon.svg" width="23" height="23" alt="">Retake<small>Product walkthroughs</small></a></div>
   </section>
+  <p class="works-with wrap">Works with websites, web apps and Mac apps.</p>
 
   <section class="workflow-section wrap" id="workflow" aria-labelledby="workflow-title">
     <div class="section-marker"><span>01 / The workflow</span><span class="mono marker-right">You direct. Your agent records.</span></div>
