@@ -290,6 +290,7 @@ assert.ok(notice, "a changed night is not silent");
 await viewer.setViewportSize({ width: 1040, height: 760 });
 await viewer.goto(UI + "/watch");
 await viewer.waitForSelector("ul.cards");
+await sleep(600);   // the page fades in
 {
   const m = await box(".more");
   await grab("journeys", { x: 0, y: 0, width: 1040, height: m.y + m.height + 30 });

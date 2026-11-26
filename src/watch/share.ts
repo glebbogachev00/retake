@@ -4,10 +4,11 @@
     Watch already keeps. The page says how things stand in one line, then
     shows one thing at a time, in the window's order: what needs a look
     first (journeys stopped by the same missing sign-in are one item), then
-    the rest. Each has a picture of its problem, its replay (loaded only when
+    the rest. A list of every one sits beside it (a sheet on a phone), so any
+    journey is one click away. Each has a picture of its problem, its replay (loaded only when
     it is the one on screen, and paced like the window's: a hold at each
-    step's end), and its steps with pass or fail. Next moves on; "3 of 12"
-    opens an index; the address keeps the place, so a link can point at one.
+    step's end), and its steps with pass or fail. Next moves on, or pick one
+    in the list; the address keeps the place, so a link can point at one.
 
     The page holds only videos, pictures and text. No token, no login, no
     address of the window, and none of the person's notes unless they ask
@@ -119,7 +120,9 @@ export function buildWatchShare(o: { root: string; outRoot: string; what: string
   } else {
     const sites = groupByApp(o.root, named.map((t) => ({ name: t.journey! })));
     for (const s of sites) {
-      const g = groupName(s.items.map((i) => titles.get(i.name)!), s.host);
+      // Named from the journeys listed under it; those needing a look are listed first, on their own.
+      const quiet = s.items.filter((i) => { const st = readLast(o.root, i.name)?.status; return st !== "failed" && st !== "changed"; });
+      const g = groupName((quiet.length ? quiet : s.items).map((i) => titles.get(i.name)!), s.host);
       for (const i of s.items) groupOf.set(i.name, sites.length > 1 ? g : { name: projects.find((p) => p.journeys.includes(i.name))?.name ?? g.name, short: g.short });
     }
   }
@@ -287,16 +290,34 @@ ${brandCss()}
   ol.steps .n { display:block; color:var(--muted); }
   .notes { margin-top:14px; padding:12px 16px; background:var(--amber-soft); border:1px solid var(--line-dark); border-radius:10px; font-size:14px; }
   .notes ul { margin:4px 0 0; padding-left:18px; }
-  .pager { display:flex; justify-content:flex-end; align-items:center; gap:12px; margin:22px 0 0; position:relative; }
+  /* The list: every journey, always there on a wide screen, a sheet on a phone. */
+  .layout { display:grid; grid-template-columns:280px minmax(0, 1fr); gap:44px; align-items:start; }
+  .list { position:sticky; top:16px; max-height:calc(100vh - 32px); overflow:auto; padding:4px 0 12px; border-right:1px solid var(--line); }
+  .list p { margin:16px 12px 6px 0; font-size:12px; color:var(--muted); }
+  .list p:first-child { margin-top:4px; }
+  .list ol { list-style:none; margin:0; padding:0; }
+  .list button { position:relative; display:flex; gap:9px; align-items:baseline; width:100%; text-align:left; border:0; background:none; padding:7px 12px 7px 10px; font-size:14px; line-height:1.35; color:var(--ink); cursor:pointer; border-radius:0 6px 6px 0; }
+  .list button:hover { background:var(--soft); }
+  .list button.fine { color:var(--muted); }
+  .list button[aria-current="true"] { background:var(--tint); color:var(--ink); }
+  .list button[aria-current="true"]::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--amber); }
+  .list button:focus-visible { outline:2px solid var(--amber-ink); outline-offset:-2px; }
+  .list .k { flex:none; width:12px; font-size:11px; font-weight:700; text-align:center; }
+  .list .k.failed, .list .k.signin { color:var(--fail); } .list .k.changed { color:var(--amber-ink); } .list .k.fine { color:var(--pass); font-weight:400; }
+  .where { display:none; }
+  .pager { display:flex; justify-content:flex-end; align-items:center; gap:14px; margin:22px 0 0; }
   .pager .quiet { font-size:13px; color:var(--muted); margin-right:auto; }
-  .count { background:none; border:0; color:var(--muted); font:12px var(--mono); cursor:pointer; padding:8px 4px; }
-  .count:hover { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
-  .index { position:absolute; right:0; bottom:calc(100% + 8px); z-index:5; width:min(420px, 100%); max-height:60vh; overflow:auto; background:var(--panel); border:1px solid var(--line-dark); border-radius:10px; box-shadow:var(--shadow); padding:8px; }
-  .index p { margin:8px 8px 4px; font-size:12px; color:var(--muted); }
-  .index a { display:flex; gap:10px; padding:7px 8px; border-radius:6px; font-size:14px; }
-  .index a:hover { background:var(--soft); } .index a[aria-current="true"] { background:var(--tint); }
-  .index a .s { margin-left:auto; color:var(--muted); font-size:12px; white-space:nowrap; }
-  .index a .s.failed, .index a .s.signin { color:var(--fail); } .index a .s.changed { color:var(--amber-ink); }
+  .pager .count { font:12px var(--mono); color:var(--muted); }
+  .sheet-bg { display:none; }
+  @media (max-width: 999px) {
+    .layout { grid-template-columns:minmax(0, 1fr); gap:0; }
+    .where { display:flex; justify-content:flex-end; margin:0 0 12px; }
+    .where button { border:1px solid var(--line-dark); background:var(--panel); color:var(--ink); border-radius:6px; padding:7px 12px; font:12px var(--mono); cursor:pointer; }
+    .list { position:fixed; left:0; right:0; bottom:0; top:auto; z-index:20; max-height:72vh; border:1px solid var(--line-dark); border-bottom:0; border-radius:14px 14px 0 0; background:var(--panel); box-shadow:var(--shadow); padding:10px 8px 24px; transform:translateY(105%); visibility:hidden; }
+    body.sheet .list { transform:none; visibility:visible; }
+    body.sheet .sheet-bg { display:block; position:fixed; inset:0; z-index:19; background:rgba(21,21,18,.32); }
+  }
+  @media (max-width: 999px) and (prefers-reduced-motion: no-preference) { .list { transition:transform .2s ease, visibility .2s; } }
   footer { border-top:1px solid var(--line); margin-top:48px; padding:22px 0 32px; display:flex; flex-wrap:wrap; gap:10px 24px; align-items:center; font-size:12px; color:var(--muted); }
   footer .rt-brand { font-size:15px; }
   footer a.site { margin-left:auto; font-family:var(--mono); }
@@ -311,9 +332,16 @@ ${brandCss()}
     <h1>${esc(o.title)}</h1>
     ${when ? `<p class="when">${esc(when)}</p>` : ""}
   </section>
-  <section class="item" id="item" aria-live="polite"></section>
-  <nav class="pager" aria-label="Journeys"><span class="quiet" id="quiet"></span><button class="count" id="count" type="button" aria-haspopup="true" aria-expanded="false"></button><button class="rt-btn go" id="next" type="button">Next</button><div class="index" id="index" hidden></div></nav>
+  <div class="layout">
+    <nav class="list" id="list" aria-label="Every journey on this page"></nav>
+    <div class="col">
+      <div class="where"><button type="button" id="all" aria-controls="list" aria-expanded="false"></button></div>
+      <section class="item" id="item" aria-live="polite"></section>
+      <div class="pager"><span class="quiet" id="quiet"></span><span class="count" id="count"></span><button class="rt-btn go" id="next" type="button">Next</button></div>
+    </div>
+  </div>
 </main>
+<div class="sheet-bg" id="sheetbg"></div>
 <footer class="wrap"><span class="rt-brand">${markSvg(20)}<span>Retake</span></span><span>Every run is a real browser, driven by a script.</span><a class="site" href="https://www.useretake.app">useretake.app</a></footer>
 <script>${pacerSource()}</script>
 <script>
@@ -328,7 +356,7 @@ const pic = (p) => '<div class="pic"><span class="holder"><img src="' + esc(p.sr
 function show(i) {
   at = i;
   const v = V[i];
-  let h = '<p class="status ' + v.kind + '">' + esc(v.line) + (v.group ? ' <span class="group">· ' + esc(v.group) + "</span>" : "") + "</p><h2>" + esc(v.group ? v.short : v.title) + "</h2>";
+  let h = '<p class="status ' + v.kind + '">' + esc(v.line) + (v.group ? ' <span class="group">· ' + esc(v.group) + "</span>" : "") + "</p><h2>" + esc(v.group && !loud(v) ? v.short : v.title) + "</h2>";
   if (v.reason) h += '<p class="reason">' + esc(v.reason) + "</p>";
   if (v.journeys && v.journeys.length > 1) h += '<ul class="who">' + v.journeys.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul>";
   if ((v.removed && v.removed.length) || (v.added && v.added.length)) h += '<div class="diff">' + (v.removed || []).map((t) => '<div class="gone">' + esc(t) + "</div>").join("") + (v.added || []).map((t) => '<div class="new">' + esc(t) + "</div>").join("") + "</div>";
@@ -342,9 +370,11 @@ function show(i) {
   if (v.notes.length) h += '<div class="notes"><span class="rt-label">Notes</span><ul>' + v.notes.map((n) => "<li>" + (n.step ? "Step " + n.step + ": " : "") + esc(n.text) + "</li>").join("") + "</ul></div>";
   $("item").innerHTML = h;
   $("count").textContent = i + 1 + " of " + V.length;
+  $("all").textContent = i + 1 + " of " + V.length + " · All ▾";
+  document.querySelectorAll("#list button").forEach((b) => b.setAttribute("aria-current", String(+b.dataset.i === i)));
+  const cur = document.querySelector('#list button[data-i="' + i + '"]'); if (cur) cur.scrollIntoView({ block: "nearest" });
   $("next").disabled = i + 1 >= V.length;
   $("quiet").textContent = loud(v) && V[i + 1] && !loud(V[i + 1]) ? "Nothing else needs a look" : "";
-  $("index").hidden = true; $("count").setAttribute("aria-expanded", "false");
   const vid = $("vid");
   function line() {
     const vd = $("vid"); if (!vd) return;
@@ -375,20 +405,33 @@ function show(i) {
     track.addEventListener("pointerdown", (e) => { seek(e); track.setPointerCapture(e.pointerId); const mv = (ev) => seek(ev); track.addEventListener("pointermove", mv); track.addEventListener("pointerup", () => track.removeEventListener("pointermove", mv), { once: true }); });
   } else pace = null;
 }
-function go(i) { if (i < 0 || i >= V.length) return; history.replaceState(null, "", "#" + (i + 1)); show(i); scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }
+function go(i) { if (i < 0 || i >= V.length) return; history.replaceState(null, "", "#" + (i + 1)); show(i); if ($("item").getBoundingClientRect().top < 0) $("item").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }
 $("next").onclick = () => go(at + 1);
-$("count").onclick = () => {
-  const ix = $("index");
-  if (!ix.hidden) { ix.hidden = true; $("count").setAttribute("aria-expanded", "false"); return; }
-  let h = "", group;
+// The list: what needs a look first, each with its mark, then the rest by site, the fine ones quiet.
+{
+  let h = "", group = null;
+  const mark = { failed: "✕", signin: "✕", changed: "△", fine: "✓" };
   V.forEach((v, i) => {
     const g = loud(v) ? "Needs a look" : v.group || "Everything else";
-    if (g !== group) { group = g; h += "<p>" + esc(g) + "</p>"; }
-    h += '<a href="#' + (i + 1) + '" data-i="' + i + '"' + (i === at ? ' aria-current="true"' : "") + "><span>" + esc(loud(v) ? v.title : v.short) + '</span><span class="s ' + v.kind + '">' + esc(loud(v) ? v.line.split(" ")[0] : "✓") + "</span></a>";
+    if (g !== group) { if (group !== null) h += "</ol>"; group = g; h += "<p>" + esc(g) + "</p><ol>"; }
+    h += '<li><button type="button" class="' + v.kind + '" data-i="' + i + '"><span class="k ' + v.kind + '" aria-label="' + esc(v.line.split(" ")[0]) + '">' + mark[v.kind] + "</span><span>" + esc(loud(v) ? v.title : v.short) + "</span></button></li>";
   });
-  ix.innerHTML = h; ix.hidden = false; $("count").setAttribute("aria-expanded", "true");
-};
-$("index").onclick = (e) => { const a = e.target.closest("a"); if (!a) return; e.preventDefault(); go(+a.dataset.i); };
+  $("list").innerHTML = h + "</ol>";
+}
+const sheet = (open) => { document.body.classList.toggle("sheet", open); $("all").setAttribute("aria-expanded", String(open)); if (open) { const c = document.querySelector('#list button[aria-current="true"]'); if (c) c.focus(); } };
+$("list").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (!b) return; go(+b.dataset.i); sheet(false); };
+$("all").onclick = () => sheet(!document.body.classList.contains("sheet"));
+$("sheetbg").onclick = () => sheet(false);
+// ↑ and ↓ move through the list while it has the focus.
+$("list").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  e.preventDefault();
+  const all = [...document.querySelectorAll("#list button[data-i]")];
+  const k = all.indexOf(document.activeElement);
+  const n = all[Math.max(0, Math.min(all.length - 1, (k < 0 ? at : k) + (e.key === "ArrowDown" ? 1 : -1)))];
+  n.focus(); go(+n.dataset.i);
+});
+addEventListener("keydown", (e) => { if (e.key === "Escape") sheet(false); });
 // → is Next, except while typing somewhere.
 addEventListener("keydown", (e) => { if (e.key !== "ArrowRight" || e.metaKey || e.ctrlKey || e.altKey) return; const t = e.target; if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return; e.preventDefault(); go(at + 1); });
 addEventListener("hashchange", () => show(fromHash()));

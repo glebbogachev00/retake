@@ -244,8 +244,9 @@ new one named after it (`--project` to choose).
 `retake watch share <project|journey|session|all>` (MCP: `watch_share`; in
 the window, **Share** on a journey or under the list) builds one page to send
 a client or a partner: how the run stands in one line, then one thing at a
-time with Next and "3 of 12" (which opens an index; the address keeps the
-place). What needs a look comes first, each with a picture of the problem,
+time with Next and "3 of 12", and a list of every journey beside it (a sheet
+on a phone, under "3 of 12 · All") to jump to any one; the address keeps the
+place. What needs a look comes first, each with a picture of the problem,
 its replay and its steps; journeys stopped by the same missing sign-in are
 one item. It lives in `outputs/.shares/watch-<what>/` and holds only the
 runs' videos, pictures and words: no sign-ins, no tokens, and your notes

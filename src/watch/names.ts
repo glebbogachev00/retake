@@ -34,8 +34,11 @@ export function groupName(titles: string[], host: string | null): { name: string
     const words = titles.map((t) => t.split(/\s+/));
     let n = 0;
     while (words.every((w) => w[n] !== undefined && w[n].replace(/,$/, "") === words[0][n].replace(/,$/, ""))) n++;
-    const name = clean(words[0].slice(0, n).join(" "));
-    if (n && name.length >= 3) return { name, short: (t) => { const rest = clean(t.slice(name.length).replace(/^[\s,:;–—-]+/u, "")); return rest ? cap(rest) : t; } };
+    // Small words at the end say nothing about the app ("See the" is not a name), and one word rarely does.
+    const kept = words[0].slice(0, n).map((w) => w.replace(/,$/, ""));
+    while (kept.length && /^(the|a|an|of|to|and|in|on|for|with)$/i.test(kept.at(-1)!)) kept.pop();
+    const name = clean(kept.join(" "));
+    if (kept.length >= 2 && name.length >= 3) return { name, short: (t) => { if (!t.startsWith(name)) return t; const rest = clean(t.slice(name.length).replace(/^[\s,:;–—-]+/u, "")); return rest ? cap(rest) : t; } };
   }
   return { name: hostName(host) ?? host ?? "Other journeys", ...keep };
 }

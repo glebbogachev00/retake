@@ -236,10 +236,26 @@ test("the page you send: one thing at a time, Next and its count, the place kept
   await page.evaluate(() => (document.activeElement as HTMLElement).blur());
   await page.keyboard.press("ArrowRight");
   assert.equal(await page.textContent("#count"), "2 of 3");
-  await page.click("#count");
-  assert.equal(await page.isVisible("#index"), true, "the count opens the index");
-  await page.click('#index a[data-i="2"]');
+  // The list is always there on a wide screen: every journey is one click away.
+  assert.equal(await page.isVisible("#list"), true);
+  assert.deepEqual(await page.$$eval("#list p", (ps) => ps.map((p) => p.textContent)), ["Needs a look", "Shop"]);
+  await page.click('#list button[data-i="2"]');
   assert.equal(await page.textContent("#count"), "3 of 3");
+  assert.ok(page.url().endsWith("#3"));
+  assert.equal(await page.getAttribute('#list button[data-i="2"]', "aria-current"), "true");
+  // ↑ and ↓ move through it while it has the focus.
+  await page.focus('#list button[data-i="2"]');
+  await page.keyboard.press("ArrowUp");
+  assert.equal(await page.textContent("#count"), "2 of 3");
+  // On a phone the same list is a sheet, opened from "2 of 3 · All ▾".
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => getComputedStyle(document.getElementById("list")!).visibility === "hidden", null, { timeout: 3000 });
+  assert.equal(await page.textContent("#all"), "2 of 3 · All ▾");
+  await page.click("#all");
+  await page.waitForFunction(() => getComputedStyle(document.getElementById("list")!).visibility === "visible");
+  await page.click('#list button[data-i="0"]');
+  assert.equal(await page.textContent("#count"), "1 of 3");
+  await page.waitForFunction(() => !document.body.classList.contains("sheet"));
   const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
   assert.ok(!/retakeToken|x-retake-token|localhost:43|password/i.test(html), "no token, no window address, no sign-in");
   assert.ok(!/id="theme"/.test(html), "it follows the viewer's own theme: no button");
@@ -261,4 +277,12 @@ test("a share of a project holds only its runs' videos, pictures and words, and 
   const withNotes = buildWatchShare({ root, outRoot: path.join(root, "outputs"), what: "shop", notes: true });
   assert.ok(fs.readFileSync(path.join(withNotes.dir, "index.html"), "utf8").includes("a private note"));
   assert.deepEqual(fs.readdirSync(s.dir).sort(), ["index.html", "v"]);
+});
+
+test("a name is never made of small words, and a title that does not start with it is left whole", () => {
+  const g = groupName(["See the actions", "See the intentions"], null);
+  assert.notEqual(g.name, "See the");
+  assert.equal(g.short("Read a thread"), "Read a thread");
+  const s = groupName(["Sign-in screens", "Sign-in screens, on a phone"], null);
+  assert.equal(s.short("Read a thread"), "Read a thread");
 });

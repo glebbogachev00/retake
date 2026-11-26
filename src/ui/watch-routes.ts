@@ -185,6 +185,8 @@ export function watchRoutes(deps: WatchDeps) {
       const n = groupName((quiet.length ? quiet : g.items).map((r) => r.title), g.host);
       return { host: g.host, name: n.name, names: g.items.map((r) => r.name), short: Object.fromEntries(g.items.map((r) => [r.name, n.short(r.title)])) };
     });
+    // A project on one site needs no site name: the group is the project.
+    if (groups.length === 1 && chosen) groups[0].name = chosen.name;
     // The order the list shows and Next walks: what needs a look (failures, those sharing a
     // missing sign-in together, then changes), then the rest, site by site.
     const order: { name: string; href: string; loud: boolean }[] = [];
