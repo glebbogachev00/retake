@@ -1,0 +1,133 @@
+{
+ "rev": 1,
+ "board": {
+  "actions": [
+   {
+    "id": "a1",
+    "text": "Send the launch note to the three people who asked for it",
+    "done": false,
+    "at": 1791164604959,
+    "shelf": "days",
+    "expires": null,
+    "due": null,
+    "updatedAt": 1791164604959
+   },
+   {
+    "id": "a2",
+    "text": "Cut the onboarding copy down to one screen",
+    "done": false,
+    "at": 1791164604959,
+    "shelf": "weeks",
+    "expires": null,
+    "due": null,
+    "updatedAt": 1791164604959
+   },
+   {
+    "id": "a3",
+    "text": "Book the dentist before the month turns over",
+    "done": false,
+    "at": 1791164604959,
+    "shelf": "weeks",
+    "expires": null,
+    "due": null,
+    "updatedAt": 1791164604959
+   }
+  ],
+  "threads": [
+   {
+    "id": "t1",
+    "name": "Pricing",
+    "summary": "Leaning towards seats: small teams want to know the bill up front. Still open is what the smallest plan costs.",
+    "frags": [
+     {
+      "id": "f1",
+      "at": 1790673777086,
+      "text": "Usage-based feels fair on paper, but nobody can predict their bill."
+     },
+     {
+      "id": "f2",
+      "at": 1790932977086,
+      "text": "Two small teams said they would rather pay per seat and know the cost up front."
+     },
+     {
+      "id": "f4",
+      "at": 1791105777086,
+      "text": "If seats win, the real question is what the smallest plan should cost."
+     }
+    ],
+    "at": 1790673777086,
+    "updatedAt": 1791105777086,
+    "next": "Draft a one-page pricing outline for seats-only and send it to the two teams."
+   },
+   {
+    "id": "t2",
+    "name": "What the landing page should promise",
+    "summary": "The problem to open on, and the one sentence that names it.",
+    "frags": [
+     {
+      "id": "f3",
+      "at": 1791085404959,
+      "text": "Open on the pile of half-finished notes, not on the feature list."
+     }
+    ],
+    "at": 1791085404959,
+    "updatedAt": 1791085404959
+   }
+  ],
+  "intentions": [
+   {
+    "id": "dem0ship",
+    "number": 1,
+    "rawInput": "I want to stop sitting on work until it's perfect.",
+    "expandedIntention": "I am someone who ships small things often, and lets them be seen before they are finished.",
+    "recommendedActions": [
+     "I show the work on the day it works, not the day it is perfect.",
+     "I cut the scope instead of moving the date.",
+     "I let the first version be small enough to actually leave my hands."
+    ],
+    "counterIntentions": [
+     "I rewrite the same feature instead of releasing it.",
+     "I wait for a finished feeling that never arrives.",
+     "I call it research when I am avoiding the ship."
+    ],
+    "at": 1791085404959,
+    "updatedAt": 1791085404959
+   },
+   {
+    "id": "dem0clear",
+    "number": 2,
+    "rawInput": "I keep carrying the whole day home with me.",
+    "expandedIntention": "I am someone who ends the day clear, because everything that mattered was written down once and trusted.",
+    "recommendedActions": [
+     "I say the thought out loud the moment it arrives, and let it be filed.",
+     "I let a thing fade when it has stopped mattering.",
+     "I close the day by naming only what is actually next."
+    ],
+    "counterIntentions": [
+     "I keep lists I never read again.",
+     "I re-decide the same thing three times a week.",
+     "I carry unfinished decisions into the night."
+    ],
+    "at": 1791168204959,
+    "updatedAt": 1791168204959
+   }
+  ],
+  "principles": [],
+  "ledger": [],
+  "corrections": [],
+  "wraps": [],
+  "completions": [],
+  "routingSettlements": [],
+  "routingRetirements": [],
+  "historyImports": [],
+  "historyEpoch": 0,
+  "profile": {
+   "name": "Gleb",
+   "showSignature": false,
+   "updatedAt": 1791171804959,
+   "intentionShowcaseEnabled": false,
+   "pinnedIntentionIds": []
+  }
+ },
+ "tombstones": []
+}

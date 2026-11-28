@@ -571,6 +571,8 @@ export function whyNot(r: Pick<RunRecord, "error" | "status"> & { steps?: number
  */
 export async function addJourneys(o: {
   root: string; out: string; suggestion: Suggestion; pick: number[]; code?: Record<number, string>;
+  /** The project folder under watch/ they go in; none for watch/ itself. */
+  folder?: string | null;
   log?: (l: string) => void;
   run?: (a: { root: string; name: string; file: string; out: string }) => Promise<RunRecord>;
 }): Promise<Added[]> {
@@ -603,9 +605,11 @@ export async function addJourneys(o: {
     let r: RunRecord | null = null, error: string | null = null;
     try { r = await run({ root: o.root, name, file: staged, out: o.out }); } catch (e) { error = (e as Error).message.split("\n")[0]; }
     if (r && r.status !== "failed") {
-      fs.renameSync(staged, path.join(journeysDir(o.root), `${name}.mjs`));
+      const home = o.folder ? path.join(journeysDir(o.root), o.folder) : journeysDir(o.root);
+      fs.mkdirSync(home, { recursive: true });
+      fs.renameSync(staged, path.join(home, `${name}.mjs`));
       results.push({ title: p.title, added: true, name });
-      log(`✓ ${p.title} added as watch/${name}.mjs`);
+      log(`✓ ${p.title} added as watch/${o.folder ? o.folder + "/" : ""}${name}.mjs`);
       continue;
     }
     const failed = r?.dir ? readSteps(r.dir).find((s) => s.result === "fail") : null;

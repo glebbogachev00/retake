@@ -17,7 +17,7 @@ import {
 } from "../src/watch/compare.js";
 import {
   acceptLast, acceptRun, journeyLine, journeyStates, listJourneys, momentOf, nightlyNotice, parseWatchSchedule, pickJourneys,
-  readBaseline, readLast, summaryLine, whenWord, writeRun, type RunRecord,
+  readBaseline, readLast, summaryLine, whenWord, dayWord, problemOf, writeRun, type RunRecord,
 } from "../src/watch/journey-store.js";
 import { runJourney } from "../src/watch/journeys.js";
 import { watchRoutes } from "../src/ui/watch-routes.js";
@@ -118,13 +118,16 @@ test("failed beats changed; a run with no steps failed", () => {
 
 const run = (over: Partial<RunRecord>): RunRecord => ({ journey: "j", title: "J", at: new Date(2026, 11, 4, 3, 0).toISOString(), session: "j-1", dir: "/nowhere", status: "unchanged", scheduled: true, error: null, steps: 3, changes: [], ...over });
 
-test("when: the small hours and the evening before are last night", () => {
+test("when: the small hours are last night; the evening before is yesterday, at its time", () => {
   const morning = new Date(2026, 11, 4, 9, 0);
-  assert.equal(whenWord(new Date(2026, 11, 4, 3, 0).toISOString(), morning), "last night");
-  assert.equal(whenWord(new Date(2026, 11, 3, 23, 0).toISOString(), morning), "last night");
-  assert.equal(whenWord(new Date(2026, 11, 4, 8, 0).toISOString(), morning), "today");
-  assert.equal(whenWord(new Date(2026, 11, 3, 12, 0).toISOString(), morning), "yesterday");
+  assert.equal(whenWord(new Date(2026, 11, 4, 3, 0).toISOString(), morning), "last night at 03:00");
+  assert.equal(whenWord(new Date(2026, 11, 3, 21, 21).toISOString(), morning), "yesterday at 21:21");
+  assert.equal(whenWord(new Date(2026, 11, 4, 8, 0).toISOString(), morning), "today at 08:00");
+  assert.equal(whenWord(new Date(2026, 11, 3, 12, 0).toISOString(), morning), "yesterday at 12:00");
   assert.equal(whenWord(new Date(2026, 11, 1, 3, 0).toISOString(), morning), "on 1 Dec");
+  assert.equal(dayWord(new Date(2026, 11, 4, 3, 0).toISOString(), morning), "last night");
+  assert.equal(dayWord(new Date(2026, 11, 3, 21, 21).toISOString(), morning), "yesterday evening");
+  assert.equal(dayWord(new Date(2026, 11, 3, 12, 0).toISOString(), morning), "yesterday");
 });
 
 test("each journey says where it stands in one line", () => {
@@ -132,11 +135,23 @@ test("each journey says where it stands in one line", () => {
   const b = { acceptedAt: new Date(2026, 11, 3, 3, 0).toISOString(), from: "x", steps: [] };
   assert.equal(journeyLine(null, null, now), "Not run yet");
   assert.equal(journeyLine(run({}), b, now), "Unchanged since 3 Dec");
-  assert.equal(journeyLine(run({ status: "changed" }), b, now), "Changed last night");
-  assert.equal(journeyLine(run({ status: "failed" }), b, now), "Failed last night");
+  assert.equal(journeyLine(run({ status: "changed" }), b, now), "Changed last night at 03:00");
+  assert.equal(journeyLine(run({ status: "failed" }), b, now), "Failed last night at 03:00");
   assert.equal(summaryLine([run({}), run({ status: "changed" })], now), "1 journey changed since last night");
   assert.equal(summaryLine([run({ status: "changed" }), run({ status: "changed" }), run({ status: "failed" })], now), "2 journeys changed and 1 failed since last night");
+  // A change this morning and failures the evening before are not one "today".
+  const evening = new Date(2026, 11, 3, 21, 21).toISOString();
+  assert.equal(summaryLine([run({ status: "changed", at: new Date(2026, 11, 4, 8, 0).toISOString() }), run({ status: "failed", at: evening }), run({ status: "failed", at: evening })], now), "1 journey changed today and 2 failed yesterday evening");
   assert.equal(summaryLine([run({}), null], now), null);
+});
+
+test("a missing sign-in says what broke and what to do, without the raw sentence", () => {
+  const p = problemOf("no saved login for portal.example.com — run `retake login https://portal.example.com` once, with the test account's e-mail, password and authenticator key");
+  assert.equal(p.broke, "There is no saved sign-in for portal.example.com.");
+  assert.equal(p.signIn, "https://portal.example.com");
+  assert.equal(p.command, "retake login https://portal.example.com");
+  assert.ok(p.todo && !p.todo.includes("`"));
+  assert.deepEqual(problemOf("The heading reads “Person not found”"), { broke: "The heading reads “Person not found”", todo: null, signIn: null, command: null });
 });
 
 test("the nightly run is silent unless something changed or failed, and then says it once", () => {
@@ -223,7 +238,7 @@ test("the CLI: a wrong word or a journey that is not there stops with a sentence
   assert.match(late.stderr, /HH:MM/);
   const none = cli("watch", "run", "portal");
   assert.equal(none.status, 1);
-  assert.match(none.stderr, /no journey called "portal" — there are: home/);
+  assert.match(none.stderr, /no journey or project called "portal" — there are: home/);
   assert.ok(!fs.existsSync(path.join(root, ".retake", "watch-schedule.json")));
   const list = cli("watch");
   assert.equal(list.status, 0);
@@ -301,7 +316,7 @@ test("a journey run for real: first run is the normal; text, picture and failure
     };
     const list = await ask("/api/watch/journeys");
     assert.match(list.json.summary, /^1 journey changed (today|since last night)$/);
-    assert.match(list.json.journeys[0].line, /^Changed (today|last night)$/);
+    assert.match(list.json.journeys[0].line, /^Changed (today|last night) at \d\d:\d\d$/);
     const one = await ask("/api/watch/journeys/sample");
     assert.equal(one.json.moment.n, 1);
     assert.match(one.json.moment.what, /^The text changed/);

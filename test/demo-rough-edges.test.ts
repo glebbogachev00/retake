@@ -145,6 +145,7 @@ test("a live Watch session keeps its controls on screen at every recording prese
       await page.route("http://watch.test/**", (route) => {
         const u = new URL(route.request().url());
         if (u.pathname === "/watch/s") return route.fulfill({ contentType: "text/html", body: html.replace("</head>", `<script>window.__retakeToken="t"</script></head>`) });
+        if (u.pathname === "/brand.css") return route.fulfill({ contentType: "text/css", body: fs.readFileSync(path.join(import.meta.dirname, "..", "src", "ui", "brand.css"), "utf8") });
         if (u.pathname === "/api/watch/s/stream") return route.fulfill({ contentType: "text/event-stream", body: `event: state\ndata: ${JSON.stringify(state)}\n\n` });
         if (u.pathname.endsWith("live.mjpg")) return route.fulfill({ status: 404, body: "" });
         return route.fulfill({ contentType: "application/json", body: "{}" });

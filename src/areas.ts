@@ -29,7 +29,7 @@ export const DEMO_GROUPS: [heading: string, names: string[]][] = [
 export const DEMO_AREA = new Set(DEMO_GROUPS.flatMap(([, names]) => names));
 
 /** The Watch commands, in the order `retake watch --help` lists them. */
-export const WATCH_ORDER = ["sessions", "journeys", "run", "suggest", "add", "accept", "check", "schedule"];
+export const WATCH_ORDER = ["sessions", "journeys", "run", "suggest", "add", "accept", "share", "check", "schedule"];
 
 /** Shared by both areas: they stay top-level. */
 export const SHARED = ["install", "ui", "login", "logins", "doctor", "tidy"];

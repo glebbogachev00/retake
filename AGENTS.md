@@ -90,7 +90,20 @@ schedule without asking.
 
 `retake watch sessions` lists every session, newest first; `retake watch
 journeys` (or plain `retake watch`) lists each journey with how its last run
-went.
+went, in honest time words ("Failed yesterday at 21:21"; "last night" is only
+the small hours).
+
+**Projects** are folders under `watch/`: `watch/capture/*.mjs` is the project
+"Capture" (or `watch/capture/project.json` names it). Journeys directly in
+`watch/` group by the site they are about, so nothing has to move. `retake
+watch run <project>` runs one; the window shows one project at a time; a new
+app goes into the project already watching its site.
+
+**Send a run to someone** with `retake watch share <project|journey|session|all>`
+(MCP: `watch_share`): one page, one thing at a time with Next, what needs a
+look first. It holds only the runs' videos, pictures and words; the person's
+notes only with `--notes`, which you pass only when they ask. Masks stay
+applied. The link is local; exposing it is the person's call.
 
 ## Watch for any app, with nothing set up — `watch_suggest`, `watch_write`
 

@@ -42,7 +42,7 @@ const { dir, flags } = await w.end();                 // writes the folder, retu
 | `w.scenario(name)` | Groups the steps that follow under a heading. |
 | `w.step(intent, expect)` | Starts a step. Its screenshot is taken once the next action has settled (the first change on screen, then half a second of stillness), or at `result` if nothing changed. |
 | `w.result(ok, note?)` | Ends the step: pass or fail, and a short note. |
-| `w.beat()` | Honours the person's speed: Watch about 1.5 s, Step waits for Next, Fast returns at once. If the script skips it, the next `step` takes the pause instead. |
+| `w.beat()` | Honours the person's Play/Pause: at Play about 1.5 s; at Pause it waits for Play or Next. If the script skips it, the next `step` takes the pause instead. |
 | `w.mask(selectorOrLocator)` / `w.unmask(…)` | Blacks out a region (with a blur under it) in the stream, the screenshots and the video. Takes one or an array. |
 | `w.end()` | Stops the picture, makes the video, writes the folder, returns `{ dir, flags }`. |
 | `w.dir`, `w.link` | The session folder, and its address in the window (or `null`). |
@@ -86,12 +86,17 @@ and past sessions are under Sessions, newest first.
   Enter saves the words, Esc keeps the flag without them.
 - The note field is always there: type at any moment and press Enter.
   While it has the cursor, a Watch pause waits for you.
-- **Watch · Step · Fast**: the person's choice, kept between sessions. A
+- **Play / Pause**: one button. Pause stops the run at its next step until
+  Play or Next is pressed. The person's choice, kept between sessions; a
   script cannot change it.
-- After the session, the same screen plays the video, at 1× or 2×. Each step is
+- After the session, the same screen plays the video with the same one
+  button and a speed (0.5×, 0.75×, 1×, 2×, remembered). Runs nobody watched go
+  at machine speed, so the replay holds about 1.5 s at the end of each step,
+  with that step's line on screen; the timeline stays real time. Each step is
   a mark on the timeline; click a mark, a step, or anywhere on the line to
   jump. Unclear and notes work the same and attach to the step at that time.
-  Space plays and pauses; ← and → jump 5 seconds.
+  Space plays and pauses. Under the picture, **Next** goes on to the next
+  journey in the project ("3 of 12"), as does →.
 
 When a session's video ends (on `w.end()` for a live session; at the end of
 playback, or when the window closes, for a replay) and it has unsent notes,
@@ -222,21 +227,60 @@ is kept, along with every night that changed or failed, and any session
 someone left a note on. What the runs printed is in
 `.retake/watch-schedule.log`.
 
+### Projects
+
+A project is a folder under `watch/`: `watch/capture/*.mjs` is the project
+"Capture", named after the folder (or `watch/capture/project.json`,
+`{ "name": "Capture" }`). Journeys kept directly in `watch/`, as before
+folders, fall into a project by the site they are about: one per registrable
+domain (`login.`, `portal.` and `www.example.com` are one), one per host for a
+local address. Nothing has to move. The window shows one project at a time,
+picked at the top; `retake watch run <project>` runs one, and `retake watch
+add` puts an app's journeys in the project already watching its site, or a
+new one named after it (`--project` to choose).
+
+### Send a run to someone
+
+`retake watch share <project|journey|session|all>` (MCP: `watch_share`; in
+the window, **Share** on a journey or under the list) builds one page to send
+a client or a partner: how the run stands in one line, then one thing at a
+time with Next and "3 of 12", and a list of every journey beside it (a sheet
+on a phone, under "3 of 12 · All") to jump to any one; the address keeps the
+place. What needs a look comes first, each with a picture of the problem,
+its replay and its steps; journeys stopped by the same missing sign-in are
+one item. It lives in `outputs/.shares/watch-<what>/` and holds only the
+runs' videos, pictures and words: no sign-ins, no tokens, and your notes
+only with `--notes`. Masks stay applied. `--serve` serves it on
+127.0.0.1:4790, with the demo shares. The link opens on this Mac; sending it
+further (Tailscale, a server) is your call.
+
 ### In the window
 
-The Watch area (`/watch`, next to Demos) lists the journeys, grouped under
-the address of the app each is about (journeys that do not say come last,
-under Other journeys), each with one line: "Unchanged since 3 Dec", "Changed
-last night", "Failed last night". A run going on is one line at the top,
-"Running now: … · Watch it live"; the list stays where it is. A
-changed journey opens to the moment it changed: the accepted picture and
-last night's, side by side, with the changed patch outlined, the lines of
-text that changed, and the few seconds of video around it (not for a step
-that opens the session and is over in a moment, which would be a second of
-blank page: the two pictures say it). The one button is
-**Accept as normal**; "Open the session" plays the whole run from that
-moment. Accepting moves on to the next journey that changed, or back to the
-list. Past sessions are under Sessions.
+The Watch area (`/watch`, next to Demos) shows one project, picked at the
+top, and opens on one line: "1 journey changed today and 4 failed yesterday
+evening", or "Everything looks the same as normal" with **Run all now**. What
+needs a look comes first, a card per cause with a picture, one plain line and
+when (journeys stopped by the same missing sign-in share one card, with one
+**Save the sign-in**). Then the rest, by site when the project spans more than
+one, named in words ("Shop", "Sign-in screens") with the address on hover;
+a site where nothing changed is one line, "10 unchanged since 25 Nov", which
+opens. Times are honest: "last night" is the small hours only; the evening
+before is "yesterday" with its time. A run going on is a line in the header,
+"REC · Running now: …"; the list stays where it is.
+
+A journey that needs a look opens to its moment, with what broke (or what
+changed) and what to do first, then the pictures. A failure names the step,
+what it expected and what it saw; **Tell your agent** sends that as a note on
+the session, the way Unclear does. A failure because no sign-in is saved
+says so, with **Save the sign-in** (the window's own form, for a test
+account) and the `retake login` line for a terminal. A change shows the
+lines of text that changed, the accepted picture and this run's side by
+side with the changed patch outlined, and the few seconds of video around it
+(not for a step that opens the session and is over in a moment, which would
+be a second of blank page: the two pictures say it). The next move is
+**Accept as normal**, or **Tell your agent** when the change is not wanted;
+"Open the session" plays the whole run from that moment. Accepting moves on
+to the next journey that changed, or back to the list. Past sessions are under Sessions.
 
 ### Where it is kept
 

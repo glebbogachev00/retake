@@ -1,0 +1,119 @@
+/* Retake's own look, shared by both areas of the window (Watch and Demos).
+   It is the landing page's (site/landing.css, site/split.css): warm paper
+   and ink, an amber accent, the REC red, small monospace labels in brackets,
+   fine lines between sections, and pictures in soft-shadowed windows.
+   Nothing is loaded from anywhere: the type is the system's, as on the
+   landing page, so the window works offline. Light and dark follow the
+   Mac, unless the theme button in the header says otherwise. */
+:root {
+  --paper:#fbfaf7; --panel:#fffefa; --soft:#f3f3ed; --tint:#f4eedf;
+  --ink:#252720; --ink-hover:#45463d; --on-ink:#fffefa; --muted:#72736b; --faint:#b3b2a7;
+  --line:#e6e5dd; --line-dark:#d4d3c9;
+  --amber:#dda547; --amber-ink:#8a601e; --amber-soft:#f5efdf;
+  --rec:#cf513c; --pass:#5d6f48; --pass-soft:#edf1e5; --fail:#b5432f; --fail-soft:#f8e9e4;
+  --shadow:0 1px 0 rgba(0,0,0,.02), 0 30px 70px -34px rgba(37,39,32,.34);
+  --shadow-sm:0 10px 32px -22px rgba(48,40,25,.30);
+  --sans:-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light dark;
+}
+/* Dark: the Mac's choice, unless the window's theme button says otherwise
+   (html[data-theme], remembered in localStorage). The same two palettes either way. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:#151512; --panel:#1c1c18; --soft:#22221e; --tint:#2a2519;
+    --ink:#ecebe3; --ink-hover:#d5d4ca; --on-ink:#151512; --muted:#9d9c91; --faint:#5e5d55;
+    --line:#2b2b26; --line-dark:#3a3a33;
+    --amber:#e8b04b; --amber-ink:#e6b562; --amber-soft:#2e2717;
+    --rec:#e66a52; --pass:#a3ba89; --pass-soft:#232a1c; --fail:#f08b75; --fail-soft:#33201b;
+    --shadow:0 1px 0 rgba(0,0,0,.2), 0 30px 70px -30px rgba(0,0,0,.75);
+    --shadow-sm:0 10px 32px -20px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+    --paper:#151512; --panel:#1c1c18; --soft:#22221e; --tint:#2a2519;
+    --ink:#ecebe3; --ink-hover:#d5d4ca; --on-ink:#151512; --muted:#9d9c91; --faint:#5e5d55;
+    --line:#2b2b26; --line-dark:#3a3a33;
+    --amber:#e8b04b; --amber-ink:#e6b562; --amber-soft:#2e2717;
+    --rec:#e66a52; --pass:#a3ba89; --pass-soft:#232a1c; --fail:#f08b75; --fail-soft:#33201b;
+    --shadow:0 1px 0 rgba(0,0,0,.2), 0 30px 70px -30px rgba(0,0,0,.75);
+    --shadow-sm:0 10px 32px -20px rgba(0,0,0,.7);
+}
+:root[data-theme="light"] { color-scheme:light; }
+:root[data-theme="dark"] { color-scheme:dark; }
+
+/* What is hidden stays hidden, whatever its own display says. */
+[hidden] { display:none !important; }
+
+/* ---------- the header: the mark, and the two areas ----------
+   It holds still while the page under it changes. */
+.rt-top { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:30px; height:58px; padding:0 24px; background:var(--paper); border-bottom:1px solid var(--line); font-family:var(--sans); }
+.rt-brand { display:inline-flex; align-items:center; gap:10px; font-size:18px; font-weight:650; letter-spacing:-.6px; color:var(--ink); text-decoration:none; flex:none; }
+.rt-mark { display:block; flex:none; border-radius:7px; }
+.rt-mark .tile { fill:#1a1c1e; }
+.rt-mark .take { fill:#eceee9; }
+.rt-mark .keep { fill:#e8b04b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rt-mark { box-shadow:0 0 0 1px var(--line-dark); } }
+:root[data-theme="dark"] .rt-mark { box-shadow:0 0 0 1px var(--line-dark); }
+.rt-areas { display:flex; align-self:stretch; gap:26px; font-size:13px; }
+.rt-areas a { display:flex; align-items:center; color:var(--muted); text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px; padding-top:2px; }
+.rt-areas a:hover { color:var(--ink); }
+.rt-areas a[aria-current="page"] { color:var(--ink); border-bottom-color:var(--amber); }
+.rt-areas[hidden] { display:none; }
+.rt-sp { flex:1; }
+@media (max-width: 520px) { .rt-top { gap:20px; padding:0 16px; height:54px; } .rt-brand { font-size:17px; } .rt-areas { gap:20px; } }
+
+/* ---------- labels: small monospace, in brackets ---------- */
+.rt-label { font:10.5px/1.6 var(--mono); letter-spacing:.07em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }
+.rt-label::before { content:"[ "; color:var(--faint); }
+.rt-label::after { content:" ]"; color:var(--faint); }
+.rt-label.rec, .rt-label.fail { color:var(--fail); }
+.rt-label.rec { color:var(--rec); }
+.rt-label.changed { color:var(--amber-ink); }
+.rt-label.pass { color:var(--pass); }
+.rt-label i.dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:currentColor; margin-right:6px; vertical-align:0; }
+
+/* ---------- a section: a fine line over it, its label in brackets ---------- */
+.rt-marker { position:relative; display:flex; justify-content:space-between; align-items:center; gap:16px; border-top:1px solid var(--line); padding:13px 0 0; }
+
+/* ---------- a window: a picture or a video, framed, with its label ---------- */
+.rt-win { background:var(--panel); border:1px solid var(--line-dark); border-radius:10px; overflow:hidden; box-shadow:var(--shadow); min-width:0; }
+.rt-win-top { display:flex; align-items:center; gap:12px; height:34px; padding:0 12px; border-bottom:1px solid var(--line); background:var(--soft); min-width:0; }
+.rt-win-top .rt-label { overflow:hidden; text-overflow:ellipsis; }
+.rt-win-top .rt-right { margin-left:auto; }
+.rt-dots { display:inline-flex; gap:5px; flex:none; }
+.rt-dots i { width:8px; height:8px; border-radius:50%; background:var(--line-dark); }
+
+/* ---------- buttons: the next move in ink, the rest quiet ---------- */
+.rt-btn { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:40px; padding:9px 16px; border-radius:6px; border:1px solid var(--line-dark); background:var(--panel); color:var(--ink); font:600 13px/1.2 var(--sans); text-decoration:none; cursor:pointer; white-space:nowrap; transition:background .15s, border-color .15s; }
+.rt-btn:hover { background:var(--soft); border-color:var(--ink); }
+.rt-btn.go { background:var(--ink); border-color:var(--ink); color:var(--on-ink); }
+.rt-btn.go:hover { background:var(--ink-hover); border-color:var(--ink-hover); }
+.rt-btn:disabled { opacity:.45; cursor:default; }
+.rt-btn kbd { font:10px var(--mono); color:var(--muted); letter-spacing:.04em; }
+.rt-btn.go kbd { color:inherit; opacity:.65; }
+.rt-quiet { color:var(--muted); text-decoration:none; background:none; border:0; padding:8px 4px; font:inherit; cursor:pointer; }
+.rt-quiet:hover { color:var(--ink); }
+:where(.rt-btn, .rt-quiet, .rt-areas a, .rt-brand):focus-visible { outline:2px solid var(--amber-ink); outline-offset:3px; }
+
+/* ---------- the theme button: System, Light, Dark ---------- */
+.rt-theme { display:inline-grid; place-items:center; width:32px; height:32px; flex:none; border:1px solid transparent; border-radius:6px; background:none; color:var(--muted); cursor:pointer; padding:0; }
+.rt-theme:hover { color:var(--ink); border-color:var(--line-dark); }
+.rt-theme svg { display:block; }
+.rt-theme:focus-visible { outline:2px solid var(--amber-ink); outline-offset:2px; }
+
+/* ---------- the project switcher: "Capture ▾" ---------- */
+#proj { position:relative; display:flex; align-items:center; }
+#proj:empty { display:none; }
+.rt-proj { display:inline-flex; align-items:center; gap:6px; font:600 14px var(--sans); color:var(--ink); background:none; border:1px solid transparent; border-radius:6px; padding:6px 8px; margin-left:-8px; white-space:nowrap; }
+button.rt-proj { cursor:pointer; }
+button.rt-proj:hover, button.rt-proj[aria-expanded="true"] { border-color:var(--line-dark); background:var(--panel); }
+.rt-caret { font-size:10px; color:var(--muted); }
+.rt-menu { position:absolute; top:calc(100% + 6px); left:-8px; z-index:40; min-width:220px; padding:6px; background:var(--panel); border:1px solid var(--line-dark); border-radius:10px; box-shadow:var(--shadow); display:grid; }
+.rt-menu > * { display:flex; align-items:center; gap:10px; padding:8px 10px; border:0; border-radius:6px; background:none; color:var(--ink); font:14px var(--sans); text-align:left; text-decoration:none; cursor:pointer; }
+.rt-menu > *:hover { background:var(--soft); }
+.rt-menu > [aria-current="true"] { font-weight:600; }
+.rt-menu > a { color:var(--muted); border-top:1px solid var(--line); border-radius:0 0 6px 6px; margin-top:4px; }
+.rt-dot { width:7px; height:7px; border-radius:50%; background:var(--line-dark); flex:none; }
+.rt-dot.loud { background:var(--fail); }
+.rt-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }

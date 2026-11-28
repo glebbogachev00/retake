@@ -4,160 +4,228 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Watch · Retake</title>
+<!-- The theme the person picked, before anything is painted: no flash of the other one. -->
+<script>try { var t = localStorage.getItem('retake-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/brand.css">
 <style>
-  :root { --paper:#f6f6f3; --ink:#1b1b19; --muted:#6c6c66; --fill:#ebebe6; --fill2:#e2e2dc; --pass:#2f7d4f; --fail:#b3402f; --accent:#0a84ff; --body:15px; --small:13px; --title:20px; color-scheme: light dark; }
-  @supports (color: AccentColor) { :root { --accent: AccentColor; } }
-  @media (prefers-color-scheme: dark) { :root { --paper:#161615; --ink:#ececE8; --muted:#94948d; --fill:#222220; --fill2:#2c2c29; --pass:#6cc08e; --fail:#e5806f; } }
+  /* The Watch area, in Retake's own look (brand.css: the landing page's
+     paper, ink, amber, REC red, bracket labels, frames and windows). */
+  :root { --body:15px; --small:13px; --title:clamp(26px, 2.6vw, 34px); }
   * { box-sizing:border-box; }
-  html, body { margin:0; background:var(--paper); color:var(--ink); font: var(--body)/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width:1180px; margin:0 auto; padding:20px 28px 48px; }
+  html, body { margin:0; background:var(--paper); color:var(--ink); font:var(--body)/1.5 var(--sans); -webkit-font-smoothing:antialiased; }
+  main { max-width:1180px; margin:0 auto; padding:30px 28px 64px; }
   /* A session is one screen: the title, the picture, what it is doing, and Next / Unclear.
      On a short, wide window (every landscape recording preset is 465–700px tall) a
      full-width 16:10 picture pushed the controls below the fold, so the column
-     narrows until all of it fits the height. 210px is the header, the two lines
-     and the controls; the steps may run on below. A phone's tall window never
-     narrows, so the phone layout stays as it is. */
-  main.session { max-width:min(1180px, calc((100vh - 210px) * 1.6 + 56px)); }
+     narrows until all of it fits the height. 210px is the title, the two lines
+     and the controls; the header and the picture's frame add theirs while the
+     window is tall enough to carry them, and give them up below 600px. The steps
+     may run on below. A phone's tall window never narrows. */
+  main.session { --chrome:305px; max-width:min(1180px, calc((100vh - var(--chrome)) * 1.6 + 56px)); padding-top:18px; }
+  @media (max-height: 600px) { main.session { --chrome:212px; padding-top:12px; } body:has(main.session) .rt-top, main.session .rt-win-top { display:none; } }
   a { color:inherit; text-decoration:none; }
-  button { font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:8px 16px; cursor:pointer; }
-  button:hover { background:var(--fill2); }
-  button.go { background:var(--accent); color:#fff; }
-  a.btn { display:inline-block; background:var(--fill); border-radius:10px; padding:8px 16px; }
-  a.btn.go { background:var(--accent); color:#fff; }
-  kbd { font:inherit; font-size:var(--small); color:var(--muted); margin-left:6px; }
-  button.go kbd { color:rgba(255,255,255,.75); }
+  button { font:inherit; color:inherit; }
   .small { font-size:var(--small); color:var(--muted); }
-  header { display:flex; align-items:center; gap:16px; min-height:40px; margin-bottom:14px; }
-  header h1 { font-size:var(--title); font-weight:600; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  header .back { color:var(--muted); }
-  .seg { display:inline-flex; background:var(--fill); border-radius:10px; padding:3px; }
-  .seg button { background:transparent; padding:5px 14px; border-radius:8px; }
-  .seg button[aria-pressed="true"] { background:var(--paper); }
-  .stage { background:var(--fill); border-radius:14px; overflow:hidden; aspect-ratio:16/10; display:flex; align-items:center; justify-content:center; }
-  .stage img, .stage video { width:100%; height:100%; object-fit:contain; display:block; }
-  .stage .empty { color:var(--muted); }
-  .track { position:relative; height:28px; margin-top:10px; cursor:pointer; touch-action:none; }
-  .track .bar { position:absolute; left:0; right:0; top:12px; height:4px; border-radius:2px; background:var(--fill2); }
-  .track .done { position:absolute; left:0; top:12px; height:4px; border-radius:2px; background:var(--ink); opacity:.55; }
-  .track .mark { position:absolute; top:6px; width:3px; height:16px; margin-left:-1px; border-radius:2px; background:var(--muted); }
-  .track .mark.fail { background:var(--fail); }
-  .track .mark:hover { background:var(--ink); }
-  .track .flag { position:absolute; top:0; width:8px; height:8px; margin-left:-4px; border-radius:50%; background:var(--accent); }
-  .track .head { position:absolute; top:5px; width:2px; height:18px; margin-left:-1px; background:var(--ink); }
-  .now { margin:16px 0 0; min-height:1.45em; }
-  .now .exp { color:var(--muted); }
-  .verdict { margin:2px 0 0; min-height:1.45em; color:var(--muted); }
-  .verdict.pass b { color:var(--pass); font-weight:600; } .verdict.fail b { color:var(--fail); font-weight:600; }
-  .act { display:flex; gap:10px; align-items:center; margin-top:14px; }
-  .act input { flex:1; font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:8px 14px; outline:none; }
-  .act input:focus { background:var(--fill2); }
-  /* On a phone, as on the landing's drawing: the buttons on one line, the note on its own, full width. */
-  @media (max-width: 640px) { .act { flex-wrap:wrap; } .act input { flex:1 1 100%; min-width:0; } }
-  .fixline { margin-top:10px; min-height:1.45em; font-size:var(--small); color:var(--muted); }
-  .fixline button { background:none; padding:0 4px; color:var(--accent); font-size:var(--small); }
-  ol.steps { list-style:none; margin:26px 0 0; padding:0; columns:2 380px; column-gap:40px; }
-  ol.steps li { break-inside:avoid; padding:3px 0; font-size:var(--small); }
-  ol.steps li .row { display:flex; gap:10px; }
-  /* A scenario's heading lives in its first step's item, so a column can never end between them. */
-  ol.steps li .h { display:block; color:var(--muted); padding:9px 0 3px; font-weight:400; }
-  ol.steps li .m { width:16px; flex:none; text-align:center; color:var(--muted); }
-  ol.steps li.pass .m { color:var(--pass); } ol.steps li.fail .m { color:var(--fail); } ol.steps li.flagged .m { color:var(--accent); }
-  ol.steps li.here { font-weight:600; }
-  ol.steps li .n { color:var(--muted); display:block; font-weight:400; }
-  ol.steps li[data-t] { cursor:pointer; }
-  .list { list-style:none; margin:24px 0 0; padding:0; }
-  .list li a { display:flex; gap:16px; align-items:baseline; padding:12px 14px; border-radius:10px; }
-  .list li a:hover { background:var(--fill); }
-  .list .t { flex:1; } .list .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); display:inline-block; margin-right:8px; }
+  .display { font-size:var(--title); font-weight:500; line-height:1.12; letter-spacing:-.04em; margin:0; text-wrap:balance; }
   .quiet { color:var(--muted); margin-top:30vh; text-align:center; }
-  /* The two areas of the window. Holds still while the page under it changes. */
-  nav.areas { display:flex; gap:18px; min-height:40px; align-items:center; margin-bottom:10px; }
-  nav.areas a { color:var(--muted); }
-  nav.areas a[aria-current="page"] { color:var(--ink); font-weight:600; }
-  .sum { font-size:var(--title); font-weight:600; margin:18px 0 0; }
-  ul.journeys { list-style:none; margin:18px 0 0; padding:0; }
-  ul.journeys li > * { display:flex; gap:16px; align-items:baseline; padding:12px 14px; border-radius:10px; }
-  ul.journeys li a:hover { background:var(--fill); }
-  ul.journeys .t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  ul.journeys .l { color:var(--muted); white-space:nowrap; }
-  ul.journeys .l.changed { color:var(--accent); font-weight:600; }
-  ul.journeys .l.failed { color:var(--fail); font-weight:600; }
-  .more { margin:22px 14px 0; font-size:var(--small); }
-  .more a { color:var(--muted); }
-  .quiet + .more { text-align:center; margin-left:0; margin-right:0; }
-  .more a:hover { color:var(--ink); }
-  .line { margin:6px 0 0; }
-  .line b.changed { color:var(--accent); } .line b.failed { color:var(--fail); }
-  .what { margin:2px 0 0; color:var(--muted); }
-  .diff { margin:10px 0 0; font-size:var(--small); }
-  .diff div { padding:1px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .diff .gone { color:var(--muted); text-decoration:line-through; }
-  .pair { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap:16px; margin-top:18px; }
-  .pair figure { margin:0; }
-  .pair .pic { position:relative; background:var(--fill); border-radius:14px; overflow:hidden; display:flex; justify-content:center; }
-  .pair .pic span.box { position:absolute; outline:2px solid var(--accent); border-radius:4px; pointer-events:none; }
-  .pair .pic .holder { position:relative; display:inline-block; max-width:100%; }
-  .pair img { display:block; max-width:100%; max-height:46vh; }
-  .pair .none { color:var(--muted); padding:48px 0; }
-  .pair figcaption { margin-top:6px; font-size:var(--small); color:var(--muted); }
-  .clip { margin-top:16px; background:var(--fill); border-radius:14px; overflow:hidden; display:flex; justify-content:center; }
-  .clip video { display:block; max-width:100%; max-height:30vh; }
-  .act a.quiet2 { color:var(--muted); padding:8px 6px; }
-  .act a.quiet2:hover { color:var(--ink); }
-  .others { margin-top:12px; font-size:var(--small); color:var(--muted); }
-  .ran { margin:6px 0 0; color:var(--muted); }
-  h2.app { font-size:var(--small); font-weight:600; color:var(--muted); margin:22px 14px 0; }
-  h2.app + ul.journeys { margin-top:4px; }
-  p.live { margin:8px 0 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  p.live .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); }
-  p.live a { color:var(--accent); }
-  .sum + .ran { margin-top:4px; }
-  .blind { margin:2px 0 0; color:var(--muted); font-size:var(--small); }
-  ul.journeys .l.skipped { color:var(--muted); }
-  .ask { margin:18px 0 0; padding:14px; background:var(--fill); border-radius:12px; display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  .more { margin:34px 0 0; font-size:var(--small); color:var(--faint); display:flex; flex-wrap:wrap; gap:10px; }
+  .more a, .more .rt-quiet { color:var(--muted); padding:0; font-size:var(--small); }
+  .more a:hover, .more .rt-quiet:hover { color:var(--ink); }
+
+  /* ---------- the header's right side: a run going now, Sessions, Add an app ---------- */
+  .live-top { display:inline-flex; align-items:center; gap:10px; font-size:var(--small); color:var(--muted); min-width:0; }
+  .live-top .lt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:30vw; }
+  .live-top .lt b { color:var(--ink); font-weight:500; }
+  .live-top:hover .lt b { text-decoration:underline; text-underline-offset:3px; }
+  .hl { font-size:var(--small); white-space:nowrap; padding:0; }
+  #topLinks { display:flex; gap:18px; }
+  /* With several projects, adding an app lives in the switcher's list. */
+  body:not(.one-project) #topLinks .addapp { display:none; }
+  @media (max-width: 760px) { .live-top .lt { display:none; } }
+  @media (max-width: 560px) { #topLinks .sessions { display:none; } .rt-top { gap:14px; } .rt-areas { gap:16px; } }
+
+  /* ---------- the Watch area: one line, what needs a look, then the rest ---------- */
+  .standing { display:grid; gap:18px; justify-items:start; margin:4px 0 38px; }
+  .section { margin-top:34px; }
+  .section:first-of-type { margin-top:0; }
+  /* What needs a look: one card per cause. A picture big enough to read, or none. */
+  ul.cards { list-style:none; margin:16px 0 0; padding:0; display:grid; gap:16px; }
+  ul.cards > li { display:grid; grid-template-columns:minmax(240px, 340px) minmax(0, 1fr); gap:22px; align-items:start; padding:16px; background:var(--panel); border:1px solid var(--line-dark); border-radius:10px; box-shadow:var(--shadow-sm); }
+  ul.cards > li.nopic { grid-template-columns:minmax(0, 1fr); }
+  ul.cards > li.failed { border-left:3px solid var(--fail); }
+  ul.cards > li.changed { border-left:3px solid var(--amber); }
+  ul.cards .pic { display:block; aspect-ratio:16/10; border-radius:5px; overflow:hidden; background:var(--soft); border:1px solid var(--line); }
+  ul.cards .pic img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+  ul.cards .body { display:grid; gap:6px; min-width:0; justify-items:start; }
+  ul.cards h2 { margin:0; font-size:18px; font-weight:600; letter-spacing:-.01em; line-height:1.3; }
+  ul.cards .why { margin:0; }
+  ul.cards .when { margin:0; font-size:var(--small); color:var(--muted); }
+  ul.cards .who { list-style:none; margin:4px 0 0; padding:0; font-size:var(--small); color:var(--muted); }
+  ul.cards .who a:hover { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
+  ul.cards .rt-btn { margin-top:8px; }
+  ul.cards .signin { width:100%; max-width:480px; margin-top:6px; }
+  @media (max-width: 640px) { ul.cards > li { grid-template-columns:minmax(0, 1fr); gap:14px; padding:14px; } }
+  /* Everything else: a line per site where nothing changed; open it to see each journey. */
+  .apps { margin-top:12px; }
+  .app { border-bottom:1px solid var(--line); }
+  .app summary { list-style:none; display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; padding:12px 4px; cursor:pointer; }
+  .app summary::-webkit-details-marker { display:none; }
+  .app summary::before { content:"›"; color:var(--faint); width:10px; display:inline-block; transition:transform .15s; }
+  .app[open] summary::before { transform:rotate(90deg); }
+  .app summary:hover { background:var(--soft); }
+  .app b { font-weight:600; }
+  .app .sum { color:var(--muted); font-size:var(--small); }
+  .app .ok { color:var(--pass); font-weight:700; margin-right:4px; }
+  ul.rows { list-style:none; margin:0 0 10px; padding:0 0 0 24px; }
+  ul.rows li > * { display:flex; gap:14px; align-items:baseline; padding:6px 4px; }
+  ul.rows li a:hover { background:var(--soft); }
+  ul.rows .t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  ul.rows .l { color:var(--muted); font-size:var(--small); white-space:nowrap; }
+  @media (max-width: 560px) { ul.rows { padding-left:14px; } ul.rows li > * { flex-wrap:wrap; gap:0 12px; } ul.rows .t { flex-basis:100%; white-space:normal; } }
+  .ask { margin:0 0 30px; padding:16px; background:var(--amber-soft); border:1px solid var(--line-dark); border-radius:10px; display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; }
   .ask p { margin:0; flex:1 1 260px; }
   .ask .btns { display:flex; gap:8px; }
-  .ask button { background:var(--paper); }
-  .ask button:hover { background:var(--fill2); }
-  /* Adding an app: one thing per screen, at the middle of it. */
-  .add { max-width:560px; margin:22vh auto 0; }
-  .add h1 { font-size:var(--title); font-weight:600; margin:0 0 6px; }
-  .add p.sub { margin:0 0 18px; color:var(--muted); }
+  .sharebox { margin:16px 0 0; padding:16px 18px; max-width:640px; background:var(--panel); border:1px solid var(--line-dark); border-radius:10px; box-shadow:var(--shadow-sm); display:grid; gap:10px; }
+  .sharebox p { margin:0; }
+  .sharebox .tick { display:inline-flex; gap:8px; align-items:center; font-size:var(--small); cursor:pointer; }
+  .sharebox .tick input { accent-color:var(--ink); }
+  .sharebox .link { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; }
+  .sharebox .link a { font:13px var(--mono); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
+
+  /* ---------- a journey that failed or changed: what, what to do, then the picture ---------- */
+  .crumb { margin:0 0 18px; font-size:var(--small); }
+  .crumb a { color:var(--muted); } .crumb a:hover { color:var(--ink); }
+  .verdict-head { display:grid; gap:8px; max-width:860px; }
+  .status { margin:0; font-size:var(--small); color:var(--muted); }
+  .status.failed { color:var(--fail); } .status.changed { color:var(--amber-ink); }
+  dl.say { margin:18px 0 0; display:grid; grid-template-columns:max-content minmax(0, 1fr); gap:8px 22px; max-width:860px; }
+  dl.say dt { color:var(--muted); font-size:var(--small); line-height:1.6rem; }
+  dl.say dd { margin:0; }
+  dl.say .diff { margin-top:6px; font:12.5px/1.7 var(--mono); }
+  dl.say .diff div { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  dl.say .diff .gone { color:var(--muted); text-decoration:line-through; }
+  dl.say .diff .new::before { content:"+ "; color:var(--pass); }
+  @media (max-width: 560px) { dl.say { grid-template-columns:1fr; gap:2px; } dl.say dd { margin-bottom:10px; } }
+  .act { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin-top:20px; }
+  .cmd { margin:4px 0 0; font-size:var(--small); color:var(--muted); display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .cmd code { font:12px var(--mono); color:var(--ink); background:var(--panel); border:1px solid var(--line-dark); border-radius:6px; padding:6px 10px; overflow-wrap:anywhere; }
+  .sent { margin:14px 0 0; font-size:var(--small); color:var(--muted); min-height:1.5em; }
+  .sent button { background:none; border:0; padding:0 4px; color:var(--ink); font-weight:600; font-size:var(--small); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  .signin { margin-top:18px; max-width:520px; display:grid; gap:10px; }
+  .pair { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap:22px; margin-top:34px; align-items:start; }
+  .pair.one { grid-template-columns:minmax(0, 760px); }
+  .pair .pic { position:relative; display:flex; justify-content:center; background:var(--soft); }
+  .pair .pic .holder { position:relative; display:inline-block; max-width:100%; }
+  .pair .pic span.box { position:absolute; outline:2px solid var(--amber); outline-offset:1px; border-radius:3px; pointer-events:none; }
+  .pair img { display:block; max-width:100%; max-height:52vh; }
+  .pair video { display:block; width:100%; max-height:52vh; background:var(--soft); }
+  .others { margin-top:16px; font-size:var(--small); color:var(--muted); }
+  /* Next: the next journey in the project, under the picture, on the right. */
+  .pager { display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:16px; min-height:40px; }
+  .pager:empty { display:none; }
+  .pager .quietline { margin-right:auto; font-size:var(--small); color:var(--muted); }
+  .pager .count { font:12px var(--mono); color:var(--muted); }
+
+  /* ---------- every session ---------- */
+  ul.list { list-style:none; margin:20px 0 0; padding:0; }
+  ul.list li { border-bottom:1px solid var(--line); }
+  ul.list li a { display:flex; gap:16px; align-items:baseline; padding:12px 4px; }
+  ul.list li a:hover { background:var(--soft); }
+  ul.list .t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  ul.list .dot { width:7px; height:7px; border-radius:50%; background:var(--rec); display:inline-block; margin-right:8px; vertical-align:1px; }
+  @media (max-width: 560px) { ul.list li a { flex-wrap:wrap; gap:2px 12px; } ul.list .t { flex-basis:100%; } }
+
+  /* ---------- one session: live, or a replay ---------- */
+  .shead { display:flex; align-items:center; gap:10px 14px; min-height:40px; margin-bottom:14px; }
+  .shead h1 { font-size:20px; font-weight:600; letter-spacing:-.02em; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .shead .back { color:var(--muted); font-size:20px; line-height:1; padding:4px 2px; }
+  .shead .back:hover { color:var(--ink); }
+  .pp { min-height:34px; padding:6px 12px; gap:7px; font-size:13px; }
+  .rate { font:12px var(--mono); color:var(--ink); background:var(--panel); border:1px solid var(--line-dark); border-radius:6px; height:34px; padding:0 6px; cursor:pointer; }
+  @media (max-width: 640px) { .shead { flex-wrap:wrap; } .shead h1 { flex:1 1 calc(100% - 40px); } }
+  .rt-win-top .url { font:10.5px var(--mono); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:50%; }
+  .stage { background:var(--soft); aspect-ratio:16/10; display:flex; align-items:center; justify-content:center; }
+  .stage img, .stage video { width:100%; height:100%; object-fit:contain; display:block; }
+  .stage .empty { color:var(--muted); font:12px var(--mono); }
+  /* The timeline: a mark per step, and the playhead in REC red. Real time: the holds add nothing to it. */
+  .track { position:relative; height:30px; margin-top:12px; cursor:pointer; touch-action:none; }
+  .track .bar { position:absolute; left:0; right:0; top:13px; height:3px; border-radius:2px; background:var(--line-dark); }
+  .track .done { position:absolute; left:0; top:13px; height:3px; border-radius:2px; background:var(--ink); opacity:.5; }
+  .track .mark { position:absolute; top:7px; width:2px; height:15px; margin-left:-1px; border-radius:1px; background:var(--faint); }
+  .track .mark.fail { background:var(--fail); width:3px; }
+  .track .mark:hover { background:var(--ink); }
+  .track .flag { position:absolute; top:0; width:8px; height:8px; margin-left:-4px; border-radius:50%; background:var(--amber); }
+  .track .head { position:absolute; top:4px; width:2px; height:22px; margin-left:-1px; background:var(--rec); }
+  .track .head::before { content:""; position:absolute; top:-3px; left:-3.5px; width:9px; height:9px; border-radius:2px; background:var(--rec); }
+  .now { margin:14px 0 0; min-height:1.5em; }
+  .now .exp { color:var(--muted); }
+  .verdict { margin:2px 0 0; min-height:1.5em; color:var(--muted); }
+  .verdict.pass b { color:var(--pass); font-weight:600; } .verdict.fail b { color:var(--fail); font-weight:600; }
+  .session .act { flex-wrap:nowrap; gap:10px; margin-top:12px; }
+  .session .act input { flex:1; min-width:0; font:inherit; color:inherit; background:var(--panel); border:1px solid var(--line-dark); border-radius:6px; padding:0 14px; outline:none; height:40px; }
+  .session .act input:focus { border-color:var(--ink); }
+  /* On a phone, as on the landing's drawing: the buttons on one line, the note on its own, full width. */
+  @media (max-width: 640px) { .session .act { flex-wrap:wrap; } .session .act input { flex:1 1 100%; } }
+  .fixline { margin-top:10px; min-height:1.5em; font-size:var(--small); color:var(--muted); }
+  .fixline button { background:none; border:0; padding:0 4px; color:var(--ink); font-weight:600; font-size:var(--small); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  /* The steps, as on the landing's session card: a round mark each, fine dashed lines. */
+  ol.steps { list-style:none; margin:24px 0 0; padding:0; columns:2 380px; column-gap:44px; }
+  ol.steps li { break-inside:avoid; font-size:var(--small); }
+  ol.steps li .row { display:flex; gap:11px; align-items:flex-start; padding:7px 0; border-bottom:1px dashed var(--line); }
+  /* A scenario's heading lives in its first step's item, so a column can never end between them. */
+  ol.steps li .h { display:block; font:10.5px/1.6 var(--mono); letter-spacing:.07em; text-transform:uppercase; color:var(--muted); padding:14px 0 4px; }
+  ol.steps li .m { width:16px; height:16px; flex:none; border-radius:50%; display:inline-grid; place-items:center; margin-top:1px; font:700 9px/1 var(--sans); color:var(--on-ink); border:1px solid var(--line-dark); }
+  ol.steps li.pass .m { background:var(--pass); border-color:var(--pass); }
+  ol.steps li.fail .m { background:var(--fail); border-color:var(--fail); }
+  ol.steps li.flagged .m { background:var(--amber); border-color:var(--amber); color:#1a1c1e; }
+  ol.steps li.running .m { border-color:var(--amber); }
+  ol.steps li.here { font-weight:600; }
+  ol.steps li.here .row { border-bottom-color:var(--amber); }
+  ol.steps li .n { color:var(--muted); display:block; font-weight:400; }
+  ol.steps li[data-t] { cursor:pointer; }
+
+  /* ---------- adding an app: one thing per screen, at the middle of it ---------- */
+  .add { max-width:600px; margin:18vh auto 0; }
+  .add .display { margin:0 0 10px; }
+  .add p.sub { margin:0 0 22px; color:var(--muted); }
   .add form { display:flex; gap:10px; }
-  .add input[type=text], .add input[type=password], .add input[type=email], .add input[type=url] { flex:1; min-width:0; font:inherit; color:inherit; background:var(--fill); border:0; border-radius:10px; padding:10px 14px; outline:none; }
-  .add input:focus { background:var(--fill2); }
-  .add .fields { display:grid; gap:10px; }
-  .add .row { display:flex; gap:10px; align-items:center; margin-top:16px; }
-  .add .row .sp { flex:1; }
-  .add .quietlink { background:none; padding:8px 4px; color:var(--muted); }
-  .add .quietlink:hover { background:none; color:var(--ink); }
-  .add .err { color:var(--fail); margin:12px 0 0; min-height:1.45em; }
-  .add.wide { max-width:720px; margin-top:10vh; }
-  .wait { color:var(--muted); min-height:1.45em; }
-  .wait .cur { display:inline-block; width:1px; height:1em; background:var(--muted); margin-left:2px; vertical-align:-2px; }
+  .field, .add input[type=text], .add input[type=password], .add input[type=email], .add input[type=url] { flex:1; min-width:0; font:inherit; font-size:16px; color:inherit; background:var(--panel); border:1px solid var(--line-dark); border-radius:6px; padding:11px 14px; outline:none; min-height:46px; }
+  .field:focus, .add input:focus { border-color:var(--ink); }
+  .add .rt-btn { min-height:46px; }
+  .fields { display:grid; gap:10px; }
+  .btnrow { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:16px; }
+  .btnrow .sp { flex:1; }
+  .err { color:var(--fail); margin:12px 0 0; min-height:1.5em; }
+  .add.wide { max-width:760px; margin-top:9vh; }
+  .into { font-size:var(--small); color:var(--muted); display:inline-flex; gap:8px; align-items:center; }
+  .into select { font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line-dark); border-radius:6px; padding:6px 8px; }
+  .wait { color:var(--muted); min-height:1.6em; font:14px/1.6 var(--mono); }
+  .wait .cur { display:inline-block; width:7px; height:15px; background:var(--ink); margin-left:3px; vertical-align:-2px; }
   @media (prefers-reduced-motion: no-preference) { .wait .cur { animation: blink 1s steps(1) infinite; } @keyframes blink { 50% { opacity:0 } } }
-  ul.picks { list-style:none; margin:18px 0 0; padding:0; }
-  ul.picks li label { display:grid; grid-template-columns:22px 1fr auto; gap:4px 12px; align-items:baseline; padding:10px 12px; border-radius:10px; cursor:pointer; }
-  ul.picks li label:hover { background:var(--fill); }
-  ul.picks input { margin:0; accent-color:var(--accent); width:16px; height:16px; transform:translateY(2px); }
+  ul.picks { list-style:none; margin:22px 0 0; padding:0; background:var(--panel); border:1px solid var(--line-dark); border-radius:10px; overflow:hidden; }
+  ul.picks li + li { border-top:1px solid var(--line); }
+  ul.picks li label { position:relative; display:grid; grid-template-columns:22px 1fr auto; gap:4px 12px; align-items:baseline; padding:14px 16px; cursor:pointer; }
+  ul.picks li label:hover { background:var(--soft); }
+  ul.picks li label:has(input:checked) { background:var(--tint); }
+  ul.picks li label:has(input:checked)::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--amber); }
+  ul.picks input { margin:0; accent-color:var(--ink); width:16px; height:16px; transform:translateY(2px); }
   ul.picks .pt { font-weight:600; }
-  ul.picks .pc { grid-column:2 / 4; color:var(--muted); font-size:var(--small); }
   ul.picks .pk { color:var(--muted); font-size:var(--small); white-space:nowrap; }
-  ul.picks .pk.data { color:var(--ink); }
-  ul.done { list-style:none; margin:18px 0 0; padding:0; }
-  ul.done li { padding:8px 0; display:flex; gap:10px; }
-  ul.done li .m { width:16px; flex:none; text-align:center; }
+  ul.picks .pk.data { color:var(--amber-ink); }
+  ul.picks .pc { grid-column:2 / 4; color:var(--muted); font-size:var(--small); }
+  ul.done { list-style:none; margin:20px 0 0; padding:0; }
+  ul.done li { padding:9px 0; display:flex; gap:12px; border-bottom:1px dashed var(--line); }
+  ul.done li .m { width:16px; flex:none; text-align:center; font-weight:700; }
   ul.done li.ok .m { color:var(--pass); } ul.done li.no .m { color:var(--fail); }
   ul.done li .why { display:block; color:var(--muted); font-size:var(--small); }
   @media (max-width: 520px) {
-    main { padding:16px 18px 40px; }
-    .add { margin-top:12vh; }
+    main { padding:22px 18px 48px; }
+    .add { margin-top:9vh; }
     .add form { flex-direction:column; }
     /* The next move first and full width; the quiet ones under it. */
-    .add .row { flex-wrap:wrap; }
-    .add .row .go { order:-1; flex:1 1 100%; text-align:center; }
-    .add .row .sp { display:none; }
+    .add .btnrow .go { order:-1; flex:1 1 100%; }
+    .btnrow .sp { display:none; }
     ul.picks li label { grid-template-columns:22px 1fr; }
     ul.picks .pk { grid-column:2; }
     ul.picks .pc { grid-column:2; }
@@ -166,20 +234,75 @@
 </style>
 </head>
 <body>
+<header class="rt-top">
+  <a class="rt-brand" href="/watch" aria-label="Retake"><svg class="rt-mark" viewBox="0 0 64 64" width="26" height="26" aria-hidden="true" focusable="false"><rect class="tile" width="64" height="64" rx="14"/><rect class="take" x="16" y="12" width="12" height="6" rx="3" opacity=".55"/><rect class="take" x="16" y="21" width="20" height="6" rx="3" opacity=".8"/><rect class="keep" x="16" y="30" width="36" height="6" rx="3"/><rect class="take" x="16" y="39" width="20" height="6" rx="3" opacity=".8"/><rect class="take" x="16" y="48" width="12" height="6" rx="3" opacity=".55"/></svg><span>Retake</span></a>
+  <span id="proj"></span>
+  <nav class="rt-areas" aria-label="Areas"><a href="/watch" aria-current="page">Watch</a><a href="/demos">Demos</a></nav>
+  <span class="rt-sp"></span>
+  <span id="liveTop"></span>
+  <span id="topLinks"><a class="rt-quiet hl sessions" href="/watch/sessions">Sessions</a><a class="rt-quiet hl addapp" href="/watch/add">Add an app</a></span>
+  <button class="rt-theme" id="theme" type="button"></button>
+</header>
 <main id="app"></main>
+<script src="/brand.js"></script>
+<script id="pacer">
+/** A replay's pace. Unattended runs go at machine speed, so a step can flash
+    past in a second: while it plays, the video holds about 1.5 s at the end of
+    each step, with that step's line on screen, then goes on. The video itself
+    and its timeline stay real time; the holds add nothing to either.
+    steps(): [{ t, tEnd }] in ms on the video's clock. */
+function pacer(video, steps, o) {
+  o = o || {};
+  const HOLD = o.holdMs || 1500;
+  let at = null, timer = 0, raf = 0;
+  const held = new Set();
+  const ends = () => steps().map(s => s.tEnd).filter(x => x != null).map(x => x / 1000).sort((a, b) => a - b);
+  const tick = () => {
+    raf = 0;
+    if (video.paused || video.ended) return;
+    const now = video.currentTime;
+    // Only a step end the video has just crossed: a jump past several holds on none of them.
+    const e = ends().find(x => x <= now && now - x < 0.75 && !held.has(x));
+    if (e !== undefined) { held.add(e); hold(); return; }
+    raf = requestAnimationFrame(tick);
+  };
+  const changed = () => { if (o.onHold) o.onHold(at !== null); };
+  function hold() { video.pause(); at = video.currentTime; changed(); timer = setTimeout(go, HOLD); }
+  function go() { clearTimeout(timer); timer = 0; if (at === null) return; at = null; changed(); video.play().catch(() => {}); }
+  video.addEventListener('play', () => { if (at !== null) { clearTimeout(timer); at = null; changed(); } if (!raf) raf = requestAnimationFrame(tick); });
+  video.addEventListener('seeking', () => { clearTimeout(timer); if (at !== null && Math.abs(video.currentTime - at) > 0.01) { at = null; changed(); } const now = video.currentTime; for (const x of [...held]) if (x >= now - 0.01) held.delete(x); });
+  return {
+    /** Holding at a step's end: the run is still playing, only waiting. */
+    holding: () => at !== null,
+    /** Play or Pause. A hold counts as playing: Pause stops it there. */
+    toggle() { if (at !== null) { clearTimeout(timer); at = null; changed(); return; } if (video.paused) video.play().catch(() => {}); else video.pause(); },
+    playing: () => at !== null || !video.paused,
+  };
+}
+/** The speeds a replay offers, and the one the person last picked. */
+const RATES = [0.5, 0.75, 1, 2];
+const savedRate = () => { try { const r = Number(localStorage.getItem('retake-rate')); return RATES.includes(r) ? r : 1; } catch (e) { return 1; } };
+const saveRate = r => { try { localStorage.setItem('retake-rate', String(r)); } catch (e) {} };
+/** The one Play/Pause button: its icon and word say what pressing it does. */
+const playPause = (paused) => paused
+  ? '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg>Play'
+  : '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5h2.5v9H2.5zM7 1.5h2.5v9H7z" fill="currentColor"/></svg>Pause';
+</script>
 <script>
 const T = window.__retakeToken;
 const H = { 'content-type': 'application/json', 'x-retake-token': T };
 const api = (p, body) => fetch(p, body === undefined ? { headers: H } : { method: 'POST', headers: H, body: JSON.stringify(body) }).then(r => r.json());
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const clock = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const app = document.getElementById('app');
-const AREAS = '<nav class="areas"><a href="/watch" aria-current="page">Watch</a><a href="/demos">Demos</a></nav>';
 const journeyName = (location.pathname.match(/^\/watch\/j\/([a-z0-9-]+)$/) || [])[1];
 const id = journeyName ? null : (location.pathname.match(/^\/watch\/([a-z0-9-]+)$/) || [])[1];
+/** A section's label, in brackets, as on the landing page: [ NEEDS A LOOK ]. Only for sections and frames. */
+const label = (text, cls = '') => `<span class="rt-label ${cls}">${text}</span>`;
+const project = { get: () => window.retakeProject ? window.retakeProject.get() : null, set: p => { if (window.retakeProject) window.retakeProject.set(p); }, draw: (...a) => { if (window.retakeProject) window.retakeProject.draw(...a); } };
 
 // Declared before the router runs: the screens below use them at once.
-let homeTimer = null, waitTimer = null, followTimer = null, shown = null;
+let homeTimer = null, waitTimer = null, followTimer = null, shown = null, sharing = false;
+const openApps = new Set();
 const WAITING = { exploring: ['Looking around', 'Reading its pages', 'Following its navigation', 'Finding its forms', 'Choosing what is worth watching'], adding: ['Running each one once', 'Keeping the ones that pass'] };
 if (journeyName) journey(journeyName);
 else if (id === 'sessions') sessions();
@@ -187,35 +310,135 @@ else if (id === 'add') addApp();
 else if (!id) home();
 else session(id);
 
-// ---------- the Watch area: each journey, one line ----------
+/** The header from a list answer: the project switcher, and a run going now in any project. */
+function header(J, current) {
+  if (J && J.projects) project.draw(J.projects, current, p => { if (location.pathname === '/watch') home(); else location.href = '/watch'; });
+  const el = document.getElementById('liveTop');
+  el.innerHTML = J && J.live ? `<a class="live-top" href="/watch/${esc(J.live)}" title="Watch it live">${label('<i class="dot"></i>REC', 'rec')}<span class="lt">Running now: <b>${esc(J.liveTitle || 'a session')}</b></span></a>` : '';
+  const a = el.querySelector('a');
+  if (a && J.liveProject) a.onclick = () => project.set(J.liveProject);
+}
+function listOf(p) { return api('/api/watch/journeys' + (p ? '?project=' + encodeURIComponent(p) : '')); }
+
+// ---------- the Watch area: one project, one line, what needs a look, then the rest ----------
+/** The site's own word for a sign-in: "portal" for portal.example.com. */
+function siteWord(host) { const p = host.replace(/:\d+$/, '').split('.').filter(x => !/^(www|login|auth|app)$/.test(x)); return p.length > 1 ? p[0] : host; }
+
 async function home() {
   clearTimeout(homeTimer);
-  const J = await api('/api/watch/journeys').catch(() => null);
+  // Making a page to share, or saving a sign-in: the list waits, so the box is not drawn away.
+  if (sharing) { homeTimer = setTimeout(home, 15000); return; }
+  const J = await listOf(project.get()).catch(() => null);
   if (!J) { homeTimer = setTimeout(home, 3000); return; }
   // Nothing to watch yet: the one thing to ask is the app's address.
   if (!J.journeys.length) { addApp(); return; }
-  const more = `<p class="more"><a href="/watch/add">Add an app</a>${J.sessions ? ' · <a href="/watch/sessions">Sessions</a>' : ''}</p>`;
-  let h = AREAS + liveLine(J) + (J.summary ? `<h1 class="sum">${esc(J.summary)}</h1>` : '');
-  if (J.ran) h += `<p class="ran">${esc(J.ran)}</p>`;
-  if (J.blind) h += `<p class="blind">${esc(J.blind)}</p>`;
-  if (J.ask) h += `<div class="ask"><p>${esc(J.ask.question)}</p><div class="btns"><button data-test="yes">Yes, a test space</button><button data-test="no">No</button></div></div>`;
-  const row = j => {
-    const href = j.status === 'changed' || j.status === 'failed' ? '/watch/j/' + j.name : j.session ? '/watch/' + j.session : null;
-    const inner = `<span class="t">${esc(j.title)}</span><span class="l ${esc(j.status || '')}"${j.why ? ` title="${esc(j.why)}"` : ''}>${esc(j.line)}</span>`;
-    return `<li>${href ? `<a href="${href}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
-  };
-  // By app: each under its address. One app with no address known needs no heading.
+  if (J.project) project.set(J.project);
+  header(J, J.project);
+  const loud = J.journeys.filter(j => j.status === 'failed' || j.status === 'changed');
+  let h = `<section class="standing"><h1 class="display">${esc(J.summary || 'Everything looks the same as normal')}</h1>`;
+  // Nothing needs a look: the next move is to look again.
+  if (!loud.length) h += `<button class="rt-btn go" id="runall"${J.live ? ' disabled' : ''}>${J.live ? 'Running…' : 'Run all now'}</button>`;
+  h += '</section>';
+  if (J.ask) h += `<div class="ask"><p>${esc(J.ask.question)}</p><div class="btns"><button class="rt-btn go" data-test="yes">Yes, a test space</button><button class="rt-btn" data-test="no">No</button></div></div>`;
+  // What needs a look, one card per cause: journeys stopped by the same missing sign-in are one card.
+  const cards = [];
+  const bySite = new Map();
+  for (const j of loud.filter(j => j.status === 'failed')) {
+    if (j.signIn) { if (!bySite.has(j.site)) { const c = { kind: 'signin', site: j.site, url: j.signIn, journeys: [] }; bySite.set(j.site, c); cards.push(c); } bySite.get(j.site).journeys.push(j); }
+    else cards.push({ kind: 'failed', j });
+  }
+  for (const j of loud.filter(j => j.status === 'changed')) cards.push({ kind: 'changed', j });
+  if (cards.length) {
+    h += `<section class="section">${label('Needs a look')}<ul class="cards">` + cards.map((c, i) => {
+      const go = i === 0 ? 'rt-btn go' : 'rt-btn';
+      if (c.kind === 'signin') {
+        const n = c.journeys.length, first = c.journeys[0];
+        const title = n > 1 ? `${n} journeys need the ${esc(siteWord(c.site))} sign-in` : esc(first.title);
+        return `<li class="failed nopic"><div class="body"><h2>${title}</h2><p class="why">There is no saved sign-in for ${esc(c.site)}.</p><p class="when">${n > 1 ? 'Last failed' : 'Failed'} ${esc(first.when || '')}</p>${n > 1 ? `<ul class="who">${c.journeys.map(j => `<li><a href="/watch/j/${esc(j.name)}">${esc(j.title)}</a></li>`).join('')}</ul>` : ''}<button class="${go}" data-signin="${esc(c.url)}">Save the sign-in</button><div></div></div></li>`;
+      }
+      const j = c.j, failed = c.kind === 'failed';
+      return `<li class="${failed ? 'failed' : 'changed'}${j.thumb ? '' : ' nopic'}">${j.thumb ? `<a class="pic" href="/watch/j/${esc(j.name)}" tabindex="-1"><img src="${esc(j.thumb)}" alt="" loading="lazy"></a>` : ''}<div class="body"><h2>${esc(j.title)}</h2>${j.reason ? `<p class="why">${esc(j.reason)}</p>` : ''}<p class="when">${failed ? 'Failed' : 'Changed'} ${esc(j.when || '')}</p><a class="${go}" href="/watch/j/${esc(j.name)}">${failed ? 'See what broke' : 'Review the change'}</a></div></li>`;
+    }).join('') + '</ul></section>';
+  }
+  // Everything else, by site when the project spans more than one, named in words. A site where
+  // nothing changed is one line; it opens.
   const byName = new Map(J.journeys.map(j => [j.name, j]));
-  const groups = J.groups && J.groups.length ? J.groups : [{ host: null, names: J.journeys.map(j => j.name) }];
-  const headed = groups.length > 1 || groups.some(g => g.host);
-  h += groups.map(g => (headed ? `<h2 class="app">${esc(g.host || 'Other journeys')}</h2>` : '') + '<ul class="journeys">' + g.names.map(n => row(byName.get(n))).join('') + '</ul>').join('') + more;
+  let rest = '';
+  for (const g of J.groups) {
+    const rows = g.names.map(n => byName.get(n)).filter(j => j && j.status !== 'failed' && j.status !== 'changed');
+    if (!rows.length) continue;
+    const tally = new Map(); for (const r of rows) tally.set(r.line, (tally.get(r.line) || 0) + 1);
+    const common = [...tally.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const all = rows.every(r => r.line === common);
+    const n = rows.length;
+    const fine = all && /^Unchanged since /.test(common);
+    const said = fine ? `${n} unchanged since ${common.replace(/^Unchanged since /, '')}` : `${n} journey${n === 1 ? '' : 's'}`;
+    const list = `<ul class="rows">${rows.map(r => {
+      const inner = `<span class="t">${esc((g.short && g.short[r.name]) || r.title)}</span>${all ? '' : `<span class="l"${r.why ? ` title="${esc(r.why)}"` : ''}>${esc(r.line)}</span>`}`;
+      return `<li>${r.session ? `<a href="/watch/${esc(r.session)}">${inner}</a>` : `<div>${inner}</div>`}</li>`;
+    }).join('')}</ul>`;
+    rest += `<details class="app" data-app="${esc(g.name)}"${openApps.has(g.name) || !fine ? ' open' : ''}><summary title="${esc(g.host || '')}"><b>${esc(g.name)}</b><span class="sum">${fine ? '<span class="ok" aria-hidden="true">✓</span>' : ''}${esc(said)}</span></summary>${list}</details>`;
+  }
+  if (rest) h += `<section class="section">${cards.length ? label('Everything else') : ''}<div class="apps">${rest}</div></section>`;
+  h += `<p class="more"><button class="rt-quiet" id="share">Share this project</button></p><div id="sharebox"></div>`;
   app.innerHTML = h;
+  const $ = s => document.getElementById(s);
+  app.querySelectorAll('details.app').forEach(d => d.addEventListener('toggle', () => { if (d.open) openApps.add(d.dataset.app); else openApps.delete(d.dataset.app); }));
   app.querySelectorAll('[data-test]').forEach(b => b.onclick = async () => { await api('/api/watch/spaces', { url: J.ask.url, test: b.dataset.test === 'yes' }); home(); });
+  app.querySelectorAll('[data-signin]').forEach(b => b.onclick = () => { sharing = true; b.hidden = true; signInInline(b.dataset.signin, b.nextElementSibling, () => { sharing = false; b.hidden = false; }); });
+  $('share').onclick = () => shareBox(J.project || 'all', $('sharebox'), 'this project');
+  if ($('runall')) $('runall').onclick = async () => {
+    $('runall').disabled = true; $('runall').textContent = 'Running…';
+    const r = await api('/api/watch/run', { project: J.project }).catch(e => ({ error: String(e) }));
+    if (r.error) { $('runall').textContent = r.error; return; }
+    homeTimer = setTimeout(home, 2500);
+  };
   homeTimer = setTimeout(home, 15000);
 }
 
-/** A run going now: one line at the top, with the way to watch it. */
-const liveLine = J => J.live ? `<p class="live"><span class="dot"></span>Running now: ${esc(J.liveTitle || 'a session')} · <a href="/watch/${esc(J.live)}">Watch it live</a></p>` : '';
+// ---------- a page to send someone ----------
+/** Share: one page with the replays, the steps, what changed and what failed. Notes only if ticked. */
+function shareBox(what, el, words = 'this run') {
+  sharing = true;
+  el.innerHTML = `<div class="sharebox">
+      <p>A page to send someone, with ${words}: the replays, the steps, what changed and what failed. No sign-ins are on it, and your notes only if you include them.</p>
+      <label class="tick"><input type="checkbox" id="shnotes"> Include my notes</label>
+      <div class="btnrow"><button class="rt-btn go" id="shmake">Make the page</button><button class="rt-quiet" id="shno">Not now</button></div>
+      <p class="err" id="sherr"></p>
+    </div>`;
+  const $ = s => document.getElementById(s);
+  $('shno').onclick = () => { el.innerHTML = ''; sharing = false; };
+  $('shmake').onclick = async () => {
+    $('shmake').disabled = true; $('shmake').textContent = 'Making it…';
+    const r = await api('/api/watch/share', { what, notes: $('shnotes').checked }).catch(e => ({ error: String(e) }));
+    if (r.error) { $('sherr').textContent = r.error; $('shmake').disabled = false; $('shmake').textContent = 'Make the page'; return; }
+    el.innerHTML = `<div class="sharebox">
+        <p class="link"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a><button class="rt-quiet" id="shcopy">Copy</button></p>
+        <p class="small">This link opens on this Mac only. Sending it further, over Tailscale or from a server you control, is your call.</p>
+        <div class="btnrow"><button class="rt-quiet" id="shdone">Done</button></div>
+      </div>`;
+    $('shcopy').onclick = () => navigator.clipboard.writeText(r.url).then(() => { $('shcopy').textContent = 'Copied'; }).catch(() => {});
+    $('shdone').onclick = () => { el.innerHTML = ''; sharing = false; };
+  };
+}
+
+// ---------- Next: the next journey in the project, in the list's order ----------
+/** Draws "3 of 12" and Next under the picture. `quiet` when the page has its own ink action. */
+async function pager(el, q, quiet) {
+  const o = await api('/api/watch/order?' + q).catch(() => null);
+  if (!o || !o.at) return null;
+  if (o.project) project.set(o.project);
+  el.innerHTML = `${o.lastLoud ? '<span class="quietline">Nothing else needs a look</span>' : ''}<span class="count">${o.at} of ${o.total}</span><button class="rt-btn${quiet ? '' : ' go'}" id="nextJourney" type="button"${o.next ? '' : ' disabled'}>Next</button>`;
+  const go = () => { if (o.next) location.href = o.next; };
+  document.getElementById('nextJourney').onclick = go;
+  // → is Next too, except while typing.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowRight' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    e.preventDefault(); go();
+  });
+  return o;
+}
 
 // ---------- adding an app: its address, then what is worth watching ----------
 /** Waiting writes itself: one faded line types a phrase, holds it, erases it. */
@@ -241,13 +464,14 @@ async function addApp() {
   // From `retake <address>`: the address is already decided, so the looking starts at once.
   const given = new URLSearchParams(location.search).get('url');
   history.replaceState(null, '', '/watch/add');
-  const J = await api('/api/watch/journeys').catch(() => ({ journeys: [] }));
-  app.innerHTML = AREAS + liveLine(J) + `<section class="add">
-      <h1>${J.journeys.length ? 'Add an app' : 'What should Watch keep an eye on?'}</h1>
+  const J = await listOf(project.get()).catch(() => ({ journeys: [] }));
+  header(J, J.project);
+  app.innerHTML = `<section class="add">
+      <h1 class="display">${J.journeys.length ? 'Add an app' : 'What should Watch keep an eye on?'}</h1>
       <p class="sub">The app’s address. Retake looks around it and suggests what to watch.</p>
-      <form id="f"><input id="u" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="app.example.com" aria-label="The app’s address"><button class="go" type="submit">Look around</button></form>
+      <form id="f"><input id="u" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="app.example.com" aria-label="The app’s address"><button class="rt-btn go" type="submit">Look around</button></form>
       <p class="err" id="err"></p>
-    </section>` + (J.journeys.length ? '<p class="more" style="text-align:center"><a href="/watch">Back to Watch</a></p>' : J.sessions ? '<p class="more" style="text-align:center"><a href="/watch/sessions">Sessions</a></p>' : '');
+    </section>`;
   const u = document.getElementById('u');
   u.focus();
   const form = document.getElementById('f');
@@ -271,7 +495,7 @@ async function follow(jobId) {
   const key = J.phase + (J.phase === 'adding' || J.phase === 'exploring' ? '' : ':' + J.id);
   if (J.phase === 'exploring' || J.phase === 'adding') {
     if (shown !== key) {
-      app.innerHTML = AREAS + `<section class="add"><h1>${esc(J.host)}</h1><p class="wait" id="wait"></p></section>`;
+      app.innerHTML = `<section class="add"><h1 class="display">${esc(J.host)}</h1><p class="wait" id="wait"></p></section>`;
       typeWait(document.getElementById('wait'), J.phase === 'exploring' ? WAITING.exploring : WAITING.adding);
       shown = key;
     }
@@ -281,7 +505,7 @@ async function follow(jobId) {
   shown = key;
   clearTimeout(waitTimer);
   if (J.phase === 'error') {
-    app.innerHTML = AREAS + `<section class="add"><h1>${esc(J.host)}</h1><p class="sub">${esc(J.error)}</p><div class="row"><a class="btn go" href="/watch/add">Try another address</a></div></section>`;
+    app.innerHTML = `<section class="add"><h1 class="display">${esc(J.host)}</h1><p class="sub">${esc(J.error)}</p><div class="btnrow"><a class="rt-btn go" href="/watch/add">Try another address</a></div></section>`;
     return;
   }
   if (J.phase === 'signin') return signInStep(J);
@@ -289,20 +513,47 @@ async function follow(jobId) {
   if (J.phase === 'done') return finished(J);
 }
 
+/** The sign-in form: the window's own login form, for a test account. */
+const signInForm = (id, extra = '') => `<form id="${id}" class="fields" autocomplete="on">
+    <input id="lu" class="field" type="email" autocomplete="username" placeholder="Username or email" aria-label="Username or email">
+    <input id="lp" class="field" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password">
+    <input id="lt" class="field" type="password" autocomplete="off" placeholder="Authenticator key (the setup key, not a code)" aria-label="Authenticator key" hidden>
+    <div class="btnrow"><button type="button" class="rt-quiet" id="code">It asks for a code</button><span class="sp"></span>${extra}</div>
+  </form>`;
+
+/** Save a sign-in for a site, here: the form, and a quiet way to do it in a terminal instead. */
+async function signInInline(url, el, done) {
+  const req = await api('/api/logins/request', { url, why: 'A journey needs a sign-in. Use a test account.' });
+  const pending = await api('/api/logins/pending').catch(() => []);
+  const store = (pending.find(x => x.id === req.id) || {}).store || 'this computer';
+  const cmd = 'retake login ' + url;
+  el.innerHTML = `<div class="signin">${signInForm('lf', '<button type="button" class="rt-quiet" id="lcancel">Not now</button><button class="rt-btn go" type="submit">Save the sign-in</button>')}<p class="small">It stays in ${esc(store)}. The next run signs in with it. <button type="button" class="rt-quiet" id="lterm" style="padding:0;font-size:inherit">Use the terminal instead</button></p><p class="cmd" id="lcmd" hidden><code>${esc(cmd)}</code><button type="button" class="rt-quiet" id="lcopy">Copy</button></p><p class="err" id="err"></p></div>`;
+  const $ = s => document.getElementById(s);
+  $('lu').focus();
+  $('code').onclick = () => { $('lt').hidden = false; $('code').remove(); $('lt').focus(); };
+  $('lterm').onclick = () => { $('lcmd').hidden = false; $('lterm').remove(); };
+  $('lcopy').onclick = () => navigator.clipboard.writeText(cmd).then(() => { $('lcopy').textContent = 'Copied'; }).catch(() => {});
+  $('lcancel').onclick = async () => { await api(`/api/logins/${req.id}/cancel`, {}).catch(() => {}); el.innerHTML = ''; done(false); };
+  $('lf').onsubmit = async e => {
+    e.preventDefault();
+    const user = $('lu').value, password = $('lp').value, totp = $('lt').value;
+    if (!user.trim() || !password) { (user.trim() ? $('lp') : $('lu')).focus(); return; }
+    const r = await api(`/api/logins/${req.id}/save`, { user, password, totp });
+    if (r.error) { $('err').textContent = 'Could not save: ' + r.error; return; }
+    el.innerHTML = `<p class="small">Saved in ${esc(r.where || store)}. The next run signs in with it.</p>`;
+    done(true);
+  };
+}
+
 // This app needs a sign-in: the existing login form, here, for a test account.
 async function signInStep(J) {
   const req = await api('/api/logins/request', { url: J.signIn.url, why: 'This app needs a sign-in. Use a test account.' });
   const pending = await api('/api/logins/pending').catch(() => []);
   const store = (pending.find(x => x.id === req.id) || {}).store || 'this computer';
-  app.innerHTML = AREAS + `<section class="add">
-      <h1>This app needs a sign-in.</h1>
+  app.innerHTML = `<section class="add">
+      <h1 class="display">This app needs a sign-in.</h1>
       <p class="sub">Use a test account. It stays in ${esc(store)}, and journeys sign in with it.</p>
-      <form id="lf" class="fields" autocomplete="on">
-        <input id="lu" type="email" autocomplete="username" placeholder="Username or email" aria-label="Username or email">
-        <input id="lp" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password">
-        <input id="lt" type="password" autocomplete="off" placeholder="Authenticator key (the setup key, not a code)" aria-label="Authenticator key" hidden>
-        <div class="row"><button type="button" class="quietlink" id="code">It asks for a code</button><span class="sp"></span><button type="button" class="quietlink" id="skip">Not now</button><button class="go" type="submit">Save and look again</button></div>
-      </form>
+      ${signInForm('lf', '<button type="button" class="rt-quiet" id="skip">Not now</button><button class="rt-btn go" type="submit">Save and look again</button>')}
       <p class="err" id="err"></p>
     </section>`;
   const $ = s => document.getElementById(s);
@@ -322,27 +573,32 @@ async function signInStep(J) {
 
 function proposals(J) {
   if (!J.proposals.length) {
-    app.innerHTML = AREAS + `<section class="add"><h1>${esc(J.host)}</h1><p class="sub">Nothing worth watching was found there${J.signIn && !J.signedIn ? ' before the sign-in' : ''}.</p><div class="row"><a class="btn go" href="/watch/add">Try another address</a></div></section>`;
+    app.innerHTML = `<section class="add"><h1 class="display">${esc(J.host)}</h1><p class="sub">Nothing worth watching was found there${J.signIn && !J.signedIn ? ' before the sign-in' : ''}.</p><div class="btnrow"><a class="rt-btn go" href="/watch/add">Try another address</a></div></section>`;
     return;
   }
   const note = J.signInError ? `<p class="sub">The sign-in did not work (${esc(J.signInError)}), so only the pages before it were seen.</p>`
     : J.signIn && !J.signedIn ? '<p class="sub">Only the pages before the sign-in were seen.</p>' : '';
-  app.innerHTML = AREAS + `<section class="add wide">
-      <h1>Worth watching on ${esc(J.host)}</h1>${note}
+  // Which project they go in: decided when the site is already watched; otherwise a new one, unless picked.
+  const into = J.projectDecided ? `<span class="into">Adds to ${esc(J.projectDecided.name)}</span>`
+    : J.projects && J.projects.length ? `<label class="into">Add to <select id="into"><option value="">${esc(J.newProject.name)} (new)</option>${J.projects.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></label>` : '';
+  app.innerHTML = `<section class="add wide">
+      <h1 class="display">Worth watching on ${esc(J.host)}</h1>${note}
       <ul class="picks">${J.proposals.map((p, i) => {
         const why = p.watched ? ' · Already watched' : p.noAccount ? ' · Needs the test account' : '';
         return `<li><label><input type="checkbox" value="${i + 1}"${p.ticked ? ' checked' : ''}${p.watched ? ' disabled' : ''}><span class="pt">${esc(p.title)}</span><span class="pk ${p.changes === 'data' ? 'data' : ''}">${p.changes === 'data' ? 'Changes data' : 'Reads only'}</span><span class="pc">${esc(p.checks)}${esc(why)}</span></label></li>`;
       }).join('')}</ul>
-      <div class="row"><span class="sp"></span><button class="go" id="addb">Add journeys</button></div>
+      <div class="btnrow">${into}<span class="sp"></span><button class="rt-btn go" id="addb">Add journeys</button></div>
       <p class="err" id="err"></p>
     </section>`;
   const boxes = [...app.querySelectorAll('ul.picks input')];
   const btn = document.getElementById('addb');
-  const sync = () => { btn.disabled = !boxes.some(b => b.checked); btn.style.opacity = btn.disabled ? .45 : 1; };
+  const sync = () => { btn.disabled = !boxes.some(b => b.checked); };
   boxes.forEach(b => b.onchange = sync); sync();
   btn.onclick = async () => {
     const pick = boxes.filter(b => b.checked).map(b => Number(b.value));
     const writes = pick.some(n => J.proposals[n - 1].changes === 'data');
+    const into = document.getElementById('into');
+    J.into = into ? into.value : null;
     // Asked once per app, only when it matters.
     if (writes && J.testSpace === null) return askSpace(J, pick);
     await add(J, pick);
@@ -350,17 +606,17 @@ function proposals(J) {
 }
 
 function askSpace(J, pick) {
-  app.innerHTML = AREAS + `<section class="add">
-      <h1>Is ${esc(J.host)} a test space?</h1>
+  app.innerHTML = `<section class="add">
+      <h1 class="display">Is ${esc(J.host)} a test space?</h1>
       <p class="sub">Journeys that change data run only there.</p>
-      <div class="row"><button id="yes">Yes, a test space</button><button id="no">No</button></div>
+      <div class="btnrow"><button class="rt-btn go" id="yes">Yes, a test space</button><button class="rt-btn" id="no">No</button></div>
     </section>`;
   document.getElementById('yes').onclick = async () => { await api('/api/watch/spaces', { url: J.origin, test: true }); add(J, pick); };
   document.getElementById('no').onclick = async () => { await api('/api/watch/spaces', { url: J.origin, test: false }); add(J, pick); };
 }
 
 async function add(J, pick) {
-  const r = await api(`/api/watch/suggest/${J.id}/add`, { pick });
+  const r = await api(`/api/watch/suggest/${J.id}/add`, { pick, project: J.into || undefined });
   if (r.error && !r.id) { const e = document.getElementById('err'); if (e) e.textContent = r.error; return; }
   shown = null; follow(J.id);
 }
@@ -370,59 +626,126 @@ function finished(J) {
   // Everything went in: the list it went into is the ending.
   if (res.length && res.every(r => r.added || r.already)) { history.replaceState(null, '', '/watch'); home(); return; }
   const n = res.filter(r => r.added).length;
-  app.innerHTML = AREAS + `<section class="add">
-      <h1>${n ? `${n} added` : 'Nothing added'}</h1>
+  app.innerHTML = `<section class="add">
+      <h1 class="display">${n ? `${n} added` : 'Nothing added'}</h1>
       <ul class="done">${res.map(r => `<li class="${r.added ? 'ok' : r.already ? '' : 'no'}"><span class="m">${r.added ? '✓' : r.already ? '·' : '✗'}</span><span>${esc(r.title)}${r.added ? '' : `<span class="why">${esc(r.why)}</span>`}</span></li>`).join('')}</ul>
-      <div class="row"><a class="btn go" href="/watch">Done</a></div>
+      <div class="btnrow"><a class="rt-btn go" href="/watch">Done</a></div>
     </section>`;
 }
 
-// ---------- a journey that changed or failed, at its moment ----------
+// ---------- a journey that changed or failed: what, what to do, then the picture ----------
+/** Text that names a command shows it as one: `retake …` in code. */
+const words = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+
 async function journey(name) {
   const J = await api('/api/watch/journeys/' + name);
-  if (J.error && !J.name) { app.innerHTML = AREAS + `<p class="quiet">${esc(J.error)}</p>`; return; }
+  if (J.error && !J.name) { app.innerHTML = `<p class="quiet">${esc(J.error)}</p>`; return; }
   document.title = J.title + ' · Watch';
-  const m = J.moment;
+  const m = J.moment, P = J.problem;
+  const failed = J.status === 'failed', changed = J.status === 'changed';
   const sessionHref = J.session ? `/watch/${J.session}${m && m.clip ? '?t=' + m.clip.start.toFixed(1) : ''}` : null;
-  let h = AREAS + `<header><a class="back" href="/watch">‹</a><h1>${esc(J.title)}</h1></header>`;
-  h += `<p class="line"><b class="${esc(J.status || '')}">${esc(J.line)}</b>${m ? ` · step ${m.n}: ${esc(m.intent)}` : ''}</p>`;
-  if (m) {
-    h += `<p class="what">${esc(m.what)}${m.note ? ' — ' + esc(m.note) : ''}</p>`;
-    if (m.text && (m.text.added.length || m.text.removed.length)) {
-      h += '<div class="diff">' + m.text.removed.slice(0, 4).map(t => `<div class="gone">${esc(t)}</div>`).join('') + m.text.added.slice(0, 4).map(t => `<div>${esc(t)}</div>`).join('') + '</div>';
+  const openLink = sessionHref ? `<a class="rt-quiet" href="${sessionHref}">Open the session</a>` : '';
+  const when = J.when || J.line.replace(/^(Changed|Failed|Unchanged) /, '');
+  const head = [failed ? 'Failed ' + when : changed ? 'Changed ' + when : J.line, m ? `step ${m.n}${J.steps ? ' of ' + J.steps : ''}` : ''].filter(Boolean).join(' · ');
+  let h = `<p class="crumb"><a href="/watch">‹ Watch</a></p><div class="verdict-head"><p class="status ${failed ? 'failed' : changed ? 'changed' : ''}">${esc(head)}</p><h1 class="display">${esc(J.title)}</h1></div>`;
+  // What broke (or what changed), and what to do about it.
+  let say = '';
+  if (failed) {
+    const at = m ? `Step ${m.n}, “${esc(m.intent)}”` : 'It';
+    if (P && P.signIn) say += `<dt>What broke</dt><dd>${at} could not run. ${esc(P.broke)}</dd><dt>What to do</dt><dd>${esc(P.todo)}</dd>`;
+    else {
+      say += `<dt>What broke</dt><dd>${at} failed.</dd>`;
+      if (J.expect) say += `<dt>Expected</dt><dd>${esc(J.expect)}</dd>`;
+      if (P && P.broke) say += `<dt>${J.expect ? 'Saw' : 'Why'}</dt><dd>${words(P.broke)}</dd>`;
+      say += `<dt>What to do</dt><dd>If the app is wrong, tell your agent: it gets the step, what was expected and what was seen.</dd>`;
     }
-    const pic = (src, box, alt) => src
-      ? `<div class="pic"><span class="holder"><img src="${src}" alt="${alt}">${box ? `<span class="box" style="left:${box.x * 100}%;top:${box.y * 100}%;width:${box.width * 100}%;height:${box.height * 100}%"></span>` : ''}</span></div>`
-      : `<div class="pic"><span class="none">No picture</span></div>`;
-    const when = J.line.replace(/^(Changed|Failed) /, '');
-    h += '<div class="pair">'
-      + `<figure>${pic(m.before ? `/watch-journey/${name}/${m.before}` : null, null, 'Before')}<figcaption>Normal${J.accepted ? ' since ' + esc(J.accepted) : ''}</figcaption></figure>`
-      + `<figure>${pic(m.after && J.session ? `/watch-files/${J.session}/${m.after}` : null, m.box, 'After')}<figcaption>${esc(when[0].toUpperCase() + when.slice(1))}</figcaption></figure>`
-      + '</div>';
-    if (J.video && m.clip) h += `<div class="clip"><video id="clip" muted playsinline controls preload="auto" src="/watch-files/${J.session}/${esc(J.video)}#t=${m.clip.start.toFixed(2)},${m.clip.end.toFixed(2)}"></video></div>`;
+  } else if (changed && m) {
+    let diff = '';
+    if (m.text && (m.text.added.length || m.text.removed.length)) diff = '<div class="diff">' + m.text.removed.slice(0, 4).map(t => `<div class="gone">${esc(t)}</div>`).join('') + m.text.added.slice(0, 4).map(t => `<div class="new">${esc(t)}</div>`).join('') + '</div>';
+    say += `<dt>What changed</dt><dd>Step ${m.n}, “${esc(m.intent)}”: ${esc(m.what.replace(/^./, c => c.toLowerCase()))}.${diff}</dd>`;
+    say += `<dt>What to do</dt><dd>If this is how it should look now, accept it as normal. If not, tell your agent.</dd>`;
   }
-  h += '<div class="act">';
-  if (J.status === 'changed') h += `<button class="go" id="accept">Accept as normal</button>${sessionHref ? `<a class="quiet2" href="${sessionHref}">Open the session</a>` : ''}`;
-  else if (sessionHref) h += `<a class="btn go" href="${sessionHref}">Open the session</a>`;
-  h += '</div>';
+  if (say) h += `<dl class="say">${say}</dl>`;
+  // One button: the next move. Everything else is a quiet link.
+  const ownAction = changed || failed;
+  h += '<div class="act" id="act">';
+  if (changed) h += `<button class="rt-btn go" id="accept">Accept as normal</button><button class="rt-btn" id="tell">Tell your agent</button>${openLink}`;
+  else if (failed && P && P.signIn) h += `<button class="rt-btn go" id="signin">Save the sign-in</button>${openLink}`;
+  else if (failed && J.session) h += `<button class="rt-btn go" id="tell">Tell your agent</button>${openLink}`;
+  else if (sessionHref) h += openLink;
+  if (J.session) h += '<button class="rt-quiet" id="share">Share</button>';
+  h += '</div><div id="more"></div><div id="sharebox"></div><p class="sent" id="sent"></p>';
   if (J.others && J.others.length) h += `<p class="others">Also changed: ${J.others.map(o => 'step ' + o.n + ' · ' + esc(o.intent)).join(', ')}</p>`;
+  // The pictures, framed like the landing's windows. A change: the normal beside this run, and the
+  // moment in the video. A failure: the moment it failed; the replay beside it only when the
+  // video has something to show there, waiting on that moment. Never an empty box or a blank video.
+  if (m) {
+    const pic = (src, box, alt) => `<div class="pic"><span class="holder"><img src="${src}" alt="${alt}">${box ? `<span class="box" style="left:${box.x * 100}%;top:${box.y * 100}%;width:${box.width * 100}%;height:${box.height * 100}%"></span>` : ''}</span></div>`;
+    const win = (lab, body) => `<figure class="rt-win" style="margin:0"><div class="rt-win-top"><span class="rt-dots" aria-hidden="true"><i></i><i></i><i></i></span>${lab}</div>${body}</figure>`;
+    const before = m.before ? `/watch-journey/${name}/${m.before}` : null;
+    const after = m.after && J.session ? `/watch-files/${J.session}/${m.after}` : null;
+    const replay = (poster, start) => J.video && m.clip ? `<video id="clip" muted playsinline controls preload="none"${poster ? ` poster="${poster}"` : ''} src="/watch-files/${J.session}/${esc(J.video)}#t=${start.toFixed(2)}"></video>` : null;
+    if (changed) {
+      const wins = [];
+      if (before) wins.push(win(label('Normal'), pic(before, null, 'Normal')));
+      if (after) wins.push(win(label('This run', 'changed'), pic(after, m.box, 'This run')));
+      if (wins.length) h += `<div class="pair${wins.length === 1 ? ' one' : ''}">${wins.join('')}</div>`;
+      const v = replay(after, m.clip ? m.clip.start : 0);
+      if (v) h += `<div class="pair one">${win(label('Replay'), v)}</div>`;
+    } else if (failed) {
+      const wins = [];
+      if (after) wins.push(win(label('Where it stopped', 'fail'), pic(after, null, 'Where it stopped')));
+      // A journey that failed at its first step, before any page loaded, has nothing more to show.
+      const v = m.n > 1 ? replay(after, m.clip ? m.clip.start : 0) : null;
+      if (v && after) wins.push(win(label('Replay'), v));
+      if (wins.length) h += `<div class="pair${wins.length === 1 ? ' one' : ''}">${wins.join('')}</div>`;
+    }
+  }
+  h += '<nav class="pager" id="pager" aria-label="Journeys"></nav>';
   app.innerHTML = h;
-  const clip = document.getElementById('clip');
-  if (clip) clip.play().catch(() => {});
-  const acc = document.getElementById('accept');
+  const $ = s => document.getElementById(s);
+  pager($('pager'), 'journey=' + encodeURIComponent(name), ownAction).then(o => listOf(o && o.project).then(L => header(L, L.project)).catch(() => {}));
+  const acc = $('accept');
   if (acc) acc.onclick = async () => {
     acc.disabled = true;
     const r = await api(`/api/watch/journeys/${name}/accept`, {});
     // One decision, then the next: the next journey that changed, or the list.
     location.href = r.next ? '/watch/j/' + r.next : '/watch';
   };
+  if ($('share')) $('share').onclick = () => shareBox(name, $('sharebox'));
+  // Tell your agent: the moment goes out as a note on the session, the way an Unclear does.
+  const tell = $('tell');
+  if (tell) tell.onclick = async () => {
+    tell.disabled = true;
+    const note = changed
+      ? `Step ${m.n}, “${m.intent}”, changed: ${m.what}.${m.text && m.text.added.length ? ' Now: ' + m.text.added.slice(0, 2).join(' / ') + '.' : ''}${m.text && m.text.removed.length ? ' Was: ' + m.text.removed.slice(0, 2).join(' / ') + '.' : ''} This was not expected.`
+      : `Step ${m ? m.n : '?'}${m ? `, “${m.intent}”,` : ''} failed.${J.expect ? ' Expected: ' + J.expect + '.' : ''}${P && P.broke ? ' Saw: ' + P.broke : ''}`;
+    const fl = await api(`/api/watch/${J.session}/flag`, { kind: 'note', note, time: J.stepAt ?? (m && m.clip ? m.clip.start : 0) });
+    const r = await api(`/api/watch/${J.session}/fix`, {});
+    const sendAt = r.pending ? r.pending.sendAt : Date.now();
+    const sent = $('sent');
+    let t = null;
+    const draw = () => {
+      const left = Math.max(0, Math.ceil((sendAt - Date.now()) / 1000));
+      if (!left) { sent.textContent = 'Sent to your agent.'; return; }
+      sent.innerHTML = `Sending to your agent in ${left}s — <button id="undo">Undo</button>`;
+      // Undo undoes all of it: the send, and the note itself.
+      $('undo').onclick = async () => { clearTimeout(t); await api(`/api/watch/${J.session}/fix/undo`, {}); if (fl && fl.flag) await api(`/api/watch/${J.session}/flag/remove`, { n: fl.flag.n }); sent.textContent = ''; tell.disabled = false; };
+      t = setTimeout(draw, 500);
+    };
+    draw();
+  };
+  // A missing sign-in: the window's own form, here, then the next run uses it.
+  const si = $('signin');
+  if (si) si.onclick = () => { $('act').hidden = true; signInInline(P.signIn, $('more'), () => { $('act').hidden = false; }); };
 }
 
 // ---------- every session, newest first ----------
 async function sessions() {
   const all = await api('/api/watch/sessions');
-  if (!all.length) { app.innerHTML = AREAS + '<p class="quiet">Nothing has been watched yet.</p>'; return; }
-  app.innerHTML = AREAS + '<header><a class="back" href="/watch">‹</a><h1>Sessions</h1></header><ul class="list">' + all.map(s => {
+  listOf(project.get()).then(J => header(J, J.project)).catch(() => {});
+  if (!all.length) { app.innerHTML = '<p class="quiet">Nothing has been watched yet.</p>'; return; }
+  app.innerHTML = `<p class="crumb"><a href="/watch">‹ Watch</a></p><h1 class="display">Sessions</h1><ul class="list">` + all.map(s => {
     const d = new Date(s.startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
     const bits = [s.steps + (s.steps === 1 ? ' step' : ' steps'), s.failed ? s.failed + ' failed' : '', s.flags ? s.flags + ' flagged' : ''].filter(Boolean).join(' · ');
     return `<li><a href="/watch/${s.id}"><span class="t">${s.live ? '<span class="dot"></span>' : ''}${esc(s.title)}</span><span class="small">${bits}</span><span class="small">${d}</span></a></li>`;
@@ -432,24 +755,27 @@ async function sessions() {
 
 // ---------- one session ----------
 function session(id) {
-  let S = null, mode = null, rate = 1, pendingFlag = null, noteTime = null, resumeAfterNote = false, fixAsked = false;
+  let S = null, mode = null, rate = savedRate(), pendingFlag = null, noteTime = null, resumeAfterNote = false, fixAsked = false, pace = null, paged = false;
   app.classList.add('session');
   app.innerHTML = `
-    <header><a class="back" href="/watch">‹</a><h1 id="title"></h1><div class="seg" id="seg"></div></header>
-    <div class="stage" id="stage"><span class="empty">Starting…</span></div>
+    <div class="shead"><a class="back" href="/watch" aria-label="Back to Watch">‹</a><h1 id="title"></h1><button class="rt-btn pp" id="playpause" type="button" hidden></button><select class="rate" id="rate" title="Speed" aria-label="Speed" hidden></select></div>
+    <div class="rt-win"><div class="rt-win-top"><span class="rt-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="wlabel">${label('Starting')}</span><span class="rt-right url" id="wurl"></span></div>
+    <div class="stage" id="stage"><span class="empty">Starting…</span></div></div>
     <div class="track" id="track" hidden><div class="bar"></div><div class="done" id="done"></div><div id="marks"></div><div class="head" id="head"></div></div>
     <p class="now" id="now"></p>
     <p class="verdict" id="verdict"></p>
     <div class="act">
-      <button id="next" hidden>Next</button>
-      <button id="unclear">Unclear<kbd>U</kbd></button>
+      <button class="rt-btn" id="next" hidden>Next</button>
+      <button class="rt-btn" id="unclear">Unclear<kbd>U</kbd></button>
       <input id="note" placeholder="Note on this moment…" autocomplete="off" maxlength="500">
     </div>
     <div class="fixline" id="fixline"></div>
+    <nav class="pager" id="pager" aria-label="Journeys"></nav>
     <ol class="steps" id="steps"></ol>`;
   const $ = s => document.getElementById(s);
   const note = $('note'), stage = $('stage');
   let video = null;
+  listOf(project.get()).then(J => header(J, J.project)).catch(() => {});
 
   const es = new EventSource(`/api/watch/${id}/stream?t=${encodeURIComponent(T)}`);
   es.addEventListener('state', e => { S = JSON.parse(e.data); render(); });
@@ -467,45 +793,67 @@ function session(id) {
     renderSteps();
     renderFix();
     if (mode === 'live') {
-      $('seg').innerHTML = ['watch', 'step', 'fast'].map(s => `<button data-speed="${s}" aria-pressed="${S.speed === s}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('');
+      // Pause: the run stops at the next step until Play or Next.
+      drawPlay(S.speed === 'step');
       const next = $('next');
       next.hidden = false;
-      next.className = S.waiting && S.speed === 'step' && !S.hold ? 'go' : '';
+      next.className = 'rt-btn' + (S.waiting && S.speed === 'step' && !S.hold ? ' go' : '');
     }
     if (mode === 'replay') renderMarks();
+    // A finished run of a journey: Next goes on to the next journey in its project.
+    if (!S.live && !paged) { paged = true; pager($('pager'), 'session=' + encodeURIComponent(id), false); }
+  }
+
+  /** The one button: what pressing it does, in an icon and a word. */
+  function drawPlay(paused) {
+    const b = $('playpause');
+    b.hidden = false;
+    b.innerHTML = playPause(paused);
+    b.setAttribute('aria-pressed', String(paused));
   }
 
   function setMode(m) {
     mode = m;
+    $('wlabel').innerHTML = m === 'live' ? label('<i class="dot"></i>REC · live', 'rec') : m === 'replay' ? label('Replay') : label('No video');
     if (m === 'live') {
       stage.innerHTML = `<img id="live" alt="" src="/api/watch/${id}/live.mjpg?t=${encodeURIComponent(T)}">`;
     } else if (m === 'replay') {
-      stage.innerHTML = `<video id="vid" preload="auto" src="/watch-files/${id}/${esc(S.video)}"></video>`;
+      stage.innerHTML = `<video id="vid" muted playsinline preload="auto" src="/watch-files/${id}/${esc(S.video)}"></video>`;
       video = $('vid');
       video.playbackRate = rate;
+      pace = pacer(video, () => S.steps, { onHold: () => { drawPlay(!pace.playing()); renderLine(); } });
       video.addEventListener('timeupdate', () => { renderLine(); renderHead(); renderSteps(); });
+      video.addEventListener('play', () => drawPlay(false));
+      video.addEventListener('pause', () => drawPlay(!pace.playing()));
       video.addEventListener('loadedmetadata', () => {
         // Opened from a journey's moment: start there.
         const at = Number(new URLSearchParams(location.search).get('t'));
         if (at > 0 && at < video.duration) video.currentTime = at;
+        video.playbackRate = rate;
         renderMarks(); video.play().catch(() => {});
       });
-      video.addEventListener('click', () => video.paused ? video.play() : video.pause());
+      video.addEventListener('click', () => pace.toggle());
       video.addEventListener('ended', () => askFix());
       $('track').hidden = false;
       $('next').hidden = true;
-      $('seg').innerHTML = [1, 2].map(r => `<button data-rate="${r}" aria-pressed="${rate === r}">${r}×</button>`).join('');
+      drawPlay(true);
+      const sel = $('rate');
+      sel.innerHTML = RATES.map(r => `<option value="${r}"${rate === r ? ' selected' : ''}>${r}×</option>`).join('');
+      sel.hidden = false;
     } else {
       stage.innerHTML = '<span class="empty">This session has no video.</span>';
-      $('seg').innerHTML = '';
+      $('playpause').hidden = true;
       $('next').hidden = true;
     }
   }
 
   function renderLine() {
     let s, running;
-    if (mode === 'replay') { s = stepAtSec(nowSec()); running = s && s.tEnd !== null && nowSec() * 1000 < s.tEnd; }
+    if (mode === 'replay') { s = stepAtSec(nowSec()); running = s && s.tEnd !== null && nowSec() * 1000 < s.tEnd - 20; }
     else { s = S.steps[S.steps.length - 1]; running = s && !s.result; }
+    // Where the app is, in the picture's frame: the step's address.
+    const u = (s && s.url) || '';
+    $('wurl').textContent = u.replace(/^https?:\/\//, '');
     if (!s) { $('now').textContent = mode === 'live' ? (S.scenario || 'Starting…') : ''; $('verdict').textContent = ''; return; }
     $('now').innerHTML = `${esc(s.intent)}${s.expect ? ` <span class="exp">— expecting ${esc(s.expect.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase()))}</span>` : ''}`;
     const v = $('verdict');
@@ -524,7 +872,7 @@ function session(id) {
       if (s.scenario !== scen) { scen = s.scenario; if (scen) head = `<span class="h">${esc(scen)}</span>`; }
       const fl = flagged.get(s.n) || [];
       const cls = fl.length ? 'flagged' : s.result || 'running';
-      const m = fl.length ? '⚑' : s.result === 'pass' ? '✓' : s.result === 'fail' ? '✗' : '…';
+      const m = fl.length ? '⚑' : s.result === 'pass' ? '✓' : s.result === 'fail' ? '✕' : '';
       const notes = fl.filter(f => f.note || f.fixStatus).map(f => `<span class="n">${f.note ? '“' + esc(f.note) + '”' : 'Unclear'}${f.fixStatus ? ' · ' + esc(f.fixStatus) : ''}</span>`).join('');
       out += `<li class="${cls}${here && here.n === s.n ? ' here' : ''}" ${mode === 'replay' ? `data-t="${s.t / 1000}"` : ''}>${head}<span class="row"><span class="m">${m}</span><span>${esc(s.intent)}${notes}</span></span></li>`;
     }
@@ -589,15 +937,18 @@ function session(id) {
   document.addEventListener('keydown', e => {
     if (e.target === note || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'u' || e.key === 'U') { e.preventDefault(); unclear(); }
-    if (e.key === ' ') { e.preventDefault(); if (mode === 'live') api(`/api/watch/${id}/next`, {}); else if (video) video.paused ? video.play() : video.pause(); }
-    if (mode === 'replay' && video && e.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 5);
-    if (mode === 'replay' && video && e.key === 'ArrowRight') video.currentTime = Math.min(video.duration, video.currentTime + 5);
+    if (e.key === ' ') { e.preventDefault(); if (mode === 'live') api(`/api/watch/${id}/next`, {}); else if (pace) pace.toggle(); }
   });
-  $('seg').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.speed) { S.speed = b.dataset.speed; render(); api('/api/watch/speed', { speed: b.dataset.speed }); }
-    if (b.dataset.rate) { rate = Number(b.dataset.rate); if (video) video.playbackRate = rate; $('seg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(Number(x.dataset.rate) === rate))); }
-  });
+  $('playpause').onclick = () => {
+    if (mode === 'replay') { pace && pace.toggle(); return; }
+    // Live: Pause stops at the next step; Play goes on, the way Next does.
+    const speed = S.speed === 'step' ? 'watch' : 'step';
+    S.speed = speed; render(); api('/api/watch/speed', { speed });
+  };
+  $('rate').onchange = () => {
+    rate = Number($('rate').value); saveRate(rate);
+    if (video) video.playbackRate = rate;
+  };
   // The timeline: click or drag anywhere, or on a step's mark.
   const track = $('track');
   const seek = e => { if (!video || !video.duration) return; const r = track.getBoundingClientRect(); const m = e.target.closest && e.target.closest('.mark'); video.currentTime = m ? Number(m.dataset.t) : Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * video.duration; renderHead(); };

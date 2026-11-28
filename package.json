@@ -1,6 +1,6 @@
 {
   "name": "retake-demos",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Demo-as-code for coding agents: a YAML manifest in, a product walkthrough video out. Rerun the demo instead of re-recording it.",
   "keywords": [
     "demo",
@@ -49,7 +49,7 @@
     "scripts/build-native.mjs"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html dist/ui/ && chmod +x dist/cli.js",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ui && cp src/ui/*.html src/ui/*.css src/ui/*.js dist/ui/ && chmod +x dist/cli.js",
     "postinstall": "node scripts/patch-testreel.mjs",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build && npm run typecheck && npm test",

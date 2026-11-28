@@ -510,7 +510,7 @@ export function serve(port: number) {
   // Watch mode: a person watching an AI test their app (src/ui/watch-routes.ts).
   // A plug-in: loaded, not linked. Without it the window is Demos alone.
   const watchP: Promise<ReturnType<typeof watchRoutes> | null> = import("./watch-routes.js")
-    .then((m) => m.watchRoutes({ root: ROOT, outRoot, token: TOKEN, activity: (type, data) => { for (const w of activityWatchers) w({ type, data }); } }))
+    .then((m) => m.watchRoutes({ root: ROOT, outRoot, token: TOKEN, port, activity: (type, data) => { for (const w of activityWatchers) w({ type, data }); } }))
     .catch((e) => { process.stderr.write(`Watch is not available in this window: ${(e as Error).message.split("\n")[0]}\n`); return null; });
   const chatPage = fs.readFileSync(path.join(HERE, "chat.html"), "utf8")
     .replace("</head>", `<script>window.__retakeToken=${JSON.stringify(TOKEN)}</script></head>`);
@@ -595,6 +595,15 @@ export function serve(port: number) {
       if (ic) {
         res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=86400" });
         return res.end(fs.readFileSync(path.join(PKG_ROOT, "assets", `icon-${ic[1]}.png`)));
+      }
+      // Retake's own look, shared by both areas. Read each time, like the pages.
+      if (p === "/brand.css" && req.method === "GET") {
+        res.writeHead(200, { "content-type": "text/css; charset=utf-8", "cache-control": "no-store, must-revalidate" });
+        return res.end(fs.readFileSync(path.join(HERE, "brand.css")));
+      }
+      if (p === "/brand.js" && req.method === "GET") {
+        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store, must-revalidate" });
+        return res.end(fs.readFileSync(path.join(HERE, "brand.js")));
       }
       if (p === "/favicon.svg") {
         const f = path.join(PKG_ROOT, "assets", "logo.svg");
